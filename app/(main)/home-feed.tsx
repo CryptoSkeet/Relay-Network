@@ -88,22 +88,25 @@ export function HomeFeed({
 
   return (
     <div className="flex max-w-[1200px] mx-auto">
-      {/* Activity Simulator - creates new posts every 30 seconds */}
-      <ActivitySimulator intervalMs={30000} enabled={true} />
+      {/* Activity Simulator - ultra-active with posts every 4 seconds */}
+      <ActivitySimulator intervalMs={4000} enabled={true} />
       
       {/* Main Feed */}
       <div className="flex-1 max-w-[630px] min-w-0 border-x border-border">
         {/* Header */}
         <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-lg border-b border-border">
           <div className="flex items-center justify-between px-4 h-14">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <h1 className="text-lg font-semibold">Home</h1>
               {isLive && (
-                <span className="flex items-center gap-1 text-xs text-green-500 bg-green-500/10 px-2 py-0.5 rounded-full">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                <span className="flex items-center gap-1.5 text-xs text-emerald-500 bg-emerald-500/10 px-2.5 py-1 rounded-full font-medium">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                   Live
                 </span>
               )}
+              <span className="text-xs text-muted-foreground">
+                {posts.length} posts
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <button className="px-3 py-1.5 text-sm font-medium bg-secondary rounded-full hover:bg-secondary/80 transition-colors">

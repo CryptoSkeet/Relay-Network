@@ -8,59 +8,82 @@ interface ActivitySimulatorProps {
 }
 
 export function ActivitySimulator({ 
-  intervalMs = 8000, // Default: simulate a new post every 8 seconds
+  intervalMs = 4000, // Post every 4 seconds for ultra-active feed
   enabled = true 
 }: ActivitySimulatorProps) {
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const fastIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const activityCountRef = useRef(0)
 
   useEffect(() => {
     if (!enabled) return
 
+    // Main activity generator - posts, mentions, interactions
     const simulateActivity = async () => {
       try {
         activityCountRef.current++
         
-        // Every 10th cycle, activate any inactive agents
-        if (activityCountRef.current % 10 === 0) {
-          await fetch('/api/activate-agents', { method: 'POST' })
+        // Every 5th cycle, activate any inactive agents
+        if (activityCountRef.current % 5 === 0) {
+          fetch('/api/activate-agents', { method: 'POST' })
         }
         
-        // Alternate between regular posts and interactive posts
-        const useInteractive = activityCountRef.current % 2 === 0
+        // Alternate between different activity types
+        const cycleType = activityCountRef.current % 3
         
-        if (useInteractive) {
-          // Use agent-activity API for mentions and interactions
+        if (cycleType === 0) {
+          // Interactive post with @mentions
           await fetch('/api/agent-activity', { method: 'POST' })
-        } else {
-          // Use simulate API for regular posts
+        } else if (cycleType === 1) {
+          // Regular post
           await fetch('/api/simulate', { method: 'POST' })
+        } else {
+          // Burst mode - fire both for maximum activity
+          await Promise.all([
+            fetch('/api/simulate', { method: 'POST' }),
+            fetch('/api/agent-activity', { method: 'POST' })
+          ])
         }
       } catch {
-        // Silently fail - this is just for demo purposes
+        // Silently fail
       }
     }
 
-    // Initial activation check after 1 second
-    const activateTimeout = setTimeout(() => {
-      fetch('/api/activate-agents', { method: 'POST' })
-    }, 1000)
+    // Fast engagement generator - likes, comments, follows happening constantly
+    const simulateEngagement = async () => {
+      try {
+        await fetch('/api/social-pulse', { method: 'POST' })
+      } catch {
+        // Silently fail
+      }
+    }
 
-    // Initial post after 2 seconds
-    const initialTimeout = setTimeout(simulateActivity, 2000)
+    // Activate all agents immediately on load
+    fetch('/api/activate-agents', { method: 'POST' })
+
+    // First post after 500ms
+    const initialTimeout = setTimeout(simulateActivity, 500)
     
-    // Then continue at regular intervals
+    // Second post after 1.5s
+    const secondTimeout = setTimeout(simulateActivity, 1500)
+    
+    // Third post after 2.5s  
+    const thirdTimeout = setTimeout(simulateActivity, 2500)
+    
+    // Main activity interval
     intervalRef.current = setInterval(simulateActivity, intervalMs)
+    
+    // Fast engagement interval (every 2 seconds)
+    fastIntervalRef.current = setInterval(simulateEngagement, 2000)
 
     return () => {
-      clearTimeout(activateTimeout)
       clearTimeout(initialTimeout)
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-      }
+      clearTimeout(secondTimeout)
+      clearTimeout(thirdTimeout)
+      if (intervalRef.current) clearInterval(intervalRef.current)
+      if (fastIntervalRef.current) clearInterval(fastIntervalRef.current)
     }
   }, [intervalMs, enabled])
 
-  // This component renders nothing - it just runs the simulation
   return null
 }
