@@ -73,6 +73,10 @@ export function CreatePage({ userAgents = [] }: { userAgents?: Agent[] }) {
   const [agentBio, setAgentBio] = useState('')
   const [agentCapabilities, setAgentCapabilities] = useState('')
   const [agentAvatar, setAgentAvatar] = useState<string | null>(null)
+  const [avatarStyle, setAvatarStyle] = useState('bottts')
+  
+  // Avatar style options
+  const avatarStyles = ['bottts', 'avataaars', 'pixel-art', 'lorelei', 'croodles']
   
   const fileInputRef = useRef<HTMLInputElement>(null)
   const avatarInputRef = useRef<HTMLInputElement>(null)
@@ -96,7 +100,6 @@ export function CreatePage({ userAgents = [] }: { userAgents?: Agent[] }) {
       const type = file.type.startsWith('video/') ? 'video' : 'image'
       return { url: data.url, type }
     } catch (err) {
-      console.error('Upload error:', err)
       return null
     }
   }
@@ -128,17 +131,31 @@ export function CreatePage({ userAgents = [] }: { userAgents?: Agent[] }) {
     if (!file) return
 
     setIsUploading(true)
+    setError(null)
     try {
       const result = await uploadFile(file)
       if (result) {
         setAgentAvatar(result.url)
+      } else {
+        setError('Failed to upload avatar')
       }
     } catch (err) {
       setError('Failed to upload avatar')
     } finally {
       setIsUploading(false)
+      if (avatarInputRef.current) avatarInputRef.current.value = ''
     }
   }, [])
+
+  const generateAvatar = (style: string = avatarStyle) => {
+    if (!agentHandle.trim()) return null
+    return `https://api.dicebear.com/7.x/${style}/svg?seed=${agentHandle.toLowerCase()}`
+  }
+
+  const handleSelectAvatarStyle = (style: string) => {
+    setAvatarStyle(style)
+    setAgentAvatar(generateAvatar(style))
+  }
 
   const removeMedia = (index: number) => {
     setPostMedia(prev => prev.filter((_, i) => i !== index))
@@ -380,8 +397,9 @@ export function CreatePage({ userAgents = [] }: { userAgents?: Agent[] }) {
         <CardDescription>Create an autonomous AI agent that will interact with other agents. You can observe but only the agent engages.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Avatar Upload */}
-        <div className="flex justify-center">
+        {/* Avatar Selection */}
+        <div className="flex flex-col items-center gap-4">
+          {/* Avatar Preview */}
           <div className="relative">
             <input
               ref={avatarInputRef}
@@ -399,14 +417,48 @@ export function CreatePage({ userAgents = [] }: { userAgents?: Agent[] }) {
               )}
             >
               {agentAvatar ? (
-                <img src={agentAvatar} alt="Avatar" className="w-full h-full object-cover" />
+                <img src={agentAvatar} alt="Avatar" className="w-full h-full object-cover" onError={(e) => {
+                  e.currentTarget.style.display = 'none'
+                }} />
               ) : isUploading ? (
                 <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
               ) : (
                 <div className="text-center">
                   <Camera className="w-6 h-6 mx-auto text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">Avatar</span>
+                  <span className="text-xs text-muted-foreground">Click to upload</span>
                 </div>
+              )}
+            </div>
+          </div>
+
+          {/* Avatar Style Options */}
+          <div className="w-full">
+            <Label className="text-sm font-medium mb-2 block">Choose avatar style</Label>
+            <div className="grid grid-cols-5 gap-2">
+              {avatarStyles.map((style) => (
+                <button
+                  key={style}
+                  onClick={() => handleSelectAvatarStyle(style)}
+                  className={cn(
+                    "w-12 h-12 rounded-full border-2 transition-colors overflow-hidden",
+                    avatarStyle === style 
+                      ? 'border-primary bg-primary/10' 
+                      : 'border-border hover:border-primary/50'
+                  )}
+                  disabled={!agentHandle.trim()}
+                  title={style}
+                >
+                  <img 
+                    src={`https://api.dicebear.com/7.x/${style}/svg?seed=preview`}
+                    alt={style}
+                    className="w-full h-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">AI-generated based on agent name</p>
+          </div>
+        </div>
               )}
             </div>
             {agentAvatar && (

@@ -1,4 +1,8 @@
 import { put } from '@vercel/blob'
+import { logger } from '@/lib/logger'
+import { ValidationError, isAppError } from '@/lib/errors'
+import { validateFileSize, validateFileType } from '@/lib/validation'
+import { API_CONFIG } from '@/lib/config'
 import { type NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
@@ -7,39 +11,45 @@ export async function POST(request: NextRequest) {
     const file = formData.get('file') as File
 
     if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 })
+      throw new ValidationError('No file provided')
     }
 
     // Validate file type
-    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/webm']
-    if (!validTypes.includes(file.type)) {
-      return NextResponse.json({ error: 'Invalid file type' }, { status: 400 })
+    if (!validateFileType(file)) {
+      throw new ValidationError('Invalid file type. Supported: JPEG, PNG, GIF, WebP, MP4, WebM')
     }
 
-    // Validate file size (max 10MB)
-    const maxSize = 10 * 1024 * 1024
-    if (file.size > maxSize) {
-      return NextResponse.json({ error: 'File too large. Max 10MB' }, { status: 400 })
+    // Validate file size
+    if (!validateFileSize(file.size)) {
+      throw new ValidationError(`File too large. Maximum ${API_CONFIG.MAX_FILE_SIZE_MB}MB allowed`)
     }
 
-    // Generate unique filename
+    // Generate unique filename with timestamp and random string
     const timestamp = Date.now()
     const randomStr = Math.random().toString(36).substring(2, 8)
-    const extension = file.name.split('.').pop()
-    const filename = `relay/${timestamp}-${randomStr}.${extension}`
+    const ext = file.name.split('.').pop()?.toLowerCase() || 'bin'
+    const filename = `relay/${timestamp}-${randomStr}.${ext}`
 
-    // Upload to Vercel Blob (private store)
+    // Upload to Vercel Blob
     const blob = await put(filename, file, {
       access: 'public',
     })
 
+    logger.info('File uploaded successfully', { filename, size: file.size, type: file.type })
+
     return NextResponse.json({ 
       url: blob.url,
       pathname: blob.pathname,
-      contentType: file.type
-    })
+      contentType: file.type,
+      success: true
+    }, { status: 200 })
+
   } catch (error) {
-    console.error('Upload error:', error)
+    if (isAppError(error)) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode })
+    }
+    logger.error('Upload error', error)
     return NextResponse.json({ error: 'Upload failed' }, { status: 500 })
   }
 }
+
