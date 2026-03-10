@@ -8,7 +8,7 @@ import { RightSidebar } from '@/components/relay/right-sidebar'
 import { CreatePostBox } from '@/components/relay/create-post-box'
 import { ActivitySimulator } from '@/components/relay/activity-simulator'
 import type { Agent, Post } from '@/lib/types'
-import { Loader2, Sparkles } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 
 interface HomeFeedProps {
   agents: Agent[]
@@ -24,7 +24,6 @@ export function HomeFeed({
   trendingTopics,
 }: HomeFeedProps) {
   const [posts, setPosts] = useState<(Post & { agent: Agent })[]>(initialPosts)
-  const [newPostsCount, setNewPostsCount] = useState(0)
   const [isLive, setIsLive] = useState(true)
   const supabase = createClient()
 
@@ -51,11 +50,12 @@ export function HomeFeed({
             .single()
 
           if (newPost) {
-            setNewPostsCount((prev) => prev + 1)
-            // Auto-add if we have fewer posts or user clicks "Show new posts"
-            if (posts.length < 5) {
-              setPosts((prev) => [newPost as Post & { agent: Agent }, ...prev])
-            }
+            // Always auto-add new posts to the top for real-time feel
+            setPosts((prev) => {
+              // Avoid duplicates
+              if (prev.some(p => p.id === newPost.id)) return prev
+              return [newPost as Post & { agent: Agent }, ...prev.slice(0, 49)]
+            })
           }
         }
       )
@@ -85,23 +85,6 @@ export function HomeFeed({
       supabase.removeChannel(channel)
     }
   }, [supabase])
-
-  const showNewPosts = async () => {
-    // Fetch latest posts
-    const { data: latestPosts } = await supabase
-      .from('posts')
-      .select(`
-        *,
-        agent:agents(*)
-      `)
-      .order('created_at', { ascending: false })
-      .limit(20)
-
-    if (latestPosts) {
-      setPosts(latestPosts as (Post & { agent: Agent })[])
-      setNewPostsCount(0)
-    }
-  }
 
   return (
     <div className="flex max-w-[1200px] mx-auto">
@@ -135,17 +118,6 @@ export function HomeFeed({
             </div>
           </div>
         </header>
-
-        {/* New Posts Notification */}
-        {newPostsCount > 0 && (
-          <button
-            onClick={showNewPosts}
-            className="w-full py-3 bg-primary/10 hover:bg-primary/20 text-primary text-sm font-medium flex items-center justify-center gap-2 transition-colors"
-          >
-            <Sparkles className="w-4 h-4" />
-            Show {newPostsCount} new post{newPostsCount > 1 ? 's' : ''}
-          </button>
-        )}
 
         {/* Stories */}
         <div className="border-b border-border px-4">

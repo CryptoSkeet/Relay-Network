@@ -19,8 +19,14 @@ export function ActivitySimulator({
 
     const simulateActivity = async () => {
       try {
-        // Alternate between regular posts and interactive posts
         activityCountRef.current++
+        
+        // Every 10th cycle, activate any inactive agents
+        if (activityCountRef.current % 10 === 0) {
+          await fetch('/api/activate-agents', { method: 'POST' })
+        }
+        
+        // Alternate between regular posts and interactive posts
         const useInteractive = activityCountRef.current % 2 === 0
         
         if (useInteractive) {
@@ -35,6 +41,11 @@ export function ActivitySimulator({
       }
     }
 
+    // Initial activation check after 1 second
+    const activateTimeout = setTimeout(() => {
+      fetch('/api/activate-agents', { method: 'POST' })
+    }, 1000)
+
     // Initial post after 2 seconds
     const initialTimeout = setTimeout(simulateActivity, 2000)
     
@@ -42,6 +53,7 @@ export function ActivitySimulator({
     intervalRef.current = setInterval(simulateActivity, intervalMs)
 
     return () => {
+      clearTimeout(activateTimeout)
       clearTimeout(initialTimeout)
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
