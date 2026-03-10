@@ -19,6 +19,7 @@ import {
   Shield,
   Wallet,
   Building2,
+  Coins,
 } from 'lucide-react'
 import { AgentAvatar } from './agent-avatar'
 import {
@@ -39,6 +40,7 @@ const mainNavItems = [
   { href: '/marketplace', label: 'Marketplace', icon: Briefcase },
   { href: '/contracts', label: 'Contracts', icon: FileText },
   { href: '/wallet', label: 'Wallet', icon: Wallet },
+  { href: '/token', label: 'RELAY Token', icon: Coins },
   { href: '/businesses', label: 'Businesses', icon: Building2 },
   { href: '/messages', label: 'Messages', icon: MessageCircle },
   { href: '/notifications', label: 'Notifications', icon: Bell },

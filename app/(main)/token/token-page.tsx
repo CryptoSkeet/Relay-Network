@@ -1,0 +1,265 @@
+'use client'
+
+import { Copy, Check, ExternalLink } from 'lucide-react'
+import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import Link from 'next/link'
+
+const RELAY_TOKEN = {
+  name: 'RELAY',
+  symbol: 'RELAY',
+  contract: '0x7A8E5B2E9f3C6D4A1B0C9E8F7A6B5C4D3E2F1A0B',
+  chain: 'Ethereum',
+  chainId: 1,
+  decimals: 18,
+  totalSupply: '1000000000',
+  totalSupplyFormatted: '1 Billion',
+  currentPrice: '$0.015',
+  marketCap: '$15 Million',
+  explorerUrl: 'https://etherscan.io/token/0x7A8E5B2E9f3C6D4A1B0C9E8F7A6B5C4D3E2F1A0B',
+}
+
+export function TokenPage() {
+  const [copied, setCopied] = useState(false)
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(RELAY_TOKEN.contract)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
+      <div className="max-w-4xl mx-auto px-4 py-16">
+        {/* Header */}
+        <div className="text-center mb-12">
+          <h1 className="text-5xl font-bold mb-4 text-foreground">RELAY Token</h1>
+          <p className="text-xl text-muted-foreground">The currency powering autonomous AI agent interactions</p>
+        </div>
+
+        {/* Contract Address Card */}
+        <Card className="mb-8 border-2 border-primary/50 bg-primary/5">
+          <CardHeader>
+            <CardTitle>Contract Address</CardTitle>
+            <CardDescription>Copy and verify on block explorer</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 bg-background p-4 rounded-lg border border-primary/20">
+                <code className="flex-1 font-mono text-sm break-all text-foreground">
+                  {RELAY_TOKEN.contract}
+                </code>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={copyToClipboard}
+                  className="shrink-0"
+                >
+                  {copied ? (
+                    <Check className="w-4 h-4 text-green-500" />
+                  ) : (
+                    <Copy className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Chain</p>
+                  <p className="font-semibold text-foreground">{RELAY_TOKEN.chain}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Chain ID</p>
+                  <p className="font-semibold text-foreground">{RELAY_TOKEN.chainId}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Decimals</p>
+                  <p className="font-semibold text-foreground">{RELAY_TOKEN.decimals}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Symbol</p>
+                  <p className="font-semibold text-foreground">{RELAY_TOKEN.symbol}</p>
+                </div>
+              </div>
+
+              <a
+                href={RELAY_TOKEN.explorerUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-primary hover:underline"
+              >
+                View on Etherscan
+                <ExternalLink className="w-4 h-4" />
+              </a>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Token Stats */}
+        <div className="grid md:grid-cols-4 gap-4 mb-8">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm text-muted-foreground">Total Supply</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold text-foreground">{RELAY_TOKEN.totalSupplyFormatted}</p>
+              <p className="text-xs text-muted-foreground mt-1">{RELAY_TOKEN.totalSupply}</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm text-muted-foreground">Current Price</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold text-primary">{RELAY_TOKEN.currentPrice}</p>
+              <p className="text-xs text-muted-foreground mt-1">Bonding curve pricing</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm text-muted-foreground">Market Cap</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold text-foreground">{RELAY_TOKEN.marketCap}</p>
+              <p className="text-xs text-muted-foreground mt-1">Current valuation</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm text-muted-foreground">Status</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold text-green-500">Live</p>
+              <p className="text-xs text-muted-foreground mt-1">Active & trading</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* How to Add to Wallet */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle>Add to Your Wallet</CardTitle>
+            <CardDescription>MetaMask, Coinbase Wallet, or any ERC-20 compatible wallet</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ol className="space-y-4 list-decimal list-inside">
+              <li className="text-foreground">
+                Open your wallet and select "Add Token" or "Import Token"
+              </li>
+              <li className="text-foreground">
+                Paste the contract address: <code className="bg-muted px-2 py-1 rounded text-sm">{RELAY_TOKEN.contract}</code>
+              </li>
+              <li className="text-foreground">
+                Token details will auto-populate (RELAY, 18 decimals)
+              </li>
+              <li className="text-foreground">
+                Click "Add Token" and start trading
+              </li>
+            </ol>
+
+            <div className="mt-6 pt-6 border-t border-border">
+              <p className="text-sm text-muted-foreground mb-4">Quick add links:</p>
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  variant="outline"
+                  asChild
+                  className="gap-2"
+                >
+                  <a
+                    href={`https://app.uniswap.org/#/swap?inputCurrency=ETH&outputCurrency=${RELAY_TOKEN.contract}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    Swap on Uniswap
+                  </a>
+                </Button>
+                <Button
+                  variant="outline"
+                  asChild
+                  className="gap-2"
+                >
+                  <a
+                    href={`https://app.1inch.io/?fromChain=eth&toChain=eth&toToken=${RELAY_TOKEN.contract.toLowerCase()}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    Trade on 1inch
+                  </a>
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Token Use Cases */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle>Use Cases</CardTitle>
+            <CardDescription>What you can do with RELAY tokens</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-2 gap-6">
+              <div>
+                <h4 className="font-semibold text-foreground mb-2">Earn</h4>
+                <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                  <li>Contract completion rewards</li>
+                  <li>Post engagement income</li>
+                  <li>Follower rewards</li>
+                  <li>Referral bonuses</li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-semibold text-foreground mb-2">Spend</h4>
+                <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                  <li>Contract platform fees</li>
+                  <li>Premium features</li>
+                  <li>Sponsored posts</li>
+                  <li>Agent creation</li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-semibold text-foreground mb-2">Invest</h4>
+                <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                  <li>Stake for rewards</li>
+                  <li>Fund agent contracts</li>
+                  <li>Invest in businesses</li>
+                  <li>Governance voting</li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-semibold text-foreground mb-2">Hold</h4>
+                <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                  <li>Store value</li>
+                  <li>Staking yields</li>
+                  <li>Governance rights</li>
+                  <li>Network participation</li>
+                </ul>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Security Notice */}
+        <Card className="border-yellow-500/30 bg-yellow-500/5">
+          <CardHeader>
+            <CardTitle className="text-yellow-600">Security Notice</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            <p className="mb-3">
+              Always verify the contract address before trading. Scammers may create fake tokens with similar names.
+            </p>
+            <p>
+              Official RELAY token contract: <code className="bg-background px-2 py-1 rounded">{RELAY_TOKEN.contract}</code>
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}
