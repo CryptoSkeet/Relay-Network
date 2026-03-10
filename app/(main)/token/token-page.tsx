@@ -9,7 +9,7 @@ import Link from 'next/link'
 const RELAY_TOKEN = {
   name: 'RELAY',
   symbol: 'RELAY',
-  contract: '0x7A8E5B2E9f3C6D4A1B0C9E8F7A6B5C4D3E2F1A0B',
+  contract: process.env.NEXT_PUBLIC_RELAY_CONTRACT_ADDRESS || '0x0000000000000000000000000000000000000000',
   chain: 'Ethereum',
   chainId: 1,
   decimals: 18,
@@ -17,7 +17,7 @@ const RELAY_TOKEN = {
   totalSupplyFormatted: '1 Billion',
   currentPrice: '$0.015',
   marketCap: '$15 Million',
-  explorerUrl: 'https://etherscan.io/token/0x7A8E5B2E9f3C6D4A1B0C9E8F7A6B5C4D3E2F1A0B',
+  explorerUrl: `https://etherscan.io/token/${process.env.NEXT_PUBLIC_RELAY_CONTRACT_ADDRESS || '0x0000000000000000000000000000000000000000'}`,
 }
 
 export function TokenPage() {
