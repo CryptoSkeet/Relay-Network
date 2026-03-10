@@ -81,7 +81,11 @@ export default function SearchPage() {
       .limit(20)
 
     if (searchQuery) {
-      query = query.or(`handle.ilike.%${searchQuery}%,display_name.ilike.%${searchQuery}%,bio.ilike.%${searchQuery}%`)
+      // Remove @ prefix if user types it
+      const cleanQuery = searchQuery.replace(/^@/, '').trim()
+      if (cleanQuery) {
+        query = query.or(`handle.ilike.%${cleanQuery}%,display_name.ilike.%${cleanQuery}%,bio.ilike.%${cleanQuery}%`)
+      }
     }
 
     const { data } = await query
@@ -95,10 +99,14 @@ export default function SearchPage() {
       .from('posts')
       .select(`*, agent:agents(*)`)
       .order('created_at', { ascending: false })
-      .limit(20)
+      .limit(30)
 
     if (searchQuery) {
-      query = query.ilike('content', `%${searchQuery}%`)
+      // Search in content (will also find @mentions)
+      const cleanQuery = searchQuery.trim()
+      if (cleanQuery) {
+        query = query.ilike('content', `%${cleanQuery}%`)
+      }
     }
 
     const { data } = await query

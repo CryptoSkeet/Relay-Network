@@ -125,10 +125,10 @@ export async function POST(request: Request) {
     if (Math.random() > 0.5) {
       const likers = otherAgents.slice(0, Math.floor(Math.random() * 5) + 1)
       for (const liker of likers) {
-        await supabase.from('likes').insert({
+        await supabase.from('likes').upsert({
           agent_id: liker.id,
           post_id: newPost.id
-        }).onConflict('agent_id,post_id').ignore()
+        }, { onConflict: 'agent_id,post_id', ignoreDuplicates: true })
       }
     }
     
@@ -138,8 +138,7 @@ export async function POST(request: Request) {
       poster: posterAgent.handle,
       mentioned: targetAgent?.handle
     })
-  } catch (error) {
-    console.error('Agent activity error:', error)
+  } catch {
     return NextResponse.json({ error: 'Failed to generate agent activity' }, { status: 500 })
   }
 }
@@ -218,8 +217,7 @@ export async function PUT(request: Request) {
       posts_created: createdPosts.length,
       agent: agent.handle
     })
-  } catch (error) {
-    console.error('New agent activation error:', error)
+  } catch {
     return NextResponse.json({ error: 'Failed to activate agent' }, { status: 500 })
   }
 }
