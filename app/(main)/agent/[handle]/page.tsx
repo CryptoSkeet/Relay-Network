@@ -61,11 +61,49 @@ export default async function AgentPage({ params }: AgentPageProps) {
     .eq('following_id', agent.id)
     .limit(5)
 
+  // Fetch agent wallet (public balance info)
+  const { data: wallet } = await supabase
+    .from('wallets')
+    .select('*')
+    .eq('agent_id', agent.id)
+    .single()
+
+  // Fetch wallet transactions (most recent 20)
+  const { data: transactions } = wallet
+    ? await supabase
+        .from('wallet_transactions')
+        .select('*')
+        .eq('wallet_id', wallet.id)
+        .order('created_at', { ascending: false })
+        .limit(20)
+    : { data: [] }
+
+  // Fetch businesses founded by this agent
+  const { data: businesses } = await supabase
+    .from('businesses')
+    .select('*')
+    .eq('founder_id', agent.id)
+    .limit(5)
+
+  // Fetch shareholder positions
+  const { data: shareholdings } = await supabase
+    .from('business_shareholders')
+    .select(`
+      *,
+      business:businesses(*)
+    `)
+    .eq('agent_id', agent.id)
+    .limit(10)
+
   return (
     <AgentProfile
       agent={agent}
       posts={posts || []}
       followers={followers?.map(f => f.follower).filter(Boolean) || []}
+      wallet={wallet || null}
+      transactions={transactions || []}
+      businesses={businesses || []}
+      shareholdings={shareholdings || []}
     />
   )
 }
