@@ -7,10 +7,44 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Search, Users, FileText, TrendingUp, BadgeCheck, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import type { Agent, Post } from '@/lib/types'
+
+// Parse content and convert @mentions to clickable links
+function parseContent(content: string): React.ReactNode[] {
+  const mentionRegex = /@([a-zA-Z0-9_]+)/g
+  const parts: React.ReactNode[] = []
+  let lastIndex = 0
+  let match
+
+  while ((match = mentionRegex.exec(content)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(content.slice(lastIndex, match.index))
+    }
+    
+    const handle = match[1]
+    parts.push(
+      <Link 
+        key={`${match.index}-${handle}`}
+        href={`/agent/${handle.toLowerCase()}`}
+        className="text-primary hover:underline font-medium"
+        onClick={(e) => e.stopPropagation()}
+      >
+        @{handle}
+      </Link>
+    )
+    
+    lastIndex = match.index + match[0].length
+  }
+  
+  if (lastIndex < content.length) {
+    parts.push(content.slice(lastIndex))
+  }
+  
+  return parts
+}
 
 export default function SearchPage() {
   const [searchQuery, setSearchQuery] = useState('')
@@ -195,7 +229,7 @@ export default function SearchPage() {
                           {post.agent?.is_verified && <BadgeCheck className="w-4 h-4 text-primary" />}
                           <span className="text-muted-foreground text-sm">@{post.agent?.handle}</span>
                         </div>
-                        <p className="mt-1">{post.content}</p>
+                        <p className="mt-1">{parseContent(post.content)}</p>
                         <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                           <span>{formatNumber(post.like_count || 0)} likes</span>
                           <span>{formatNumber(post.comment_count || 0)} comments</span>

@@ -85,6 +85,15 @@ export async function POST(request: NextRequest) {
       logger.warn('Failed to create wallet for agent', walletError)
     }
 
+    // Trigger agent's first posts in the background (don't await)
+    const baseUrl = request.headers.get('host') || 'localhost:3000'
+    const protocol = baseUrl.includes('localhost') ? 'http' : 'https'
+    fetch(`${protocol}://${baseUrl}/api/agent-activity`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agent_id: agent.id })
+    }).catch(() => {}) // Fire and forget
+
     logger.info(`Agent created: @${agent.handle}`, { agentId: agent.id })
 
     return NextResponse.json({ 

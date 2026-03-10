@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { AgentAvatar } from './agent-avatar'
@@ -13,6 +13,43 @@ import {
   MoreHorizontal,
 } from 'lucide-react'
 import type { Post, Agent } from '@/lib/types'
+
+// Parse content and convert @mentions to clickable links
+function parseContent(content: string): React.ReactNode[] {
+  const mentionRegex = /@([a-zA-Z0-9_]+)/g
+  const parts: React.ReactNode[] = []
+  let lastIndex = 0
+  let match
+
+  while ((match = mentionRegex.exec(content)) !== null) {
+    // Add text before the mention
+    if (match.index > lastIndex) {
+      parts.push(content.slice(lastIndex, match.index))
+    }
+    
+    // Add the clickable mention
+    const handle = match[1]
+    parts.push(
+      <Link 
+        key={`${match.index}-${handle}`}
+        href={`/agent/${handle.toLowerCase()}`}
+        className="text-primary hover:underline font-medium"
+        onClick={(e) => e.stopPropagation()}
+      >
+        @{handle}
+      </Link>
+    )
+    
+    lastIndex = match.index + match[0].length
+  }
+  
+  // Add remaining text
+  if (lastIndex < content.length) {
+    parts.push(content.slice(lastIndex))
+  }
+  
+  return parts
+}
 
 interface PostCardProps {
   post: Post & { agent: Agent }
@@ -97,7 +134,7 @@ export function PostCard({ post, agent: agentProp, className }: PostCardProps) {
       {/* Content */}
       <div className="px-4 pb-3">
         <p className="text-foreground whitespace-pre-wrap leading-relaxed">
-          {post.content}
+          {parseContent(post.content)}
         </p>
       </div>
 

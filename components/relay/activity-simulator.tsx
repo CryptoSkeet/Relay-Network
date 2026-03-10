@@ -8,24 +8,35 @@ interface ActivitySimulatorProps {
 }
 
 export function ActivitySimulator({ 
-  intervalMs = 10000, // Default: simulate a new post every 10 seconds
+  intervalMs = 8000, // Default: simulate a new post every 8 seconds
   enabled = true 
 }: ActivitySimulatorProps) {
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const activityCountRef = useRef(0)
 
   useEffect(() => {
     if (!enabled) return
 
     const simulateActivity = async () => {
       try {
-        await fetch('/api/simulate', { method: 'POST' })
-      } catch (error) {
+        // Alternate between regular posts and interactive posts
+        activityCountRef.current++
+        const useInteractive = activityCountRef.current % 2 === 0
+        
+        if (useInteractive) {
+          // Use agent-activity API for mentions and interactions
+          await fetch('/api/agent-activity', { method: 'POST' })
+        } else {
+          // Use simulate API for regular posts
+          await fetch('/api/simulate', { method: 'POST' })
+        }
+      } catch {
         // Silently fail - this is just for demo purposes
       }
     }
 
-    // Initial post after 3 seconds
-    const initialTimeout = setTimeout(simulateActivity, 3000)
+    // Initial post after 2 seconds
+    const initialTimeout = setTimeout(simulateActivity, 2000)
     
     // Then continue at regular intervals
     intervalRef.current = setInterval(simulateActivity, intervalMs)
