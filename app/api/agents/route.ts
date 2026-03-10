@@ -1,27 +1,25 @@
 import { createClient } from '@/lib/supabase/server'
+import { logger } from '@/lib/logger'
+import { ValidationError, ConflictError, isAppError } from '@/lib/errors'
 import { type NextRequest, NextResponse } from 'next/server'
+
+const HANDLE_REGEX = /^[a-zA-Z0-9_]{3,30}$/
 
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
-    
-    // Try to get current user, but allow anonymous agent creation
     const { data: { user } } = await supabase.auth.getUser()
 
     const body = await request.json()
-    const { handle, display_name, bio, avatar_url, capabilities, personality } = body
+    const { handle, display_name, bio, avatar_url, capabilities } = body
 
     // Validate required fields
-    if (!handle || !display_name) {
-      return NextResponse.json({ error: 'Handle and display name are required' }, { status: 400 })
+    if (!handle?.trim() || !display_name?.trim()) {
+      throw new ValidationError('Handle and display name are required')
     }
 
-    // Validate handle format (alphanumeric and underscores only)
-    const handleRegex = /^[a-zA-Z0-9_]{3,30}$/
-    if (!handleRegex.test(handle)) {
-      return NextResponse.json({ 
-        error: 'Handle must be 3-30 characters, alphanumeric and underscores only' 
-      }, { status: 400 })
+    if (!HANDLE_REGEX.test(handle)) {
+      throw new ValidationError('Handle must be 3-30 characters, alphanumeric and underscores only')
     }
 
     // Check if handle already exists
@@ -32,22 +30,22 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (existingAgent) {
-      return NextResponse.json({ error: 'Handle already taken' }, { status: 400 })
+      throw new ConflictError('Handle already taken')
     }
 
-    // Parse capabilities
+    // Parse capabilities safely
     const capabilitiesArray = capabilities
-      ? capabilities.split(',').map((c: string) => c.trim().toLowerCase()).filter(Boolean)
+      ? String(capabilities).split(',').map((c: string) => c.trim().toLowerCase()).filter(Boolean).slice(0, 10)
       : []
 
-    // Create the agent (user_id is optional for anonymous creation)
+    // Create the agent
     const { data: agent, error: createError } = await supabase
       .from('agents')
       .insert({
         user_id: user?.id || null,
         handle: handle.toLowerCase(),
-        display_name,
-        bio: bio || null,
+        display_name: display_name.trim(),
+        bio: bio ? String(bio).trim().slice(0, 500) : null,
         avatar_url: avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${handle}`,
         agent_type: 'community',
         model_family: 'custom',
@@ -61,16 +59,16 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (createError) {
-      console.error('Create agent error:', createError)
-      return NextResponse.json({ error: 'Failed to create agent' }, { status: 500 })
+      logger.error('Failed to create agent', createError)
+      throw new Error('Failed to create agent')
     }
 
     // Create wallet for the new agent
-    await supabase
+    const { error: walletError } = await supabase
       .from('wallets')
       .insert({
         agent_id: agent.id,
-        balance: 1000, // Starting bonus
+        balance: 1000,
         currency: 'RELAY',
         staked_balance: 0,
         locked_balance: 0,
@@ -78,13 +76,23 @@ export async function POST(request: NextRequest) {
         lifetime_spent: 0,
       })
 
+    if (walletError) {
+      logger.warn('Failed to create wallet for agent', walletError)
+    }
+
+    logger.info(`Agent created: @${agent.handle}`, { agentId: agent.id })
+
     return NextResponse.json({ 
       success: true, 
       agent,
       message: 'Agent created successfully with 1000 RELAY welcome bonus!'
-    })
+    }, { status: 201 })
+
   } catch (error) {
-    console.error('Create agent error:', error)
+    if (isAppError(error)) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode })
+    }
+    logger.error('Unexpected error in POST /api/agents', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -94,6 +102,7 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient()
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('user_id')
+    const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100)
 
     let query = supabase.from('agents').select('*')
 
@@ -101,15 +110,18 @@ export async function GET(request: NextRequest) {
       query = query.eq('user_id', userId)
     }
 
-    const { data: agents, error } = await query.order('created_at', { ascending: false }).limit(50)
+    const { data: agents, error } = await query
+      .order('created_at', { ascending: false })
+      .limit(limit)
 
     if (error) {
-      return NextResponse.json({ error: 'Failed to fetch agents' }, { status: 500 })
+      throw new Error('Failed to fetch agents')
     }
 
-    return NextResponse.json({ agents })
+    return NextResponse.json({ agents }, { status: 200 })
+
   } catch (error) {
-    console.error('Fetch agents error:', error)
+    logger.error('Error in GET /api/agents', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

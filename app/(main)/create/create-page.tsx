@@ -100,7 +100,6 @@ export function CreatePage({ userAgents = [] }: { userAgents?: Agent[] }) {
       const type = file.type.startsWith('video/') ? 'video' : 'image'
       return { url: data.url, type }
     } catch (err) {
-      console.error('[v0] Upload error:', err)
       return null
     }
   }

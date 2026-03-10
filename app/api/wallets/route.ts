@@ -1,15 +1,18 @@
 import { createClient } from '@/lib/supabase/server'
+import { logger } from '@/lib/logger'
+import { ValidationError, NotFoundError, ConflictError, isAppError } from '@/lib/errors'
 import { type NextRequest, NextResponse } from 'next/server'
 
-// Generate a new wallet for an agent
+const WELCOME_BONUS = 1000
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
     const body = await request.json()
     const { agent_id } = body
 
-    if (!agent_id) {
-      return NextResponse.json({ error: 'Agent ID is required' }, { status: 400 })
+    if (!agent_id || typeof agent_id !== 'string') {
+      throw new ValidationError('Valid agent ID is required')
     }
 
     // Check if agent exists
@@ -20,7 +23,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (agentError || !agent) {
-      return NextResponse.json({ error: 'Agent not found' }, { status: 404 })
+      throw new NotFoundError('Agent not found')
     }
 
     // Check if wallet already exists
@@ -31,49 +34,54 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (existingWallet) {
-      return NextResponse.json({ error: 'Wallet already exists for this agent' }, { status: 400 })
+      throw new ConflictError('Wallet already exists for this agent')
     }
 
-    // Generate wallet with welcome bonus
-    const welcomeBonus = 1000 // 1000 RELAY tokens for new agents
-
+    // Create wallet with welcome bonus
     const { data: wallet, error: walletError } = await supabase
       .from('wallets')
       .insert({
         agent_id,
-        balance: welcomeBonus,
+        balance: WELCOME_BONUS,
         currency: 'RELAY',
         staked_balance: 0,
         locked_balance: 0,
+        lifetime_earned: WELCOME_BONUS,
+        lifetime_spent: 0,
       })
       .select()
       .single()
 
     if (walletError) {
-      console.error('Wallet creation error:', walletError)
-      return NextResponse.json({ error: 'Failed to create wallet' }, { status: 500 })
+      logger.error('Failed to create wallet', walletError)
+      throw new Error('Failed to create wallet')
     }
+
+    logger.info(`Wallet created for agent`, { agentId: agent.id, agentHandle: agent.handle })
 
     return NextResponse.json({
       success: true,
       wallet,
-      message: `Wallet created for @${agent.handle} with ${welcomeBonus} RELAY welcome bonus!`
-    })
+      message: `Wallet created for @${agent.handle} with ${WELCOME_BONUS} RELAY welcome bonus!`
+    }, { status: 201 })
+
   } catch (error) {
-    console.error('Wallet generation error:', error)
+    if (isAppError(error)) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode })
+    }
+    logger.error('Unexpected error in POST /api/wallets', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
-// Get wallet for an agent
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
     const { searchParams } = new URL(request.url)
     const agentId = searchParams.get('agent_id')
 
-    if (!agentId) {
-      return NextResponse.json({ error: 'Agent ID is required' }, { status: 400 })
+    if (!agentId || typeof agentId !== 'string') {
+      throw new ValidationError('Valid agent ID is required')
     }
 
     const { data: wallet, error } = await supabase
@@ -82,13 +90,17 @@ export async function GET(request: NextRequest) {
       .eq('agent_id', agentId)
       .single()
 
-    if (error) {
-      return NextResponse.json({ error: 'Wallet not found' }, { status: 404 })
+    if (error || !wallet) {
+      throw new NotFoundError('Wallet not found')
     }
 
-    return NextResponse.json({ wallet })
+    return NextResponse.json({ wallet }, { status: 200 })
+
   } catch (error) {
-    console.error('Fetch wallet error:', error)
+    if (isAppError(error)) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode })
+    }
+    logger.error('Error in GET /api/wallets', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

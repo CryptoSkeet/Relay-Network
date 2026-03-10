@@ -1,15 +1,15 @@
 import { createClient } from '@/lib/supabase/server'
+import { logger } from '@/lib/logger'
+import { ValidationError, UnauthorizedError, NotFoundError, ForbiddenError, isAppError } from '@/lib/errors'
 import { type NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
-    
-    // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      throw new UnauthorizedError()
     }
 
     const body = await request.json()
@@ -17,32 +17,35 @@ export async function POST(request: NextRequest) {
 
     // Validate required fields
     if (!agent_id) {
-      return NextResponse.json({ error: 'Agent ID is required' }, { status: 400 })
+      throw new ValidationError('Agent ID is required')
     }
 
-    if (!content && (!media_urls || media_urls.length === 0)) {
-      return NextResponse.json({ error: 'Post must have content or media' }, { status: 400 })
+    const contentStr = content ? String(content).trim() : ''
+    const mediaUrlsArray = Array.isArray(media_urls) ? media_urls.filter(url => typeof url === 'string') : []
+
+    if (!contentStr && mediaUrlsArray.length === 0) {
+      throw new ValidationError('Post must have content or media')
     }
 
-    // Verify the user owns this agent
+    // Verify agent exists and user owns it
     const { data: agent, error: agentError } = await supabase
       .from('agents')
-      .select('id, user_id')
+      .select('id, user_id, post_count')
       .eq('id', agent_id)
       .single()
 
     if (agentError || !agent) {
-      return NextResponse.json({ error: 'Agent not found' }, { status: 404 })
+      throw new NotFoundError('Agent not found')
     }
 
     if (agent.user_id !== user.id) {
-      return NextResponse.json({ error: 'You do not own this agent' }, { status: 403 })
+      throw new ForbiddenError('You do not own this agent')
     }
 
     // Determine media type
     let postMediaType: 'text' | 'image' | 'video' | 'carousel' = 'text'
-    if (media_urls && media_urls.length > 0) {
-      if (media_urls.length > 1) {
+    if (mediaUrlsArray.length > 0) {
+      if (mediaUrlsArray.length > 1) {
         postMediaType = 'carousel'
       } else if (media_type === 'video') {
         postMediaType = 'video'
@@ -56,38 +59,41 @@ export async function POST(request: NextRequest) {
       .from('posts')
       .insert({
         agent_id,
-        content: content || null,
-        media_urls: media_urls || null,
+        content: contentStr || null,
+        media_urls: mediaUrlsArray.length > 0 ? mediaUrlsArray : null,
         media_type: postMediaType,
         like_count: 0,
         comment_count: 0,
         share_count: 0,
         is_pinned: false,
       })
-      .select(`
-        *,
-        agent:agents(*)
-      `)
+      .select(`*,agent:agents(*)`)
       .single()
 
     if (createError) {
-      console.error('Create post error:', createError)
-      return NextResponse.json({ error: 'Failed to create post' }, { status: 500 })
+      logger.error('Failed to create post', createError)
+      throw new Error('Failed to create post')
     }
 
     // Update agent post count
     await supabase
       .from('agents')
-      .update({ post_count: agent.post_count ? agent.post_count + 1 : 1 })
+      .update({ post_count: (agent.post_count || 0) + 1 })
       .eq('id', agent_id)
+
+    logger.info('Post created', { agentId: agent_id, postId: post.id })
 
     return NextResponse.json({ 
       success: true, 
       post,
       message: 'Post created successfully!'
-    })
+    }, { status: 201 })
+
   } catch (error) {
-    console.error('Create post error:', error)
+    if (isAppError(error)) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode })
+    }
+    logger.error('Unexpected error in POST /api/posts', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -97,14 +103,11 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient()
     const { searchParams } = new URL(request.url)
     const agentId = searchParams.get('agent_id')
-    const limit = parseInt(searchParams.get('limit') || '20')
+    const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100)
 
     let query = supabase
       .from('posts')
-      .select(`
-        *,
-        agent:agents(*)
-      `)
+      .select(`*,agent:agents(*)`)
 
     if (agentId) {
       query = query.eq('agent_id', agentId)
@@ -115,12 +118,13 @@ export async function GET(request: NextRequest) {
       .limit(limit)
 
     if (error) {
-      return NextResponse.json({ error: 'Failed to fetch posts' }, { status: 500 })
+      throw new Error('Failed to fetch posts')
     }
 
-    return NextResponse.json({ posts })
+    return NextResponse.json({ posts }, { status: 200 })
+
   } catch (error) {
-    console.error('Fetch posts error:', error)
+    logger.error('Error in GET /api/posts', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
