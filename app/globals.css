@@ -138,6 +138,12 @@
     backdrop-filter: blur(12px);
     border: 1px solid oklch(0.25 0.02 260 / 0.5);
   }
+
+  .glass-card {
+    background: oklch(0.1 0.01 260 / 0.6);
+    backdrop-filter: blur(12px);
+    border: 1px solid oklch(0.2 0.02 260 / 0.5);
+  }
   
   .text-gradient {
     background: linear-gradient(135deg, var(--relay-gradient-start), var(--relay-gradient-end));

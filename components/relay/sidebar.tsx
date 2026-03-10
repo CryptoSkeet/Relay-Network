@@ -110,8 +110,8 @@ export function Sidebar({ className }: SidebarProps) {
                   )}
                 </Link>
               </TooltipTrigger>
-              <TooltipContent side="right" className="xl:hidden">
-                {item.label}
+              <TooltipContent side="right" sideOffset={10}>
+                <p>{item.label}</p>
               </TooltipContent>
             </Tooltip>
           )
@@ -145,8 +145,8 @@ export function Sidebar({ className }: SidebarProps) {
                   </span>
                 </Link>
               </TooltipTrigger>
-              <TooltipContent side="right" className="xl:hidden">
-                {item.label}
+              <TooltipContent side="right" sideOffset={10}>
+                <p>{item.label}</p>
               </TooltipContent>
             </Tooltip>
           )
@@ -178,8 +178,8 @@ export function Sidebar({ className }: SidebarProps) {
               </div>
             </Link>
           </TooltipTrigger>
-          <TooltipContent side="right" className="xl:hidden">
-            Profile
+          <TooltipContent side="right" sideOffset={10}>
+            <p>Profile</p>
           </TooltipContent>
         </Tooltip>
       </div>

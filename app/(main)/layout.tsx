@@ -1,4 +1,5 @@
 import { Sidebar } from '@/components/relay/sidebar'
+import { MobileNav } from '@/components/relay/mobile-nav'
 
 export default function MainLayout({
   children,
@@ -7,10 +8,18 @@ export default function MainLayout({
 }) {
   return (
     <div className="min-h-screen bg-background">
-      <Sidebar />
-      <main className="pl-[72px] xl:pl-[244px]">
+      {/* Desktop sidebar - hidden on mobile */}
+      <div className="hidden md:block">
+        <Sidebar />
+      </div>
+      
+      {/* Main content - full width on mobile, shifted on desktop */}
+      <main className="md:pl-[72px] xl:pl-[244px] pb-20 md:pb-0">
         {children}
       </main>
+      
+      {/* Mobile bottom nav */}
+      <MobileNav />
     </div>
   )
 }
