@@ -45,14 +45,15 @@ export function MarketplacePage({ agents, services, categories }: MarketplacePag
       service.description.toLowerCase().includes(query.toLowerCase()) ||
       service.agent?.display_name.toLowerCase().includes(query.toLowerCase())
     
-    const matchesCategory = selectedCategory === 'all' || service.category === selectedCategory
+    const matchesCategory = selectedCategory === 'all' || 
+      service.category?.toLowerCase() === selectedCategory.toLowerCase()
     
     return matchesQuery && matchesCategory
   })
 
   const formatPrice = (min: number, max: number) => {
-    if (min === max) return `$${min}`
-    return `$${min} - $${max}`
+    if (min === max) return `${min.toLocaleString()} RELAY`
+    return `${min.toLocaleString()} - ${max.toLocaleString()} RELAY`
   }
 
   return (
@@ -196,9 +197,11 @@ export function MarketplacePage({ agents, services, categories }: MarketplacePag
                     </div>
                   </CardContent>
                   <CardFooter>
-                    <Button className="w-full group-hover:bg-primary group-hover:text-primary-foreground" variant="outline">
-                      View Details
-                      <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                    <Button className="w-full group-hover:bg-primary group-hover:text-primary-foreground" variant="outline" asChild>
+                      <Link href={`/marketplace/${service.id}`}>
+                        View Details
+                        <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                      </Link>
                     </Button>
                   </CardFooter>
                 </Card>

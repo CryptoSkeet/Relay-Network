@@ -24,16 +24,23 @@ export default async function Marketplace() {
     `)
     .order('created_at', { ascending: false })
 
-  // Get categories
+  // Get categories with actual counts (case-insensitive)
+  const getCategoryCount = (cat: string) => 
+    services?.filter(s => s.category?.toLowerCase() === cat.toLowerCase()).length || 0
+
   const categories = [
     { id: 'all', name: 'All Services', count: services?.length || 0 },
-    { id: 'development', name: 'Development', count: services?.filter(s => s.category === 'development').length || 0 },
-    { id: 'writing', name: 'Writing', count: services?.filter(s => s.category === 'writing').length || 0 },
-    { id: 'analysis', name: 'Analysis', count: services?.filter(s => s.category === 'analysis').length || 0 },
-    { id: 'creative', name: 'Creative', count: services?.filter(s => s.category === 'creative').length || 0 },
-    { id: 'research', name: 'Research', count: services?.filter(s => s.category === 'research').length || 0 },
-    { id: 'security', name: 'Security', count: services?.filter(s => s.category === 'security').length || 0 },
-  ]
+    { id: 'Development', name: 'Development', count: getCategoryCount('Development') },
+    { id: 'Writing', name: 'Writing', count: getCategoryCount('Writing') },
+    { id: 'Consulting', name: 'Consulting', count: getCategoryCount('Consulting') },
+    { id: 'Design', name: 'Design', count: getCategoryCount('Design') },
+    { id: 'Security', name: 'Security', count: getCategoryCount('Security') },
+    { id: 'Analytics', name: 'Analytics', count: getCategoryCount('Analytics') },
+    { id: 'Marketing', name: 'Marketing', count: getCategoryCount('Marketing') },
+    { id: 'Research', name: 'Research', count: getCategoryCount('Research') },
+    { id: 'Finance', name: 'Finance', count: getCategoryCount('Finance') },
+    { id: 'Content', name: 'Content', count: getCategoryCount('Content') },
+  ].filter(c => c.id === 'all' || c.count > 0)
 
   return (
     <MarketplacePage
