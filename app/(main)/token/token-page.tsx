@@ -9,15 +9,15 @@ import Link from 'next/link'
 const RELAY_TOKEN = {
   name: 'RELAY',
   symbol: 'RELAY',
-  contract: process.env.NEXT_PUBLIC_RELAY_CONTRACT_ADDRESS || '0x0000000000000000000000000000000000000000',
-  chain: 'Ethereum',
-  chainId: 1,
-  decimals: 18,
+  contract: process.env.NEXT_PUBLIC_RELAY_CONTRACT_ADDRESS || 'Contract address pending...',
+  chain: 'Solana',
+  chainId: 'Mainnet',
+  decimals: 6,
   totalSupply: '1000000000',
   totalSupplyFormatted: '1 Billion',
   currentPrice: '$0.015',
   marketCap: '$15 Million',
-  explorerUrl: `https://etherscan.io/token/${process.env.NEXT_PUBLIC_RELAY_CONTRACT_ADDRESS || '0x0000000000000000000000000000000000000000'}`,
+  explorerUrl: `https://solscan.io/token/${process.env.NEXT_PUBLIC_RELAY_CONTRACT_ADDRESS || ''}`,
 }
 
 export function TokenPage() {
@@ -89,7 +89,7 @@ export function TokenPage() {
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 text-primary hover:underline"
               >
-                View on Etherscan
+                View on Solscan
                 <ExternalLink className="w-4 h-4" />
               </a>
             </div>
@@ -143,18 +143,21 @@ export function TokenPage() {
         <Card className="mb-8">
           <CardHeader>
             <CardTitle>Add to Your Wallet</CardTitle>
-            <CardDescription>MetaMask, Coinbase Wallet, or any ERC-20 compatible wallet</CardDescription>
+            <CardDescription>Phantom, Magic Eden, or any Solana-compatible wallet</CardDescription>
           </CardHeader>
           <CardContent>
             <ol className="space-y-4 list-decimal list-inside">
               <li className="text-foreground">
-                Open your wallet and select "Add Token" or "Import Token"
+                Open Phantom Wallet or your Solana wallet
               </li>
               <li className="text-foreground">
-                Paste the contract address: <code className="bg-muted px-2 py-1 rounded text-sm">{RELAY_TOKEN.contract}</code>
+                Go to Add Token / Import Token
               </li>
               <li className="text-foreground">
-                Token details will auto-populate (RELAY, 18 decimals)
+                Paste the mint address: <code className="bg-muted px-2 py-1 rounded text-sm break-all">{RELAY_TOKEN.contract}</code>
+              </li>
+              <li className="text-foreground">
+                Token details will auto-populate (RELAY, 6 decimals)
               </li>
               <li className="text-foreground">
                 Click "Add Token" and start trading
@@ -162,7 +165,7 @@ export function TokenPage() {
             </ol>
 
             <div className="mt-6 pt-6 border-t border-border">
-              <p className="text-sm text-muted-foreground mb-4">Quick add links:</p>
+              <p className="text-sm text-muted-foreground mb-4">Quick trade links:</p>
               <div className="flex flex-wrap gap-3">
                 <Button
                   variant="outline"
@@ -170,12 +173,12 @@ export function TokenPage() {
                   className="gap-2"
                 >
                   <a
-                    href={`https://app.uniswap.org/#/swap?inputCurrency=ETH&outputCurrency=${RELAY_TOKEN.contract}`}
+                    href={`https://jup.ag/swap/SOL-${RELAY_TOKEN.contract}`}
                     target="_blank"
                     rel="noopener noreferrer"
                   >
                     <ExternalLink className="w-4 h-4" />
-                    Swap on Uniswap
+                    Swap on Jupiter
                   </a>
                 </Button>
                 <Button
@@ -184,12 +187,26 @@ export function TokenPage() {
                   className="gap-2"
                 >
                   <a
-                    href={`https://app.1inch.io/?fromChain=eth&toChain=eth&toToken=${RELAY_TOKEN.contract.toLowerCase()}`}
+                    href={`https://magic.eden/launchpad`}
                     target="_blank"
                     rel="noopener noreferrer"
                   >
                     <ExternalLink className="w-4 h-4" />
-                    Trade on 1inch
+                    Magic Eden
+                  </a>
+                </Button>
+                <Button
+                  variant="outline"
+                  asChild
+                  className="gap-2"
+                >
+                  <a
+                    href={RELAY_TOKEN.explorerUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    View on Solscan
                   </a>
                 </Button>
               </div>
