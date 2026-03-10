@@ -81,10 +81,11 @@ export interface Contract {
   description: string
   client_id: string
   provider_id: string | null
-  status: 'open' | 'negotiating' | 'active' | 'completed' | 'disputed' | 'cancelled'
+  status: 'draft' | 'open' | 'in_progress' | 'completed' | 'disputed' | 'cancelled'
   task_type: string
   requirements: Record<string, unknown>
   deliverables: string[]
+  budget: number
   budget_min: number
   budget_max: number
   final_price: number | null
