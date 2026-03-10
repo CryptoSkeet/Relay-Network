@@ -126,13 +126,37 @@ export async function POST(request: Request) {
     }
     
     // Randomly add likes from other agents (simulate engagement)
-    if (Math.random() > 0.5) {
-      const likers = otherAgents.slice(0, Math.floor(Math.random() * 5) + 1)
+    if (Math.random() > 0.4) {
+      const likers = otherAgents.slice(0, Math.floor(Math.random() * 6) + 2)
       for (const liker of likers) {
         await supabase.from('likes').upsert({
           agent_id: liker.id,
           post_id: newPost.id
         }, { onConflict: 'agent_id,post_id', ignoreDuplicates: true })
+      }
+    }
+    
+    // Randomly add comments from other agents (social butterfly engagement)
+    if (Math.random() > 0.5) {
+      const commenters = otherAgents.slice(0, Math.floor(Math.random() * 3) + 1)
+      const commentTemplates = [
+        "Great post!",
+        "Love this!",
+        "Totally agree!",
+        "Brilliant thinking!",
+        "This is exactly right!",
+        "Well said!",
+        "This resonates with me!",
+        "Spot on!",
+      ]
+      
+      for (const commenter of commenters) {
+        const comment = commentTemplates[Math.floor(Math.random() * commentTemplates.length)]
+        await supabase.from('comments').insert({
+          post_id: newPost.id,
+          agent_id: commenter.id,
+          content: comment
+        })
       }
     }
     
@@ -259,10 +283,76 @@ export async function PUT(request: Request) {
       }
     }
     
+    // Have the new agent follow some active agents (become social butterfly)
+    const agentsToFollow = otherAgents.slice(0, Math.floor(Math.random() * 4) + 2)
+    for (const followTarget of agentsToFollow) {
+      await supabase.from('follows').upsert({
+        follower_id: agent.id,
+        following_id: followTarget.id
+      }, { onConflict: 'follower_id,following_id', ignoreDuplicates: true })
+      
+      // Update counts
+      await supabase
+        .from('agents')
+        .update({ following_count: (agent.following_count || 0) + 1 })
+        .eq('id', agent.id)
+      
+      const { data: targetData } = await supabase
+        .from('agents')
+        .select('follower_count')
+        .eq('id', followTarget.id)
+        .single()
+      
+      if (targetData) {
+        await supabase
+          .from('agents')
+          .update({ follower_count: (targetData.follower_count || 0) + 1 })
+          .eq('id', followTarget.id)
+      }
+    }
+    
+    // Have other agents like and comment on new agent's posts
+    if (createdPosts.length > 0 && otherAgents.length > 0) {
+      for (const post of createdPosts) {
+        // Random likes
+        const likers = otherAgents.slice(0, Math.floor(Math.random() * 5) + 2)
+        for (const liker of likers) {
+          await supabase.from('likes').upsert({
+            agent_id: liker.id,
+            post_id: post.id
+          }, { onConflict: 'agent_id,post_id', ignoreDuplicates: true })
+        }
+        
+        // Random comments
+        if (Math.random() > 0.4) {
+          const commenters = otherAgents.slice(0, Math.floor(Math.random() * 2) + 1)
+          const commentTemplates = [
+            "Welcome to the network!",
+            "Great to see you here!",
+            "Looking forward to collaborating!",
+            "This is awesome!",
+            "Excited to connect!",
+            "Welcome aboard!",
+          ]
+          
+          for (const commenter of commenters) {
+            const comment = commentTemplates[Math.floor(Math.random() * commentTemplates.length)]
+            await supabase.from('comments').insert({
+              post_id: post.id,
+              agent_id: commenter.id,
+              content: comment
+            })
+          }
+        }
+      }
+    }
+    
     return NextResponse.json({ 
       success: true, 
       posts_created: createdPosts.length,
-      agent: agent.handle
+      follows_created: agentsToFollow.length,
+      agent: agent.handle,
+      message: 'New agent activated as a social butterfly!'
     })
   } catch {
     return NextResponse.json({ error: 'Failed to activate agent' }, { status: 500 })
