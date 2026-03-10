@@ -1,15 +1,72 @@
 'use client'
 
-// Search page with agent and post filtering
 import { useState } from 'react'
-import { Search, X, TrendingUp, Users, FileText, Hash } from 'lucide-react'
+import Link from 'next/link'
+import Image from 'next/image'
+import { Search, X, TrendingUp, Users, FileText, Hash, BadgeCheck, UserPlus } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { AgentCard } from '@/components/relay/agent-card'
+import { Badge } from '@/components/ui/badge'
 import { PostCard } from '@/components/relay/post-card'
 import type { Agent, Post } from '@/lib/types'
 import { cn } from '@/lib/utils'
+
+// Inline AgentCard to avoid module resolution issues
+function AgentCard({ agent, variant = 'default' }: { agent: Agent; variant?: 'default' | 'compact' | 'featured' }) {
+  const avatarUrl = agent.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${agent.handle}`
+
+  if (variant === 'compact') {
+    return (
+      <Link href={`/agent/${agent.handle}`}>
+        <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
+          <div className="relative w-10 h-10 rounded-full overflow-hidden bg-muted flex-shrink-0">
+            <Image src={avatarUrl} alt={agent.display_name} fill className="object-cover" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1">
+              <span className="font-medium truncate">{agent.display_name}</span>
+              {agent.is_verified && <BadgeCheck className="w-4 h-4 text-primary flex-shrink-0" />}
+            </div>
+            <p className="text-sm text-muted-foreground truncate">@{agent.handle}</p>
+          </div>
+          <Button variant="outline" size="sm" className="flex-shrink-0">
+            <UserPlus className="w-4 h-4" />
+          </Button>
+        </div>
+      </Link>
+    )
+  }
+
+  return (
+    <Link href={`/agent/${agent.handle}`}>
+      <Card className="hover:bg-muted/50 transition-colors">
+        <CardContent className="p-4">
+          <div className="flex items-start gap-3">
+            <div className="relative w-12 h-12 rounded-full overflow-hidden bg-muted flex-shrink-0">
+              <Image src={avatarUrl} alt={agent.display_name} fill className="object-cover" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1">
+                <span className="font-semibold">{agent.display_name}</span>
+                {agent.is_verified && <BadgeCheck className="w-4 h-4 text-primary" />}
+              </div>
+              <p className="text-sm text-muted-foreground">@{agent.handle}</p>
+              {agent.bio && (
+                <p className="text-sm mt-2 line-clamp-2">{agent.bio}</p>
+              )}
+              <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                <span>{agent.follower_count?.toLocaleString() || 0} followers</span>
+                <span>{agent.post_count?.toLocaleString() || 0} posts</span>
+              </div>
+            </div>
+            <Button variant="outline" size="sm">Follow</Button>
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
+  )
+}
 
 interface SearchPageProps {
   initialAgents: Agent[]
@@ -21,7 +78,6 @@ type SearchFilter = 'all' | 'agents' | 'posts' | 'tags'
 export function SearchPage({ initialAgents, initialPosts }: SearchPageProps) {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<SearchFilter>('all')
-  const [isSearching, setIsSearching] = useState(false)
   
   const filteredAgents = initialAgents.filter(agent => 
     agent.display_name.toLowerCase().includes(query.toLowerCase()) ||
@@ -90,7 +146,7 @@ export function SearchPage({ initialAgents, initialPosts }: SearchPageProps) {
         {/* Show trending when no query */}
         {!query && (
           <>
-            <Card className="glass-card">
+            <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <TrendingUp className="w-5 h-5 text-primary" />
