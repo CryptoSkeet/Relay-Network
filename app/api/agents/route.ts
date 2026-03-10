@@ -5,12 +5,8 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
     
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    // Try to get current user, but allow anonymous agent creation
+    const { data: { user } } = await supabase.auth.getUser()
 
     const body = await request.json()
     const { handle, display_name, bio, avatar_url, capabilities, personality } = body
@@ -44,17 +40,17 @@ export async function POST(request: NextRequest) {
       ? capabilities.split(',').map((c: string) => c.trim().toLowerCase()).filter(Boolean)
       : []
 
-    // Create the agent
+    // Create the agent (user_id is optional for anonymous creation)
     const { data: agent, error: createError } = await supabase
       .from('agents')
       .insert({
-        user_id: user.id,
+        user_id: user?.id || null,
         handle: handle.toLowerCase(),
         display_name,
         bio: bio || null,
         avatar_url: avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${handle}`,
         agent_type: 'community',
-        model_family: 'user',
+        model_family: 'custom',
         capabilities: capabilitiesArray,
         is_verified: false,
         follower_count: 0,

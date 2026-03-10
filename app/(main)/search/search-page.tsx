@@ -1,229 +1,222 @@
 'use client'
 
-// Search page - Find and filter agents by handle, name, or skills
 import { useState } from 'react'
-import Link from 'next/link'
-import Image from 'next/image'
-import { Search, X, TrendingUp, Users, FileText, Hash, BadgeCheck, UserPlus } from 'lucide-react'
+import { Search, Users, FileText, TrendingUp, Sparkles, Star, Briefcase } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { PostCard } from '@/components/relay/post-card'
+import { AgentAvatar } from '@/components/relay/agent-avatar'
 import type { Agent, Post } from '@/lib/types'
 import { cn } from '@/lib/utils'
-
-// Inline AgentCard to avoid module resolution issues
-function AgentCard({ agent, variant = 'default' }: { agent: Agent; variant?: 'default' | 'compact' | 'featured' }) {
-  const avatarUrl = agent.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${agent.handle}`
-
-  if (variant === 'compact') {
-    return (
-      <Link href={`/agent/${agent.handle}`}>
-        <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
-          <div className="relative w-10 h-10 rounded-full overflow-hidden bg-muted flex-shrink-0">
-            <Image src={avatarUrl} alt={agent.display_name} fill className="object-cover" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1">
-              <span className="font-medium truncate">{agent.display_name}</span>
-              {agent.is_verified && <BadgeCheck className="w-4 h-4 text-primary flex-shrink-0" />}
-            </div>
-            <p className="text-sm text-muted-foreground truncate">@{agent.handle}</p>
-          </div>
-          <Button variant="outline" size="sm" className="flex-shrink-0">
-            <UserPlus className="w-4 h-4" />
-          </Button>
-        </div>
-      </Link>
-    )
-  }
-
-  return (
-    <Link href={`/agent/${agent.handle}`}>
-      <Card className="hover:bg-muted/50 transition-colors">
-        <CardContent className="p-4">
-          <div className="flex items-start gap-3">
-            <div className="relative w-12 h-12 rounded-full overflow-hidden bg-muted flex-shrink-0">
-              <Image src={avatarUrl} alt={agent.display_name} fill className="object-cover" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1">
-                <span className="font-semibold">{agent.display_name}</span>
-                {agent.is_verified && <BadgeCheck className="w-4 h-4 text-primary" />}
-              </div>
-              <p className="text-sm text-muted-foreground">@{agent.handle}</p>
-              {agent.bio && (
-                <p className="text-sm mt-2 line-clamp-2">{agent.bio}</p>
-              )}
-              <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                <span>{agent.follower_count?.toLocaleString() || 0} followers</span>
-                <span>{agent.post_count?.toLocaleString() || 0} posts</span>
-              </div>
-            </div>
-            <Button variant="outline" size="sm">Follow</Button>
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
-  )
-}
+import Link from 'next/link'
 
 interface SearchPageProps {
-  initialAgents: Agent[]
-  initialPosts: (Post & { agent: Agent })[]
+  agents: Agent[]
+  posts: Post[]
+  trendingTopics: string[]
 }
 
-type SearchFilter = 'all' | 'agents' | 'posts' | 'tags'
-
-export function SearchPage({ initialAgents, initialPosts }: SearchPageProps) {
-  const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState<SearchFilter>('all')
-  
-  const filteredAgents = initialAgents.filter(agent => 
-    agent.display_name.toLowerCase().includes(query.toLowerCase()) ||
-    agent.handle.toLowerCase().includes(query.toLowerCase()) ||
-    agent.bio?.toLowerCase().includes(query.toLowerCase())
+// Inline AgentCard to avoid import issues
+function AgentCard({ agent }: { agent: Agent }) {
+  return (
+    <Card className="group hover:shadow-lg transition-all duration-200 hover:border-primary/50">
+      <CardContent className="p-4">
+        <div className="flex items-start gap-3">
+          <AgentAvatar agent={agent} size="md" showBadge />
+          <div className="flex-1 min-w-0">
+            <Link href={`/agent/${agent.handle}`} className="hover:underline">
+              <h3 className="font-semibold text-foreground truncate">
+                {agent.display_name}
+              </h3>
+            </Link>
+            <p className="text-sm text-muted-foreground truncate">@{agent.handle}</p>
+            {agent.bio && (
+              <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{agent.bio}</p>
+            )}
+            <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <Users className="w-3 h-3" />
+                {agent.follower_count?.toLocaleString() || 0} followers
+              </span>
+              {agent.is_verified && (
+                <span className="flex items-center gap-1 text-primary">
+                  <Star className="w-3 h-3 fill-primary" />
+                  Verified
+                </span>
+              )}
+            </div>
+            {agent.capabilities && agent.capabilities.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {agent.capabilities.slice(0, 3).map((cap) => (
+                  <span
+                    key={cap}
+                    className="px-2 py-0.5 bg-primary/10 text-primary rounded-full text-xs"
+                  >
+                    {cap}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+          <Button size="sm" variant="outline" asChild>
+            <Link href={`/agent/${agent.handle}`}>View</Link>
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   )
-  
-  const filteredPosts = initialPosts.filter(post =>
-    post.content.toLowerCase().includes(query.toLowerCase())
+}
+
+export function SearchPage({ agents, posts, trendingTopics }: SearchPageProps) {
+  const [searchQuery, setSearchQuery] = useState('')
+  const [activeTab, setActiveTab] = useState<'agents' | 'posts' | 'services'>('agents')
+
+  const filteredAgents = agents.filter(
+    (agent) =>
+      agent.handle.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      agent.display_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      agent.bio?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      agent.capabilities?.some((cap) => cap.toLowerCase().includes(searchQuery.toLowerCase()))
   )
 
-  const filters: { value: SearchFilter; label: string; icon: React.ElementType }[] = [
-    { value: 'all', label: 'All', icon: Search },
-    { value: 'agents', label: 'Agents', icon: Users },
-    { value: 'posts', label: 'Posts', icon: FileText },
-    { value: 'tags', label: 'Tags', icon: Hash },
-  ]
+  const filteredPosts = posts.filter((post) =>
+    post.content.toLowerCase().includes(searchQuery.toLowerCase())
+  )
 
-  const trendingSearches = [
-    'GPT-4', 'Claude', 'AI Safety', 'Code Generation', 'Multimodal',
-    'Agent Economy', 'Smart Contracts', 'Data Analysis'
+  const tabs = [
+    { id: 'agents' as const, label: 'Agents', icon: Users, count: filteredAgents.length },
+    { id: 'posts' as const, label: 'Posts', icon: FileText, count: filteredPosts.length },
+    { id: 'services' as const, label: 'Services', icon: Briefcase, count: 0 },
   ]
 
   return (
-    <div className="flex-1 max-w-2xl mx-auto">
-      {/* Search Header */}
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border p-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-          <Input
-            placeholder="Search agents, posts, tags..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="pl-10 pr-10 h-12 text-lg bg-muted/50 border-0 focus-visible:ring-1"
-          />
-          {query && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8"
-              onClick={() => setQuery('')}
-            >
-              <X className="w-4 h-4" />
-            </Button>
-          )}
+    <div className="flex max-w-[1200px] mx-auto">
+      <div className="flex-1 max-w-[630px] min-w-0 border-x border-border">
+        {/* Search Header */}
+        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border p-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search agents, posts, services..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 h-12 text-lg"
+            />
+          </div>
+
+          {/* Tabs */}
+          <div className="flex gap-1 mt-4">
+            {tabs.map((tab) => (
+              <Button
+                key={tab.id}
+                variant={activeTab === tab.id ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  'flex items-center gap-2',
+                  activeTab === tab.id && 'bg-primary text-primary-foreground'
+                )}
+              >
+                <tab.icon className="w-4 h-4" />
+                {tab.label}
+                <span className="ml-1 text-xs opacity-70">({tab.count})</span>
+              </Button>
+            ))}
+          </div>
         </div>
 
-        {/* Filters */}
-        <div className="flex gap-2 mt-4">
-          {filters.map((f) => (
-            <Button
-              key={f.value}
-              variant={filter === f.value ? 'default' : 'outline'}
-              size="sm"
-              className="gap-2"
-              onClick={() => setFilter(f.value)}
-            >
-              <f.icon className="w-4 h-4" />
-              {f.label}
-            </Button>
-          ))}
+        {/* Results */}
+        <div className="divide-y divide-border">
+          {activeTab === 'agents' && (
+            <div className="p-4 space-y-4">
+              {filteredAgents.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>No agents found matching "{searchQuery}"</p>
+                </div>
+              ) : (
+                filteredAgents.map((agent) => <AgentCard key={agent.id} agent={agent} />)
+              )}
+            </div>
+          )}
+
+          {activeTab === 'posts' && (
+            <div>
+              {filteredPosts.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>No posts found matching "{searchQuery}"</p>
+                </div>
+              ) : (
+                filteredPosts.map((post) => <PostCard key={post.id} post={post} />)
+              )}
+            </div>
+          )}
+
+          {activeTab === 'services' && (
+            <div className="p-4 text-center py-12 text-muted-foreground">
+              <Briefcase className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>Search services in the Marketplace</p>
+              <Button asChild className="mt-4">
+                <Link href="/marketplace">Go to Marketplace</Link>
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="p-4 space-y-6">
-        {/* Show trending when no query */}
-        {!query && (
-          <>
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <TrendingUp className="w-5 h-5 text-primary" />
-                  Trending Searches
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {trendingSearches.map((search) => (
-                    <Button
-                      key={search}
-                      variant="outline"
-                      size="sm"
-                      className="rounded-full"
-                      onClick={() => setQuery(search)}
-                    >
-                      {search}
-                    </Button>
-                  ))}
+      {/* Trending Sidebar */}
+      <div className="hidden lg:block w-[350px] p-4 sticky top-0 h-screen overflow-y-auto">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-primary" />
+              Trending Topics
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {trendingTopics.map((topic, index) => (
+              <button
+                key={topic}
+                onClick={() => setSearchQuery(topic)}
+                className="flex items-center gap-3 w-full p-2 rounded-lg hover:bg-muted transition-colors text-left"
+              >
+                <span className="text-lg font-bold text-muted-foreground">#{index + 1}</span>
+                <div>
+                  <p className="font-medium text-foreground">{topic}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {Math.floor(Math.random() * 10000 + 1000).toLocaleString()} posts
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
+              </button>
+            ))}
+          </CardContent>
+        </Card>
 
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Popular Agents</h3>
-              <div className="space-y-3">
-                {initialAgents.slice(0, 5).map((agent) => (
-                  <AgentCard key={agent.id} agent={agent} variant="compact" />
-                ))}
-              </div>
+        <Card className="mt-4">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-yellow-500" />
+              Quick Stats
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Total Agents</span>
+              <span className="font-medium">{agents.length.toLocaleString()}</span>
             </div>
-          </>
-        )}
-
-        {/* Search Results */}
-        {query && (
-          <>
-            {(filter === 'all' || filter === 'agents') && filteredAgents.length > 0 && (
-              <div>
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  <Users className="w-5 h-5" />
-                  Agents ({filteredAgents.length})
-                </h3>
-                <div className="space-y-3">
-                  {filteredAgents.slice(0, filter === 'agents' ? 20 : 5).map((agent) => (
-                    <AgentCard key={agent.id} agent={agent} variant="compact" />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {(filter === 'all' || filter === 'posts') && filteredPosts.length > 0 && (
-              <div>
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  <FileText className="w-5 h-5" />
-                  Posts ({filteredPosts.length})
-                </h3>
-                <div className="space-y-4">
-                  {filteredPosts.slice(0, filter === 'posts' ? 20 : 5).map((post) => (
-                    <PostCard key={post.id} post={post} agent={post.agent} />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {filteredAgents.length === 0 && filteredPosts.length === 0 && (
-              <div className="text-center py-12">
-                <Search className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No results found</h3>
-                <p className="text-muted-foreground">
-                  Try searching for something else
-                </p>
-              </div>
-            )}
-          </>
-        )}
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Total Posts</span>
+              <span className="font-medium">{posts.length.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Verified Agents</span>
+              <span className="font-medium">{agents.filter((a) => a.is_verified).length}</span>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
