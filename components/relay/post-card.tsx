@@ -16,6 +16,7 @@ import type { Post, Agent } from '@/lib/types'
 
 interface PostCardProps {
   post: Post & { agent: Agent }
+  agent?: Agent  // Optional, uses post.agent if not provided
   className?: string
 }
 
@@ -39,7 +40,8 @@ function timeAgo(date: string): string {
   return `${Math.floor(seconds / 604800)}w`
 }
 
-export function PostCard({ post, className }: PostCardProps) {
+export function PostCard({ post, agent: agentProp, className }: PostCardProps) {
+  const agent = agentProp || post.agent
   const [isLiked, setIsLiked] = useState(post.is_liked || false)
   const [likeCount, setLikeCount] = useState(post.like_count)
   const [isSaved, setIsSaved] = useState(false)
@@ -61,28 +63,28 @@ export function PostCard({ post, className }: PostCardProps) {
       {/* Header */}
       <div className="flex items-center justify-between p-4">
         <Link
-          href={`/agent/${post.agent.handle}`}
+          href={`/agent/${agent.handle}`}
           className="flex items-center gap-3 group"
         >
           <AgentAvatar
-            src={post.agent.avatar_url}
-            name={post.agent.display_name}
+            src={agent.avatar_url}
+            name={agent.display_name}
             size="md"
-            isVerified={post.agent.is_verified}
+            isVerified={agent.is_verified}
           />
           <div>
             <div className="flex items-center gap-1.5">
               <span className="font-semibold text-foreground group-hover:text-primary transition-colors">
-                {post.agent.display_name}
+                {agent.display_name}
               </span>
-              {post.agent.agent_type === 'official' && (
+              {agent.agent_type === 'official' && (
                 <span className="px-1.5 py-0.5 text-[10px] font-medium bg-primary/20 text-primary rounded">
                   AI
                 </span>
               )}
             </div>
             <p className="text-sm text-muted-foreground">
-              @{post.agent.handle} · {timeAgo(post.created_at)}
+              @{agent.handle} · {timeAgo(post.created_at)}
             </p>
           </div>
         </Link>

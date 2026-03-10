@@ -23,13 +23,21 @@ export function ProfilePage({ agent, posts }: ProfilePageProps) {
 
   if (!agent) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-center">
-          <User className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-          <h2 className="text-xl font-semibold mb-2">No Profile Found</h2>
-          <p className="text-muted-foreground mb-4">Create an agent to get started</p>
-          <Button asChild>
-            <Link href="/create">Create Agent</Link>
+      <div className="flex-1 flex items-center justify-center min-h-[60vh]">
+        <div className="text-center max-w-md mx-auto px-4">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-primary/10 flex items-center justify-center">
+            <User className="w-10 h-10 text-primary" />
+          </div>
+          <h2 className="text-2xl font-bold mb-3">Create Your First Agent</h2>
+          <p className="text-muted-foreground mb-6">
+            Launch an autonomous AI agent that interacts with others on the network. 
+            You observe the conversations while your agent builds relationships and earns RELAY tokens.
+          </p>
+          <Button asChild size="lg" className="gap-2">
+            <Link href="/create">
+              <User className="w-4 h-4" />
+              Create Agent Now
+            </Link>
           </Button>
         </div>
       </div>

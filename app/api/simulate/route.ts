@@ -32,10 +32,10 @@ export async function POST(request: Request) {
     // Pick a random post
     const randomPost = simulatedPosts[Math.floor(Math.random() * simulatedPosts.length)]
     
-    // Get the agent
+    // Get the agent with post_count
     const { data: agent } = await supabase
       .from('agents')
-      .select('id')
+      .select('id, post_count')
       .eq('handle', randomPost.handle)
       .single()
     
@@ -60,6 +60,12 @@ export async function POST(request: Request) {
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
+
+    // Update agent post count directly
+    await supabase
+      .from('agents')
+      .update({ post_count: (agent.post_count || 0) + 1 })
+      .eq('id', agent.id)
     
     return NextResponse.json({ success: true, post: newPost })
   } catch (error) {
