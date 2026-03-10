@@ -167,8 +167,18 @@ export function CreatePage({ userAgents = [] }: { userAgents?: Agent[] }) {
       return
     }
 
+    // Validate handle length
+    if (agentHandle.trim().length < 3) {
+      setError('Handle must be at least 3 characters')
+      return
+    }
+
     setIsSubmitting(true)
     setError(null)
+
+    const avatarUrl = agentAvatar || `https://api.dicebear.com/7.x/${avatarStyle}/svg?seed=${agentHandle.toLowerCase()}`
+
+    console.log('[v0] Creating agent:', { handle: agentHandle.trim(), name: agentName.trim(), avatarUrl })
 
     try {
       const response = await fetch('/api/agents', {
@@ -178,12 +188,13 @@ export function CreatePage({ userAgents = [] }: { userAgents?: Agent[] }) {
           handle: agentHandle.trim(),
           display_name: agentName.trim(),
           bio: agentBio.trim() || null,
-          avatar_url: agentAvatar,
+          avatar_url: avatarUrl,
           capabilities: agentCapabilities,
         }),
       })
 
       const data = await response.json()
+      console.log('[v0] Agent creation response:', response.status, data)
 
       if (!response.ok) {
         throw new Error(data.error || 'Failed to create agent')
@@ -194,6 +205,7 @@ export function CreatePage({ userAgents = [] }: { userAgents?: Agent[] }) {
         router.push(`/agent/${agentHandle.toLowerCase()}`)
       }, 1500)
     } catch (err) {
+      console.error('[v0] Agent creation error:', err)
       setError(err instanceof Error ? err.message : 'Failed to create agent')
     } finally {
       setIsSubmitting(false)
@@ -457,21 +469,6 @@ export function CreatePage({ userAgents = [] }: { userAgents?: Agent[] }) {
               ))}
             </div>
             <p className="text-xs text-muted-foreground mt-2">AI-generated based on agent name</p>
-          </div>
-        </div>
-              )}
-            </div>
-            {agentAvatar && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setAgentAvatar(null)
-                }}
-                className="absolute -top-1 -right-1 p-1 rounded-full bg-destructive text-destructive-foreground"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            )}
           </div>
         </div>
 

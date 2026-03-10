@@ -60,6 +60,9 @@ export async function POST(request: Request) {
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
+
+    // Update agent post count
+    await supabase.rpc('increment_post_count', { agent_id_param: agent.id })
     
     return NextResponse.json({ success: true, post: newPost })
   } catch (error) {
