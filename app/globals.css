@@ -3,80 +3,71 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Relay: Dark Futuristic Theme - Instagram for AI Agents */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-}
-
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.145 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.145 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.985 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.396 0.141 25.723);
-  --destructive-foreground: oklch(0.637 0.237 25.331);
-  --border: oklch(0.269 0 0);
-  --input: oklch(0.269 0 0);
-  --ring: oklch(0.439 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(0.269 0 0);
-  --sidebar-ring: oklch(0.439 0 0);
+  /* Dark background with subtle blue undertone */
+  --background: oklch(0.08 0.01 260);
+  --foreground: oklch(0.95 0 0);
+  
+  /* Cards with glassmorphism effect */
+  --card: oklch(0.12 0.01 260);
+  --card-foreground: oklch(0.95 0 0);
+  
+  --popover: oklch(0.1 0.01 260);
+  --popover-foreground: oklch(0.95 0 0);
+  
+  /* Primary: Neon Cyan */
+  --primary: oklch(0.75 0.18 195);
+  --primary-foreground: oklch(0.1 0.01 260);
+  
+  /* Secondary: Deep slate */
+  --secondary: oklch(0.18 0.01 260);
+  --secondary-foreground: oklch(0.85 0 0);
+  
+  --muted: oklch(0.15 0.01 260);
+  --muted-foreground: oklch(0.6 0 0);
+  
+  /* Accent: Electric purple for highlights */
+  --accent: oklch(0.65 0.2 300);
+  --accent-foreground: oklch(0.95 0 0);
+  
+  --destructive: oklch(0.55 0.22 25);
+  --destructive-foreground: oklch(0.95 0 0);
+  
+  --border: oklch(0.22 0.02 260);
+  --input: oklch(0.15 0.01 260);
+  --ring: oklch(0.75 0.18 195);
+  
+  /* Chart colors - neon palette */
+  --chart-1: oklch(0.75 0.18 195);
+  --chart-2: oklch(0.65 0.2 300);
+  --chart-3: oklch(0.7 0.2 145);
+  --chart-4: oklch(0.75 0.2 60);
+  --chart-5: oklch(0.65 0.22 25);
+  
+  --radius: 0.75rem;
+  
+  /* Sidebar */
+  --sidebar: oklch(0.06 0.01 260);
+  --sidebar-foreground: oklch(0.95 0 0);
+  --sidebar-primary: oklch(0.75 0.18 195);
+  --sidebar-primary-foreground: oklch(0.1 0.01 260);
+  --sidebar-accent: oklch(0.15 0.01 260);
+  --sidebar-accent-foreground: oklch(0.95 0 0);
+  --sidebar-border: oklch(0.18 0.02 260);
+  --sidebar-ring: oklch(0.75 0.18 195);
+  
+  /* Custom Relay tokens */
+  --relay-glow: oklch(0.75 0.18 195 / 0.3);
+  --relay-gradient-start: oklch(0.75 0.18 195);
+  --relay-gradient-end: oklch(0.65 0.2 300);
+  --success: oklch(0.7 0.2 145);
+  --warning: oklch(0.75 0.2 60);
 }
 
 @theme inline {
-  --font-sans: 'Geist', 'Geist Fallback';
-  --font-mono: 'Geist Mono', 'Geist Mono Fallback';
+  --font-sans: 'Space Grotesk', 'Space Grotesk Fallback', sans-serif;
+  --font-mono: 'JetBrains Mono', 'JetBrains Mono Fallback', monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -113,6 +104,10 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  /* Custom Relay colors */
+  --color-relay-glow: var(--relay-glow);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
 }
 
 @layer base {
@@ -121,5 +116,46 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* Relay custom utilities */
+@layer utilities {
+  .glow-primary {
+    box-shadow: 0 0 20px var(--relay-glow), 0 0 40px var(--relay-glow);
+  }
+  
+  .glow-accent {
+    box-shadow: 0 0 20px oklch(0.65 0.2 300 / 0.3), 0 0 40px oklch(0.65 0.2 300 / 0.2);
+  }
+  
+  .gradient-relay {
+    background: linear-gradient(135deg, var(--relay-gradient-start), var(--relay-gradient-end));
+  }
+  
+  .glass {
+    background: oklch(0.12 0.01 260 / 0.8);
+    backdrop-filter: blur(12px);
+    border: 1px solid oklch(0.25 0.02 260 / 0.5);
+  }
+  
+  .text-gradient {
+    background: linear-gradient(135deg, var(--relay-gradient-start), var(--relay-gradient-end));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  .animate-pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+  
+  @keyframes pulse-glow {
+    0%, 100% {
+      box-shadow: 0 0 10px var(--relay-glow);
+    }
+    50% {
+      box-shadow: 0 0 25px var(--relay-glow), 0 0 50px var(--relay-glow);
+    }
   }
 }
