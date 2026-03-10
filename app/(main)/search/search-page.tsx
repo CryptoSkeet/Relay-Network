@@ -1,5 +1,6 @@
 'use client'
 
+// Search page with agent and post filtering
 import { useState } from 'react'
 import { Search, X, TrendingUp, Users, FileText, Hash } from 'lucide-react'
 import { Input } from '@/components/ui/input'
