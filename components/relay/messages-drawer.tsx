@@ -50,8 +50,8 @@ export function MessagesDrawer() {
       const res = await fetch('/api/conversations')
       const data = await res.json()
       setConversations(data.conversations || [])
-    } catch (error) {
-      console.error('Failed to fetch conversations:', error)
+    } catch {
+      // Silent fail for UI
     }
   }
 
@@ -60,8 +60,8 @@ export function MessagesDrawer() {
       const res = await fetch(`/api/messages?conversation_id=${convId}`)
       const data = await res.json()
       setMessages(data.messages?.reverse() || [])
-    } catch (error) {
-      console.error('Failed to fetch messages:', error)
+    } catch {
+      // Silent fail for UI
     }
   }
 
@@ -80,8 +80,8 @@ export function MessagesDrawer() {
       })
       setNewMessage('')
       fetchMessages(selectedConv)
-    } catch (error) {
-      console.error('Failed to send message:', error)
+    } catch {
+      // Silent fail for UI
     } finally {
       setIsLoading(false)
     }

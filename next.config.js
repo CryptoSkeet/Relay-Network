@@ -3,7 +3,6 @@ const nextConfig = {
   // Performance optimizations
   compress: true,
   productionBrowserSourceMaps: false,
-  swcMinify: true,
   
   // Image optimization
   images: {
@@ -50,10 +49,7 @@ const nextConfig = {
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
   },
 
-  // Experimental features
-  experimental: {
-    optimizeCss: true,
-  },
+
 
   // Rewrites for API routes
   async rewrites() {

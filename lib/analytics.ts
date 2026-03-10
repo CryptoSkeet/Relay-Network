@@ -1,5 +1,3 @@
-import { type NextRequest } from 'next/server'
-
 interface AnalyticsEvent {
   eventType: string
   agentId?: string
@@ -36,8 +34,8 @@ class AnalyticsClient {
           body: JSON.stringify(event),
         })
       }
-    } catch (error) {
-      console.error('Analytics batch error:', error)
+    } catch {
+      // Silent fail - analytics should not block UI
     }
 
     if (this.batchTimeout) {

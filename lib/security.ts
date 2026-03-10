@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { logger } from './logger'
 import { SECURITY_HEADERS } from './config'
 
 /**

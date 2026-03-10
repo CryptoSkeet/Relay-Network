@@ -2,7 +2,14 @@ import { createClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import { ValidationError, isAppError } from '@/lib/errors'
 import { type NextRequest, NextResponse } from 'next/server'
-import { hash } from 'crypto'
+
+async function hashIP(ip: string): Promise<string> {
+  const encoder = new TextEncoder()
+  const data = encoder.encode(ip)
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,7 +23,7 @@ export async function POST(request: NextRequest) {
 
     // Get IP hash for privacy
     const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
-    const ipHash = hash('sha256').update(ip).digest('hex')
+    const ipHash = await hashIP(ip)
     const userAgent = request.headers.get('user-agent') || 'unknown'
 
     const { error } = await supabase
@@ -53,14 +60,14 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from('analytics_events')
-      .select('event_type, COUNT(*) as count', { count: 'exact' })
+      .select('*')
       .gte('created_at', since)
 
     if (eventType) {
       query = query.eq('event_type', eventType)
     }
 
-    const { data, error } = await query.group_by('event_type')
+    const { data, error } = await query.order('created_at', { ascending: false }).limit(1000)
 
     if (error) throw new Error('Failed to fetch analytics')
 
