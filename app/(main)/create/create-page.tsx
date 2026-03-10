@@ -82,21 +82,26 @@ export function CreatePage({ userAgents = [] }: { userAgents?: Agent[] }) {
     formData.append('file', file)
 
     try {
+      console.log('[v0] Uploading file:', file.name, file.type, file.size)
       const response = await fetch('/api/upload', {
         method: 'POST',
         body: formData,
       })
 
+      console.log('[v0] Upload response status:', response.status)
+      
       if (!response.ok) {
         const data = await response.json()
+        console.log('[v0] Upload error:', data)
         throw new Error(data.error || 'Upload failed')
       }
 
       const data = await response.json()
+      console.log('[v0] Upload success:', data.url)
       const type = file.type.startsWith('video/') ? 'video' : 'image'
       return { url: data.url, type }
     } catch (err) {
-      console.error('Upload error:', err)
+      console.error('[v0] Upload error:', err)
       return null
     }
   }
@@ -125,18 +130,30 @@ export function CreatePage({ userAgents = [] }: { userAgents?: Agent[] }) {
 
   const handleAvatarUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (!file) return
+    if (!file) {
+      console.log('[v0] No avatar file selected')
+      return
+    }
 
+    console.log('[v0] Avatar upload started:', file.name, file.type)
     setIsUploading(true)
+    setError(null)
     try {
       const result = await uploadFile(file)
+      console.log('[v0] Avatar upload result:', result)
       if (result) {
+        console.log('[v0] Setting avatar URL:', result.url)
         setAgentAvatar(result.url)
+      } else {
+        console.log('[v0] Avatar upload returned null')
+        setError('Failed to upload avatar')
       }
     } catch (err) {
+      console.error('[v0] Avatar upload error:', err)
       setError('Failed to upload avatar')
     } finally {
       setIsUploading(false)
+      if (avatarInputRef.current) avatarInputRef.current.value = ''
     }
   }, [])
 
@@ -150,6 +167,7 @@ export function CreatePage({ userAgents = [] }: { userAgents?: Agent[] }) {
       return
     }
 
+    console.log('[v0] Creating agent:', { handle: agentHandle, name: agentName, avatar: agentAvatar })
     setIsSubmitting(true)
     setError(null)
 
@@ -166,7 +184,9 @@ export function CreatePage({ userAgents = [] }: { userAgents?: Agent[] }) {
         }),
       })
 
+      console.log('[v0] Agent creation response status:', response.status)
       const data = await response.json()
+      console.log('[v0] Agent creation response:', data)
 
       if (!response.ok) {
         throw new Error(data.error || 'Failed to create agent')
@@ -177,6 +197,7 @@ export function CreatePage({ userAgents = [] }: { userAgents?: Agent[] }) {
         router.push(`/agent/${agentHandle.toLowerCase()}`)
       }, 1500)
     } catch (err) {
+      console.error('[v0] Agent creation error:', err)
       setError(err instanceof Error ? err.message : 'Failed to create agent')
     } finally {
       setIsSubmitting(false)
@@ -399,7 +420,12 @@ export function CreatePage({ userAgents = [] }: { userAgents?: Agent[] }) {
               )}
             >
               {agentAvatar ? (
-                <img src={agentAvatar} alt="Avatar" className="w-full h-full object-cover" />
+                <>
+                  <img src={agentAvatar} alt="Avatar" className="w-full h-full object-cover" onError={(e) => {
+                    console.error('[v0] Avatar image failed to load:', agentAvatar)
+                    e.currentTarget.style.display = 'none'
+                  }} />
+                </>
               ) : isUploading ? (
                 <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
               ) : (
