@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import {
   Home,
@@ -10,7 +12,6 @@ import {
   MessageCircle,
   Bell,
   PlusSquare,
-  User,
   Briefcase,
   FileText,
   Zap,
@@ -28,6 +29,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import type { Agent } from '@/lib/types'
 
 interface SidebarProps {
   className?: string
@@ -50,142 +52,183 @@ const secondaryNavItems = [
   { href: '/create', label: 'Create', icon: PlusSquare },
   { href: '/analytics', label: 'Analytics', icon: TrendingUp },
   { href: '/settings', label: 'Settings', icon: Settings },
-  { href: '/admin', label: 'Admin', icon: Shield, adminOnly: true },
+  { href: '/admin', label: 'Admin', icon: Shield },
 ]
 
 export function Sidebar({ className }: SidebarProps) {
   const pathname = usePathname()
+  const [agent, setAgent] = useState<Agent | null>(null)
+
+  useEffect(() => {
+    async function loadAgent() {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+
+      if (user) {
+        const { data } = await supabase
+          .from('agents')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single()
+        if (data) setAgent(data)
+      } else {
+        // Demo: load most active agent
+        const { data } = await supabase
+          .from('agents')
+          .select('*')
+          .order('post_count', { ascending: false })
+          .limit(1)
+          .single()
+        if (data) setAgent(data)
+      }
+    }
+    loadAgent()
+  }, [])
 
   return (
     <TooltipProvider delayDuration={0}>
-    <aside
-      className={cn(
-        'fixed left-0 top-0 z-40 h-screen',
-        'w-[72px] xl:w-[244px]',
-        'bg-sidebar border-r border-sidebar-border',
-        'flex flex-col',
-        className
-      )}
-    >
-      {/* Logo */}
-      <div className="flex items-center h-16 px-4 xl:px-6">
-        <Link href="/" className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg gradient-relay flex items-center justify-center glow-primary">
-            <Zap className="w-5 h-5 text-primary-foreground" />
-          </div>
-          <span className="hidden xl:block text-xl font-bold text-gradient">
-            Relay
-          </span>
-        </Link>
-      </div>
+      <aside
+        className={cn(
+          'fixed left-0 top-0 z-40 h-screen',
+          'w-[72px] xl:w-[244px]',
+          'bg-sidebar border-r border-sidebar-border',
+          'flex flex-col',
+          className
+        )}
+      >
+        {/* Logo */}
+        <div className="flex items-center h-16 px-4 xl:px-6">
+          <Link href="/" className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg gradient-relay flex items-center justify-center glow-primary">
+              <Zap className="w-5 h-5 text-primary-foreground" />
+            </div>
+            <span className="hidden xl:block text-xl font-bold text-gradient">
+              Relay
+            </span>
+          </Link>
+        </div>
 
-      {/* Main navigation */}
-      <nav className="flex-1 px-2 xl:px-3 py-4 space-y-1">
-        {mainNavItems.map((item) => {
-          const isActive = pathname === item.href
-          return (
-            <Tooltip key={item.href}>
-              <TooltipTrigger asChild>
-                <Link
-                  href={item.href}
-                  className={cn(
-                    'flex items-center gap-4 px-3 py-3 rounded-xl',
-                    'transition-all duration-200',
-                    'hover:bg-sidebar-accent',
-                    isActive && 'bg-sidebar-accent text-sidebar-primary',
-                    !isActive && 'text-sidebar-foreground/70 hover:text-sidebar-foreground'
-                  )}
-                >
-                  <item.icon
+        {/* Main navigation */}
+        <nav className="flex-1 px-2 xl:px-3 py-4 space-y-1 overflow-y-auto">
+          {mainNavItems.map((item) => {
+            const isActive = pathname === item.href
+            return (
+              <Tooltip key={item.href}>
+                <TooltipTrigger asChild>
+                  <Link
+                    href={item.href}
                     className={cn(
-                      'w-6 h-6 shrink-0',
-                      isActive && 'text-primary'
+                      'flex items-center gap-4 px-3 py-3 rounded-xl',
+                      'transition-all duration-200',
+                      'hover:bg-sidebar-accent',
+                      isActive && 'bg-sidebar-accent text-sidebar-primary',
+                      !isActive && 'text-sidebar-foreground/70 hover:text-sidebar-foreground'
                     )}
-                  />
-                  <span className="hidden xl:block font-medium">
-                    {item.label}
-                  </span>
-                  {item.label === 'Notifications' && (
-                    <span className="hidden xl:flex ml-auto w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs items-center justify-center font-semibold">
-                      3
+                  >
+                    <item.icon
+                      className={cn(
+                        'w-6 h-6 shrink-0',
+                        isActive && 'text-primary'
+                      )}
+                    />
+                    <span className="hidden xl:block font-medium">
+                      {item.label}
                     </span>
-                  )}
-                </Link>
-              </TooltipTrigger>
-              <TooltipContent side="right" sideOffset={10}>
-                <p>{item.label}</p>
-              </TooltipContent>
-            </Tooltip>
-          )
-        })}
-
-        <div className="my-4 h-px bg-sidebar-border" />
-
-        {secondaryNavItems.map((item) => {
-          const isActive = pathname === item.href
-          return (
-            <Tooltip key={item.href}>
-              <TooltipTrigger asChild>
-                <Link
-                  href={item.href}
-                  className={cn(
-                    'flex items-center gap-4 px-3 py-3 rounded-xl',
-                    'transition-all duration-200',
-                    'hover:bg-sidebar-accent',
-                    isActive && 'bg-sidebar-accent text-sidebar-primary',
-                    !isActive && 'text-sidebar-foreground/70 hover:text-sidebar-foreground'
-                  )}
-                >
-                  <item.icon
-                    className={cn(
-                      'w-6 h-6 shrink-0',
-                      isActive && 'text-primary'
+                    {item.label === 'Notifications' && (
+                      <span className="hidden xl:flex ml-auto w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs items-center justify-center font-semibold">
+                        3
+                      </span>
                     )}
-                  />
-                  <span className="hidden xl:block font-medium">
-                    {item.label}
-                  </span>
-                </Link>
-              </TooltipTrigger>
-              <TooltipContent side="right" sideOffset={10}>
-                <p>{item.label}</p>
-              </TooltipContent>
-            </Tooltip>
-          )
-        })}
-      </nav>
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent side="right" sideOffset={10}>
+                  <p>{item.label}</p>
+                </TooltipContent>
+              </Tooltip>
+            )
+          })}
 
-      {/* Profile */}
-      <div className="p-2 xl:p-3 border-t border-sidebar-border">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Link
-              href="/profile"
-              className={cn(
-                'flex items-center gap-3 px-3 py-3 rounded-xl',
-                'transition-all duration-200',
-                'hover:bg-sidebar-accent',
-                pathname === '/profile' && 'bg-sidebar-accent'
-              )}
-            >
-              <AgentAvatar
-                src={null}
-                name="Your Agent"
-                size="sm"
-                isOnline
-              />
-              <div className="hidden xl:block flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">Your Agent</p>
-                <p className="text-xs text-muted-foreground truncate">@your_handle</p>
-              </div>
-            </Link>
-          </TooltipTrigger>
-          <TooltipContent side="right" sideOffset={10}>
-            <p>Profile</p>
-          </TooltipContent>
-        </Tooltip>
-      </div>
-    </aside>
+          <div className="my-4 h-px bg-sidebar-border" />
+
+          {secondaryNavItems.map((item) => {
+            const isActive = pathname === item.href
+            return (
+              <Tooltip key={item.href}>
+                <TooltipTrigger asChild>
+                  <Link
+                    href={item.href}
+                    className={cn(
+                      'flex items-center gap-4 px-3 py-3 rounded-xl',
+                      'transition-all duration-200',
+                      'hover:bg-sidebar-accent',
+                      isActive && 'bg-sidebar-accent text-sidebar-primary',
+                      !isActive && 'text-sidebar-foreground/70 hover:text-sidebar-foreground'
+                    )}
+                  >
+                    <item.icon
+                      className={cn(
+                        'w-6 h-6 shrink-0',
+                        isActive && 'text-primary'
+                      )}
+                    />
+                    <span className="hidden xl:block font-medium">
+                      {item.label}
+                    </span>
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent side="right" sideOffset={10}>
+                  <p>{item.label}</p>
+                </TooltipContent>
+              </Tooltip>
+            )
+          })}
+        </nav>
+
+        {/* Active Agent at bottom */}
+        <div className="p-2 xl:p-3 border-t border-sidebar-border">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link
+                href={agent ? `/agent/${agent.handle}` : '/profile'}
+                className={cn(
+                  'flex items-center gap-3 px-3 py-3 rounded-xl',
+                  'transition-all duration-200',
+                  'hover:bg-sidebar-accent',
+                  (pathname === '/profile' || pathname.startsWith('/agent/')) && 'bg-sidebar-accent'
+                )}
+              >
+                <div className="relative shrink-0">
+                  <AgentAvatar
+                    src={agent?.avatar_url ?? null}
+                    name={agent?.display_name ?? 'Your Agent'}
+                    size="sm"
+                  />
+                  {/* Green active dot */}
+                  <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-sidebar animate-pulse" />
+                </div>
+                <div className="hidden xl:block flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-sm font-semibold truncate">
+                      {agent?.display_name ?? 'Your Agent'}
+                    </p>
+                    <span className="shrink-0 text-[10px] font-medium text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded-full">
+                      Active
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground truncate">
+                    @{agent?.handle ?? 'your_handle'}
+                  </p>
+                </div>
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent side="right" sideOffset={10}>
+              <p>{agent ? `@${agent.handle} — Active` : 'Your Agent'}</p>
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      </aside>
     </TooltipProvider>
   )
 }

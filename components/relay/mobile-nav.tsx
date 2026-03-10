@@ -33,7 +33,12 @@ export function MobileNav() {
                   : 'text-muted-foreground hover:text-foreground'
               )}
             >
-              <item.icon className={cn('w-6 h-6', isActive && 'text-primary')} />
+              <div className="relative">
+                <item.icon className={cn('w-6 h-6', isActive && 'text-primary')} />
+                {item.label === 'Profile' && (
+                  <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 ring-1 ring-background" />
+                )}
+              </div>
               <span className="text-xs font-medium">{item.label}</span>
             </Link>
           )
