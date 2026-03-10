@@ -16,6 +16,9 @@ import {
   Zap,
   Settings,
   TrendingUp,
+  Shield,
+  Wallet,
+  Building2,
 } from 'lucide-react'
 import { AgentAvatar } from './agent-avatar'
 
@@ -29,6 +32,8 @@ const mainNavItems = [
   { href: '/explore', label: 'Explore', icon: Compass },
   { href: '/marketplace', label: 'Marketplace', icon: Briefcase },
   { href: '/contracts', label: 'Contracts', icon: FileText },
+  { href: '/wallet', label: 'Wallet', icon: Wallet },
+  { href: '/businesses', label: 'Businesses', icon: Building2 },
   { href: '/messages', label: 'Messages', icon: MessageCircle },
   { href: '/notifications', label: 'Notifications', icon: Bell },
 ]
@@ -37,6 +42,7 @@ const secondaryNavItems = [
   { href: '/create', label: 'Create', icon: PlusSquare },
   { href: '/analytics', label: 'Analytics', icon: TrendingUp },
   { href: '/settings', label: 'Settings', icon: Settings },
+  { href: '/admin', label: 'Admin', icon: Shield, adminOnly: true },
 ]
 
 export function Sidebar({ className }: SidebarProps) {

@@ -148,3 +148,134 @@ export interface FeedItem {
   data: Post | Contract | Transaction
   timestamp: string
 }
+
+// Admin/Creator Control Types
+export interface SystemSetting {
+  id: string
+  key: string
+  value: Record<string, unknown>
+  description: string | null
+  updated_by: string | null
+  updated_at: string
+}
+
+export interface AdminUser {
+  id: string
+  user_id: string
+  role: 'creator' | 'super_admin' | 'admin' | 'moderator'
+  permissions: Record<string, boolean>
+  created_at: string
+  created_by: string | null
+}
+
+export interface FeatureFlag {
+  id: string
+  name: string
+  description: string | null
+  is_enabled: boolean
+  enabled_for: Record<string, unknown>
+  updated_by: string | null
+  updated_at: string
+}
+
+export interface AgentSuspension {
+  id: string
+  agent_id: string
+  suspended_by: string | null
+  reason: string
+  suspension_type: 'warning' | 'temporary' | 'permanent' | 'shadow'
+  expires_at: string | null
+  is_active: boolean
+  created_at: string
+  agent?: Agent
+}
+
+export interface AdminLog {
+  id: string
+  admin_id: string | null
+  action: string
+  target_type: string | null
+  target_id: string | null
+  details: Record<string, unknown>
+  ip_address: string | null
+  created_at: string
+}
+
+export interface Announcement {
+  id: string
+  title: string
+  content: string
+  type: 'info' | 'warning' | 'critical' | 'maintenance'
+  is_active: boolean
+  show_until: string | null
+  created_by: string | null
+  created_at: string
+}
+
+// Wallet & Business Types
+export interface Wallet {
+  id: string
+  agent_id: string
+  balance: number
+  currency: string
+  staked_balance: number
+  locked_balance: number
+  lifetime_earned: number
+  lifetime_spent: number
+  wallet_address: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface Business {
+  id: string
+  name: string
+  handle: string
+  description: string | null
+  logo_url: string | null
+  founder_id: string | null
+  business_type: 'agency' | 'collective' | 'fund' | 'studio' | 'lab' | 'guild' | 'dao'
+  industry: string | null
+  treasury_balance: number
+  total_shares: number
+  share_price: number
+  market_cap: number
+  revenue_30d: number
+  employee_count: number
+  is_public: boolean
+  status: 'active' | 'paused' | 'dissolved'
+  founded_at: string
+  created_at: string
+  founder?: Agent
+}
+
+export interface AgentFork {
+  id: string
+  parent_id: string
+  child_id: string
+  fork_type: 'clone' | 'specialization' | 'evolution' | 'experiment'
+  inherited_capabilities: string[]
+  new_capabilities: string[]
+  removed_capabilities: string[]
+  inheritance_percentage: number
+  capital_split: number
+  reason: string | null
+  forked_at: string
+  parent?: Agent
+  child?: Agent
+}
+
+export interface AgentMerge {
+  id: string
+  primary_agent_id: string
+  secondary_agent_id: string
+  result_agent_id: string | null
+  merge_type: 'acquisition' | 'merger' | 'capability_transfer' | 'partnership'
+  capabilities_transferred: string[]
+  capital_transferred: number
+  share_exchange_ratio: number | null
+  status: 'proposed' | 'negotiating' | 'approved' | 'completed' | 'rejected'
+  terms: Record<string, unknown>
+  proposed_at: string
+  completed_at: string | null
+}
