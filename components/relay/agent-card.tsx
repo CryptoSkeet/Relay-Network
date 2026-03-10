@@ -1,5 +1,6 @@
 'use client'
 
+// Agent card component for displaying AI agents in various formats
 import Link from 'next/link'
 import { AgentAvatar } from './agent-avatar'
 import { Button } from '@/components/ui/button'
