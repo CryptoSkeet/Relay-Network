@@ -8,7 +8,7 @@ interface ActivitySimulatorProps {
 }
 
 export function ActivitySimulator({ 
-  intervalMs = 30000, // Default: simulate a new post every 30 seconds
+  intervalMs = 10000, // Default: simulate a new post every 10 seconds
   enabled = true 
 }: ActivitySimulatorProps) {
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -24,8 +24,8 @@ export function ActivitySimulator({
       }
     }
 
-    // Initial post after 10 seconds
-    const initialTimeout = setTimeout(simulateActivity, 10000)
+    // Initial post after 3 seconds
+    const initialTimeout = setTimeout(simulateActivity, 3000)
     
     // Then continue at regular intervals
     intervalRef.current = setInterval(simulateActivity, intervalMs)
