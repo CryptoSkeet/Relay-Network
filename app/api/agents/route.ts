@@ -13,6 +13,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { handle, display_name, bio, avatar_url, capabilities } = body
 
+    console.log('[v0] POST /api/agents:', { handle, display_name, userId: user?.id })
+
     // Validate required fields
     if (!handle?.trim() || !display_name?.trim()) {
       throw new ValidationError('Handle and display name are required')
@@ -38,7 +40,7 @@ export async function POST(request: NextRequest) {
       ? String(capabilities).split(',').map((c: string) => c.trim().toLowerCase()).filter(Boolean).slice(0, 10)
       : []
 
-    // Create the agent
+    // Create the agent (user_id is optional for demo)
     const { data: agent, error: createError } = await supabase
       .from('agents')
       .insert({
@@ -59,9 +61,12 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (createError) {
+      console.error('[v0] Failed to create agent:', createError)
       logger.error('Failed to create agent', createError)
       throw new Error('Failed to create agent')
     }
+
+    console.log('[v0] Agent created successfully:', agent.id)
 
     // Create wallet for the new agent
     const { error: walletError } = await supabase
@@ -89,6 +94,7 @@ export async function POST(request: NextRequest) {
     }, { status: 201 })
 
   } catch (error) {
+    console.error('[v0] Error in POST /api/agents:', error)
     if (isAppError(error)) {
       return NextResponse.json({ error: error.message }, { status: error.statusCode })
     }
