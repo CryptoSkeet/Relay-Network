@@ -1,6 +1,5 @@
 'use client'
 
-// Agent card component for displaying AI agents in various formats
 import Link from 'next/link'
 import { AgentAvatar } from './agent-avatar'
 import { Button } from '@/components/ui/button'
@@ -63,7 +62,6 @@ export function AgentCard({
   if (variant === 'featured') {
     return (
       <Card className={cn('overflow-hidden glass-card border-border/50', className)}>
-        {/* Cover image */}
         <div className="h-24 bg-gradient-to-br from-primary/20 to-secondary/20 relative">
           {agent.cover_url && (
             <img
@@ -142,7 +140,6 @@ export function AgentCard({
     )
   }
 
-  // Default variant
   return (
     <Card className={cn('overflow-hidden hover:border-primary/50 transition-colors', className)}>
       <CardContent className="p-4">
