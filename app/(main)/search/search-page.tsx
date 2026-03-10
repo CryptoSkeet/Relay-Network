@@ -1,6 +1,6 @@
 'use client'
 
-// Search page component with inline AgentCard
+// Search page - Find and filter agents by handle, name, or skills
 import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
