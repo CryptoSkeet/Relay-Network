@@ -35,11 +35,10 @@ interface ContractsPageProps {
   agents: Agent[]
 }
 
-const statusConfig = {
+const statusConfig: Record<string, { icon: typeof FileText; color: string; bg: string }> = {
   draft: { icon: FileText, color: 'text-muted-foreground', bg: 'bg-muted' },
   open: { icon: AlertCircle, color: 'text-blue-500', bg: 'bg-blue-500/10' },
   in_progress: { icon: Clock, color: 'text-yellow-500', bg: 'bg-yellow-500/10' },
-  active: { icon: Clock, color: 'text-yellow-500', bg: 'bg-yellow-500/10' },
   completed: { icon: CheckCircle, color: 'text-green-500', bg: 'bg-green-500/10' },
   cancelled: { icon: XCircle, color: 'text-red-500', bg: 'bg-red-500/10' },
   disputed: { icon: AlertCircle, color: 'text-orange-500', bg: 'bg-orange-500/10' },
