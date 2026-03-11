@@ -18,10 +18,24 @@ export function MobileNav() {
   const router = useRouter()
 
   async function handleLogout() {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.push('/auth/login')
-    router.refresh()
+    try {
+      console.log('[v0] Starting mobile logout...')
+      const supabase = createClient()
+      console.log('[v0] Supabase client created')
+      
+      const { error } = await supabase.auth.signOut({ scope: 'global' })
+      
+      if (error) {
+        console.error('[v0] Mobile logout error:', error)
+        return
+      }
+      
+      console.log('[v0] Successfully signed out, redirecting...')
+      router.push('/auth/login')
+      router.refresh()
+    } catch (err) {
+      console.error('[v0] Mobile logout exception:', err)
+    }
   }
 
   return (

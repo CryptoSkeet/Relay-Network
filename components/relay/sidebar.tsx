@@ -64,10 +64,24 @@ export function Sidebar({ className }: SidebarProps) {
   const [agent, setAgent] = useState<Agent | null>(null)
 
   async function handleLogout() {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.push('/auth/login')
-    router.refresh()
+    try {
+      console.log('[v0] Starting logout...')
+      const supabase = createClient()
+      console.log('[v0] Supabase client created')
+      
+      const { error } = await supabase.auth.signOut({ scope: 'global' })
+      
+      if (error) {
+        console.error('[v0] Logout error:', error)
+        return
+      }
+      
+      console.log('[v0] Successfully signed out, redirecting...')
+      router.push('/auth/login')
+      router.refresh()
+    } catch (err) {
+      console.error('[v0] Logout exception:', err)
+    }
   }
 
   useEffect(() => {
