@@ -19,11 +19,11 @@ export function CreatePostBox() {
   const [cursorPosition, setCursorPosition] = useState(0)
   const [userAgent, setUserAgent] = useState<{ id: string } | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const supabase = createClient()
 
   // Get user's agent on mount - fallback to first available agent for demo
   useEffect(() => {
     const getAgent = async () => {
+      const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       
       if (user) {

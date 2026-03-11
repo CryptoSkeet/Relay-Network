@@ -78,26 +78,17 @@ export function Sidebar({ className }: SidebarProps) {
     async function loadAgent() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
 
-      if (user) {
-        const { data } = await supabase
-          .from('agents')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single()
-        if (data) setAgent(data)
-      } else {
-        // Demo: load most active agent
-        const { data } = await supabase
-          .from('agents')
-          .select('*')
-          .order('post_count', { ascending: false })
-          .limit(1)
-          .single()
-        if (data) setAgent(data)
-      }
+      const { data } = await supabase
+        .from('agents')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (data) setAgent(data)
     }
     loadAgent()
   }, [])
@@ -221,45 +212,59 @@ export function Sidebar({ className }: SidebarProps) {
           </Tooltip>
         </div>
 
-        {/* Active Agent at bottom */}
+        {/* Your Agent at bottom */}
         <div className="p-2 xl:p-3 border-t border-sidebar-border">
           <Tooltip>
             <TooltipTrigger asChild>
-              <Link
-                href={agent ? `/agent/${agent.handle}` : '/profile'}
-                className={cn(
-                  'flex items-center gap-3 px-3 py-3 rounded-xl',
-                  'transition-all duration-200',
-                  'hover:bg-sidebar-accent',
-                  (pathname === '/profile' || pathname.startsWith('/agent/')) && 'bg-sidebar-accent'
-                )}
-              >
-                <div className="relative shrink-0">
-                  <AgentAvatar
-                    src={agent?.avatar_url ?? null}
-                    name={agent?.display_name ?? 'Your Agent'}
-                    size="sm"
-                  />
-                  {/* Green active dot */}
-                  <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-sidebar animate-pulse" />
-                </div>
-                <div className="hidden xl:block flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <p className="text-sm font-semibold truncate">
-                      {agent?.display_name ?? 'Your Agent'}
-                    </p>
-                    <span className="shrink-0 text-[10px] font-medium text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded-full">
-                      Active
-                    </span>
+              {agent ? (
+                <Link
+                  href={`/agent/${agent.handle}`}
+                  className={cn(
+                    'flex items-center gap-3 px-3 py-3 rounded-xl w-full',
+                    'transition-all duration-200',
+                    'hover:bg-sidebar-accent',
+                    pathname.startsWith(`/agent/${agent.handle}`) && 'bg-sidebar-accent'
+                  )}
+                >
+                  <div className="relative shrink-0">
+                    <AgentAvatar
+                      src={agent.avatar_url ?? null}
+                      name={agent.display_name}
+                      size="sm"
+                    />
+                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-sidebar animate-pulse" />
                   </div>
-                  <p className="text-xs text-muted-foreground truncate">
-                    @{agent?.handle ?? 'your_handle'}
-                  </p>
-                </div>
-              </Link>
+                  <div className="hidden xl:block flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-sm font-semibold truncate">{agent.display_name}</p>
+                      <span className="shrink-0 text-[10px] font-medium text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded-full">
+                        Active
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate">@{agent.handle}</p>
+                  </div>
+                </Link>
+              ) : (
+                <Link
+                  href="/create"
+                  className={cn(
+                    'flex items-center gap-3 px-3 py-3 rounded-xl w-full',
+                    'transition-all duration-200',
+                    'hover:bg-sidebar-accent text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  <div className="w-8 h-8 shrink-0 rounded-full bg-secondary flex items-center justify-center ring-2 ring-background">
+                    <Zap className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                  <div className="hidden xl:block flex-1 min-w-0">
+                    <p className="text-sm font-semibold truncate">Create Agent</p>
+                    <p className="text-xs text-muted-foreground truncate">Launch your AI agent</p>
+                  </div>
+                </Link>
+              )}
             </TooltipTrigger>
             <TooltipContent side="right" sideOffset={10}>
-              <p>{agent ? `@${agent.handle} — Active` : 'Your Agent'}</p>
+              <p>{agent ? `@${agent.handle} — View Profile` : 'Create Agent'}</p>
             </TooltipContent>
           </Tooltip>
         </div>
