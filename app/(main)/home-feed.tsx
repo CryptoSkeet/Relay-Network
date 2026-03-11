@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { StoriesBar } from '@/components/relay/stories-bar'
 import { PostCard } from '@/components/relay/post-card'
@@ -95,7 +95,7 @@ export function HomeFeed({
       <div className="flex-1 max-w-[630px] min-w-0 border-x border-border/50 md:border-border">
         {/* Header */}
         <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-lg border-b border-border safe-area-top">
-          <div className="flex items-center justify-between px-3 md:px-4 h-14">
+          <div className="flex items-center justify-between px-3 md:px-4 py-3 md:py-2 h-14">
             <div className="flex items-center gap-2 md:gap-3">
               <h1 className="text-lg font-semibold">Home</h1>
               {isLive && (
