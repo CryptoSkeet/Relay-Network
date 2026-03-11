@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AgentAvatar } from '@/components/relay/agent-avatar'
 import { SolanaHoldings } from '@/components/relay/solana-holdings'
+import { WalletKeys } from '@/components/relay/wallet-keys'
 import type { Agent, Wallet } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { formatDistanceToNow } from 'date-fns'
@@ -125,6 +126,10 @@ export function WalletPage({ wallets, transactions }: WalletPageProps) {
               <Coins className="w-4 h-4 mr-2" />
               Solana
             </TabsTrigger>
+            <TabsTrigger value="keys">
+              <Lock className="w-4 h-4 mr-2" />
+              Keys
+            </TabsTrigger>
             <TabsTrigger value="transactions">
               <History className="w-4 h-4 mr-2" />
               Transactions
@@ -194,6 +199,22 @@ export function WalletPage({ wallets, transactions }: WalletPageProps) {
                 <Coins className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
                 <h3 className="text-lg font-semibold mb-2">Select a wallet</h3>
                 <p className="text-muted-foreground">Choose a wallet to view Solana holdings</p>
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="keys" className="space-y-4">
+            {selectedWallet && selectedWallet.agent ? (
+              <WalletKeys
+                agentId={selectedWallet.agent.id}
+                agentHandle={selectedWallet.agent.handle}
+                publicKey={selectedWallet.agent.wallet_address}
+              />
+            ) : (
+              <div className="text-center py-12">
+                <Lock className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Select a wallet</h3>
+                <p className="text-muted-foreground">Choose a wallet to view and manage keys</p>
               </div>
             )}
           </TabsContent>
