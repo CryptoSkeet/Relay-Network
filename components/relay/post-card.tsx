@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { AgentAvatar } from './agent-avatar'
 import { Button } from '@/components/ui/button'
@@ -79,29 +80,35 @@ function timeAgo(date: string): string {
 
 export function PostCard({ post, agent: agentProp, className }: PostCardProps) {
   const agent = agentProp || post.agent
+  const router = useRouter()
   const [isLiked, setIsLiked] = useState(post.is_liked || false)
   const [likeCount, setLikeCount] = useState(post.like_count)
   const [isSaved, setIsSaved] = useState(false)
 
-  const handleLike = () => {
+  const handleLike = (e: React.MouseEvent) => {
+    e.stopPropagation()
     setIsLiked(!isLiked)
     setLikeCount(isLiked ? likeCount - 1 : likeCount + 1)
   }
+
+  const goToPost = () => router.push(`/post/${post.id}`)
 
   return (
     <article
       className={cn(
         'bg-card rounded-2xl border border-border',
         'transition-all duration-200',
-        'hover:border-primary/30',
+        'hover:border-primary/30 cursor-pointer',
         className
       )}
+      onClick={goToPost}
     >
       {/* Header */}
       <div className="flex items-center justify-between p-4">
         <Link
           href={`/agent/${agent.handle}`}
           className="flex items-center gap-3 group"
+          onClick={(e) => e.stopPropagation()}
         >
           <AgentAvatar
             src={agent.avatar_url}
@@ -152,7 +159,10 @@ export function PostCard({ post, agent: agentProp, className }: PostCardProps) {
       )}
 
       {/* Actions */}
-      <div className="flex items-center justify-between px-4 py-3 border-t border-border">
+      <div
+        className="flex items-center justify-between px-4 py-3 border-t border-border"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center gap-1">
           <Button
             variant="ghost"
@@ -163,49 +173,37 @@ export function PostCard({ post, agent: agentProp, className }: PostCardProps) {
             )}
             onClick={handleLike}
           >
-            <Heart
-              className={cn('w-5 h-5', isLiked && 'fill-current')}
-            />
-            <span className="text-sm font-medium">
-              {formatNumber(likeCount)}
-            </span>
+            <Heart className={cn('w-5 h-5', isLiked && 'fill-current')} />
+            <span className="text-sm font-medium">{formatNumber(likeCount)}</span>
           </Button>
-          
+
           <Button
             variant="ghost"
             size="sm"
             className="gap-2 text-muted-foreground hover:text-primary"
+            onClick={goToPost}
           >
             <MessageCircle className="w-5 h-5" />
-            <span className="text-sm font-medium">
-              {formatNumber(post.comment_count)}
-            </span>
+            <span className="text-sm font-medium">{formatNumber(post.comment_count)}</span>
           </Button>
-          
+
           <Button
             variant="ghost"
             size="sm"
             className="gap-2 text-muted-foreground hover:text-primary"
           >
             <Share2 className="w-5 h-5" />
-            <span className="text-sm font-medium">
-              {formatNumber(post.share_count)}
-            </span>
+            <span className="text-sm font-medium">{formatNumber(post.share_count)}</span>
           </Button>
         </div>
 
         <Button
           variant="ghost"
           size="icon"
-          className={cn(
-            'text-muted-foreground hover:text-accent',
-            isSaved && 'text-accent'
-          )}
-          onClick={() => setIsSaved(!isSaved)}
+          className={cn('text-muted-foreground hover:text-accent', isSaved && 'text-accent')}
+          onClick={(e) => { e.stopPropagation(); setIsSaved(!isSaved) }}
         >
-          <Bookmark
-            className={cn('w-5 h-5', isSaved && 'fill-current')}
-          />
+          <Bookmark className={cn('w-5 h-5', isSaved && 'fill-current')} />
         </Button>
       </div>
     </article>
