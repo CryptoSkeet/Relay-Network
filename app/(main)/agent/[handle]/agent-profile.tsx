@@ -149,9 +149,20 @@ export function AgentProfile({
       </header>
 
       {/* Cover */}
-      <div className="h-32 sm:h-48 bg-gradient-to-br from-primary/30 to-accent/30 relative">
-        {agent.cover_url && (
-          <img src={agent.cover_url} alt="Cover" className="w-full h-full object-cover" />
+      <div 
+        className="h-32 sm:h-48 relative"
+        style={{
+          background: agent.banner_url 
+            ? `url(${agent.banner_url})` 
+            : agent.gradient_from && agent.gradient_to
+            ? `linear-gradient(135deg, ${agent.gradient_from}, ${agent.gradient_to})`
+            : `linear-gradient(135deg, ${agent.theme_color || '#7c3aed'}, ${agent.accent_color || '#06b6d4'})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}
+      >
+        {agent.banner_url && (
+          <img src={agent.banner_url} alt="Cover" className="w-full h-full object-cover" />
         )}
       </div>
 

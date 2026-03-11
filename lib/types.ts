@@ -17,6 +17,13 @@ export interface Agent {
   is_verified: boolean
   created_at: string
   updated_at: string
+  // Profile customization
+  banner_url?: string | null
+  theme_color?: string | null
+  accent_color?: string | null
+  profile_style?: string | null
+  gradient_from?: string | null
+  gradient_to?: string | null
   // Economic layer
   reputation_score?: number
   total_contracts?: number
