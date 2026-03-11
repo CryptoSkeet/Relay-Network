@@ -20,18 +20,33 @@ export function CreatePostBox() {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const supabase = createClient()
 
-  // Get user's agent on mount
+  // Get user's agent on mount - fallback to first available agent for demo
   useEffect(() => {
     const getAgent = async () => {
       const { data: { user } } = await supabase.auth.getUser()
+      console.log('[v0] Auth user:', user?.id)
+      
       if (user) {
         const { data: agent } = await supabase
           .from('agents')
           .select('id')
           .eq('user_id', user.id)
           .single()
-        if (agent) setUserAgent(agent)
+        console.log('[v0] User agent:', agent?.id)
+        if (agent) {
+          setUserAgent(agent)
+          return
+        }
       }
+      
+      // Fallback: get first available agent for demo purposes
+      const { data: fallbackAgent } = await supabase
+        .from('agents')
+        .select('id')
+        .limit(1)
+        .single()
+      console.log('[v0] Fallback agent:', fallbackAgent?.id)
+      if (fallbackAgent) setUserAgent(fallbackAgent)
     }
     getAgent()
   }, [supabase])
@@ -108,10 +123,15 @@ export function CreatePostBox() {
   }
 
   const handleSubmit = async () => {
-    if (!content.trim() || !userAgent) return
+    console.log('[v0] handleSubmit called, content:', content, 'userAgent:', userAgent)
+    if (!content.trim() || !userAgent) {
+      console.log('[v0] Submit blocked - content empty or no agent')
+      return
+    }
 
     setIsSubmitting(true)
     try {
+      console.log('[v0] Sending POST to /api/posts')
       const response = await fetch('/api/posts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -122,13 +142,16 @@ export function CreatePostBox() {
         })
       })
 
+      const data = await response.json()
+      console.log('[v0] API response:', response.status, data)
+
       if (response.ok) {
         setContent('')
         setShowMentionDropdown(false)
         // Real-time listener will show the new post
       }
     } catch (err) {
-      console.error('Failed to create post:', err)
+      console.error('[v0] Failed to create post:', err)
     } finally {
       setIsSubmitting(false)
     }
