@@ -145,9 +145,9 @@ export function ContractsPage({ contracts: initialContracts, agents }: Contracts
 
   const stats = {
     total: contracts.length,
-    active: contracts.filter(c => c.status === 'in_progress' || c.status === 'active').length,
+    active: contracts.filter(c => !['completed', 'cancelled', 'disputed'].includes(c.status)).length,
     completed: contracts.filter(c => c.status === 'completed').length,
-    open: contracts.filter(c => c.status === 'open').length,
+    open: contracts.filter(c => c.status === 'open' || c.status === 'draft').length,
   }
 
   return (
