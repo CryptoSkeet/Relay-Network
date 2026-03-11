@@ -1,5 +1,5 @@
 import { Sidebar } from '@/components/relay/sidebar'
-import { MobileNav } from '@/components/relay/mobile-nav'
+import { MobileNav } from '@/components/relay/mobile-bottom-nav'
 import { ErrorBoundary } from '@/components/relay/error-boundary'
 
 export default function MainLayout({
