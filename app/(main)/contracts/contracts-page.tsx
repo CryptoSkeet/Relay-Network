@@ -135,15 +135,14 @@ export function ContractsPage({ contracts: initialContracts, agents }: Contracts
   return (
     <div className="flex-1 max-w-6xl mx-auto">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-lg supports-[backdrop-filter]:bg-background/60 border-b border-border px-3 md:px-4 py-3 md:py-4 safe-area-top">
-        <div className="flex items-center justify-between mb-3 md:mb-4">
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-lg supports-[backdrop-filter]:bg-background/60 border-b border-border px-4 py-4 safe-area-top">
+        <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-lg md:text-2xl font-bold flex items-center gap-2">
-              <FileText className="w-5 h-5 md:w-6 md:h-6 text-primary" />
-              <span className="hidden sm:inline">Agent Collaborations</span>
-              <span className="sm:hidden">Contracts</span>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <FileText className="w-6 h-6 text-primary" />
+              Agent Collaborations
             </h1>
-            <p className="text-xs md:text-sm text-muted-foreground hidden sm:block">Track contracts and milestone progress</p>
+            <p className="text-sm text-muted-foreground">Track contracts and milestone progress</p>
           </div>
           <div className="flex gap-2">
             <Button
@@ -157,53 +156,52 @@ export function ContractsPage({ contracts: initialContracts, agents }: Contracts
             </Button>
             <Button
               onClick={() => setIsNewContractOpen(true)}
-              className="gap-1.5 md:gap-2 touch-manipulation min-h-[44px]"
+              className="gap-2 touch-manipulation min-h-[44px]"
             >
               <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">New Contract</span>
-              <span className="sm:hidden">New</span>
+              New Contract
             </Button>
           </div>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-4 gap-2 md:gap-4">
+        <div className="grid grid-cols-4 gap-4">
           <Card className="bg-muted/50">
-            <CardContent className="p-2 md:p-4">
-              <p className="text-lg md:text-2xl font-bold">{stats.total}</p>
-              <p className="text-[10px] md:text-sm text-muted-foreground">Total</p>
+            <CardContent className="p-4">
+              <p className="text-2xl font-bold">{stats.total}</p>
+              <p className="text-sm text-muted-foreground">Total</p>
             </CardContent>
           </Card>
           <Card className="bg-blue-500/10 border-blue-500/20">
-            <CardContent className="p-2 md:p-4">
-              <p className="text-lg md:text-2xl font-bold text-blue-500">{stats.open}</p>
-              <p className="text-[10px] md:text-sm text-muted-foreground">Open</p>
+            <CardContent className="p-4">
+              <p className="text-2xl font-bold text-blue-500">{stats.open}</p>
+              <p className="text-sm text-muted-foreground">Open</p>
             </CardContent>
           </Card>
           <Card className="bg-yellow-500/10 border-yellow-500/20">
-            <CardContent className="p-2 md:p-4">
-              <p className="text-lg md:text-2xl font-bold text-yellow-500">{stats.active}</p>
-              <p className="text-[10px] md:text-sm text-muted-foreground">Active</p>
+            <CardContent className="p-4">
+              <p className="text-2xl font-bold text-yellow-500">{stats.active}</p>
+              <p className="text-sm text-muted-foreground">Active</p>
             </CardContent>
           </Card>
           <Card className="bg-green-500/10 border-green-500/20">
-            <CardContent className="p-2 md:p-4">
-              <p className="text-lg md:text-2xl font-bold text-green-500">{stats.completed}</p>
-              <p className="text-[10px] md:text-sm text-muted-foreground">Done</p>
+            <CardContent className="p-4">
+              <p className="text-2xl font-bold text-green-500">{stats.completed}</p>
+              <p className="text-sm text-muted-foreground">Done</p>
             </CardContent>
           </Card>
         </div>
       </div>
 
       {/* Content */}
-      <div className="p-3 md:p-4">
+      <div className="p-4">
         {mounted ? (
-          <Tabs defaultValue="all" className="space-y-3 md:space-y-4">
-            <TabsList className="w-full overflow-x-auto scrollbar-hide flex-nowrap justify-start">
+          <Tabs defaultValue="all" className="space-y-4">
+            <TabsList className="w-full overflow-x-auto scrollbar-hide">
               <TabsTrigger value="all" onClick={() => setFilter('all')} className="touch-manipulation">All</TabsTrigger>
               <TabsTrigger value="open" onClick={() => setFilter('open')} className="touch-manipulation">Open</TabsTrigger>
               <TabsTrigger value="active" onClick={() => setFilter('active')} className="touch-manipulation">Active</TabsTrigger>
-              <TabsTrigger value="in_progress" onClick={() => setFilter('in_progress')} className="touch-manipulation whitespace-nowrap">In Progress</TabsTrigger>
+              <TabsTrigger value="in_progress" onClick={() => setFilter('in_progress')} className="touch-manipulation">In Progress</TabsTrigger>
               <TabsTrigger value="completed" onClick={() => setFilter('completed')} className="touch-manipulation">Completed</TabsTrigger>
             </TabsList>
 
