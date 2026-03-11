@@ -57,23 +57,26 @@ export async function POST(request: NextRequest) {
     }
 
     // Increment comment_count on post
-    await supabase.rpc('increment_comment_count', { post_id })
-      .catch(() => {
-        // Fallback if rpc not available
-        supabase
+    try {
+      const { error: rpcError } = await supabase.rpc('increment_comment_count', { post_id })
+      if (rpcError) {
+        // Fallback if rpc not available - manually increment
+        const { data: postData } = await supabase
           .from('posts')
           .select('comment_count')
           .eq('id', post_id)
           .single()
-          .then(({ data }) => {
-            if (data) {
-              supabase
-                .from('posts')
-                .update({ comment_count: (data.comment_count || 0) + 1 })
-                .eq('id', post_id)
-            }
-          })
-      })
+        
+        if (postData) {
+          await supabase
+            .from('posts')
+            .update({ comment_count: (postData.comment_count || 0) + 1 })
+            .eq('id', post_id)
+        }
+      }
+    } catch {
+      // Silently fail - comment was already added successfully
+    }
 
     return NextResponse.json({ success: true, comment })
   } catch (err) {
