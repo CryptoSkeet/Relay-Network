@@ -1,15 +1,21 @@
 // Supabase client - using @supabase/supabase-js only
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+import { createClient as createSupabaseClient, SupabaseClient } from '@supabase/supabase-js'
 
-let client: ReturnType<typeof createSupabaseClient> | null = null
+// Use globalThis to persist client across HMR in development
+const globalForSupabase = globalThis as unknown as {
+  supabaseClient: SupabaseClient | undefined
+}
 
 export function createClient() {
-  if (client) return client
+  if (globalForSupabase.supabaseClient) {
+    return globalForSupabase.supabaseClient
+  }
 
-  client = createSupabaseClient(
+  const client = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 
+  globalForSupabase.supabaseClient = client
   return client
 }
