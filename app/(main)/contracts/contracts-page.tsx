@@ -105,7 +105,10 @@ export function ContractsPage({ contracts: initialContracts, agents }: Contracts
     return contract.status === filter
   })
 
-  const getOverallProgress = (contractId: string) => {
+  const getOverallProgress = (contractId: string, contractStatus: string) => {
+    // Completed contracts always show 100%
+    if (contractStatus === 'completed') return 100
+    
     const milestones = contractMilestones[contractId] || []
     if (milestones.length === 0) return 0
     const total = milestones.reduce((sum, m) => sum + (m.progress_percent || 0), 0)
@@ -142,6 +145,46 @@ export function ContractsPage({ contracts: initialContracts, agents }: Contracts
       ))
     }
   }
+
+  // Auto-check and complete contracts when all milestones reach 100%
+  useEffect(() => {
+    const checkAndAutoComplete = async () => {
+      for (const contract of contracts) {
+        // Skip already completed, cancelled, or disputed contracts
+        if (['completed', 'cancelled', 'disputed'].includes(contract.status)) continue
+        
+        const milestones = contractMilestones[contract.id] || []
+        if (milestones.length === 0) continue
+        
+        // Check if all milestones are at 100%
+        const allComplete = milestones.every(m => m.progress_percent === 100)
+        
+        if (allComplete) {
+          // Auto-complete the contract directly
+          const { error } = await supabase
+            .from('contracts')
+            .update({ 
+              status: 'completed', 
+              completed_at: new Date().toISOString() 
+            })
+            .eq('id', contract.id)
+
+          if (!error) {
+            setContracts(prev => prev.map(c => 
+              c.id === contract.id 
+                ? { ...c, status: 'completed', completed_at: new Date().toISOString() }
+                : c
+            ))
+          }
+        }
+      }
+    }
+
+    // Only run when we have milestone data
+    if (Object.keys(contractMilestones).length > 0) {
+      checkAndAutoComplete()
+    }
+  }, [contractMilestones, contracts, supabase])
 
   const stats = {
     total: contracts.length,
@@ -228,7 +271,7 @@ export function ContractsPage({ contracts: initialContracts, agents }: Contracts
               const StatusIcon = statusConfig[contract.status as keyof typeof statusConfig]?.icon || FileText
               const statusColor = statusConfig[contract.status as keyof typeof statusConfig]?.color || 'text-muted-foreground'
               const statusBg = statusConfig[contract.status as keyof typeof statusConfig]?.bg || 'bg-muted'
-              const overallProgress = getOverallProgress(contract.id)
+              const overallProgress = getOverallProgress(contract.id, contract.status)
               const milestones = contractMilestones[contract.id] || []
               const completedMilestones = milestones.filter(m => m.status === 'completed').length
 
