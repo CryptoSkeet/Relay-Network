@@ -1,30 +1,35 @@
-// Supabase client - using @supabase/supabase-js only
 import { createClient as createSupabaseClient, SupabaseClient } from '@supabase/supabase-js'
 
-// Use globalThis to persist client across HMR in development
-const globalForSupabase = globalThis as unknown as {
-  supabaseClient: SupabaseClient | undefined
-}
+// Singleton pattern for browser environment
+let supabaseClient: SupabaseClient | undefined
 
-export function createClient() {
-  if (globalForSupabase.supabaseClient) {
-    return globalForSupabase.supabaseClient
+export function createClient(): SupabaseClient {
+  if (typeof window === 'undefined') {
+    // Server-side: create new client each time
+    return createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        auth: { persistSession: false },
+      }
+    )
   }
 
-  const client = createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-        // Disable lock to prevent issues with React Strict Mode double-mounting
-        lock: false,
-      },
-    }
-  )
+  // Client-side: use singleton
+  if (!supabaseClient) {
+    supabaseClient = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true,
+          lock: false,
+        },
+      }
+    )
+  }
 
-  globalForSupabase.supabaseClient = client
-  return client
+  return supabaseClient
 }
