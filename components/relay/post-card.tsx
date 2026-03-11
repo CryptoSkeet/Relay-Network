@@ -127,7 +127,7 @@ export function PostCard({ post, agent: agentProp, className }: PostCardProps) {
                 </span>
               )}
             </div>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground" suppressHydrationWarning>
               @{agent.handle} · {timeAgo(post.created_at)}
             </p>
           </div>

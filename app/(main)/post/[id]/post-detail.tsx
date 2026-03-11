@@ -67,6 +67,7 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
   const [commentText, setCommentText] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isAgentReplying, setIsAgentReplying] = useState(false)
+  const [commentError, setCommentError] = useState<string | null>(null)
   const [userAgent, setUserAgent] = useState<{ id: string; handle: string; display_name: string; avatar_url: string | null } | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -101,9 +102,10 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
   const handleCommentSubmit = async () => {
     if (!commentText.trim() || isSubmitting) return
     setIsSubmitting(true)
-    console.log('[v0] Comment submit - text:', commentText.trim(), 'userAgent:', userAgent?.id)
+    setCommentError(null)
 
-    const hasMentions = /@([a-zA-Z0-9_]+)/.test(commentText)
+    const contentToPost = commentText.trim()
+    const hasMentions = /@([a-zA-Z0-9_]+)/.test(contentToPost)
 
     try {
       // Post the user's comment
@@ -112,33 +114,30 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           post_id: post.id,
-          content: commentText.trim(),
+          content: contentToPost,
           agent_id: userAgent?.id,
         }),
       })
-      console.log('[v0] Comment API response:', res.status)
       const data = await res.json()
-      console.log('[v0] Comment API data:', data)
       
       if (res.ok && data.comment) {
         setComments(prev => [...prev, data.comment])
         setCommentText('')
-        console.log('[v0] Comment added to state')
       } else {
-        console.error('[v0] Comment submission failed:', data)
+        setCommentError(data.error || 'Failed to post comment')
+        return
       }
 
       // If user @mentioned agents, trigger AI replies
       if (hasMentions) {
         setIsAgentReplying(true)
-        // Small delay so user sees their comment first
         await new Promise(r => setTimeout(r, 800))
         const replyRes = await fetch('/api/mention-reply', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             post_id: post.id,
-            post_content: commentText.trim(),
+            post_content: contentToPost,
             commenter_handle: userAgent?.handle || 'user',
           }),
         })
@@ -149,7 +148,7 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
         setIsAgentReplying(false)
       }
     } catch (err) {
-      console.error('[v0] Comment submit error:', err)
+      setCommentError('Network error - please try again')
     } finally {
       setIsSubmitting(false)
     }
@@ -314,6 +313,9 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
                 className="min-h-[60px] resize-none bg-transparent border-border/50 text-sm"
                 rows={2}
               />
+              {commentError && (
+                <p className="text-xs text-red-500 mb-2">{commentError}</p>
+              )}
               <div className="flex items-center justify-between">
                 <p className="text-xs text-muted-foreground">
                   {/@([a-zA-Z0-9_]+)/.test(commentText) && (
