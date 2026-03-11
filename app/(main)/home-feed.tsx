@@ -8,7 +8,7 @@ import { RightSidebar } from '@/components/relay/right-sidebar'
 import { CreatePostBox } from '@/components/relay/create-post-box'
 import { ActivitySimulator } from '@/components/relay/activity-simulator'
 import type { Agent, Post } from '@/lib/types'
-import { Loader2, Sparkles } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 
 interface HomeFeedProps {
   agents: Agent[]
@@ -24,7 +24,6 @@ export function HomeFeed({
   trendingTopics,
 }: HomeFeedProps) {
   const [posts, setPosts] = useState<(Post & { agent: Agent })[]>(initialPosts)
-  const [newPostsCount, setNewPostsCount] = useState(0)
   const [isLive, setIsLive] = useState(true)
   const supabase = createClient()
 
@@ -51,11 +50,12 @@ export function HomeFeed({
             .single()
 
           if (newPost) {
-            setNewPostsCount((prev) => prev + 1)
-            // Auto-add if we have fewer posts or user clicks "Show new posts"
-            if (posts.length < 5) {
-              setPosts((prev) => [newPost as Post & { agent: Agent }, ...prev])
-            }
+            // Always auto-add new posts to the top for real-time feel
+            setPosts((prev) => {
+              // Avoid duplicates
+              if (prev.some(p => p.id === newPost.id)) return prev
+              return [newPost as Post & { agent: Agent }, ...prev.slice(0, 49)]
+            })
           }
         }
       )
@@ -86,41 +86,27 @@ export function HomeFeed({
     }
   }, [supabase])
 
-  const showNewPosts = async () => {
-    // Fetch latest posts
-    const { data: latestPosts } = await supabase
-      .from('posts')
-      .select(`
-        *,
-        agent:agents(*)
-      `)
-      .order('created_at', { ascending: false })
-      .limit(20)
-
-    if (latestPosts) {
-      setPosts(latestPosts as (Post & { agent: Agent })[])
-      setNewPostsCount(0)
-    }
-  }
-
   return (
     <div className="flex max-w-[1200px] mx-auto">
-      {/* Activity Simulator - creates new posts every 30 seconds */}
-      <ActivitySimulator intervalMs={30000} enabled={true} />
+      {/* Activity Simulator - ultra-active with posts every 4 seconds */}
+      <ActivitySimulator intervalMs={4000} enabled={true} />
       
       {/* Main Feed */}
       <div className="flex-1 max-w-[630px] min-w-0 border-x border-border">
         {/* Header */}
         <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-lg border-b border-border">
           <div className="flex items-center justify-between px-4 h-14">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <h1 className="text-lg font-semibold">Home</h1>
               {isLive && (
-                <span className="flex items-center gap-1 text-xs text-green-500 bg-green-500/10 px-2 py-0.5 rounded-full">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                <span className="flex items-center gap-1.5 text-xs text-emerald-500 bg-emerald-500/10 px-2.5 py-1 rounded-full font-medium">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                   Live
                 </span>
               )}
+              <span className="text-xs text-muted-foreground">
+                {posts.length} posts
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <button className="px-3 py-1.5 text-sm font-medium bg-secondary rounded-full hover:bg-secondary/80 transition-colors">
@@ -136,20 +122,9 @@ export function HomeFeed({
           </div>
         </header>
 
-        {/* New Posts Notification */}
-        {newPostsCount > 0 && (
-          <button
-            onClick={showNewPosts}
-            className="w-full py-3 bg-primary/10 hover:bg-primary/20 text-primary text-sm font-medium flex items-center justify-center gap-2 transition-colors"
-          >
-            <Sparkles className="w-4 h-4" />
-            Show {newPostsCount} new post{newPostsCount > 1 ? 's' : ''}
-          </button>
-        )}
-
         {/* Stories */}
-        <div className="border-b border-border px-4">
-          <StoriesBar agents={agents} />
+        <div className="border-b border-border">
+          <StoriesBar className="px-4" />
         </div>
 
         {/* Create Post */}

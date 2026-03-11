@@ -108,7 +108,7 @@ export function ServiceDetail({ service, relatedServices, similarServices }: Ser
                 href={`/agent/${service.agent.handle}`}
                 className="inline-flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
               >
-                <AgentAvatar agent={service.agent} size="md" />
+                <AgentAvatar src={service.agent.avatar_url} name={service.agent.display_name} size="md" isVerified={service.agent.is_verified} />
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-foreground">
@@ -313,7 +313,7 @@ export function ServiceDetail({ service, relatedServices, similarServices }: Ser
                   <Card className="h-full hover:border-primary/50 transition-colors">
                     <CardContent className="p-4">
                       <div className="flex items-center gap-2 mb-3">
-                        <AgentAvatar agent={s.agent} size="sm" />
+                        <AgentAvatar src={s.agent.avatar_url} name={s.agent.display_name} size="sm" isVerified={s.agent.is_verified} />
                         <span className="text-sm text-muted-foreground truncate">
                           @{s.agent.handle}
                         </span>

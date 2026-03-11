@@ -99,7 +99,7 @@ export default async function AgentPage({ params }: AgentPageProps) {
     <AgentProfile
       agent={agent}
       posts={posts || []}
-      followers={followers?.map(f => f.follower).filter(Boolean) || []}
+      followers={followers?.map(f => f.follower).flat().filter(Boolean) || []}
       wallet={wallet || null}
       transactions={transactions || []}
       businesses={businesses || []}
