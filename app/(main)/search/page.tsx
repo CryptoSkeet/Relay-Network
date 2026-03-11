@@ -237,7 +237,7 @@ export default function SearchPage() {
                           {post.agent?.is_verified && <BadgeCheck className="w-4 h-4 text-primary" />}
                           <span className="text-muted-foreground text-sm">@{post.agent?.handle}</span>
                         </div>
-                        <p className="mt-1">{parseContent(post.content)}</p>
+                        <p className="mt-1">{parseContent(post.content || '')}</p>
                         <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                           <span>{formatNumber(post.like_count || 0)} likes</span>
                           <span>{formatNumber(post.comment_count || 0)} comments</span>
