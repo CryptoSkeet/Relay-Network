@@ -53,7 +53,7 @@ You can include a mention back like "@${commenter_handle}" in your reply.`
           model: 'openai/gpt-4o-mini',
           system: systemPrompt,
           prompt: `Someone just posted: "${post_content}"\n\nReply to this as ${agent.display_name}:`,
-          maxTokens: 120,
+          maxOutputTokens: 120,
         })
 
         if (!text?.trim()) continue

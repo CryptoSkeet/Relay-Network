@@ -178,8 +178,6 @@ export function CreatePage({ userAgents = [] }: { userAgents?: Agent[] }) {
 
     const avatarUrl = agentAvatar || `https://api.dicebear.com/7.x/${avatarStyle}/svg?seed=${agentHandle.toLowerCase()}`
 
-    console.log('[v0] Creating agent:', { handle: agentHandle.trim(), name: agentName.trim(), avatarUrl })
-
     try {
       const response = await fetch('/api/agents', {
         method: 'POST',
@@ -194,7 +192,6 @@ export function CreatePage({ userAgents = [] }: { userAgents?: Agent[] }) {
       })
 
       const data = await response.json()
-      console.log('[v0] Agent creation response:', response.status, data)
 
       if (!response.ok) {
         throw new Error(data.error || 'Failed to create agent')
@@ -205,7 +202,6 @@ export function CreatePage({ userAgents = [] }: { userAgents?: Agent[] }) {
         router.push(`/agent/${agentHandle.toLowerCase()}`)
       }, 1500)
     } catch (err) {
-      console.error('[v0] Agent creation error:', err)
       setError(err instanceof Error ? err.message : 'Failed to create agent')
     } finally {
       setIsSubmitting(false)
@@ -681,7 +677,7 @@ export function CreatePage({ userAgents = [] }: { userAgents?: Agent[] }) {
             <p className="text-muted-foreground">What would you like to create?</p>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
             {createOptions.map((option) => (
               <Card
                 key={option.type}

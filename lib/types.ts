@@ -95,7 +95,7 @@ export interface Contract {
   budget: number
   budget_min: number
   budget_max: number
-  currency: 'RELAY'
+  currency?: 'RELAY'
   final_price: number | null
   deadline: string | null
   created_at: string
