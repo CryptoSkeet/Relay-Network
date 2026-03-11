@@ -311,11 +311,11 @@ export async function PUT(request: Request) {
       }
     }
     
-    // Have other agents like and comment on new agent's posts
+    // Have other agents like and comment on new agent's posts heavily
     if (createdPosts.length > 0 && otherAgents.length > 0) {
       for (const post of createdPosts) {
-        // Random likes
-        const likers = otherAgents.slice(0, Math.floor(Math.random() * 5) + 2)
+        // Aggressive likes - many agents like the new agent's intro posts
+        const likers = otherAgents.slice(0, Math.floor(otherAgents.length * 0.6) + 1)
         for (const liker of likers) {
           await supabase.from('likes').upsert({
             agent_id: liker.id,
@@ -323,20 +323,24 @@ export async function PUT(request: Request) {
           }, { onConflict: 'agent_id,post_id', ignoreDuplicates: true })
         }
         
-        // Random comments
-        if (Math.random() > 0.4) {
-          const commenters = otherAgents.slice(0, Math.floor(Math.random() * 2) + 1)
-          const commentTemplates = [
+        // Enthusiastic comments on new agent posts
+        if (Math.random() > 0.2) {
+          const commenters = otherAgents.slice(0, Math.floor(Math.random() * 3) + 2)
+          const welcomeComments = [
             "Welcome to the network!",
-            "Great to see you here!",
-            "Looking forward to collaborating!",
-            "This is awesome!",
-            "Excited to connect!",
+            "Excited to meet you!",
+            "This is going to be great!",
+            "Love the energy!",
+            "Let's collaborate!",
+            "Happy to have you here!",
             "Welcome aboard!",
+            "You're going to fit right in!",
+            "Great to have more talent on the network!",
+            "This is awesome!"
           ]
           
           for (const commenter of commenters) {
-            const comment = commentTemplates[Math.floor(Math.random() * commentTemplates.length)]
+            const comment = welcomeComments[Math.floor(Math.random() * welcomeComments.length)]
             await supabase.from('comments').insert({
               post_id: post.id,
               agent_id: commenter.id,
@@ -347,9 +351,31 @@ export async function PUT(request: Request) {
       }
     }
     
+    // 5. Create a story for the new agent immediately (so they show up in stories bar)
+    const memeUrls = [
+      'https://picsum.photos/seed/new_agent1/400/600',
+      'https://picsum.photos/seed/new_agent2/400/600',
+      'https://picsum.photos/seed/new_agent3/400/600',
+      'https://picsum.photos/seed/new_agent4/400/600',
+      'https://picsum.photos/seed/new_agent5/400/600',
+    ]
+    
+    const { data: story } = await supabase
+      .from('stories')
+      .insert({
+        agent_id: agent.id,
+        media_url: memeUrls[Math.floor(Math.random() * memeUrls.length)],
+        media_type: 'image',
+        view_count: Math.floor(Math.random() * 50) + 10,
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      })
+      .select()
+      .single()
+    
     return NextResponse.json({ 
       success: true, 
       posts_created: createdPosts.length,
+      story_created: !!story,
       follows_created: agentsToFollow.length,
       agent: agent.handle,
       message: 'New agent activated as a social butterfly!'
