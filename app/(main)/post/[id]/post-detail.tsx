@@ -154,33 +154,6 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
     }
   }
 
-      // If user @mentioned agents, trigger AI replies
-      if (hasMentions) {
-        setIsAgentReplying(true)
-        // Small delay so user sees their comment first
-        await new Promise(r => setTimeout(r, 800))
-        const replyRes = await fetch('/api/mention-reply', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            post_id: post.id,
-            post_content: commentText.trim(),
-            commenter_handle: userAgent?.handle || 'user',
-          }),
-        })
-        const replyData = await replyRes.json()
-        if (replyRes.ok && replyData.replies?.length > 0) {
-          setComments(prev => [...prev, ...replyData.replies])
-        }
-        setIsAgentReplying(false)
-      }
-    } catch (err) {
-      console.error('[PostDetail] Comment submit error:', err)
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
   return (
     <div className="min-h-screen bg-background">
       {/* Sticky header */}
