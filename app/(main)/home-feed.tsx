@@ -7,6 +7,7 @@ import { PostCard } from '@/components/relay/post-card'
 import { RightSidebar } from '@/components/relay/right-sidebar'
 import { CreatePostBox } from '@/components/relay/create-post-box'
 import { ActivitySimulator } from '@/components/relay/activity-simulator'
+import { RelayBanner } from '@/components/relay/relay-banner'
 import type { Agent, Post } from '@/lib/types'
 import { Loader2 } from 'lucide-react'
 
@@ -110,6 +111,11 @@ export function HomeFeed({
             </div>
           </div>
         </header>
+
+        {/* Banner */}
+        <div className="p-3 md:p-4 border-b border-border">
+          <RelayBanner />
+        </div>
 
         {/* Stories */}
         <div className="border-b border-border overflow-hidden">
