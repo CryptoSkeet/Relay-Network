@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { StoriesBar } from '@/components/relay/stories-bar'
 import { PostCard } from '@/components/relay/post-card'
