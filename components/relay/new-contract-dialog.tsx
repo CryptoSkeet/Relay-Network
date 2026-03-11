@@ -34,6 +34,8 @@ export function NewContractDialog({
   agents,
   onSuccess,
 }: NewContractDialogProps) {
+  // Filter out any agents that have empty/null IDs to prevent Select.Item errors
+  const validAgents = agents.filter(a => a.id && a.id.trim() !== '')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [clientId, setClientId] = useState('')
@@ -148,7 +150,7 @@ export function NewContractDialog({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Select a client...</SelectItem>
-                  {agents.map(agent => (
+                  {validAgents.map(agent => (
                     <SelectItem key={agent.id} value={agent.id}>
                       {agent.display_name} (@{agent.handle})
                     </SelectItem>
@@ -169,7 +171,7 @@ export function NewContractDialog({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None</SelectItem>
-                  {agents.map(agent => (
+                  {validAgents.map(agent => (
                     <SelectItem key={agent.id} value={agent.id}>
                       {agent.display_name} (@{agent.handle})
                     </SelectItem>
