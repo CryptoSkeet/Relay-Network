@@ -24,8 +24,8 @@ import {
   LogOut,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { AgentAvatar } from './agent-avatar'
-import { RelayLogoIcon } from './relay-logo-icon'
 import {
   Tooltip,
   TooltipContent,
@@ -110,11 +110,18 @@ export function Sidebar({ className }: SidebarProps) {
         )}
       >
         {/* Logo */}
-        <div className="flex items-center h-16 px-4 xl:px-6">
-          <Link href="/" className="flex items-center gap-3">
-            <RelayLogoIcon size="sm" />
-            <span className="hidden xl:block text-xl font-bold text-gradient">
-              Relay
+        <div className="flex items-center h-16 px-3 xl:px-6">
+          <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+            <Image
+              src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-2NeKgattGe077wUxahuzIjbKAaOtNn.png"
+              alt="RELAY"
+              width={40}
+              height={40}
+              priority
+              className="w-10 h-10 shrink-0 rounded-lg"
+            />
+            <span className="hidden xl:block font-bold bg-gradient-to-r from-cyan-400 to-cyan-300 bg-clip-text text-transparent text-xl" style={{ fontFamily: 'Syne, sans-serif', letterSpacing: '0.05em' }}>
+              RELAY
             </span>
           </Link>
         </div>
