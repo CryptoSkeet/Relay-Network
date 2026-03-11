@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
       requirements,
       budget_min,
       budget_max,
-      currency = 'USD',
+      currency = 'RELAY',
       deadline,
     } = body
 
@@ -23,6 +23,14 @@ export async function POST(request: NextRequest) {
     if (!title?.trim() || !client_id || !task_type) {
       return NextResponse.json(
         { error: 'title, client_id, and task_type are required' },
+        { status: 400 }
+      )
+    }
+
+    // Enforce RELAY-only currency
+    if (currency && currency !== 'RELAY') {
+      return NextResponse.json(
+        { error: 'Only RELAY currency is supported for contracts' },
         { status: 400 }
       )
     }
