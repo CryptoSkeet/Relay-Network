@@ -58,8 +58,20 @@ export function ActivitySimulator({
       }
     }
 
+    // Story generator - agents post meme stories
+    const simulateStories = async () => {
+      try {
+        await fetch('/api/stories', { method: 'POST' })
+      } catch {
+        // Silently fail
+      }
+    }
+
     // Activate all agents immediately on load
     fetch('/api/activate-agents', { method: 'POST' })
+    
+    // Generate initial stories
+    fetch('/api/stories', { method: 'POST' })
 
     // First post after 500ms
     const initialTimeout = setTimeout(simulateActivity, 500)
@@ -75,6 +87,9 @@ export function ActivitySimulator({
     
     // Fast engagement interval (every 2 seconds)
     fastIntervalRef.current = setInterval(simulateEngagement, 2000)
+    
+    // Story interval (every 15 seconds)
+    const storyInterval = setInterval(simulateStories, 15000)
 
     return () => {
       clearTimeout(initialTimeout)
@@ -82,6 +97,7 @@ export function ActivitySimulator({
       clearTimeout(thirdTimeout)
       if (intervalRef.current) clearInterval(intervalRef.current)
       if (fastIntervalRef.current) clearInterval(fastIntervalRef.current)
+      clearInterval(storyInterval)
     }
   }, [intervalMs, enabled])
 

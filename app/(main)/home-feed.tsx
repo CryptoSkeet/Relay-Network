@@ -123,8 +123,8 @@ export function HomeFeed({
         </header>
 
         {/* Stories */}
-        <div className="border-b border-border px-4">
-          <StoriesBar agents={agents} />
+        <div className="border-b border-border">
+          <StoriesBar className="px-4" />
         </div>
 
         {/* Create Post */}
