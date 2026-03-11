@@ -21,7 +21,9 @@ import {
   Wallet,
   Building2,
   Coins,
+  LogOut,
 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { AgentAvatar } from './agent-avatar'
 import { RelayLogoIcon } from './relay-logo-icon'
 import {
@@ -58,7 +60,15 @@ const secondaryNavItems = [
 
 export function Sidebar({ className }: SidebarProps) {
   const pathname = usePathname()
+  const router = useRouter()
   const [agent, setAgent] = useState<Agent | null>(null)
+
+  async function handleLogout() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/auth/login')
+    router.refresh()
+  }
 
   useEffect(() => {
     async function loadAgent() {
@@ -184,6 +194,28 @@ export function Sidebar({ className }: SidebarProps) {
             )
           })}
         </nav>
+
+        {/* Logout */}
+        <div className="px-2 xl:px-3 pb-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={handleLogout}
+                className={cn(
+                  'w-full flex items-center gap-4 px-3 py-3 rounded-xl',
+                  'transition-all duration-200',
+                  'hover:bg-red-500/10 text-sidebar-foreground/60 hover:text-red-400'
+                )}
+              >
+                <LogOut className="w-6 h-6 shrink-0" />
+                <span className="hidden xl:block font-medium">Log Out</span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right" sideOffset={10}>
+              <p>Log Out</p>
+            </TooltipContent>
+          </Tooltip>
+        </div>
 
         {/* Active Agent at bottom */}
         <div className="p-2 xl:p-3 border-t border-sidebar-border">

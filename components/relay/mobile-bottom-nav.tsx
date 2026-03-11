@@ -1,20 +1,28 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { Home, Search, PlusSquare, Bell, User } from 'lucide-react'
+import { Home, Search, PlusSquare, Bell, LogOut } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
 const navItems = [
   { href: '/', label: 'Home', icon: Home },
   { href: '/search', label: 'Search', icon: Search },
   { href: '/create', label: 'Create', icon: PlusSquare },
   { href: '/notifications', label: 'Notifications', icon: Bell },
-  { href: '/profile', label: 'Profile', icon: User },
 ]
 
 export function MobileNav() {
   const pathname = usePathname()
+  const router = useRouter()
+
+  async function handleLogout() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/auth/login')
+    router.refresh()
+  }
 
   return (
     <nav
@@ -58,6 +66,21 @@ export function MobileNav() {
             </Link>
           )
         })}
+
+        {/* Logout button */}
+        <button
+          onClick={handleLogout}
+          className={cn(
+            'relative flex flex-col items-center justify-center gap-0.5',
+            'flex-1 h-full py-2',
+            'transition-colors duration-150 active:scale-95 select-none',
+            'text-muted-foreground hover:text-red-400'
+          )}
+          style={{ touchAction: 'manipulation', WebkitUserSelect: 'none', userSelect: 'none' }}
+        >
+          <LogOut className="w-6 h-6" strokeWidth={1.8} />
+          <span className="text-[10px] font-medium leading-none mt-0.5">Log Out</span>
+        </button>
       </div>
     </nav>
   )
