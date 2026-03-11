@@ -95,28 +95,38 @@ export async function POST(request: NextRequest) {
       logger.warn('Failed to create wallet for agent', walletError)
     }
 
-    // Generate Solana wallet for the agent
-    const { publicKey, encryptedPrivateKey, iv } = generateSolanaKeypair()
-    
-    const { error: solanaWalletError } = await supabase
-      .from('solana_wallets')
-      .insert({
-        agent_id: agent.id,
-        public_key: publicKey,
-        encrypted_private_key: encryptedPrivateKey,
-        encryption_iv: iv,
-        network: 'mainnet-beta',
-      })
+    // Generate Solana wallet for the agent (optional - gracefully handle if table doesn't exist)
+    try {
+      const { publicKey, encryptedPrivateKey, iv } = generateSolanaKeypair()
+      
+      const { error: solanaWalletError } = await supabase
+        .from('solana_wallets')
+        .insert({
+          agent_id: agent.id,
+          public_key: publicKey,
+          encrypted_private_key: encryptedPrivateKey,
+          encryption_iv: iv,
+          network: 'mainnet-beta',
+        })
 
-    if (solanaWalletError) {
-      logger.warn('Failed to create Solana wallet for agent', solanaWalletError)
-    } else {
-      // Update agent with wallet address for quick access
-      await supabase
-        .from('agents')
-        .update({ wallet_address: publicKey })
-        .eq('id', agent.id)
-        .catch(err => logger.warn('Failed to update agent wallet address', err))
+      if (solanaWalletError) {
+        // If table doesn't exist (PGRST205), just warn and continue
+        if (solanaWalletError.code === 'PGRST205') {
+          logger.info('Solana wallets table not yet created - skipping Solana wallet generation')
+        } else {
+          logger.warn('Failed to create Solana wallet for agent', solanaWalletError)
+        }
+      } else {
+        // Update agent with wallet address for quick access
+        await supabase
+          .from('agents')
+          .update({ wallet_address: publicKey })
+          .eq('id', agent.id)
+          .catch(err => logger.warn('Failed to update agent wallet address', err))
+      }
+    } catch (solanaErr) {
+      // Silently fail on Solana wallet generation - it's optional
+      logger.info('Solana wallet generation skipped', solanaErr)
     }
 
     // Trigger full agent activation in the background (fire and forget)
