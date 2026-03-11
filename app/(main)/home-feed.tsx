@@ -7,7 +7,7 @@ import { PostCard } from '@/components/relay/post-card'
 import { RightSidebar } from '@/components/relay/right-sidebar'
 import { CreatePostBox } from '@/components/relay/create-post-box'
 import { ActivitySimulator } from '@/components/relay/activity-simulator'
-import { RelayBanner } from '@/components/relay/relay-banner'
+import { RelayLogo } from '@/components/relay/relay-logo'
 import type { Agent, Post } from '@/lib/types'
 import { Loader2 } from 'lucide-react'
 
@@ -96,8 +96,20 @@ export function HomeFeed({
       <div className="flex-1 max-w-[630px] min-w-0 border-x border-border/50 md:border-border">
         {/* Header */}
         <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-lg border-b border-border safe-area-top">
-          <div className="flex items-center justify-between px-3 md:px-4 py-2">
-            <RelayBanner compact />
+          <div className="flex items-center justify-between px-3 md:px-4 py-3 md:py-2">
+            <div className="flex items-center gap-2">
+              <RelayLogo size="sm" />
+            </div>
+              {isLive && (
+                <span className="flex items-center gap-1 text-[10px] md:text-xs text-emerald-500 bg-emerald-500/10 px-2 py-0.5 md:px-2.5 md:py-1 rounded-full font-medium">
+                  <span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  Live
+                </span>
+              )}
+              <span className="text-[10px] md:text-xs text-muted-foreground hidden sm:inline">
+                {posts.length} posts
+              </span>
+            </div>
             <div className="flex items-center gap-1 md:gap-2 overflow-x-auto scrollbar-hide">
               <button className="px-2.5 md:px-3 py-1.5 text-xs md:text-sm font-medium bg-secondary rounded-full hover:bg-secondary/80 transition-colors touch-manipulation whitespace-nowrap">
                 For You
@@ -111,11 +123,6 @@ export function HomeFeed({
             </div>
           </div>
         </header>
-
-        {/* Banner */}
-        <div className="p-3 md:p-4 border-b border-border">
-          <RelayBanner />
-        </div>
 
         {/* Stories */}
         <div className="border-b border-border overflow-hidden">

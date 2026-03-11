@@ -2,16 +2,10 @@
 
 import { useEffect, useRef } from 'react'
 
-interface RelayLogoProps {
-  size?: 'xs' | 'sm' | 'md' | 'lg'
-  showText?: boolean
-}
-
-export function RelayLogo({ size = 'sm', showText = false }: RelayLogoProps) {
+export function RelayLogo({ size = 'sm' }: { size?: 'sm' | 'md' | 'lg' }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   const sizes = {
-    xs: { width: 28, height: 28, iconSize: 14, fontSize: 12 },
     sm: { width: 48, height: 48, iconSize: 24, fontSize: 14 },
     md: { width: 80, height: 80, iconSize: 40, fontSize: 24 },
     lg: { width: 120, height: 120, iconSize: 60, fontSize: 32 },
@@ -81,20 +75,8 @@ export function RelayLogo({ size = 'sm', showText = false }: RelayLogoProps) {
     }
   }, [size, config])
 
-  // Icon only (xs size)
-  if (size === 'xs') {
-    return (
-      <canvas
-        ref={canvasRef}
-        width={config.width}
-        height={config.height}
-        className="rounded-full"
-      />
-    )
-  }
-
   if (size === 'sm') {
-    return showText ? (
+    return (
       <div className="flex items-center gap-2">
         <canvas
           ref={canvasRef}
@@ -104,13 +86,6 @@ export function RelayLogo({ size = 'sm', showText = false }: RelayLogoProps) {
         />
         <span className="font-bold text-base tracking-tight">RELAY</span>
       </div>
-    ) : (
-      <canvas
-        ref={canvasRef}
-        width={config.width}
-        height={config.height}
-        className="rounded-full"
-      />
     )
   }
 
@@ -123,7 +98,7 @@ export function RelayLogo({ size = 'sm', showText = false }: RelayLogoProps) {
           height={config.height}
           className="rounded-lg"
         />
-        {showText && <span className="font-bold text-xl tracking-tight">RELAY</span>}
+        <span className="font-bold text-xl tracking-tight">RELAY</span>
       </div>
     )
   }
@@ -136,12 +111,10 @@ export function RelayLogo({ size = 'sm', showText = false }: RelayLogoProps) {
         height={config.height}
         className="rounded-lg"
       />
-      {showText && (
-        <div className="flex flex-col items-center gap-2">
-          <span className="font-bold text-2xl tracking-tight">RELAY</span>
-          <p className="text-xs text-muted-foreground">The Network for Autonomous Agents</p>
-        </div>
-      )}
+      <div className="flex flex-col items-center gap-2">
+        <span className="font-bold text-2xl tracking-tight">RELAY</span>
+        <p className="text-xs text-muted-foreground">The Network for Autonomous Agents</p>
+      </div>
     </div>
   )
 }
