@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { FileText, Plus, Clock, CheckCircle, XCircle, AlertCircle, DollarSign, ArrowRight, Filter, CheckCheck, Zap, RefreshCw } from 'lucide-react'
+import { FileText, Plus, Clock, CheckCircle, XCircle, AlertCircle, Coins, ArrowRight, Filter, CheckCheck, Zap, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -28,6 +28,7 @@ interface Milestone {
 interface ContractWithAgents extends Contract {
   client?: Agent
   provider?: Agent
+  currency?: 'RELAY'
 }
 
 interface ContractsPageProps {
@@ -196,77 +197,78 @@ export function ContractsPage({ contracts: initialContracts, agents }: Contracts
   return (
     <div className="flex-1 max-w-6xl mx-auto">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-lg supports-[backdrop-filter]:bg-background/60 border-b border-border px-4 py-4 safe-area-top">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <FileText className="w-6 h-6 text-primary" />
-              Agent Collaborations
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-lg supports-[backdrop-filter]:bg-background/60 border-b border-border px-3 sm:px-4 py-3 sm:py-4 safe-area-top">
+        <div className="flex items-center justify-between mb-3 sm:mb-4 gap-3">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg sm:text-2xl font-bold flex items-center gap-2">
+              <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-primary shrink-0" />
+              <span className="truncate">Contracts</span>
             </h1>
-            <p className="text-sm text-muted-foreground">Track contracts and milestone progress</p>
+            <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">Track contracts and milestone progress</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 shrink-0">
             <Button
               variant="outline"
               size="icon"
               onClick={handleContractCreated}
               disabled={isRefreshing}
-              className="touch-manipulation min-h-[44px] min-w-[44px]"
+              className="touch-manipulation h-9 w-9 sm:h-10 sm:w-10"
             >
               <RefreshCw className={cn('w-4 h-4', isRefreshing && 'animate-spin')} />
             </Button>
             <Button
               onClick={() => setIsNewContractOpen(true)}
-              className="gap-2 touch-manipulation min-h-[44px]"
+              className="gap-1.5 sm:gap-2 touch-manipulation h-9 sm:h-10 px-3 sm:px-4 text-sm"
             >
               <Plus className="w-4 h-4" />
-              New Contract
+              <span className="hidden sm:inline">New Contract</span>
+              <span className="sm:hidden">New</span>
             </Button>
           </div>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
           <Card className="bg-muted/50">
-            <CardContent className="p-4">
-              <p className="text-2xl font-bold">{stats.total}</p>
-              <p className="text-sm text-muted-foreground">Total</p>
+            <CardContent className="p-3 sm:p-4">
+              <p className="text-xl sm:text-2xl font-bold">{stats.total}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">Total</p>
             </CardContent>
           </Card>
           <Card className="bg-blue-500/10 border-blue-500/20">
-            <CardContent className="p-4">
-              <p className="text-2xl font-bold text-blue-500">{stats.open}</p>
-              <p className="text-sm text-muted-foreground">Open</p>
+            <CardContent className="p-3 sm:p-4">
+              <p className="text-xl sm:text-2xl font-bold text-blue-500">{stats.open}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">Open</p>
             </CardContent>
           </Card>
           <Card className="bg-yellow-500/10 border-yellow-500/20">
-            <CardContent className="p-4">
-              <p className="text-2xl font-bold text-yellow-500">{stats.active}</p>
-              <p className="text-sm text-muted-foreground">Active</p>
+            <CardContent className="p-3 sm:p-4">
+              <p className="text-xl sm:text-2xl font-bold text-yellow-500">{stats.active}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">Active</p>
             </CardContent>
           </Card>
           <Card className="bg-green-500/10 border-green-500/20">
-            <CardContent className="p-4">
-              <p className="text-2xl font-bold text-green-500">{stats.completed}</p>
-              <p className="text-sm text-muted-foreground">Done</p>
+            <CardContent className="p-3 sm:p-4">
+              <p className="text-xl sm:text-2xl font-bold text-green-500">{stats.completed}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">Done</p>
             </CardContent>
           </Card>
         </div>
       </div>
 
       {/* Content */}
-      <div className="p-4" suppressHydrationWarning>
+      <div className="p-3 sm:p-4" suppressHydrationWarning>
         {mounted ? (
-          <Tabs defaultValue="all" className="space-y-4" suppressHydrationWarning>
-            <TabsList className="w-full overflow-x-auto scrollbar-hide" suppressHydrationWarning>
-              <TabsTrigger value="all" onClick={() => setFilter('all')} className="touch-manipulation">All</TabsTrigger>
-              <TabsTrigger value="open" onClick={() => setFilter('open')} className="touch-manipulation">Open</TabsTrigger>
-              <TabsTrigger value="active" onClick={() => setFilter('active')} className="touch-manipulation">Active</TabsTrigger>
-              <TabsTrigger value="in_progress" onClick={() => setFilter('in_progress')} className="touch-manipulation">In Progress</TabsTrigger>
-              <TabsTrigger value="completed" onClick={() => setFilter('completed')} className="touch-manipulation">Completed</TabsTrigger>
+          <Tabs defaultValue="all" className="space-y-3 sm:space-y-4" suppressHydrationWarning>
+            <TabsList className="w-full overflow-x-auto scrollbar-hide gap-1" suppressHydrationWarning>
+              <TabsTrigger value="all" onClick={() => setFilter('all')} className="touch-manipulation text-xs sm:text-sm">All</TabsTrigger>
+              <TabsTrigger value="open" onClick={() => setFilter('open')} className="touch-manipulation text-xs sm:text-sm">Open</TabsTrigger>
+              <TabsTrigger value="active" onClick={() => setFilter('active')} className="touch-manipulation text-xs sm:text-sm">Active</TabsTrigger>
+              <TabsTrigger value="in_progress" onClick={() => setFilter('in_progress')} className="touch-manipulation text-xs sm:text-sm whitespace-nowrap">In Progress</TabsTrigger>
+              <TabsTrigger value="completed" onClick={() => setFilter('completed')} className="touch-manipulation text-xs sm:text-sm">Completed</TabsTrigger>
             </TabsList>
 
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             {filteredContracts.map((contract) => {
               const StatusIcon = statusConfig[contract.status as keyof typeof statusConfig]?.icon || FileText
               const statusColor = statusConfig[contract.status as keyof typeof statusConfig]?.color || 'text-muted-foreground'
@@ -277,30 +279,30 @@ export function ContractsPage({ contracts: initialContracts, agents }: Contracts
 
               return (
                 <Card key={contract.id} className="glass-card hover:border-primary/50 transition-all">
-                  <CardContent className="p-6 space-y-4">
+                  <CardContent className="p-4 sm:p-6 space-y-4">
                     {/* Header */}
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <Badge className={cn(statusBg, statusColor, 'capitalize')}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                          <Badge className={cn(statusBg, statusColor, 'capitalize text-xs')}>
                             <StatusIcon className="w-3 h-3 mr-1" />
                             {contract.status.replace('_', ' ')}
                           </Badge>
-                          <span className="text-sm text-muted-foreground">
+                          <span className="text-xs text-muted-foreground">
                             {formatDistanceToNow(new Date(contract.created_at), { addSuffix: true })}
                           </span>
                         </div>
-                        <h3 className="text-lg font-semibold mb-1">{contract.title}</h3>
-                        <p className="text-muted-foreground text-sm mb-3">
+                        <h3 className="text-base sm:text-lg font-semibold mb-1 line-clamp-2">{contract.title}</h3>
+                        <p className="text-muted-foreground text-xs sm:text-sm mb-3 line-clamp-2">
                           {contract.description}
                         </p>
                       </div>
-                      <div className="text-right">
+                      <div className="text-right shrink-0">
                         <p className={cn(
-                          "text-2xl font-bold",
+                          "text-xl sm:text-2xl font-bold",
                           overallProgress === 100 ? "text-green-500" : "text-primary"
                         )}>{overallProgress}%</p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-[10px] sm:text-xs text-muted-foreground">
                           {contract.status === 'completed' ? 'Completed' : 'Progress'}
                         </p>
                         {contract.completed_at && (
@@ -382,12 +384,12 @@ export function ContractsPage({ contracts: initialContracts, agents }: Contracts
                     <div className="pt-4 border-t flex items-center justify-between text-xs text-muted-foreground">
                       <div className="flex items-center gap-4">
                         {(contract.budget_min || contract.budget_max) && (
-                          <span className="flex items-center gap-1">
-                            <DollarSign className="w-3 h-3" />
+                          <span className="flex items-center gap-1 text-primary">
+                            <Coins className="w-3 h-3" />
                             {contract.budget_min && contract.budget_max 
                               ? `${contract.budget_min.toLocaleString()} - ${contract.budget_max.toLocaleString()}`
                               : (contract.budget_max || contract.budget_min)?.toLocaleString()
-                            } {contract.currency || 'USD'}
+                            } {contract.currency || 'RELAY'}
                           </span>
                         )}
                         {contract.deadline && (
