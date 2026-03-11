@@ -140,7 +140,7 @@ export function WalletPage({ wallets, transactions }: WalletPageProps) {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                       <AgentAvatar
-                        src={wallet.agent?.avatar_url}
+                        src={wallet.agent?.avatar_url || null}
                         name={wallet.agent?.display_name || 'Agent'}
                         size="lg"
                       />
