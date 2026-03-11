@@ -226,35 +226,43 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
             <Button
               variant="ghost"
               size="sm"
-              className="flex-1 rounded-full hover:text-primary hover:bg-primary/10"
+              className="gap-2 text-xs"
               onClick={handleLike}
             >
-              <Heart className={cn('w-4 h-4', isLiked && 'fill-red-500 text-red-500')} />
-              <span className="ml-2 text-xs hidden sm:inline">Like</span>
-            </Button>
-            <Button variant="ghost" size="sm" className="flex-1 rounded-full hover:text-primary hover:bg-primary/10">
-              <MessageCircle className="w-4 h-4" />
-              <span className="ml-2 text-xs hidden sm:inline">Reply</span>
-            </Button>
-            <Button variant="ghost" size="sm" className="flex-1 rounded-full hover:text-primary hover:bg-primary/10">
-              <Share2 className="w-4 h-4" />
-              <span className="ml-2 text-xs hidden sm:inline">Share</span>
+              <Heart className={cn('w-4 h-4', isLiked && 'fill-current text-red-500')} />
+              Like
             </Button>
             <Button
               variant="ghost"
               size="sm"
-              className="flex-1 rounded-full hover:text-primary hover:bg-primary/10"
+              className="gap-2 text-xs"
+            >
+              <MessageCircle className="w-4 h-4" />
+              Reply
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2 text-xs"
+            >
+              <Share2 className="w-4 h-4" />
+              Share
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2 text-xs"
               onClick={() => setIsSaved(!isSaved)}
             >
-              <Bookmark className={cn('w-4 h-4', isSaved && 'fill-yellow-500 text-yellow-500')} />
-              <span className="ml-2 text-xs hidden sm:inline">Save</span>
+              <Bookmark className={cn('w-4 h-4', isSaved && 'fill-current')} />
+              Save
             </Button>
           </div>
         </article>
       </div>
 
-      {/* Comment compose box */}
-      <div className="px-4 py-3 border-b border-border bg-background/50">
+      {/* Comment Compose Box */}
+      <div className="max-w-2xl mx-auto w-full px-4 py-3 border-b border-border bg-background/50">
         <div className="flex gap-3 items-start">
           <AgentAvatar
             src={userAgent?.avatar_url || null}
@@ -303,8 +311,8 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
         </div>
       </div>
 
-      {/* Comments section */}
-      <div>
+      {/* Comments Section */}
+      <div className="max-w-2xl mx-auto w-full">
         {comments.length === 0 && !isAgentReplying ? (
           <div className="flex flex-col items-center justify-center py-16 text-center px-4">
             <MessageCircle className="w-12 h-12 text-muted-foreground/30 mb-3" />
@@ -338,7 +346,9 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
                           {commentAgent?.display_name}
                         </Link>
                         <span className="text-muted-foreground text-sm">@{commentAgent?.handle}</span>
-                        <span className="text-muted-foreground text-xs" suppressHydrationWarning>· {timeAgo(comment.created_at)}</span>
+                        <span className="text-muted-foreground text-xs" suppressHydrationWarning>
+                          · {timeAgo(comment.created_at)}
+                        </span>
                       </div>
                       <p className="text-foreground text-sm mt-1 leading-relaxed whitespace-pre-wrap">
                         {parseContent(comment.content)}
@@ -349,6 +359,7 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
               )
             })}
 
+            {/* Agent Typing Indicator */}
             {isAgentReplying && (
               <div className="px-4 py-4 border-b border-border/60">
                 <div className="flex gap-3 items-center">
