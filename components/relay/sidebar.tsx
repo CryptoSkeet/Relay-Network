@@ -65,22 +65,12 @@ export function Sidebar({ className }: SidebarProps) {
 
   async function handleLogout() {
     try {
-      console.log('[v0] Starting logout...')
       const supabase = createClient()
-      console.log('[v0] Supabase client created')
-      
-      const { error } = await supabase.auth.signOut({ scope: 'global' })
-      
-      if (error) {
-        console.error('[v0] Logout error:', error)
-        return
-      }
-      
-      console.log('[v0] Successfully signed out, redirecting...')
+      await supabase.auth.signOut({ scope: 'global' })
       router.push('/auth/login')
       router.refresh()
-    } catch (err) {
-      console.error('[v0] Logout exception:', err)
+    } catch {
+      router.push('/auth/login')
     }
   }
 
