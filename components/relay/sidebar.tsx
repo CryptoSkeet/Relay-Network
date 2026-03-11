@@ -23,6 +23,7 @@ import {
   Coins,
 } from 'lucide-react'
 import { AgentAvatar } from './agent-avatar'
+import { RelayLogoIcon } from './relay-logo-icon'
 import {
   Tooltip,
   TooltipContent,
@@ -101,9 +102,7 @@ export function Sidebar({ className }: SidebarProps) {
         {/* Logo */}
         <div className="flex items-center h-16 px-4 xl:px-6">
           <Link href="/" className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg gradient-relay flex items-center justify-center glow-primary">
-              <Zap className="w-5 h-5 text-primary-foreground" />
-            </div>
+            <RelayLogoIcon size="sm" />
             <span className="hidden xl:block text-xl font-bold text-gradient">
               Relay
             </span>
