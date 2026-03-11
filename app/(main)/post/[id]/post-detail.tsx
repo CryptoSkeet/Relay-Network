@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 import { AgentAvatar } from '@/components/relay/agent-avatar'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { Heart, MessageCircle, Share2, Bookmark, ArrowLeft, MoreHorizontal, Send, Loader2, Bot } from 'lucide-react'
+import { Heart, MessageCircle, Share2, Bookmark, ArrowLeft, Send, Loader2, Bot } from 'lucide-react'
 import type { Post, Agent, Comment } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
 
@@ -68,11 +68,16 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isAgentReplying, setIsAgentReplying] = useState(false)
   const [commentError, setCommentError] = useState<string | null>(null)
-  const [userAgent, setUserAgent] = useState<{ id: string; handle: string; display_name: string; avatar_url: string | null } | null>(null)
+  const [userAgent, setUserAgent] = useState<{
+    id: string
+    handle: string
+    display_name: string
+    avatar_url: string | null
+  } | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
-    const getAgent = async () => {
+    async function getAgent() {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         const { data: ua } = await supabase
@@ -92,7 +97,7 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
     getAgent()
   }, [supabase])
 
-  const handleLike = () => {
+  function handleLike() {
     setIsLiked(!isLiked)
     setLikeCount(isLiked ? likeCount - 1 : likeCount + 1)
   }
@@ -128,7 +133,7 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
 
       if (hasMentions) {
         setIsAgentReplying(true)
-        await new Promise<void>(r => setTimeout(r, 800))
+        await new Promise<void>(resolve => setTimeout(resolve, 800))
         const replyRes = await fetch('/api/mention-reply', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -155,108 +160,60 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-lg border-b border-border flex items-center gap-4 px-4 h-14">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => router.back()}
-          className="rounded-full"
-        >
+        <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full">
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <div>
           <h1 className="font-semibold text-foreground text-base">Post</h1>
-          <p className="text-xs text-muted-foreground">{comments.length} {comments.length === 1 ? 'comment' : 'comments'}</p>
+          <p className="text-xs text-muted-foreground">
+            {comments.length} {comments.length === 1 ? 'comment' : 'comments'}
+          </p>
         </div>
       </header>
 
       {/* Post */}
       <div className="max-w-2xl mx-auto w-full border-b border-border">
         <article className="px-4 pt-5 pb-4 space-y-3">
-          <div>
-            <Link href={`/agent/${agent?.handle}`} className="flex items-center gap-2 mb-3 hover:opacity-80">
-              <AgentAvatar
-                src={agent?.avatar_url}
-                name={agent?.display_name}
-                size="sm"
-                isVerified={agent?.is_verified}
-              />
-              <div>
-                <p className="font-semibold text-foreground text-sm">{agent?.display_name}</p>
-                <p className="text-sm text-muted-foreground" suppressHydrationWarning>
-                  @{agent?.handle} · {timeAgo(post.created_at)}
-                </p>
-              </div>
-            </Link>
-          </div>
+          <Link href={`/agent/${agent?.handle}`} className="flex items-center gap-2 mb-3 hover:opacity-80">
+            <AgentAvatar src={agent?.avatar_url} name={agent?.display_name} size="sm" isVerified={agent?.is_verified} />
+            <div>
+              <p className="font-semibold text-foreground text-sm">{agent?.display_name}</p>
+              <p className="text-sm text-muted-foreground" suppressHydrationWarning>
+                @{agent?.handle} · {timeAgo(post.created_at)}
+              </p>
+            </div>
+          </Link>
 
-          {/* Content */}
-          <div className="space-y-2">
-            <h2 className="text-xl font-bold text-foreground leading-tight">
-              {parseContent(post.content)}
-            </h2>
-          </div>
-
-          {/* Timestamp — suppressHydrationWarning prevents locale mismatch between SSR and client */}
-          <p className="text-sm text-muted-foreground mb-4" suppressHydrationWarning>
-            <span suppressHydrationWarning>
-              {new Date(post.created_at).toLocaleTimeString('en-US', {
-                hour: 'numeric',
-                minute: '2-digit',
-                hour12: true,
-              })} · {new Date(post.created_at).toLocaleDateString('en-US', {
-                month: 'long',
-                day: 'numeric',
-                year: 'numeric',
-              })}
-            </span>
+          <p className="text-xl font-bold text-foreground leading-tight">
+            {parseContent(post.content)}
           </p>
 
-          {/* Stats */}
+          <p className="text-sm text-muted-foreground" suppressHydrationWarning>
+            {new Date(post.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+            {' · '}
+            {new Date(post.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+          </p>
+
           <div className="flex gap-4 text-sm text-muted-foreground pt-3 border-t border-border">
-            <button className="hover:text-primary transition-colors">
-              {formatNumber(likeCount)} {likeCount === 1 ? 'Like' : 'Likes'}
-            </button>
-            <button className="hover:text-primary transition-colors">
-              {formatNumber(comments.length)} {comments.length === 1 ? 'Reply' : 'Replies'}
-            </button>
-            <button className="hover:text-primary transition-colors">
-              {formatNumber(post.share_count || 0)} {(post.share_count || 0) === 1 ? 'Share' : 'Shares'}
-            </button>
+            <span>{formatNumber(likeCount)} {likeCount === 1 ? 'Like' : 'Likes'}</span>
+            <span>{formatNumber(comments.length)} {comments.length === 1 ? 'Reply' : 'Replies'}</span>
+            <span>{formatNumber(post.share_count || 0)} {(post.share_count || 0) === 1 ? 'Share' : 'Shares'}</span>
           </div>
 
-          {/* Action Buttons */}
           <div className="flex justify-between text-muted-foreground border-t border-border pt-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="gap-2 text-xs"
-              onClick={handleLike}
-            >
+            <Button variant="ghost" size="sm" className="gap-2 text-xs" onClick={handleLike}>
               <Heart className={cn('w-4 h-4', isLiked && 'fill-current text-red-500')} />
               Like
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="gap-2 text-xs"
-            >
+            <Button variant="ghost" size="sm" className="gap-2 text-xs">
               <MessageCircle className="w-4 h-4" />
               Reply
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="gap-2 text-xs"
-            >
+            <Button variant="ghost" size="sm" className="gap-2 text-xs">
               <Share2 className="w-4 h-4" />
               Share
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="gap-2 text-xs"
-              onClick={() => setIsSaved(!isSaved)}
-            >
+            <Button variant="ghost" size="sm" className="gap-2 text-xs" onClick={() => setIsSaved(!isSaved)}>
               <Bookmark className={cn('w-4 h-4', isSaved && 'fill-current')} />
               Save
             </Button>
@@ -264,49 +221,37 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
         </article>
       </div>
 
-      {/* Comment Compose Box */}
+      {/* Comment Compose */}
       <div className="max-w-2xl mx-auto w-full px-4 py-3 border-b border-border bg-background/50">
         <div className="flex gap-3 items-start">
-          <AgentAvatar
-            src={userAgent?.avatar_url || null}
-            name={userAgent?.display_name || 'You'}
-            size="sm"
-          />
+          <AgentAvatar src={userAgent?.avatar_url || null} name={userAgent?.display_name || 'You'} size="sm" />
           <div className="flex-1 space-y-2">
             <Textarea
               ref={textareaRef}
               value={commentText}
               onChange={e => setCommentText(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleCommentSubmit()
-              }}
+              onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleCommentSubmit() }}
               placeholder="Write a comment... Type @ to mention an agent and they'll reply!"
               className="min-h-[60px] resize-none bg-transparent border-border/50 text-sm"
               rows={2}
             />
-            {commentError && (
-              <p className="text-xs text-red-500">{commentError}</p>
-            )}
+            {commentError && <p className="text-xs text-red-500">{commentError}</p>}
             <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">
+              <span className="text-xs">
                 {/@([a-zA-Z0-9_]+)/.test(commentText) && (
                   <span className="flex items-center gap-1 text-primary">
                     <Bot className="w-3 h-3" />
                     Mentioned agents will reply
                   </span>
                 )}
-              </p>
+              </span>
               <Button
                 size="sm"
                 onClick={handleCommentSubmit}
                 disabled={!commentText.trim() || isSubmitting}
                 className="gap-1.5"
               >
-                {isSubmitting ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Send className="w-3.5 h-3.5" />
-                )}
+                {isSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                 Comment
               </Button>
             </div>
@@ -314,7 +259,7 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
         </div>
       </div>
 
-      {/* Comments Section */}
+      {/* Comments */}
       <div className="max-w-2xl mx-auto w-full">
         {comments.length === 0 && !isAgentReplying ? (
           <div className="flex flex-col items-center justify-center py-16 text-center px-4">
@@ -327,25 +272,14 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
             {comments.map((comment) => {
               const commentAgent = Array.isArray(comment.agent) ? comment.agent[0] : comment.agent
               return (
-                <div
-                  key={comment.id}
-                  className="px-4 py-4 border-b border-border/60 hover:bg-accent/20 transition-colors"
-                >
+                <div key={comment.id} className="px-4 py-4 border-b border-border/60 hover:bg-accent/20 transition-colors">
                   <div className="flex gap-3">
                     <Link href={`/agent/${commentAgent?.handle}`} className="shrink-0">
-                      <AgentAvatar
-                        src={commentAgent?.avatar_url}
-                        name={commentAgent?.display_name}
-                        size="sm"
-                        isVerified={commentAgent?.is_verified}
-                      />
+                      <AgentAvatar src={commentAgent?.avatar_url} name={commentAgent?.display_name} size="sm" isVerified={commentAgent?.is_verified} />
                     </Link>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline gap-2 flex-wrap">
-                        <Link
-                          href={`/agent/${commentAgent?.handle}`}
-                          className="font-semibold text-foreground hover:text-primary transition-colors text-sm"
-                        >
+                        <Link href={`/agent/${commentAgent?.handle}`} className="font-semibold text-foreground hover:text-primary transition-colors text-sm">
                           {commentAgent?.display_name}
                         </Link>
                         <span className="text-muted-foreground text-sm">@{commentAgent?.handle}</span>
@@ -362,7 +296,6 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
               )
             })}
 
-            {/* Agent Typing Indicator */}
             {isAgentReplying && (
               <div className="px-4 py-4 border-b border-border/60">
                 <div className="flex gap-3 items-center">
@@ -384,7 +317,6 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
         )}
       </div>
 
-      {/* Bottom padding for mobile nav */}
       <div className="h-20" />
     </div>
   )
