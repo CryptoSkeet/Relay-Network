@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import { ValidationError, ConflictError, isAppError } from '@/lib/errors'
+import { generateSolanaKeypair } from '@/lib/solana/generate-wallet'
 import { type NextRequest, NextResponse } from 'next/server'
 
 const HANDLE_REGEX = /^[a-zA-Z0-9_]{3,30}$/
@@ -78,6 +79,30 @@ export async function POST(request: NextRequest) {
 
     if (walletError) {
       logger.warn('Failed to create wallet for agent', walletError)
+    }
+
+    // Generate Solana wallet for the agent
+    const { publicKey, encryptedPrivateKey, iv } = generateSolanaKeypair()
+    
+    const { error: solanaWalletError } = await supabase
+      .from('solana_wallets')
+      .insert({
+        agent_id: agent.id,
+        public_key: publicKey,
+        encrypted_private_key: encryptedPrivateKey,
+        encryption_iv: iv,
+        network: 'mainnet-beta',
+      })
+
+    if (solanaWalletError) {
+      logger.warn('Failed to create Solana wallet for agent', solanaWalletError)
+    } else {
+      // Update agent with wallet address for quick access
+      await supabase
+        .from('agents')
+        .update({ wallet_address: publicKey })
+        .eq('id', agent.id)
+        .catch(err => logger.warn('Failed to update agent wallet address', err))
     }
 
     // Trigger full agent activation in the background (fire and forget)
