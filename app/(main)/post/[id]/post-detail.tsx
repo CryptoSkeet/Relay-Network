@@ -1,13 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { AgentAvatar } from '@/components/relay/agent-avatar'
 import { Button } from '@/components/ui/button'
-import { Heart, MessageCircle, Share2, Bookmark, ArrowLeft, MoreHorizontal } from 'lucide-react'
+import { Textarea } from '@/components/ui/textarea'
+import { Heart, MessageCircle, Share2, Bookmark, ArrowLeft, MoreHorizontal, Send, Loader2, Bot } from 'lucide-react'
 import type { Post, Agent, Comment } from '@/lib/types'
+import { createClient } from '@/lib/supabase/client'
 
 function parseContent(content: string): React.ReactNode[] {
   const mentionRegex = /@([a-zA-Z0-9_]+)/g
@@ -54,22 +56,102 @@ interface PostDetailProps {
   comments: (Comment & { agent: Agent })[]
 }
 
-export function PostDetail({ post, comments }: PostDetailProps) {
+export function PostDetail({ post, comments: initialComments }: PostDetailProps) {
   const router = useRouter()
+  const supabase = createClient()
   const agent = Array.isArray(post.agent) ? post.agent[0] : post.agent
   const [isLiked, setIsLiked] = useState(post.is_liked || false)
   const [likeCount, setLikeCount] = useState(post.like_count)
   const [isSaved, setIsSaved] = useState(false)
+  const [comments, setComments] = useState(initialComments)
+  const [commentText, setCommentText] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isAgentReplying, setIsAgentReplying] = useState(false)
+  const [userAgent, setUserAgent] = useState<{ id: string; handle: string; display_name: string; avatar_url: string | null } | null>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Fetch user's agent on mount
+  useEffect(() => {
+    const getAgent = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: ua } = await supabase
+          .from('agents')
+          .select('id, handle, display_name, avatar_url')
+          .eq('user_id', user.id)
+          .single()
+        if (ua) { setUserAgent(ua); return }
+      }
+      // Fallback to first agent
+      const { data: fa } = await supabase
+        .from('agents')
+        .select('id, handle, display_name, avatar_url')
+        .limit(1)
+        .single()
+      if (fa) setUserAgent(fa)
+    }
+    getAgent()
+  }, [supabase])
 
   const handleLike = () => {
     setIsLiked(!isLiked)
     setLikeCount(isLiked ? likeCount - 1 : likeCount + 1)
   }
 
+  const handleCommentSubmit = async () => {
+    if (!commentText.trim() || isSubmitting) return
+    setIsSubmitting(true)
+
+    const hasMentions = /@([a-zA-Z0-9_]+)/.test(commentText)
+
+    try {
+      // Post the user's comment
+      const res = await fetch('/api/comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          post_id: post.id,
+          content: commentText.trim(),
+          agent_id: userAgent?.id,
+        }),
+      })
+      const data = await res.json()
+      if (res.ok && data.comment) {
+        setComments(prev => [...prev, data.comment])
+        setCommentText('')
+      }
+
+      // If user @mentioned agents, trigger AI replies
+      if (hasMentions) {
+        setIsAgentReplying(true)
+        // Small delay so user sees their comment first
+        await new Promise(r => setTimeout(r, 800))
+        const replyRes = await fetch('/api/mention-reply', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            post_id: post.id,
+            post_content: commentText.trim(),
+            commenter_handle: userAgent?.handle || 'user',
+          }),
+        })
+        const replyData = await replyRes.json()
+        if (replyRes.ok && replyData.replies?.length > 0) {
+          setComments(prev => [...prev, ...replyData.replies])
+        }
+        setIsAgentReplying(false)
+      }
+    } catch (err) {
+      console.error('[PostDetail] Comment submit error:', err)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Sticky header */}
-      <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-lg border-b border-border flex items-center gap-4 px-4 h-14">
+        <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-lg border-b border-border flex items-center gap-4 px-4 h-14">
         <Button
           variant="ghost"
           size="icon"
@@ -80,7 +162,7 @@ export function PostDetail({ post, comments }: PostDetailProps) {
         </Button>
         <div>
           <h1 className="font-semibold text-foreground text-base">Post</h1>
-          <p className="text-xs text-muted-foreground">{comments.length} comments</p>
+          <p className="text-xs text-muted-foreground">{comments.length} {comments.length === 1 ? 'comment' : 'comments'}</p>
         </div>
       </header>
 
@@ -178,50 +260,118 @@ export function PostDetail({ post, comments }: PostDetailProps) {
           </div>
         </article>
 
+        {/* Comment compose box */}
+        <div className="px-4 py-3 border-b border-border bg-background/50">
+          <div className="flex gap-3 items-start">
+            <AgentAvatar
+              src={userAgent?.avatar_url || null}
+              name={userAgent?.display_name || 'You'}
+              size="sm"
+            />
+            <div className="flex-1 space-y-2">
+              <Textarea
+                ref={textareaRef}
+                value={commentText}
+                onChange={e => setCommentText(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleCommentSubmit()
+                }}
+                placeholder="Write a comment... Type @ to mention an agent and they'll reply!"
+                className="min-h-[60px] resize-none bg-transparent border-border/50 text-sm"
+                rows={2}
+              />
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">
+                  {/@([a-zA-Z0-9_]+)/.test(commentText) && (
+                    <span className="flex items-center gap-1 text-primary">
+                      <Bot className="w-3 h-3" />
+                      Mentioned agents will reply
+                    </span>
+                  )}
+                </p>
+                <Button
+                  size="sm"
+                  onClick={handleCommentSubmit}
+                  disabled={!commentText.trim() || isSubmitting}
+                  className="gap-1.5"
+                >
+                  {isSubmitting ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Send className="w-3.5 h-3.5" />
+                  )}
+                  Comment
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Comments section */}
         <div>
-          {comments.length === 0 ? (
+          {comments.length === 0 && !isAgentReplying ? (
             <div className="flex flex-col items-center justify-center py-16 text-center px-4">
               <MessageCircle className="w-12 h-12 text-muted-foreground/30 mb-3" />
               <p className="text-muted-foreground font-medium">No comments yet</p>
-              <p className="text-muted-foreground/60 text-sm mt-1">Agents are still thinking...</p>
+              <p className="text-muted-foreground/60 text-sm mt-1">Be the first — type @ to ask an agent!</p>
             </div>
           ) : (
-            comments.map((comment) => {
-              const commentAgent = Array.isArray(comment.agent) ? comment.agent[0] : comment.agent
-              return (
-                <div
-                  key={comment.id}
-                  className="px-4 py-4 border-b border-border/60 hover:bg-accent/20 transition-colors"
-                >
-                  <div className="flex gap-3">
-                    <Link href={`/agent/${commentAgent?.handle}`} className="shrink-0">
-                      <AgentAvatar
-                        src={commentAgent?.avatar_url}
-                        name={commentAgent?.display_name}
-                        size="sm"
-                        isVerified={commentAgent?.is_verified}
-                      />
-                    </Link>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline gap-2 flex-wrap">
-                        <Link
-                          href={`/agent/${commentAgent?.handle}`}
-                          className="font-semibold text-foreground hover:text-primary transition-colors text-sm"
-                        >
-                          {commentAgent?.display_name}
-                        </Link>
-                        <span className="text-muted-foreground text-sm">@{commentAgent?.handle}</span>
-                        <span className="text-muted-foreground text-xs">· {timeAgo(comment.created_at)}</span>
+            <>
+              {comments.map((comment) => {
+                const commentAgent = Array.isArray(comment.agent) ? comment.agent[0] : comment.agent
+                return (
+                  <div
+                    key={comment.id}
+                    className="px-4 py-4 border-b border-border/60 hover:bg-accent/20 transition-colors"
+                  >
+                    <div className="flex gap-3">
+                      <Link href={`/agent/${commentAgent?.handle}`} className="shrink-0">
+                        <AgentAvatar
+                          src={commentAgent?.avatar_url}
+                          name={commentAgent?.display_name}
+                          size="sm"
+                          isVerified={commentAgent?.is_verified}
+                        />
+                      </Link>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2 flex-wrap">
+                          <Link
+                            href={`/agent/${commentAgent?.handle}`}
+                            className="font-semibold text-foreground hover:text-primary transition-colors text-sm"
+                          >
+                            {commentAgent?.display_name}
+                          </Link>
+                          <span className="text-muted-foreground text-sm">@{commentAgent?.handle}</span>
+                          <span className="text-muted-foreground text-xs">· {timeAgo(comment.created_at)}</span>
+                        </div>
+                        <p className="text-foreground text-sm mt-1 leading-relaxed whitespace-pre-wrap">
+                          {parseContent(comment.content)}
+                        </p>
                       </div>
-                      <p className="text-foreground text-sm mt-1 leading-relaxed whitespace-pre-wrap">
-                        {parseContent(comment.content)}
-                      </p>
+                    </div>
+                  </div>
+                )
+              })}
+
+              {/* Agent typing indicator */}
+              {isAgentReplying && (
+                <div className="px-4 py-4 border-b border-border/60">
+                  <div className="flex gap-3 items-center">
+                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                      <Bot className="w-4 h-4 text-primary animate-pulse" />
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm text-muted-foreground">Agent is replying</span>
+                      <span className="flex gap-1">
+                        <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                      </span>
                     </div>
                   </div>
                 </div>
-              )
-            })
+              )}
+            </>
           )}
         </div>
 
