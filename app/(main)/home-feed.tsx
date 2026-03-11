@@ -92,30 +92,30 @@ export function HomeFeed({
       <ActivitySimulator intervalMs={4000} enabled={true} />
       
       {/* Main Feed */}
-      <div className="flex-1 max-w-[630px] min-w-0 border-x border-border">
+      <div className="flex-1 max-w-[630px] min-w-0 border-x border-border/50 md:border-border">
         {/* Header */}
-        <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-lg border-b border-border">
-          <div className="flex items-center justify-between px-4 h-14">
-            <div className="flex items-center gap-3">
+        <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-lg border-b border-border safe-area-top">
+          <div className="flex items-center justify-between px-3 md:px-4 h-14">
+            <div className="flex items-center gap-2 md:gap-3">
               <h1 className="text-lg font-semibold">Home</h1>
               {isLive && (
-                <span className="flex items-center gap-1.5 text-xs text-emerald-500 bg-emerald-500/10 px-2.5 py-1 rounded-full font-medium">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="flex items-center gap-1 text-[10px] md:text-xs text-emerald-500 bg-emerald-500/10 px-2 py-0.5 md:px-2.5 md:py-1 rounded-full font-medium">
+                  <span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-emerald-500 animate-pulse" />
                   Live
                 </span>
               )}
-              <span className="text-xs text-muted-foreground">
+              <span className="text-[10px] md:text-xs text-muted-foreground hidden sm:inline">
                 {posts.length} posts
               </span>
             </div>
-            <div className="flex items-center gap-2">
-              <button className="px-3 py-1.5 text-sm font-medium bg-secondary rounded-full hover:bg-secondary/80 transition-colors">
+            <div className="flex items-center gap-1 md:gap-2 overflow-x-auto scrollbar-hide">
+              <button className="px-2.5 md:px-3 py-1.5 text-xs md:text-sm font-medium bg-secondary rounded-full hover:bg-secondary/80 transition-colors touch-manipulation whitespace-nowrap">
                 For You
               </button>
-              <button className="px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+              <button className="px-2.5 md:px-3 py-1.5 text-xs md:text-sm font-medium text-muted-foreground hover:text-foreground transition-colors touch-manipulation whitespace-nowrap">
                 Following
               </button>
-              <button className="px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+              <button className="px-2.5 md:px-3 py-1.5 text-xs md:text-sm font-medium text-muted-foreground hover:text-foreground transition-colors touch-manipulation whitespace-nowrap hidden sm:block">
                 Contracts
               </button>
             </div>
@@ -123,19 +123,19 @@ export function HomeFeed({
         </header>
 
         {/* Stories */}
-        <div className="border-b border-border">
-          <StoriesBar className="px-4" />
+        <div className="border-b border-border overflow-hidden">
+          <StoriesBar className="px-3 md:px-4" />
         </div>
 
         {/* Create Post */}
-        <div className="p-4 border-b border-border">
+        <div className="p-3 md:p-4 border-b border-border">
           <CreatePostBox />
         </div>
 
         {/* Feed */}
         <div className="divide-y divide-border">
           {posts.map((post) => (
-            <div key={post.id} className="p-4">
+            <div key={post.id} className="px-3 md:px-4 py-3 md:py-4">
               <PostCard post={post} />
             </div>
           ))}

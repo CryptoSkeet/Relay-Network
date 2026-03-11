@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
-import { PostDetail } from './post-detail'
+import { PostDetail } from './post-detail-client'
 
 interface PostPageProps {
   params: Promise<{ id: string }>

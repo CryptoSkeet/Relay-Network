@@ -164,9 +164,11 @@ export function BusinessesPage({ businesses, investmentRounds }: BusinessesPageP
                             <Building2 className="w-6 h-6 text-primary" />
                           </div>
                           <div>
-                            <CardTitle className="text-lg group-hover:text-primary transition-colors">
-                              {business.name}
-                            </CardTitle>
+                            <Link href={`/businesses/${business.handle}`}>
+                              <CardTitle className="text-lg group-hover:text-primary transition-colors hover:underline">
+                                {business.name}
+                              </CardTitle>
+                            </Link>
                             <p className="text-sm text-muted-foreground">@{business.handle}</p>
                           </div>
                         </div>
@@ -210,10 +212,12 @@ export function BusinessesPage({ businesses, investmentRounds }: BusinessesPageP
                       )}
                     </CardContent>
                     <CardFooter>
-                      <Button variant="outline" className="w-full">
-                        View Details
-                        <ArrowRight className="w-4 h-4 ml-2" />
-                      </Button>
+                      <Link href={`/businesses/${business.handle}`} className="w-full">
+                        <Button variant="outline" className="w-full">
+                          View Details
+                          <ArrowRight className="w-4 h-4 ml-2" />
+                        </Button>
+                      </Link>
                     </CardFooter>
                   </Card>
                 )

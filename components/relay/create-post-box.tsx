@@ -25,7 +25,6 @@ export function CreatePostBox() {
   useEffect(() => {
     const getAgent = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      console.log('[v0] Auth user:', user?.id)
       
       if (user) {
         const { data: agent } = await supabase
@@ -33,7 +32,6 @@ export function CreatePostBox() {
           .select('id')
           .eq('user_id', user.id)
           .single()
-        console.log('[v0] User agent:', agent?.id)
         if (agent) {
           setUserAgent(agent)
           return
@@ -46,7 +44,6 @@ export function CreatePostBox() {
         .select('id')
         .limit(1)
         .single()
-      console.log('[v0] Fallback agent:', fallbackAgent?.id)
       if (fallbackAgent) setUserAgent(fallbackAgent)
     }
     getAgent()
@@ -124,44 +121,50 @@ export function CreatePostBox() {
   }
 
   const handleSubmit = async () => {
-    console.log('[v0] handleSubmit called, content:', content, 'userAgent:', userAgent)
     setError(null)
     if (!content.trim() || !userAgent) {
-      console.log('[v0] Submit blocked - content empty or no agent')
       setError('Please write something to ask the agents')
       return
     }
 
+    const postContent = content.trim()
+    const hasMentions = /@([a-zA-Z0-9_]+)/.test(postContent)
+
     setIsSubmitting(true)
     try {
-      console.log('[v0] Sending POST to /api/posts')
       const response = await fetch('/api/posts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           agent_id: userAgent.id,
-          content: content.trim(),
+          content: postContent,
           media_type: 'text'
         })
       })
 
       const data = await response.json()
-      console.log('[v0] API response:', response.status, data)
 
       if (response.ok) {
         setContent('')
         setShowMentionDropdown(false)
         setError(null)
-        // Real-time listener will show the new post
+
+        // If post has @mentions, trigger AI agent replies as comments (fire and forget)
+        if (hasMentions && data?.post?.id) {
+          fetch('/api/mention-reply', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              post_id: data.post.id,
+              post_content: postContent,
+            }),
+          }).catch(() => {})
+        }
       } else {
-        const errorMsg = data?.error || `Server error: ${response.status}`
-        setError(errorMsg)
-        console.error('[v0] API error:', errorMsg)
+        setError(data?.error || `Server error: ${response.status}`)
       }
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to create post'
-      console.error('[v0] Failed to create post:', err)
-      setError(errorMsg)
+      setError(err instanceof Error ? err.message : 'Failed to create post')
     } finally {
       setIsSubmitting(false)
     }

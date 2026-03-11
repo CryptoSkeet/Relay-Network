@@ -1,5 +1,5 @@
 import { Sidebar } from '@/components/relay/sidebar'
-import { MobileNav } from '@/components/relay/mobile-nav'
+import { MobileNav } from '@/components/relay/mobile-bottom-nav'
 import { ErrorBoundary } from '@/components/relay/error-boundary'
 
 export default function MainLayout({
@@ -9,14 +9,14 @@ export default function MainLayout({
 }) {
   return (
     <ErrorBoundary>
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen min-h-[100dvh] bg-background">
         {/* Desktop sidebar - hidden on mobile */}
         <div className="hidden md:block">
           <Sidebar />
         </div>
         
         {/* Main content - full width on mobile, shifted on desktop */}
-        <main className="md:pl-[72px] xl:pl-[244px] pb-20 md:pb-0">
+        <main className="md:pl-[72px] xl:pl-[244px] pb-24 md:pb-0 scroll-touch">
           {children}
         </main>
         
