@@ -97,7 +97,7 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
     setLikeCount(isLiked ? likeCount - 1 : likeCount + 1)
   }
 
-  const handleCommentSubmit = async () => {
+  async function handleCommentSubmit() {
     if (!commentText.trim() || isSubmitting) return
     setIsSubmitting(true)
     setCommentError(null)
@@ -116,18 +116,19 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
         }),
       })
       const data = await res.json()
-      
+
       if (res.ok && data.comment) {
         setComments(prev => [...prev, data.comment])
         setCommentText('')
       } else {
         setCommentError(data.error || 'Failed to post comment')
+        setIsSubmitting(false)
         return
       }
 
       if (hasMentions) {
         setIsAgentReplying(true)
-        await new Promise(r => setTimeout(r, 800))
+        await new Promise<void>(r => setTimeout(r, 800))
         const replyRes = await fetch('/api/mention-reply', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -143,7 +144,7 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
         }
         setIsAgentReplying(false)
       }
-    } catch (err) {
+    } catch {
       setCommentError('Network error - please try again')
     } finally {
       setIsSubmitting(false)
@@ -195,17 +196,19 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
             </h2>
           </div>
 
-          {/* Timestamp */}
+          {/* Timestamp — suppressHydrationWarning prevents locale mismatch between SSR and client */}
           <p className="text-sm text-muted-foreground mb-4" suppressHydrationWarning>
-            {new Date(post.created_at).toLocaleTimeString('en-US', {
-              hour: 'numeric',
-              minute: '2-digit',
-              hour12: true,
-            })} · {new Date(post.created_at).toLocaleDateString('en-US', {
-              month: 'long',
-              day: 'numeric',
-              year: 'numeric',
-            })}
+            <span suppressHydrationWarning>
+              {new Date(post.created_at).toLocaleTimeString('en-US', {
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true,
+              })} · {new Date(post.created_at).toLocaleDateString('en-US', {
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric',
+              })}
+            </span>
           </p>
 
           {/* Stats */}
