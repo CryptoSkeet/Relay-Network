@@ -2,7 +2,11 @@
 
 import React, { useEffect, useRef } from 'react'
 
-export function RelayBanner() {
+interface RelayBannerProps {
+  compact?: boolean
+}
+
+export function RelayBanner({ compact = false }: RelayBannerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
@@ -49,7 +53,7 @@ export function RelayBanner() {
   }, [])
 
   return (
-    <div className="w-full bg-[#03040a] overflow-hidden rounded-lg border border-border/50">
+    <div className={compact ? "w-32 h-32 md:w-40 md:h-40 bg-[#03040a] overflow-hidden rounded-lg border border-border/50" : "w-full bg-[#03040a] overflow-hidden rounded-lg border border-border/50"}>
       {/* Canvas background */}
       <canvas
         ref={canvasRef}
@@ -57,8 +61,42 @@ export function RelayBanner() {
         style={{ display: 'block' }}
       />
 
-      {/* Content wrapper */}
-      <div className="relative flex items-center justify-between px-6 md:px-12 py-12 md:py-16 min-h-[280px] md:min-h-[360px] gap-8">
+      {/* Content wrapper - Compact */}
+      {compact && (
+        <div className="relative flex flex-col items-center justify-center w-full h-full p-3 gap-1">
+          <svg
+            width="64"
+            height="64"
+            viewBox="0 0 320 320"
+            fill="none"
+            className="w-12 h-12"
+          >
+            {/* Outer hex */}
+            <polygon
+              points="160,28 264,88 264,208 160,268 56,208 56,88"
+              stroke="rgba(0,245,160,0.25)"
+              strokeWidth="2"
+              fill="none"
+              strokeLinejoin="round"
+            />
+            {/* Inner hex */}
+            <polygon
+              points="160,80 208,108 208,164 160,192 112,164 112,108"
+              stroke="rgba(0,245,160,0.75)"
+              strokeWidth="2.5"
+              fill="rgba(0,245,160,0.06)"
+              strokeLinejoin="round"
+            />
+            {/* Center node */}
+            <circle cx="160" cy="136" r="18" fill="#00f5a0" style={{ filter: 'drop-shadow(0 0 18px rgba(0,245,160,0.9))' }} />
+            <circle cx="160" cy="136" r="9" fill="#03040a" />
+          </svg>
+          <span className="font-bold text-xs text-[#00f5a0] tracking-tight">RELAY</span>
+        </div>
+      )}
+
+      {/* Content wrapper - Full */}
+      {!compact && (
         {/* Left: Hex Icon */}
         <div className="shrink-0 hidden md:flex items-center justify-center">
           <svg
@@ -165,16 +203,17 @@ export function RelayBanner() {
         </div>
       </div>
 
-      {/* Bottom status bar */}
-      <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center gap-3 py-3 px-4 border-t border-border/30 bg-gradient-to-t from-[rgba(0,245,160,0.02)] to-transparent">
-        <div className="w-6 md:w-10 h-px bg-gradient-to-r from-transparent to-[rgba(0,245,160,0.4)]" />
-        <div className="w-1.5 h-1.5 rounded-full bg-[#00f5a0]" style={{ boxShadow: '0 0 10px #00f5a0' }} />
-        <span className="font-mono text-[10px] md:text-xs text-[rgba(0,245,160,0.35)] uppercase tracking-[0.35em] whitespace-nowrap">
-          Network Active · agents online: 2,847
-        </span>
-        <div className="w-1.5 h-1.5 rounded-full bg-[#00f5a0]" style={{ boxShadow: '0 0 10px #00f5a0' }} />
-        <div className="w-6 md:w-10 h-px bg-gradient-to-l from-transparent to-[rgba(0,245,160,0.4)]" />
-      </div>
+        {/* Bottom status bar */}
+        <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center gap-3 py-3 px-4 border-t border-border/30 bg-gradient-to-t from-[rgba(0,245,160,0.02)] to-transparent">
+          <div className="w-6 md:w-10 h-px bg-gradient-to-r from-transparent to-[rgba(0,245,160,0.4)]" />
+          <div className="w-1.5 h-1.5 rounded-full bg-[#00f5a0]" style={{ boxShadow: '0 0 10px #00f5a0' }} />
+          <span className="font-mono text-[10px] md:text-xs text-[rgba(0,245,160,0.35)] uppercase tracking-[0.35em] whitespace-nowrap">
+            Network Active · agents online: 2,847
+          </span>
+          <div className="w-1.5 h-1.5 rounded-full bg-[#00f5a0]" style={{ boxShadow: '0 0 10px #00f5a0' }} />
+          <div className="w-6 md:w-10 h-px bg-gradient-to-l from-transparent to-[rgba(0,245,160,0.4)]" />
+        </div>
+      )}
     </div>
   )
 }
