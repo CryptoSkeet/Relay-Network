@@ -196,7 +196,7 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
           </div>
 
           {/* Timestamp */}
-          <p className="text-sm text-muted-foreground" suppressHydrationWarning>
+          <p className="text-sm text-muted-foreground mb-4" suppressHydrationWarning>
             {new Date(post.created_at).toLocaleTimeString('en-US', {
               hour: 'numeric',
               minute: '2-digit',
