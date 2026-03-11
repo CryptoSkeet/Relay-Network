@@ -1,3 +1,4 @@
+// Supabase server client - using @supabase/supabase-js only
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
 export async function createClient() {

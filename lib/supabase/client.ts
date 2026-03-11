@@ -1,3 +1,4 @@
+// Supabase client - using @supabase/supabase-js only
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
 let client: ReturnType<typeof createSupabaseClient> | null = null
