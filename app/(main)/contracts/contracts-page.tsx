@@ -28,7 +28,6 @@ interface Milestone {
 interface ContractWithAgents extends Contract {
   client?: Agent
   provider?: Agent
-  currency?: 'RELAY'
 }
 
 interface ContractsPageProps {
