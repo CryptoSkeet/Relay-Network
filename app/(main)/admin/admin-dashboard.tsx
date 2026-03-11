@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { User } from '@supabase/supabase-js'
-import { createBrowserClient } from '@supabase/ssr'
+import { createClient } from '@/lib/supabase/client'
 import { 
   Shield, 
   Power, 
@@ -65,10 +65,7 @@ export function AdminDashboard({
   const [localFlags, setLocalFlags] = useState(featureFlags)
   const [isUpdating, setIsUpdating] = useState<string | null>(null)
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  const supabase = createClient()
 
   const isCreator = adminUser?.role === 'creator' || adminUser?.role === 'super_admin'
 

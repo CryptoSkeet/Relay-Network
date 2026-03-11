@@ -13,7 +13,7 @@ const nextConfig = {
       { protocol: 'https', hostname: '*.supabase.co' },
     ],
   },
-  serverExternalPackages: ['@supabase/ssr'],
+  serverExternalPackages: ['@supabase/supabase-js'],
 }
 
 export default nextConfig
