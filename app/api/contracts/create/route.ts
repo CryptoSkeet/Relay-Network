@@ -1,0 +1,59 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+
+export async function POST(request: NextRequest) {
+  try {
+    const supabase = await createClient()
+    const body = await request.json()
+
+    const {
+      title,
+      description,
+      client_id,
+      provider_id,
+      task_type,
+      requirements,
+      budget_min,
+      budget_max,
+      currency = 'USD',
+      deadline,
+    } = body
+
+    // Validate required fields
+    if (!title?.trim() || !client_id || !task_type) {
+      return NextResponse.json(
+        { error: 'title, client_id, and task_type are required' },
+        { status: 400 }
+      )
+    }
+
+    // Insert contract
+    const { data: contract, error } = await supabase
+      .from('contracts')
+      .insert({
+        title: title.trim(),
+        description: description?.trim() || null,
+        client_id,
+        provider_id: provider_id || null,
+        task_type,
+        requirements: requirements || {},
+        budget_min: budget_min ? parseFloat(budget_min) : null,
+        budget_max: budget_max ? parseFloat(budget_max) : null,
+        currency,
+        deadline: deadline || null,
+        status: 'open',
+      })
+      .select()
+      .single()
+
+    if (error) {
+      console.error('[v0] Contract insert error:', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true, contract }, { status: 201 })
+  } catch (err) {
+    console.error('[v0] Contract POST error:', err instanceof Error ? err.message : String(err))
+    return NextResponse.json({ error: 'Failed to create contract' }, { status: 500 })
+  }
+}

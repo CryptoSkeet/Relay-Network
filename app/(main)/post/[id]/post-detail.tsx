@@ -122,7 +122,6 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
         setCommentText('')
       } else {
         setCommentError(data.error || 'Failed to post comment')
-        setIsSubmitting(false)
         return
       }
 
@@ -152,7 +151,8 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* Header */}
       <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-lg border-b border-border flex items-center gap-4 px-4 h-14">
         <Button
           variant="ghost"
@@ -168,210 +168,210 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
         </div>
       </header>
 
-      <div className="max-w-2xl mx-auto">
-        <article className="px-4 pt-5 pb-4 border-b border-border">
-          <div className="flex items-center justify-between mb-4">
-            <Link href={`/agent/${agent?.handle}`} className="flex items-center gap-3 group">
+      {/* Post */}
+      <div className="max-w-2xl mx-auto w-full border-b border-border">
+        <article className="px-4 pt-5 pb-4 space-y-3">
+          <div>
+            <Link href={`/agent/${agent?.handle}`} className="flex items-center gap-2 mb-3 hover:opacity-80">
               <AgentAvatar
                 src={agent?.avatar_url}
                 name={agent?.display_name}
-                size="lg"
+                size="sm"
                 isVerified={agent?.is_verified}
               />
               <div>
-                <p className="font-semibold text-foreground group-hover:text-primary transition-colors">
-                  {agent?.display_name}
+                <p className="font-semibold text-foreground text-sm">{agent?.display_name}</p>
+                <p className="text-sm text-muted-foreground" suppressHydrationWarning>
+                  @{agent?.handle} · {timeAgo(post.created_at)}
                 </p>
-                <p className="text-sm text-muted-foreground">@{agent?.handle}</p>
               </div>
             </Link>
-            <Button variant="ghost" size="icon" className="text-muted-foreground rounded-full">
-              <MoreHorizontal className="w-5 h-5" />
-            </Button>
           </div>
 
-          <p className="text-foreground text-lg leading-relaxed whitespace-pre-wrap mb-4">
-            {post.content ? parseContent(post.content) : null}
-          </p>
+          {/* Content */}
+          <div className="space-y-2">
+            <h2 className="text-xl font-bold text-foreground leading-tight">
+              {parseContent(post.content)}
+            </h2>
+          </div>
 
-          {post.media_urls && post.media_urls.length > 0 && (
-            <div className="rounded-2xl overflow-hidden bg-secondary mb-4">
-              <img src={post.media_urls[0]} alt="Post media" className="w-full h-auto" />
-            </div>
-          )}
-
-          <p className="text-sm text-muted-foreground mb-4">
+          {/* Timestamp */}
+          <p className="text-sm text-muted-foreground" suppressHydrationWarning>
             {new Date(post.created_at).toLocaleTimeString('en-US', {
               hour: 'numeric',
               minute: '2-digit',
-            })}{' '}
-            · {new Date(post.created_at).toLocaleDateString('en-US', {
+              hour12: true,
+            })} · {new Date(post.created_at).toLocaleDateString('en-US', {
               month: 'long',
               day: 'numeric',
               year: 'numeric',
             })}
           </p>
 
-          <div className="flex items-center gap-5 py-3 border-y border-border text-sm">
-            <span>
-              <strong className="text-foreground">{formatNumber(likeCount)}</strong>{' '}
-              <span className="text-muted-foreground">Likes</span>
-            </span>
-            <span>
-              <strong className="text-foreground">{formatNumber(post.comment_count)}</strong>{' '}
-              <span className="text-muted-foreground">Comments</span>
-            </span>
-            <span>
-              <strong className="text-foreground">{formatNumber(post.share_count)}</strong>{' '}
-              <span className="text-muted-foreground">Shares</span>
-            </span>
+          {/* Stats */}
+          <div className="flex gap-4 text-sm text-muted-foreground pt-3 border-t border-border">
+            <button className="hover:text-primary transition-colors">
+              {formatNumber(likeCount)} {likeCount === 1 ? 'Like' : 'Likes'}
+            </button>
+            <button className="hover:text-primary transition-colors">
+              {formatNumber(comments.length)} {comments.length === 1 ? 'Reply' : 'Replies'}
+            </button>
+            <button className="hover:text-primary transition-colors">
+              {formatNumber(post.share_count || 0)} {(post.share_count || 0) === 1 ? 'Share' : 'Shares'}
+            </button>
           </div>
 
-          <div className="flex items-center justify-between pt-2">
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                className={cn('gap-2 rounded-full', isLiked ? 'text-primary' : 'text-muted-foreground hover:text-primary')}
-                onClick={handleLike}
-              >
-                <Heart className={cn('w-5 h-5', isLiked && 'fill-current')} />
-              </Button>
-              <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-primary rounded-full">
-                <MessageCircle className="w-5 h-5" />
-              </Button>
-              <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-primary rounded-full">
-                <Share2 className="w-5 h-5" />
-              </Button>
-            </div>
+          {/* Action Buttons */}
+          <div className="flex justify-between text-muted-foreground border-t border-border pt-3">
             <Button
               variant="ghost"
-              size="icon"
-              className={cn('rounded-full', isSaved ? 'text-accent' : 'text-muted-foreground hover:text-accent')}
+              size="sm"
+              className="flex-1 rounded-full hover:text-primary hover:bg-primary/10"
+              onClick={handleLike}
+            >
+              <Heart className={cn('w-4 h-4', isLiked && 'fill-red-500 text-red-500')} />
+              <span className="ml-2 text-xs hidden sm:inline">Like</span>
+            </Button>
+            <Button variant="ghost" size="sm" className="flex-1 rounded-full hover:text-primary hover:bg-primary/10">
+              <MessageCircle className="w-4 h-4" />
+              <span className="ml-2 text-xs hidden sm:inline">Reply</span>
+            </Button>
+            <Button variant="ghost" size="sm" className="flex-1 rounded-full hover:text-primary hover:bg-primary/10">
+              <Share2 className="w-4 h-4" />
+              <span className="ml-2 text-xs hidden sm:inline">Share</span>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="flex-1 rounded-full hover:text-primary hover:bg-primary/10"
               onClick={() => setIsSaved(!isSaved)}
             >
-              <Bookmark className={cn('w-5 h-5', isSaved && 'fill-current')} />
+              <Bookmark className={cn('w-4 h-4', isSaved && 'fill-yellow-500 text-yellow-500')} />
+              <span className="ml-2 text-xs hidden sm:inline">Save</span>
             </Button>
           </div>
         </article>
+      </div>
 
-        <div className="px-4 py-3 border-b border-border bg-background/50">
-          <div className="flex gap-3 items-start">
-            <AgentAvatar
-              src={userAgent?.avatar_url || null}
-              name={userAgent?.display_name || 'You'}
-              size="sm"
+      {/* Comment compose box */}
+      <div className="px-4 py-3 border-b border-border bg-background/50">
+        <div className="flex gap-3 items-start">
+          <AgentAvatar
+            src={userAgent?.avatar_url || null}
+            name={userAgent?.display_name || 'You'}
+            size="sm"
+          />
+          <div className="flex-1 space-y-2">
+            <Textarea
+              ref={textareaRef}
+              value={commentText}
+              onChange={e => setCommentText(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleCommentSubmit()
+              }}
+              placeholder="Write a comment... Type @ to mention an agent and they'll reply!"
+              className="min-h-[60px] resize-none bg-transparent border-border/50 text-sm"
+              rows={2}
             />
-            <div className="flex-1 space-y-2">
-              <Textarea
-                ref={textareaRef}
-                value={commentText}
-                onChange={e => setCommentText(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleCommentSubmit()
-                }}
-                placeholder="Write a comment... Type @ to mention an agent and they'll reply!"
-                className="min-h-[60px] resize-none bg-transparent border-border/50 text-sm"
-                rows={2}
-              />
-              {commentError && (
-                <p className="text-xs text-red-500">{commentError}</p>
-              )}
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-muted-foreground">
-                  {/@([a-zA-Z0-9_]+)/.test(commentText) && (
-                    <span className="flex items-center gap-1 text-primary">
-                      <Bot className="w-3 h-3" />
-                      Mentioned agents will reply
-                    </span>
-                  )}
-                </p>
-                <Button
-                  size="sm"
-                  onClick={handleCommentSubmit}
-                  disabled={!commentText.trim() || isSubmitting}
-                  className="gap-1.5"
-                >
-                  {isSubmitting ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <Send className="w-3.5 h-3.5" />
-                  )}
-                  Comment
-                </Button>
-              </div>
+            {commentError && (
+              <p className="text-xs text-red-500">{commentError}</p>
+            )}
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                {/@([a-zA-Z0-9_]+)/.test(commentText) && (
+                  <span className="flex items-center gap-1 text-primary">
+                    <Bot className="w-3 h-3" />
+                    Mentioned agents will reply
+                  </span>
+                )}
+              </p>
+              <Button
+                size="sm"
+                onClick={handleCommentSubmit}
+                disabled={!commentText.trim() || isSubmitting}
+                className="gap-1.5"
+              >
+                {isSubmitting ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Send className="w-3.5 h-3.5" />
+                )}
+                Comment
+              </Button>
             </div>
           </div>
         </div>
+      </div>
 
-        <div>
-          {comments.length === 0 && !isAgentReplying ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center px-4">
-              <MessageCircle className="w-12 h-12 text-muted-foreground/30 mb-3" />
-              <p className="text-muted-foreground font-medium">No comments yet</p>
-              <p className="text-muted-foreground/60 text-sm mt-1">Be the first — type @ to ask an agent!</p>
-            </div>
-          ) : (
-            <>
-              {comments.map((comment) => {
-                const commentAgent = Array.isArray(comment.agent) ? comment.agent[0] : comment.agent
-                return (
-                  <div
-                    key={comment.id}
-                    className="px-4 py-4 border-b border-border/60 hover:bg-accent/20 transition-colors"
-                  >
-                    <div className="flex gap-3">
-                      <Link href={`/agent/${commentAgent?.handle}`} className="shrink-0">
-                        <AgentAvatar
-                          src={commentAgent?.avatar_url}
-                          name={commentAgent?.display_name}
-                          size="sm"
-                          isVerified={commentAgent?.is_verified}
-                        />
-                      </Link>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline gap-2 flex-wrap">
-                          <Link
-                            href={`/agent/${commentAgent?.handle}`}
-                            className="font-semibold text-foreground hover:text-primary transition-colors text-sm"
-                          >
-                            {commentAgent?.display_name}
-                          </Link>
-                          <span className="text-muted-foreground text-sm">@{commentAgent?.handle}</span>
-                          <span className="text-muted-foreground text-xs" suppressHydrationWarning>· {timeAgo(comment.created_at)}</span>
-                        </div>
-                        <p className="text-foreground text-sm mt-1 leading-relaxed whitespace-pre-wrap">
-                          {parseContent(comment.content)}
-                        </p>
+      {/* Comments section */}
+      <div>
+        {comments.length === 0 && !isAgentReplying ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center px-4">
+            <MessageCircle className="w-12 h-12 text-muted-foreground/30 mb-3" />
+            <p className="text-muted-foreground font-medium">No comments yet</p>
+            <p className="text-muted-foreground/60 text-sm mt-1">Be the first — type @ to ask an agent!</p>
+          </div>
+        ) : (
+          <>
+            {comments.map((comment) => {
+              const commentAgent = Array.isArray(comment.agent) ? comment.agent[0] : comment.agent
+              return (
+                <div
+                  key={comment.id}
+                  className="px-4 py-4 border-b border-border/60 hover:bg-accent/20 transition-colors"
+                >
+                  <div className="flex gap-3">
+                    <Link href={`/agent/${commentAgent?.handle}`} className="shrink-0">
+                      <AgentAvatar
+                        src={commentAgent?.avatar_url}
+                        name={commentAgent?.display_name}
+                        size="sm"
+                        isVerified={commentAgent?.is_verified}
+                      />
+                    </Link>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline gap-2 flex-wrap">
+                        <Link
+                          href={`/agent/${commentAgent?.handle}`}
+                          className="font-semibold text-foreground hover:text-primary transition-colors text-sm"
+                        >
+                          {commentAgent?.display_name}
+                        </Link>
+                        <span className="text-muted-foreground text-sm">@{commentAgent?.handle}</span>
+                        <span className="text-muted-foreground text-xs" suppressHydrationWarning>· {timeAgo(comment.created_at)}</span>
                       </div>
-                    </div>
-                  </div>
-                )
-              })}
-
-              {isAgentReplying && (
-                <div className="px-4 py-4 border-b border-border/60">
-                  <div className="flex gap-3 items-center">
-                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                      <Bot className="w-4 h-4 text-primary animate-pulse" />
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-sm text-muted-foreground">Agent is replying</span>
-                      <span className="flex gap-1">
-                        <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                        <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                      </span>
+                      <p className="text-foreground text-sm mt-1 leading-relaxed whitespace-pre-wrap">
+                        {parseContent(comment.content)}
+                      </p>
                     </div>
                   </div>
                 </div>
-              )}
-            </>
-          )}
-        </div>
+              )
+            })}
 
-        <div className="h-20" />
+            {isAgentReplying && (
+              <div className="px-4 py-4 border-b border-border/60">
+                <div className="flex gap-3 items-center">
+                  <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                    <Bot className="w-4 h-4 text-primary animate-pulse" />
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm text-muted-foreground">Agent is replying</span>
+                    <span className="flex gap-1">
+                      <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
+
+      {/* Bottom padding for mobile nav */}
+      <div className="h-20" />
     </div>
   )
 }

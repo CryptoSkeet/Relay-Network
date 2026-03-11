@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { FileText, Plus, Clock, CheckCircle, XCircle, AlertCircle, DollarSign, ArrowRight, Filter, CheckCheck, Zap } from 'lucide-react'
+import { FileText, Plus, Clock, CheckCircle, XCircle, AlertCircle, DollarSign, ArrowRight, Filter, CheckCheck, Zap, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AgentAvatar } from '@/components/relay/agent-avatar'
+import { NewContractDialog } from '@/components/relay/new-contract-dialog'
 import type { Agent, Contract } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { formatDistanceToNow } from 'date-fns'
@@ -31,6 +32,7 @@ interface ContractWithAgents extends Contract {
 
 interface ContractsPageProps {
   contracts: ContractWithAgents[]
+  agents: Agent[]
 }
 
 const statusConfig = {
@@ -43,9 +45,12 @@ const statusConfig = {
   disputed: { icon: AlertCircle, color: 'text-orange-500', bg: 'bg-orange-500/10' },
 }
 
-export function ContractsPage({ contracts }: ContractsPageProps) {
+export function ContractsPage({ contracts: initialContracts, agents }: ContractsPageProps) {
   const [filter, setFilter] = useState<string>('all')
+  const [contracts, setContracts] = useState<ContractWithAgents[]>(initialContracts)
   const [contractMilestones, setContractMilestones] = useState<Record<string, Milestone[]>>({})
+  const [isNewContractOpen, setIsNewContractOpen] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -71,6 +76,24 @@ export function ContractsPage({ contracts }: ContractsPageProps) {
 
     fetchMilestones()
   }, [contracts, supabase])
+
+  const handleContractCreated = async () => {
+    setIsRefreshing(true)
+    try {
+      const { data } = await supabase
+        .from('contracts')
+        .select('*, client:client_id(*), provider:provider_id(*)')
+        .order('created_at', { ascending: false })
+
+      if (data) {
+        setContracts(data as ContractWithAgents[])
+      }
+    } catch (err) {
+      console.error('Failed to refresh contracts:', err)
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
 
   const filteredContracts = contracts.filter(contract => {
     if (filter === 'all') return true
@@ -116,10 +139,23 @@ export function ContractsPage({ contracts }: ContractsPageProps) {
             </h1>
             <p className="text-muted-foreground">Track contracts and milestone progress</p>
           </div>
-          <Button className="gap-2">
-            <Plus className="w-4 h-4" />
-            New Contract
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleContractCreated}
+              disabled={isRefreshing}
+            >
+              <RefreshCw className={cn('w-4 h-4', isRefreshing && 'animate-spin')} />
+            </Button>
+            <Button
+              onClick={() => setIsNewContractOpen(true)}
+              className="gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              New Contract
+            </Button>
+          </div>
         </div>
 
         {/* Stats */}
@@ -259,11 +295,25 @@ export function ContractsPage({ contracts }: ContractsPageProps) {
                 <p className="text-muted-foreground mb-4">
                   {filter !== 'all' ? 'Try a different filter' : 'Create your first collaboration contract'}
                 </p>
+                {filter === 'all' && (
+                  <Button onClick={() => setIsNewContractOpen(true)}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Contract
+                  </Button>
+                )}
               </div>
             )}
           </div>
         </Tabs>
       </div>
+
+      {/* New Contract Dialog */}
+      <NewContractDialog
+        open={isNewContractOpen}
+        onOpenChange={setIsNewContractOpen}
+        agents={agents}
+        onSuccess={handleContractCreated}
+      />
     </div>
   )
 }

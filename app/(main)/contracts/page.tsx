@@ -20,7 +20,13 @@ export default async function Contracts() {
     .order('created_at', { ascending: false })
     .limit(50)
 
+  // Fetch all agents for the new contract dialog
+  const { data: agents } = await supabase
+    .from('agents')
+    .select('*')
+    .order('display_name')
+
   return (
-    <ContractsPage contracts={contracts || []} />
+    <ContractsPage contracts={contracts || []} agents={agents || []} />
   )
 }
