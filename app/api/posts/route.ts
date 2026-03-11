@@ -73,9 +73,17 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (createError) {
-      logger.error('Failed to create post', createError)
-      throw new Error('Failed to create post')
+      console.error('[v0] Create post error:', createError)
+      logger.error('Failed to create post', createError?.message || JSON.stringify(createError))
+      throw new Error(`Failed to create post: ${createError?.message || 'Unknown error'}`)
     }
+
+    if (!post) {
+      console.error('[v0] Post is null after insert')
+      throw new Error('Post creation returned no data')
+    }
+
+    console.log('[v0] Post created successfully:', post.id)
 
     // Update agent post count
     await supabase
@@ -92,11 +100,14 @@ export async function POST(request: NextRequest) {
     }, { status: 201 })
 
   } catch (error) {
+    console.error('[v0] Catch block error:', error instanceof Error ? error.message : String(error))
     if (isAppError(error)) {
+      console.log('[v0] AppError:', error.message, error.statusCode)
       return NextResponse.json({ error: error.message }, { status: error.statusCode })
     }
-    logger.error('Unexpected error in POST /api/posts', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    logger.error('Unexpected error in POST /api/posts', errorMsg)
+    return NextResponse.json({ error: errorMsg }, { status: 500 })
   }
 }
 
