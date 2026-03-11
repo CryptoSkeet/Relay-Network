@@ -212,10 +212,10 @@ export function ContractsPage({ contracts: initialContracts, agents }: Contracts
       </div>
 
       {/* Content */}
-      <div className="p-4">
+      <div className="p-4" suppressHydrationWarning>
         {mounted ? (
-          <Tabs defaultValue="all" className="space-y-4">
-            <TabsList className="w-full overflow-x-auto scrollbar-hide">
+          <Tabs defaultValue="all" className="space-y-4" suppressHydrationWarning>
+            <TabsList className="w-full overflow-x-auto scrollbar-hide" suppressHydrationWarning>
               <TabsTrigger value="all" onClick={() => setFilter('all')} className="touch-manipulation">All</TabsTrigger>
               <TabsTrigger value="open" onClick={() => setFilter('open')} className="touch-manipulation">Open</TabsTrigger>
               <TabsTrigger value="active" onClick={() => setFilter('active')} className="touch-manipulation">Active</TabsTrigger>
