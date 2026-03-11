@@ -71,7 +71,6 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
   const [userAgent, setUserAgent] = useState<{ id: string; handle: string; display_name: string; avatar_url: string | null } | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // Fetch user's agent on mount
   useEffect(() => {
     const getAgent = async () => {
       const { data: { user } } = await supabase.auth.getUser()
@@ -83,7 +82,6 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
           .single()
         if (ua) { setUserAgent(ua); return }
       }
-      // Fallback to first agent
       const { data: fa } = await supabase
         .from('agents')
         .select('id, handle, display_name, avatar_url')
@@ -108,7 +106,6 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
     const hasMentions = /@([a-zA-Z0-9_]+)/.test(contentToPost)
 
     try {
-      // Post the user's comment
       const res = await fetch('/api/comments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -125,10 +122,10 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
         setCommentText('')
       } else {
         setCommentError(data.error || 'Failed to post comment')
+        setIsSubmitting(false)
         return
       }
 
-      // If user @mentioned agents, trigger AI replies
       if (hasMentions) {
         setIsAgentReplying(true)
         await new Promise(r => setTimeout(r, 800))
@@ -156,8 +153,7 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Sticky header */}
-        <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-lg border-b border-border flex items-center gap-4 px-4 h-14">
+      <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-lg border-b border-border flex items-center gap-4 px-4 h-14">
         <Button
           variant="ghost"
           size="icon"
@@ -173,9 +169,7 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
       </header>
 
       <div className="max-w-2xl mx-auto">
-        {/* Original post */}
         <article className="px-4 pt-5 pb-4 border-b border-border">
-          {/* Author */}
           <div className="flex items-center justify-between mb-4">
             <Link href={`/agent/${agent?.handle}`} className="flex items-center gap-3 group">
               <AgentAvatar
@@ -196,19 +190,16 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
             </Button>
           </div>
 
-          {/* Content */}
           <p className="text-foreground text-lg leading-relaxed whitespace-pre-wrap mb-4">
             {post.content ? parseContent(post.content) : null}
           </p>
 
-          {/* Media */}
           {post.media_urls && post.media_urls.length > 0 && (
             <div className="rounded-2xl overflow-hidden bg-secondary mb-4">
               <img src={post.media_urls[0]} alt="Post media" className="w-full h-auto" />
             </div>
           )}
 
-          {/* Timestamp */}
           <p className="text-sm text-muted-foreground mb-4">
             {new Date(post.created_at).toLocaleTimeString('en-US', {
               hour: 'numeric',
@@ -221,7 +212,6 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
             })}
           </p>
 
-          {/* Stats row */}
           <div className="flex items-center gap-5 py-3 border-y border-border text-sm">
             <span>
               <strong className="text-foreground">{formatNumber(likeCount)}</strong>{' '}
@@ -237,7 +227,6 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
             </span>
           </div>
 
-          {/* Action buttons */}
           <div className="flex items-center justify-between pt-2">
             <div className="flex items-center gap-1">
               <Button
@@ -266,7 +255,6 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
           </div>
         </article>
 
-        {/* Comment compose box */}
         <div className="px-4 py-3 border-b border-border bg-background/50">
           <div className="flex gap-3 items-start">
             <AgentAvatar
@@ -287,7 +275,7 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
                 rows={2}
               />
               {commentError && (
-                <p className="text-xs text-red-500 mb-2">{commentError}</p>
+                <p className="text-xs text-red-500">{commentError}</p>
               )}
               <div className="flex items-center justify-between">
                 <p className="text-xs text-muted-foreground">
@@ -316,7 +304,6 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
           </div>
         </div>
 
-        {/* Comments section */}
         <div>
           {comments.length === 0 && !isAgentReplying ? (
             <div className="flex flex-col items-center justify-center py-16 text-center px-4">
@@ -351,7 +338,7 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
                             {commentAgent?.display_name}
                           </Link>
                           <span className="text-muted-foreground text-sm">@{commentAgent?.handle}</span>
-                          <span className="text-muted-foreground text-xs">· {timeAgo(comment.created_at)}</span>
+                          <span className="text-muted-foreground text-xs" suppressHydrationWarning>· {timeAgo(comment.created_at)}</span>
                         </div>
                         <p className="text-foreground text-sm mt-1 leading-relaxed whitespace-pre-wrap">
                           {parseContent(comment.content)}
@@ -362,7 +349,6 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
                 )
               })}
 
-              {/* Agent typing indicator */}
               {isAgentReplying && (
                 <div className="px-4 py-4 border-b border-border/60">
                   <div className="flex gap-3 items-center">
@@ -384,7 +370,6 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
           )}
         </div>
 
-        {/* Bottom padding for mobile nav */}
         <div className="h-20" />
       </div>
     </div>
