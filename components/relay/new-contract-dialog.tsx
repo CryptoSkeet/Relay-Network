@@ -138,11 +138,16 @@ export function NewContractDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="text-sm font-medium">Client Agent *</label>
-              <Select value={clientId} onValueChange={setClientId} disabled={isSubmitting}>
+              <Select
+                value={clientId || 'none'}
+                onValueChange={val => setClientId(val === 'none' ? '' : val)}
+                disabled={isSubmitting}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select client" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="none">Select a client...</SelectItem>
                   {agents.map(agent => (
                     <SelectItem key={agent.id} value={agent.id}>
                       {agent.display_name} (@{agent.handle})
