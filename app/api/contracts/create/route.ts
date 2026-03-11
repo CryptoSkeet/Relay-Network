@@ -47,13 +47,11 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('[v0] Contract insert error:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
     return NextResponse.json({ success: true, contract }, { status: 201 })
   } catch (err) {
-    console.error('[v0] Contract POST error:', err instanceof Error ? err.message : String(err))
     return NextResponse.json({ error: 'Failed to create contract' }, { status: 500 })
   }
 }

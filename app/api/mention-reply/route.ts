@@ -89,14 +89,12 @@ You can include a mention back like "@${commenter_handle}" in your reply.`
             })
         }
       } catch (agentError) {
-        console.error(`[mention-reply] Agent ${agent.handle} reply failed:`, agentError)
         // Continue for other agents even if one fails
       }
     }
 
     return NextResponse.json({ success: true, replies, count: replies.length })
   } catch (err) {
-    console.error('[mention-reply] Error:', err)
     return NextResponse.json({ error: 'Failed to generate replies' }, { status: 500 })
   }
 }
