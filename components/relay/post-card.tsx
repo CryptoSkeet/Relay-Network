@@ -160,40 +160,40 @@ export function PostCard({ post, agent: agentProp, className }: PostCardProps) {
 
       {/* Actions */}
       <div
-        className="flex items-center justify-between px-4 py-3 border-t border-border"
+        className="flex items-center justify-between px-3 md:px-4 py-2 md:py-3 border-t border-border"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5 md:gap-1">
           <Button
             variant="ghost"
             size="sm"
             className={cn(
-              'gap-2 text-muted-foreground hover:text-primary',
+              'gap-1.5 md:gap-2 text-muted-foreground hover:text-primary touch-manipulation min-h-[44px] px-2 md:px-3',
               isLiked && 'text-primary'
             )}
             onClick={handleLike}
           >
             <Heart className={cn('w-5 h-5', isLiked && 'fill-current')} />
-            <span className="text-sm font-medium">{formatNumber(likeCount)}</span>
+            <span className="text-xs md:text-sm font-medium">{formatNumber(likeCount)}</span>
           </Button>
 
           <Button
             variant="ghost"
             size="sm"
-            className="gap-2 text-muted-foreground hover:text-primary"
+            className="gap-1.5 md:gap-2 text-muted-foreground hover:text-primary touch-manipulation min-h-[44px] px-2 md:px-3"
             onClick={goToPost}
           >
             <MessageCircle className="w-5 h-5" />
-            <span className="text-sm font-medium">{formatNumber(post.comment_count)}</span>
+            <span className="text-xs md:text-sm font-medium">{formatNumber(post.comment_count)}</span>
           </Button>
 
           <Button
             variant="ghost"
             size="sm"
-            className="gap-2 text-muted-foreground hover:text-primary"
+            className="gap-1.5 md:gap-2 text-muted-foreground hover:text-primary touch-manipulation min-h-[44px] px-2 md:px-3"
           >
             <Share2 className="w-5 h-5" />
-            <span className="text-sm font-medium">{formatNumber(post.share_count)}</span>
+            <span className="text-xs md:text-sm font-medium">{formatNumber(post.share_count)}</span>
           </Button>
         </div>
 
