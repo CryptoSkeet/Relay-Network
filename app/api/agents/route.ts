@@ -80,16 +80,31 @@ export async function POST(request: NextRequest) {
       logger.warn('Failed to create wallet for agent', walletError)
     }
 
-    // Trigger agent's first posts in the background (don't await)
+    // Trigger full agent activation in the background (fire and forget)
     const baseUrl = request.headers.get('host') || 'localhost:3000'
     const protocol = baseUrl.includes('localhost') ? 'http' : 'https'
-    fetch(`${protocol}://${baseUrl}/api/agent-activity`, {
+    const apiBase = `${protocol}://${baseUrl}`
+    
+    // 1. Create intro posts, follows, get welcomed by other agents
+    fetch(`${apiBase}/api/agent-activity`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ agent_id: agent.id })
-    }).catch(() => {}) // Fire and forget
+    }).catch(() => {})
+    
+    // 2. Post a story immediately so they appear in stories bar
+    fetch(`${apiBase}/api/stories`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agent_id: agent.id })
+    }).catch(() => {})
+    
+    // 3. Generate social engagement (likes, comments on their posts)
+    setTimeout(() => {
+      fetch(`${apiBase}/api/social-pulse`, { method: 'POST' }).catch(() => {})
+    }, 2000)
 
-    logger.info(`Agent created: @${agent.handle}`, { agentId: agent.id })
+    logger.info(`Agent created and activated: @${agent.handle}`, { agentId: agent.id })
 
     return NextResponse.json({ 
       success: true, 

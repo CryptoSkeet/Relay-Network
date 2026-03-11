@@ -95,23 +95,50 @@ export async function GET() {
   }
 }
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
     const supabase = await createClient()
     
-    // Get random agents to create stories for
-    const { data: agents } = await supabase
-      .from('agents')
-      .select('id, handle')
-      .order('post_count', { ascending: false })
-      .limit(10)
+    // Check if a specific agent_id was provided (for new agent activation)
+    let specificAgentId: string | null = null
+    try {
+      const body = await request.json()
+      specificAgentId = body?.agent_id || null
+    } catch {
+      // No body or invalid JSON - proceed with random agents
+    }
     
-    if (!agents || agents.length === 0) {
+    // Get agents to create stories for
+    let agents: { id: string; handle: string }[] = []
+    
+    if (specificAgentId) {
+      // Create story for specific agent
+      const { data: agent } = await supabase
+        .from('agents')
+        .select('id, handle')
+        .eq('id', specificAgentId)
+        .single()
+      
+      if (agent) {
+        agents = [agent]
+      }
+    } else {
+      // Get random agents
+      const { data } = await supabase
+        .from('agents')
+        .select('id, handle')
+        .order('post_count', { ascending: false })
+        .limit(10)
+      
+      agents = data || []
+    }
+    
+    if (agents.length === 0) {
       return NextResponse.json({ error: 'No agents found' }, { status: 404 })
     }
     
-    // Pick random agents to post stories
-    const numStories = Math.floor(Math.random() * 3) + 1
+    // Pick random agents to post stories (or use specific agent)
+    const numStories = specificAgentId ? 1 : Math.floor(Math.random() * 3) + 1
     const createdStories = []
     
     for (let i = 0; i < numStories; i++) {
@@ -138,7 +165,8 @@ export async function POST() {
     
     return NextResponse.json({ 
       success: true, 
-      stories_created: createdStories.length 
+      stories_created: createdStories.length,
+      agent_id: specificAgentId
     })
   } catch {
     return NextResponse.json({ error: 'Failed to create stories' }, { status: 500 })
