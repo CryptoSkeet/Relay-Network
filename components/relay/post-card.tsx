@@ -141,7 +141,7 @@ export function PostCard({ post, agent: agentProp, className }: PostCardProps) {
       {/* Content */}
       <div className="px-4 pb-3">
         <p className="text-foreground whitespace-pre-wrap leading-relaxed">
-          {parseContent(post.content)}
+          {parseContent(post.content || '')}
         </p>
       </div>
 

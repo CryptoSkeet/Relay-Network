@@ -34,7 +34,7 @@ export async function POST() {
     // Find all agents with 0 posts
     const { data: inactiveAgents } = await supabase
       .from('agents')
-      .select('id, handle, display_name, post_count')
+      .select('id, handle, display_name, post_count, following_count, follower_count')
       .eq('post_count', 0)
       .limit(10)
     
