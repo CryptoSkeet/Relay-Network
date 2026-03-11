@@ -97,8 +97,9 @@ export function RelayBanner({ compact = false }: RelayBannerProps) {
 
       {/* Content wrapper - Full */}
       {!compact && (
-        {/* Left: Hex Icon */}
-        <div className="shrink-0 hidden md:flex items-center justify-center">
+        <div className="relative flex items-center justify-between px-6 md:px-12 py-12 md:py-16 min-h-[280px] md:min-h-[360px] gap-8">
+          {/* Left: Hex Icon */}
+          <div className="shrink-0 hidden md:flex items-center justify-center">
           <svg
             width="200"
             height="200"
@@ -201,17 +202,17 @@ export function RelayBanner({ compact = false }: RelayBannerProps) {
             <circle cx="260" cy="250" r="5" fill="rgba(0,245,160,0.5)" />
           </svg>
         </div>
-      </div>
 
-        {/* Bottom status bar */}
-        <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center gap-3 py-3 px-4 border-t border-border/30 bg-gradient-to-t from-[rgba(0,245,160,0.02)] to-transparent">
-          <div className="w-6 md:w-10 h-px bg-gradient-to-r from-transparent to-[rgba(0,245,160,0.4)]" />
-          <div className="w-1.5 h-1.5 rounded-full bg-[#00f5a0]" style={{ boxShadow: '0 0 10px #00f5a0' }} />
-          <span className="font-mono text-[10px] md:text-xs text-[rgba(0,245,160,0.35)] uppercase tracking-[0.35em] whitespace-nowrap">
-            Network Active · agents online: 2,847
-          </span>
-          <div className="w-1.5 h-1.5 rounded-full bg-[#00f5a0]" style={{ boxShadow: '0 0 10px #00f5a0' }} />
-          <div className="w-6 md:w-10 h-px bg-gradient-to-l from-transparent to-[rgba(0,245,160,0.4)]" />
+          {/* Bottom status bar */}
+          <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center gap-3 py-3 px-4 border-t border-border/30 bg-gradient-to-t from-[rgba(0,245,160,0.02)] to-transparent">
+            <div className="w-6 md:w-10 h-px bg-gradient-to-r from-transparent to-[rgba(0,245,160,0.4)]" />
+            <div className="w-1.5 h-1.5 rounded-full bg-[#00f5a0]" style={{ boxShadow: '0 0 10px #00f5a0' }} />
+            <span className="font-mono text-[10px] md:text-xs text-[rgba(0,245,160,0.35)] uppercase tracking-[0.35em] whitespace-nowrap">
+              Network Active · agents online: 2,847
+            </span>
+            <div className="w-1.5 h-1.5 rounded-full bg-[#00f5a0]" style={{ boxShadow: '0 0 10px #00f5a0' }} />
+            <div className="w-6 md:w-10 h-px bg-gradient-to-l from-transparent to-[rgba(0,245,160,0.4)]" />
+          </div>
         </div>
       )}
     </div>
