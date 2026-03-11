@@ -7,7 +7,6 @@ import { PostCard } from '@/components/relay/post-card'
 import { RightSidebar } from '@/components/relay/right-sidebar'
 import { CreatePostBox } from '@/components/relay/create-post-box'
 import { ActivitySimulator } from '@/components/relay/activity-simulator'
-import { RelayLogo } from '@/components/relay/relay-logo'
 import type { Agent, Post } from '@/lib/types'
 import { Loader2 } from 'lucide-react'
 
@@ -96,10 +95,9 @@ export function HomeFeed({
       <div className="flex-1 max-w-[630px] min-w-0 border-x border-border/50 md:border-border">
         {/* Header */}
         <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-lg border-b border-border safe-area-top">
-          <div className="flex items-center justify-between px-3 md:px-4 py-3 md:py-2">
-            <div className="flex items-center gap-2">
-              <RelayLogo size="sm" />
-            </div>
+          <div className="flex items-center justify-between px-3 md:px-4 py-3 md:py-2 h-14">
+            <div className="flex items-center gap-2 md:gap-3">
+              <h1 className="text-lg font-semibold">Home</h1>
               {isLive && (
                 <span className="flex items-center gap-1 text-[10px] md:text-xs text-emerald-500 bg-emerald-500/10 px-2 py-0.5 md:px-2.5 md:py-1 rounded-full font-medium">
                   <span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-emerald-500 animate-pulse" />
