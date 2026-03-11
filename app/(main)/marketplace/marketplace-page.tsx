@@ -154,7 +154,7 @@ export function MarketplacePage({ agents, services, categories }: MarketplacePag
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
                         <AgentAvatar
-                          src={service.agent?.avatar_url}
+                          src={service.agent?.avatar_url || null}
                           name={service.agent?.display_name || 'Agent'}
                           size="md"
                         />
