@@ -125,6 +125,24 @@ export function ContractsPage({ contracts: initialContracts, agents }: Contracts
     }
   }
 
+  const markContractComplete = async (contractId: string) => {
+    const { error } = await supabase
+      .from('contracts')
+      .update({ 
+        status: 'completed', 
+        completed_at: new Date().toISOString() 
+      })
+      .eq('id', contractId)
+
+    if (!error) {
+      setContracts(prev => prev.map(c => 
+        c.id === contractId 
+          ? { ...c, status: 'completed', completed_at: new Date().toISOString() }
+          : c
+      ))
+    }
+  }
+
   const stats = {
     total: contracts.length,
     active: contracts.filter(c => c.status === 'in_progress' || c.status === 'active').length,
@@ -235,19 +253,45 @@ export function ContractsPage({ contracts: initialContracts, agents }: Contracts
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-2xl font-bold text-primary">{overallProgress}%</p>
-                        <p className="text-xs text-muted-foreground">Complete</p>
+                        <p className={cn(
+                          "text-2xl font-bold",
+                          overallProgress === 100 ? "text-green-500" : "text-primary"
+                        )}>{overallProgress}%</p>
+                        <p className="text-xs text-muted-foreground">
+                          {contract.status === 'completed' ? 'Completed' : 'Progress'}
+                        </p>
+                        {contract.completed_at && (
+                          <p className="text-[10px] text-green-500 mt-1">
+                            {formatDistanceToNow(new Date(contract.completed_at), { addSuffix: true })}
+                          </p>
+                        )}
                       </div>
                     </div>
 
                     {/* Progress Bar */}
                     <div className="space-y-1">
-                      <Progress value={overallProgress} className="h-2" />
-                      {milestones.length > 0 && (
-                        <p className="text-xs text-muted-foreground">
-                          {completedMilestones} of {milestones.length} milestones completed
-                        </p>
-                      )}
+                      <Progress 
+                        value={overallProgress} 
+                        className={cn("h-2", overallProgress === 100 && "bg-green-500/20")} 
+                      />
+                      <div className="flex items-center justify-between">
+                        {milestones.length > 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            {completedMilestones} of {milestones.length} milestones completed
+                          </p>
+                        )}
+                        {overallProgress === 100 && contract.status !== 'completed' && (
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            className="h-6 text-xs text-green-500 border-green-500/50 hover:bg-green-500/10"
+                            onClick={() => markContractComplete(contract.id)}
+                          >
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            Mark Complete
+                          </Button>
+                        )}
+                      </div>
                     </div>
 
                     {/* Parties */}
@@ -290,6 +334,33 @@ export function ContractsPage({ contracts: initialContracts, agents }: Contracts
                         </div>
                       </div>
                     )}
+
+                    {/* Footer - Budget & Dates */}
+                    <div className="pt-4 border-t flex items-center justify-between text-xs text-muted-foreground">
+                      <div className="flex items-center gap-4">
+                        {(contract.budget_min || contract.budget_max) && (
+                          <span className="flex items-center gap-1">
+                            <DollarSign className="w-3 h-3" />
+                            {contract.budget_min && contract.budget_max 
+                              ? `${contract.budget_min.toLocaleString()} - ${contract.budget_max.toLocaleString()}`
+                              : (contract.budget_max || contract.budget_min)?.toLocaleString()
+                            } {contract.currency || 'USD'}
+                          </span>
+                        )}
+                        {contract.deadline && (
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            Due {formatDistanceToNow(new Date(contract.deadline), { addSuffix: true })}
+                          </span>
+                        )}
+                      </div>
+                      {contract.status === 'completed' && contract.completed_at && (
+                        <span className="flex items-center gap-1 text-green-500">
+                          <CheckCircle className="w-3 h-3" />
+                          Completed {formatDistanceToNow(new Date(contract.completed_at), { addSuffix: true })}
+                        </span>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               )
