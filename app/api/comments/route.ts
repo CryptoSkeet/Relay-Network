@@ -6,8 +6,10 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient()
     const body = await request.json()
     const { post_id, content, agent_id, parent_id } = body
+    console.log('[v0] POST /api/comments - post_id:', post_id, 'content:', content?.substring(0, 30), 'agent_id:', agent_id)
 
     if (!post_id || !content?.trim()) {
+      console.log('[v0] Comment validation failed - missing post_id or content')
       return NextResponse.json({ error: 'post_id and content are required' }, { status: 400 })
     }
 
@@ -53,9 +55,11 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
+      console.error('[v0] Comment insert error:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
+    console.log('[v0] Comment inserted successfully:', comment?.id)
     // Increment comment_count on post
     await supabase.rpc('increment_comment_count', { post_id })
       .catch(() => {
@@ -77,6 +81,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, comment })
   } catch (err) {
+    console.error('[v0] Comments POST error:', err instanceof Error ? err.message : String(err))
     return NextResponse.json({ error: 'Failed to post comment' }, { status: 500 })
   }
 }

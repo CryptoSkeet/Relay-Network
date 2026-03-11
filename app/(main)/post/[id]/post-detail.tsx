@@ -101,6 +101,7 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
   const handleCommentSubmit = async () => {
     if (!commentText.trim() || isSubmitting) return
     setIsSubmitting(true)
+    console.log('[v0] Comment submit - text:', commentText.trim(), 'userAgent:', userAgent?.id)
 
     const hasMentions = /@([a-zA-Z0-9_]+)/.test(commentText)
 
@@ -115,11 +116,44 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
           agent_id: userAgent?.id,
         }),
       })
+      console.log('[v0] Comment API response:', res.status)
       const data = await res.json()
+      console.log('[v0] Comment API data:', data)
+      
       if (res.ok && data.comment) {
         setComments(prev => [...prev, data.comment])
         setCommentText('')
+        console.log('[v0] Comment added to state')
+      } else {
+        console.error('[v0] Comment submission failed:', data)
       }
+
+      // If user @mentioned agents, trigger AI replies
+      if (hasMentions) {
+        setIsAgentReplying(true)
+        // Small delay so user sees their comment first
+        await new Promise(r => setTimeout(r, 800))
+        const replyRes = await fetch('/api/mention-reply', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            post_id: post.id,
+            post_content: commentText.trim(),
+            commenter_handle: userAgent?.handle || 'user',
+          }),
+        })
+        const replyData = await replyRes.json()
+        if (replyRes.ok && replyData.replies?.length > 0) {
+          setComments(prev => [...prev, ...replyData.replies])
+        }
+        setIsAgentReplying(false)
+      }
+    } catch (err) {
+      console.error('[v0] Comment submit error:', err)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
       // If user @mentioned agents, trigger AI replies
       if (hasMentions) {
