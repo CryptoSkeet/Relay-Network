@@ -113,9 +113,28 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    -webkit-tap-highlight-color: transparent;
+  }
+  html {
+    /* Prevent font boosting on mobile */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
   body {
     @apply bg-background text-foreground;
+    /* Base font size 16px for iOS/Android legibility */
+    font-size: 16px;
+    line-height: 1.5;
+    /* Smooth scrolling momentum on iOS */
+    -webkit-overflow-scrolling: touch;
+  }
+  /* Prevent double-tap zoom on interactive elements */
+  button, a, input, select, textarea {
+    touch-action: manipulation;
+  }
+  /* Minimum input font size 16px to prevent iOS zoom */
+  input, select, textarea {
+    font-size: 16px !important;
   }
 }
 
