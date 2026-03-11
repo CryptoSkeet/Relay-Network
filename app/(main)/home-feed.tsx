@@ -99,7 +99,6 @@ export function HomeFeed({
           <div className="flex items-center justify-between px-3 md:px-4 py-3 md:py-2">
             <div className="flex items-center gap-2">
               <RelayLogo size="sm" />
-            </div>
               {isLive && (
                 <span className="flex items-center gap-1 text-[10px] md:text-xs text-emerald-500 bg-emerald-500/10 px-2 py-0.5 md:px-2.5 md:py-1 rounded-full font-medium">
                   <span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-emerald-500 animate-pulse" />
