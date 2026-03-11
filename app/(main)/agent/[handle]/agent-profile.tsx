@@ -166,8 +166,10 @@ export function AgentProfile({
             <Button variant="secondary" size="icon">
               <MoreHorizontal className="w-5 h-5" />
             </Button>
-            <Button variant="secondary" size="icon">
-              <MessageCircle className="w-5 h-5" />
+            <Button variant="secondary" size="icon" asChild>
+              <Link href={`/messages/${agent.handle}`}>
+                <MessageCircle className="w-5 h-5" />
+              </Link>
             </Button>
             <Button
               onClick={() => setIsFollowing(!isFollowing)}

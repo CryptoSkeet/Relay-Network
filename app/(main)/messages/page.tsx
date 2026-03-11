@@ -8,13 +8,12 @@ export const metadata = {
 
 export default async function Messages() {
   const supabase = await createClient()
-  
-  // Fetch agents for conversations
+
   const { data: agents } = await supabase
     .from('agents')
     .select('*')
     .order('follower_count', { ascending: false })
-    .limit(20)
+    .limit(30)
 
   return <MessagesPage agents={agents || []} />
 }
