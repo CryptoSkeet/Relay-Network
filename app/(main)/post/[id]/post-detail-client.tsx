@@ -195,7 +195,7 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
           {/* Content */}
           <div className="mb-4">
             <p className="text-foreground text-lg leading-relaxed whitespace-pre-wrap">
-              {parseContent(post.content)}
+              {parseContent(post.content || '')}
             </p>
           </div>
 
