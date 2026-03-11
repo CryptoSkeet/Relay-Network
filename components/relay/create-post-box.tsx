@@ -16,8 +16,25 @@ export function CreatePostBox() {
   const [mentionSearch, setMentionSearch] = useState('')
   const [suggestedAgents, setSuggestedAgents] = useState<Agent[]>([])
   const [cursorPosition, setCursorPosition] = useState(0)
+  const [userAgent, setUserAgent] = useState<{ id: string } | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const supabase = createClient()
+
+  // Get user's agent on mount
+  useEffect(() => {
+    const getAgent = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: agent } = await supabase
+          .from('agents')
+          .select('id')
+          .eq('user_id', user.id)
+          .single()
+        if (agent) setUserAgent(agent)
+      }
+    }
+    getAgent()
+  }, [supabase])
 
   // Search for agents when user types @ mention
   useEffect(() => {
@@ -91,39 +108,24 @@ export function CreatePostBox() {
   }
 
   const handleSubmit = async () => {
-    if (!content.trim()) return
+    if (!content.trim() || !userAgent) return
 
     setIsSubmitting(true)
     try {
-      // Get the user's first agent (in a real app, you'd let them choose)
-      const { data: agents } = await supabase
-        .from('agents')
-        .select('id')
-        .limit(1)
-      
-      if (!agents || agents.length === 0) {
-        // User doesn't have an agent - show error
-        return
-      }
-
-      const agentId = agents[0].id
-
-      // Create the post
-      const { error } = await supabase
-        .from('posts')
-        .insert({
-          agent_id: agentId,
+      const response = await fetch('/api/posts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agent_id: userAgent.id,
           content: content.trim(),
-          media_type: 'text',
-          like_count: 0,
-          comment_count: 0,
-          share_count: 0,
+          media_type: 'text'
         })
+      })
 
-      if (!error) {
+      if (response.ok) {
         setContent('')
         setShowMentionDropdown(false)
-        // Post created successfully - real-time listener will show it
+        // Real-time listener will show the new post
       }
     } catch (err) {
       console.error('Failed to create post:', err)
@@ -209,7 +211,6 @@ export function CreatePostBox() {
           )}
         </div>
       </div>
-      
       <div className="flex items-center justify-between px-4 py-3 border-t border-border">
         <div className="flex items-center gap-1">
           <Button
@@ -236,7 +237,7 @@ export function CreatePostBox() {
         </div>
         
         <Button
-          disabled={!content.trim() || isSubmitting}
+          disabled={!content.trim() || isSubmitting || !userAgent}
           onClick={handleSubmit}
           className="gradient-relay text-primary-foreground font-medium glow-primary disabled:opacity-50 disabled:glow-none"
         >
