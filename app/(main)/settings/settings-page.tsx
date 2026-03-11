@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Settings, User, Bell, Shield, Palette, Wallet, Globe, Key, LogOut, Save, Moon, Sun, Monitor } from 'lucide-react'
+import { Settings, User, Bell, Shield, Palette, Wallet, Globe, Key, LogOut, Save, Moon, Sun, Monitor, Upload, Image as ImageIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils'
 
 const settingsSections = [
   { id: 'profile', label: 'Profile', icon: User },
+  { id: 'customization', label: 'Profile Style', icon: Palette },
   { id: 'notifications', label: 'Notifications', icon: Bell },
   { id: 'privacy', label: 'Privacy & Security', icon: Shield },
   { id: 'appearance', label: 'Appearance', icon: Palette },
@@ -20,8 +21,184 @@ const settingsSections = [
 
 export function SettingsPage() {
   const [activeSection, setActiveSection] = useState('profile')
+  const [themeColor, setThemeColor] = useState('#7c3aed')
+  const [accentColor, setAccentColor] = useState('#06b6d4')
+  const [gradientFrom, setGradientFrom] = useState('#7c3aed')
+  const [gradientTo, setGradientTo] = useState('#06b6d4')
+  const [bannerFile, setBannerFile] = useState<File | null>(null)
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null)
+
+  const handleBannerUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setBannerFile(file)
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setBannerPreview(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const saveBannerAndColors = async () => {
+    try {
+      const formData = new FormData()
+      if (bannerFile) formData.append('banner', bannerFile)
+      formData.append('theme_color', themeColor)
+      formData.append('accent_color', accentColor)
+      formData.append('gradient_from', gradientFrom)
+      formData.append('gradient_to', gradientTo)
+
+      const response = await fetch('/api/profile/customize', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (response.ok) {
+        console.log('[v0] Profile customization saved')
+      }
+    } catch (error) {
+      console.error('[v0] Failed to save customization:', error)
+    }
+  }
 
   const renderSection = () => {
+    if (activeSection === 'customization') {
+      return (
+        <div className="space-y-6">
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle>Profile Banner</CardTitle>
+              <CardDescription>Upload a custom banner for your profile</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="border-2 border-dashed rounded-xl p-8 text-center hover:border-primary/50 transition-colors">
+                <div className="space-y-2">
+                  <ImageIcon className="w-8 h-8 text-muted-foreground mx-auto" />
+                  <p className="text-sm font-medium">Upload Banner Image</p>
+                  <p className="text-xs text-muted-foreground">Recommended: 1500x400px</p>
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleBannerUpload}
+                    className="mt-2"
+                  />
+                </div>
+              </div>
+              {bannerPreview && (
+                <div className="rounded-xl overflow-hidden border">
+                  <img src={bannerPreview} alt="Banner preview" className="w-full h-40 object-cover" />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle>Color Theme</CardTitle>
+              <CardDescription>Customize your profile colors</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="theme-color">Primary Theme Color</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="theme-color"
+                      type="color"
+                      value={themeColor}
+                      onChange={(e) => setThemeColor(e.target.value)}
+                      className="h-10 w-20 cursor-pointer"
+                    />
+                    <Input
+                      type="text"
+                      value={themeColor}
+                      onChange={(e) => setThemeColor(e.target.value)}
+                      placeholder="#7c3aed"
+                      className="flex-1"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="accent-color">Accent Color</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="accent-color"
+                      type="color"
+                      value={accentColor}
+                      onChange={(e) => setAccentColor(e.target.value)}
+                      className="h-10 w-20 cursor-pointer"
+                    />
+                    <Input
+                      type="text"
+                      value={accentColor}
+                      onChange={(e) => setAccentColor(e.target.value)}
+                      placeholder="#06b6d4"
+                      className="flex-1"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <p className="text-sm font-medium">Gradient Background</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="gradient-from">From</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="gradient-from"
+                        type="color"
+                        value={gradientFrom}
+                        onChange={(e) => setGradientFrom(e.target.value)}
+                        className="h-10 w-20 cursor-pointer"
+                      />
+                      <Input
+                        type="text"
+                        value={gradientFrom}
+                        onChange={(e) => setGradientFrom(e.target.value)}
+                        className="flex-1"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="gradient-to">To</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="gradient-to"
+                        type="color"
+                        value={gradientTo}
+                        onChange={(e) => setGradientTo(e.target.value)}
+                        className="h-10 w-20 cursor-pointer"
+                      />
+                      <Input
+                        type="text"
+                        value={gradientTo}
+                        onChange={(e) => setGradientTo(e.target.value)}
+                        className="flex-1"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Preview */}
+                <div
+                  className="h-32 rounded-xl border overflow-hidden"
+                  style={{
+                    background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})`,
+                  }}
+                />
+              </div>
+
+              <Button onClick={saveBannerAndColors} className="gap-2">
+                <Save className="w-4 h-4" />
+                Save Profile Style
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )
+    }
     switch (activeSection) {
       case 'profile':
         return (
