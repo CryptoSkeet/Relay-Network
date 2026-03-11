@@ -46,12 +46,17 @@ const statusConfig = {
 }
 
 export function ContractsPage({ contracts: initialContracts, agents }: ContractsPageProps) {
+  const [mounted, setMounted] = useState(false)
   const [filter, setFilter] = useState<string>('all')
   const [contracts, setContracts] = useState<ContractWithAgents[]>(initialContracts)
   const [contractMilestones, setContractMilestones] = useState<Record<string, Milestone[]>>({})
   const [isNewContractOpen, setIsNewContractOpen] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const supabase = createClient()
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     const fetchMilestones = async () => {
@@ -192,14 +197,15 @@ export function ContractsPage({ contracts: initialContracts, agents }: Contracts
 
       {/* Content */}
       <div className="p-3 md:p-4">
-        <Tabs defaultValue="all" className="space-y-3 md:space-y-4">
-          <TabsList className="w-full overflow-x-auto scrollbar-hide flex-nowrap justify-start">
-            <TabsTrigger value="all" onClick={() => setFilter('all')} className="touch-manipulation">All</TabsTrigger>
-            <TabsTrigger value="open" onClick={() => setFilter('open')} className="touch-manipulation">Open</TabsTrigger>
-            <TabsTrigger value="active" onClick={() => setFilter('active')} className="touch-manipulation">Active</TabsTrigger>
-            <TabsTrigger value="in_progress" onClick={() => setFilter('in_progress')} className="touch-manipulation whitespace-nowrap">In Progress</TabsTrigger>
-            <TabsTrigger value="completed" onClick={() => setFilter('completed')} className="touch-manipulation">Completed</TabsTrigger>
-          </TabsList>
+        {mounted ? (
+          <Tabs defaultValue="all" className="space-y-3 md:space-y-4">
+            <TabsList className="w-full overflow-x-auto scrollbar-hide flex-nowrap justify-start">
+              <TabsTrigger value="all" onClick={() => setFilter('all')} className="touch-manipulation">All</TabsTrigger>
+              <TabsTrigger value="open" onClick={() => setFilter('open')} className="touch-manipulation">Open</TabsTrigger>
+              <TabsTrigger value="active" onClick={() => setFilter('active')} className="touch-manipulation">Active</TabsTrigger>
+              <TabsTrigger value="in_progress" onClick={() => setFilter('in_progress')} className="touch-manipulation whitespace-nowrap">In Progress</TabsTrigger>
+              <TabsTrigger value="completed" onClick={() => setFilter('completed')} className="touch-manipulation">Completed</TabsTrigger>
+            </TabsList>
 
           <div className="space-y-4">
             {filteredContracts.map((contract) => {
@@ -307,7 +313,14 @@ export function ContractsPage({ contracts: initialContracts, agents }: Contracts
               </div>
             )}
           </div>
-        </Tabs>
+          </Tabs>
+        ) : (
+          <div className="space-y-4">
+            <div className="h-10 bg-muted rounded-lg animate-pulse" />
+            <div className="h-32 bg-muted rounded-lg animate-pulse" />
+            <div className="h-32 bg-muted rounded-lg animate-pulse" />
+          </div>
+        )}
       </div>
 
       {/* New Contract Dialog */}
