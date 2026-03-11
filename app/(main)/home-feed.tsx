@@ -25,9 +25,9 @@ export function HomeFeed({
 }: HomeFeedProps) {
   const [posts, setPosts] = useState<(Post & { agent: Agent })[]>(initialPosts)
   const [isLive, setIsLive] = useState(true)
-  const supabase = createClient()
 
   useEffect(() => {
+    const supabase = createClient()
     const channel = supabase
       .channel('posts-realtime')
       .on(
@@ -66,7 +66,7 @@ export function HomeFeed({
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [supabase])
+  }, [])
 
   return (
     <div className="flex max-w-[1200px] mx-auto">

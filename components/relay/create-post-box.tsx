@@ -18,7 +18,10 @@ export function CreatePostBox() {
   const [suggestedAgents, setSuggestedAgents] = useState<Agent[]>([])
   const [cursorPosition, setCursorPosition] = useState(0)
   const [userAgent, setUserAgent] = useState<{ id: string } | null>(null)
+  const [mediaUrls, setMediaUrls] = useState<string[]>([])
+  const [isUploading, setIsUploading] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Get user's agent on mount - fallback to first available agent for demo
   useEffect(() => {
@@ -47,7 +50,7 @@ export function CreatePostBox() {
       if (fallbackAgent) setUserAgent(fallbackAgent)
     }
     getAgent()
-  }, [supabase])
+  }, [])
 
   // Search for agents when user types @ mention
   useEffect(() => {
@@ -57,6 +60,7 @@ export function CreatePostBox() {
     }
 
     const searchAgents = async () => {
+      const supabase = createClient()
       const { data } = await supabase
         .from('agents')
         .select('*')
@@ -68,7 +72,7 @@ export function CreatePostBox() {
 
     const timer = setTimeout(searchAgents, 300)
     return () => clearTimeout(timer)
-  }, [mentionSearch, supabase])
+  }, [mentionSearch])
 
   // Detect @ mention in textarea
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -97,6 +101,51 @@ export function CreatePostBox() {
     setContent(text)
   }
 
+  // Handle image upload
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+
+    setIsUploading(true)
+    setError(null)
+
+    try {
+      for (const file of Array.from(files)) {
+        if (mediaUrls.length >= 4) {
+          setError('Maximum 4 images allowed')
+          break
+        }
+
+        const formData = new FormData()
+        formData.append('file', file)
+
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        })
+
+        const data = await response.json()
+
+        if (response.ok && data.url) {
+          setMediaUrls((prev) => [...prev, data.url])
+        } else {
+          setError(data.error || 'Failed to upload image')
+        }
+      }
+    } catch {
+      setError('Failed to upload image')
+    } finally {
+      setIsUploading(false)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
+  }
+
+  const removeImage = (index: number) => {
+    setMediaUrls((prev) => prev.filter((_, i) => i !== index))
+  }
+
   // Insert mention and close dropdown
   const insertMention = (agent: Agent) => {
     const beforeCursor = content.substring(0, cursorPosition)
@@ -122,8 +171,12 @@ export function CreatePostBox() {
 
   const handleSubmit = async () => {
     setError(null)
-    if (!content.trim() || !userAgent) {
-      setError('Please write something to ask the agents')
+    if (!content.trim() && mediaUrls.length === 0) {
+      setError('Please write something or add an image')
+      return
+    }
+    if (!userAgent) {
+      setError('No agent found. Please create an agent first.')
       return
     }
 
@@ -137,8 +190,9 @@ export function CreatePostBox() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           agent_id: userAgent.id,
-          content: postContent,
-          media_type: 'text'
+          content: postContent || null,
+          media_urls: mediaUrls.length > 0 ? mediaUrls : undefined,
+          media_type: mediaUrls.length > 1 ? 'carousel' : mediaUrls.length === 1 ? 'image' : 'text'
         })
       })
 
@@ -146,6 +200,7 @@ export function CreatePostBox() {
 
       if (response.ok) {
         setContent('')
+        setMediaUrls([])
         setShowMentionDropdown(false)
         setError(null)
 
@@ -233,6 +288,27 @@ export function CreatePostBox() {
             </div>
           )}
           
+          {/* Image previews */}
+          {mediaUrls.length > 0 && (
+            <div className="flex gap-2 mt-3 flex-wrap">
+              {mediaUrls.map((url, index) => (
+                <div key={index} className="relative group">
+                  <img
+                    src={url}
+                    alt={`Upload ${index + 1}`}
+                    className="w-20 h-20 object-cover rounded-lg border border-border"
+                  />
+                  <button
+                    onClick={() => removeImage(index)}
+                    className="absolute -top-2 -right-2 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          
           {isFocused && (
             <div className="flex items-center gap-2 pt-2 border-t border-border mt-2">
               <Button
@@ -259,13 +335,29 @@ export function CreatePostBox() {
       )}
 
       <div className="flex items-center justify-between px-4 py-3 border-t border-border">
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={handleImageUpload}
+          className="hidden"
+        />
+        
         <div className="flex items-center gap-1">
           <Button
             variant="ghost"
             size="icon"
             className="text-muted-foreground hover:text-primary"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading || mediaUrls.length >= 4}
           >
-            <Image className="w-5 h-5" />
+            {isUploading ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <Image className="w-5 h-5" />
+            )}
           </Button>
           <Button
             variant="ghost"
@@ -284,7 +376,7 @@ export function CreatePostBox() {
         </div>
         
         <Button
-          disabled={!content.trim() || isSubmitting || !userAgent}
+          disabled={(!content.trim() && mediaUrls.length === 0) || isSubmitting || isUploading || !userAgent}
           onClick={handleSubmit}
           className="gradient-relay text-primary-foreground font-medium glow-primary disabled:opacity-50 disabled:glow-none"
         >

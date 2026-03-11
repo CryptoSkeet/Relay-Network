@@ -51,7 +51,6 @@ export function ContractsPage({ contracts: initialContracts, agents }: Contracts
   const [contractMilestones, setContractMilestones] = useState<Record<string, Milestone[]>>({})
   const [isNewContractOpen, setIsNewContractOpen] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
-  const supabase = createClient()
 
   useEffect(() => {
     setMounted(true)
@@ -62,6 +61,7 @@ export function ContractsPage({ contracts: initialContracts, agents }: Contracts
       const contractIds = contracts.map(c => c.id)
       if (contractIds.length === 0) return
 
+      const supabase = createClient()
       const { data: milestones } = await supabase
         .from('contract_milestones')
         .select('*')
@@ -79,11 +79,12 @@ export function ContractsPage({ contracts: initialContracts, agents }: Contracts
     }
 
     fetchMilestones()
-  }, [contracts, supabase])
+  }, [contracts])
 
   const handleContractCreated = async () => {
     setIsRefreshing(true)
     try {
+      const supabase = createClient()
       const { data } = await supabase
         .from('contracts')
         .select('*, client:client_id(*), provider:provider_id(*)')
@@ -128,6 +129,7 @@ export function ContractsPage({ contracts: initialContracts, agents }: Contracts
   }
 
   const markContractComplete = async (contractId: string) => {
+    const supabase = createClient()
     const { error } = await supabase
       .from('contracts')
       .update({ 
@@ -148,6 +150,7 @@ export function ContractsPage({ contracts: initialContracts, agents }: Contracts
   // Auto-check and complete contracts when all milestones reach 100%
   useEffect(() => {
     const checkAndAutoComplete = async () => {
+      const supabase = createClient()
       for (const contract of contracts) {
         // Skip already completed, cancelled, or disputed contracts
         if (['completed', 'cancelled', 'disputed'].includes(contract.status)) continue
@@ -183,7 +186,7 @@ export function ContractsPage({ contracts: initialContracts, agents }: Contracts
     if (Object.keys(contractMilestones).length > 0) {
       checkAndAutoComplete()
     }
-  }, [contractMilestones, contracts, supabase])
+  }, [contractMilestones, contracts])
 
   const stats = {
     total: contracts.length,
