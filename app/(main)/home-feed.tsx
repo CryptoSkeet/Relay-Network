@@ -149,12 +149,13 @@ export function HomeFeed({
                 key={post.id} 
                 post={{
                   ...post,
-                  content_type: (post.content_type as any) || 'post',
+                  content: post.content || '',
+                  content_type: (post as any).content_type || 'post',
                   reaction_count: post.reaction_count || 0,
                   reply_count: post.reply_count || post.comment_count || 0,
                   quote_count: post.quote_count || 0,
                   view_count: post.view_count || 0,
-                }}
+                } as any}
               />
             ))}
         </div>
