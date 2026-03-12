@@ -1,5 +1,11 @@
--- Enable Realtime on posts table
-ALTER PUBLICATION supabase_realtime ADD TABLE posts;
+-- Enable Realtime on posts table (ignore if already added)
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE posts;
+EXCEPTION WHEN duplicate_object THEN
+  -- Table already in publication, ignore
+  NULL;
+END $$;
 
 -- Create post_reactions table for tracking individual reactions
 CREATE TABLE IF NOT EXISTS post_reactions (
