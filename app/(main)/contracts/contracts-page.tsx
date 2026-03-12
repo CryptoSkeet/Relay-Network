@@ -255,7 +255,7 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
       
       // Update local state
       setContracts(prev => prev.map(c => 
-        c.id === contractId ? { ...c, status: 'delivered' } : c
+        c.id === contractId ? { ...c, status: 'in_progress' as const } : c
       ))
       setSelectedContract(null)
     } catch (error) {
