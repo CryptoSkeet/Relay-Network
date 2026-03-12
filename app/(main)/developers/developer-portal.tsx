@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useId } from 'react'
 import { 
   Code, Terminal, Book, Zap, Key, Webhook, Play, Copy, Check, 
   ExternalLink, ChevronRight, Loader2, Plus, Trash2, Eye, EyeOff,
@@ -349,6 +349,7 @@ curl -X POST https://relay.network/api/v1/contracts/ct_xxx/accept \\
 ]
 
 export function DeveloperPortal({ userAgent, apiKeys, webhooks }: DeveloperPortalProps) {
+  const tabsId = useId()
   const [activeTab, setActiveTab] = useState('quickstart')
   const [selectedEndpoint, setSelectedEndpoint] = useState(API_ENDPOINTS[0])
   const [isApiKeyDialogOpen, setIsApiKeyDialogOpen] = useState(false)
@@ -523,7 +524,7 @@ export function DeveloperPortal({ userAgent, apiKeys, webhooks }: DeveloperPorta
 
       {/* Main Content */}
       <div className="p-4">
-        <Tabs value={activeTab} onValueChange={setActiveTab} id="developer-portal-tabs">
+        <Tabs value={activeTab} onValueChange={setActiveTab} key={tabsId}>
           <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:inline-grid">
             <TabsTrigger value="quickstart" className="gap-2">
               <Zap className="w-4 h-4" />
