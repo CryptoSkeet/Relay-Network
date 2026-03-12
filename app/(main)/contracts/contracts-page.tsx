@@ -2,12 +2,16 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { FileText, Plus, Clock, CheckCircle, XCircle, AlertCircle, Coins, ArrowRight, Filter, CheckCheck, Zap, RefreshCw } from 'lucide-react'
+import { FileText, Plus, Clock, CheckCircle, XCircle, AlertCircle, Coins, ArrowRight, Filter, CheckCheck, Zap, RefreshCw, PlusCircle, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Slider } from '@/components/ui/slider'
+import { Input } from '@/components/ui/input'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
 import { AgentAvatar } from '@/components/relay/agent-avatar'
 import { NewContractDialog } from '@/components/relay/new-contract-dialog'
 import type { Agent, Contract } from '@/lib/types'
@@ -51,10 +55,69 @@ export function ContractsPage({ contracts: initialContracts, agents }: Contracts
   const [contractMilestones, setContractMilestones] = useState<Record<string, Milestone[]>>({})
   const [isNewContractOpen, setIsNewContractOpen] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [addMilestoneContractId, setAddMilestoneContractId] = useState<string | null>(null)
+  const [newMilestoneTitle, setNewMilestoneTitle] = useState('')
+  const [isAddingMilestone, setIsAddingMilestone] = useState(false)
+  const [updatingMilestoneId, setUpdatingMilestoneId] = useState<string | null>(null)
 
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  // Update milestone progress
+  const updateMilestoneProgress = async (milestoneId: string, contractId: string, progress: number) => {
+    setUpdatingMilestoneId(milestoneId)
+    try {
+      const response = await fetch('/api/milestones', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ milestone_id: milestoneId, progress_percent: progress }),
+      })
+
+      if (response.ok) {
+        // Update local state
+        setContractMilestones(prev => ({
+          ...prev,
+          [contractId]: prev[contractId]?.map(m =>
+            m.id === milestoneId
+              ? { ...m, progress_percent: progress, status: progress === 100 ? 'completed' : progress > 0 ? 'in_progress' : 'pending' }
+              : m
+          ) || []
+        }))
+      }
+    } catch (err) {
+      console.error('Failed to update milestone:', err)
+    } finally {
+      setUpdatingMilestoneId(null)
+    }
+  }
+
+  // Add new milestone
+  const addMilestone = async (contractId: string) => {
+    if (!newMilestoneTitle.trim()) return
+    setIsAddingMilestone(true)
+    try {
+      const response = await fetch('/api/milestones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contract_id: contractId, title: newMilestoneTitle.trim() }),
+      })
+
+      const data = await response.json()
+      if (response.ok && data.milestone) {
+        setContractMilestones(prev => ({
+          ...prev,
+          [contractId]: [...(prev[contractId] || []), data.milestone]
+        }))
+        setNewMilestoneTitle('')
+        setAddMilestoneContractId(null)
+      }
+    } catch (err) {
+      console.error('Failed to add milestone:', err)
+    } finally {
+      setIsAddingMilestone(false)
+    }
+  }
 
   useEffect(() => {
     const fetchMilestones = async () => {
@@ -363,23 +426,71 @@ export function ContractsPage({ contracts: initialContracts, agents }: Contracts
                     </div>
 
                     {/* Milestones */}
-                    {milestones.length > 0 && (
-                      <div className="pt-4 border-t space-y-2">
+                    <div className="pt-4 border-t space-y-3">
+                      <div className="flex items-center justify-between">
                         <p className="text-sm font-medium">Milestones</p>
-                        <div className="space-y-1">
+                        {contract.status !== 'completed' && contract.status !== 'cancelled' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 text-xs"
+                            onClick={() => setAddMilestoneContractId(contract.id)}
+                          >
+                            <PlusCircle className="w-3 h-3 mr-1" />
+                            Add
+                          </Button>
+                        )}
+                      </div>
+                      {milestones.length > 0 ? (
+                        <div className="space-y-3">
                           {milestones.map(milestone => (
-                            <div key={milestone.id} className="flex items-center gap-2 text-xs">
-                              {getMilestoneIcon(milestone.status)}
-                              <span className="flex-1">{milestone.title}</span>
-                              <div className="flex items-center gap-1">
-                                <Progress value={milestone.progress_percent || 0} className="h-1.5 w-12" />
-                                <span className="text-muted-foreground w-8 text-right">{milestone.progress_percent}%</span>
+                            <div key={milestone.id} className="space-y-2 p-2 rounded-lg bg-muted/30">
+                              <div className="flex items-center gap-2 text-xs">
+                                {getMilestoneIcon(milestone.status)}
+                                <span className="flex-1 font-medium">{milestone.title}</span>
+                                <span className={cn(
+                                  "font-semibold",
+                                  milestone.progress_percent === 100 ? "text-green-500" : "text-muted-foreground"
+                                )}>
+                                  {milestone.progress_percent}%
+                                </span>
                               </div>
+                              {contract.status !== 'completed' && contract.status !== 'cancelled' && (
+                                <div className="flex items-center gap-3">
+                                  <Slider
+                                    value={[milestone.progress_percent || 0]}
+                                    max={100}
+                                    step={10}
+                                    className="flex-1"
+                                    disabled={updatingMilestoneId === milestone.id}
+                                    onValueCommit={(value) => updateMilestoneProgress(milestone.id, contract.id, value[0])}
+                                  />
+                                  <div className="flex gap-1">
+                                    {[0, 50, 100].map(val => (
+                                      <Button
+                                        key={val}
+                                        variant="outline"
+                                        size="sm"
+                                        className={cn(
+                                          "h-6 w-10 text-[10px] p-0",
+                                          milestone.progress_percent === val && "bg-primary text-primary-foreground"
+                                        )}
+                                        disabled={updatingMilestoneId === milestone.id}
+                                        onClick={() => updateMilestoneProgress(milestone.id, contract.id, val)}
+                                      >
+                                        {val}%
+                                      </Button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>
-                      </div>
-                    )}
+                      ) : (
+                        <p className="text-xs text-muted-foreground">No milestones yet. Add milestones to track progress.</p>
+                      )}
+                    </div>
 
                     {/* Footer - Budget & Dates */}
                     <div className="pt-4 border-t flex items-center justify-between text-xs text-muted-foreground">
@@ -445,6 +556,48 @@ export function ContractsPage({ contracts: initialContracts, agents }: Contracts
         agents={agents}
         onSuccess={handleContractCreated}
       />
+
+      {/* Add Milestone Dialog */}
+      <Dialog open={!!addMilestoneContractId} onOpenChange={(open) => { if (!open) { setAddMilestoneContractId(null); setNewMilestoneTitle('') } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Milestone</DialogTitle>
+            <DialogDescription>Add a new milestone to track progress on this contract.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label htmlFor="milestone-title">Milestone Title</Label>
+              <Input
+                id="milestone-title"
+                placeholder="e.g., Complete design mockups"
+                value={newMilestoneTitle}
+                onChange={(e) => setNewMilestoneTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && addMilestoneContractId) {
+                    addMilestone(addMilestoneContractId)
+                  }
+                }}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => { setAddMilestoneContractId(null); setNewMilestoneTitle('') }}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => addMilestoneContractId && addMilestone(addMilestoneContractId)}
+                disabled={!newMilestoneTitle.trim() || isAddingMilestone}
+              >
+                {isAddingMilestone ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <PlusCircle className="w-4 h-4 mr-2" />
+                )}
+                Add Milestone
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
