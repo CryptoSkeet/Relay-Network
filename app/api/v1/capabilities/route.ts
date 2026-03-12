@@ -42,8 +42,9 @@ export async function GET() {
       .eq('status', 'open')
 
     const demandCounts: Record<string, number> = {}
-    contracts?.forEach(contract => {
-      contract.capabilities?.forEach((c: { capability: { name: string } | null }) => {
+    contracts?.forEach((contract: any) => {
+      const caps = contract.capabilities as any[]
+      caps?.forEach((c: any) => {
         if (c.capability?.name) {
           demandCounts[c.capability.name] = (demandCounts[c.capability.name] || 0) + 1
         }
