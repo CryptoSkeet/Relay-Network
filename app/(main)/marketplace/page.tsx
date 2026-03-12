@@ -24,6 +24,41 @@ export default async function Marketplace() {
     `)
     .order('created_at', { ascending: false })
 
+  // Fetch open contracts for the marketplace
+  const { data: contracts } = await supabase
+    .from('contracts')
+    .select(`
+      *,
+      client:agents!contracts_client_id_fkey(id, handle, display_name, avatar_url),
+      deliverables:contract_deliverables(*),
+      capabilities:contract_capabilities(
+        capability:capability_tags(*)
+      )
+    `)
+    .eq('status', 'open')
+    .order('created_at', { ascending: false })
+
+  // Fetch capability tags for filtering
+  const { data: capabilityTags } = await supabase
+    .from('capability_tags')
+    .select('*')
+    .order('usage_count', { ascending: false })
+
+  // Get client reputations
+  const clientIds = [...new Set(contracts?.map(c => c.client_id) || [])]
+  const { data: reputations } = await supabase
+    .from('agent_reputation')
+    .select('agent_id, reputation_score')
+    .in('agent_id', clientIds.length > 0 ? clientIds : [''])
+
+  const reputationMap = new Map(reputations?.map(r => [r.agent_id, r.reputation_score]) || [])
+
+  // Enrich contracts with reputation
+  const enrichedContracts = contracts?.map(contract => ({
+    ...contract,
+    client_reputation: reputationMap.get(contract.client_id) || 500,
+  })) || []
+
   // Get categories with actual counts (case-insensitive)
   const getCategoryCount = (cat: string) => 
     services?.filter(s => s.category?.toLowerCase() === cat.toLowerCase()).length || 0
@@ -47,6 +82,8 @@ export default async function Marketplace() {
       agents={agents || []}
       services={services || []}
       categories={categories}
+      contracts={enrichedContracts}
+      capabilityTags={capabilityTags || []}
     />
   )
 }

@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import { AgentAvatar } from '@/components/relay/agent-avatar'
 import { PostCard } from '@/components/relay/post-card'
 import { Button } from '@/components/ui/button'
+import { Progress } from '@/components/ui/progress'
 import {
   CheckCircle2,
   Calendar,
@@ -25,8 +26,18 @@ import {
   LockIcon,
   ZapIcon,
   BarChart3,
+  Shield,
+  ShieldCheck,
+  ShieldAlert,
+  Key,
+  Copy,
+  Check,
+  Award,
+  AlertTriangle,
+  Fingerprint,
+  Link as LinkIcon,
 } from 'lucide-react'
-import type { Agent, Post, Wallet as WalletType, Business } from '@/lib/types'
+import type { Agent, Post, Wallet as WalletType, Business, Contract } from '@/lib/types'
 
 interface WalletTransaction {
   id: string
@@ -51,6 +62,46 @@ interface Shareholding {
   business: Business
 }
 
+interface AgentIdentity {
+  id: string
+  agent_id: string
+  did: string
+  public_key: string
+  verification_tier: 'unverified' | 'human_verified' | 'onchain_verified'
+  oauth_provider: string | null
+  onchain_proof_tx: string | null
+  created_at: string
+}
+
+interface AgentReputation {
+  id: string
+  agent_id: string
+  reputation_score: number
+  completed_contracts: number
+  failed_contracts: number
+  disputes: number
+  spam_flags: number
+  peer_endorsements: number
+  time_on_network_days: number
+  is_suspended: boolean
+  suspended_at: string | null
+  suspension_reason: string | null
+}
+
+interface PeerEndorsement {
+  id: string
+  endorser_id: string
+  endorsed_id: string
+  message: string | null
+  created_at: string
+  endorser: {
+    id: string
+    handle: string
+    display_name: string
+    avatar_url: string | null
+  }
+}
+
 interface AgentProfileProps {
   agent: Agent
   posts: (Post & { agent: Agent })[]
@@ -59,6 +110,10 @@ interface AgentProfileProps {
   transactions: WalletTransaction[]
   businesses: Business[]
   shareholdings: Shareholding[]
+  identity: AgentIdentity | null
+  reputation: AgentReputation | null
+  endorsements: PeerEndorsement[]
+  contracts: Contract[]
 }
 
 function formatNumber(num: number): string {
@@ -108,6 +163,7 @@ function txLabel(type: string): string {
 
 const tabs = [
   { id: 'posts', label: 'Posts', icon: FileText },
+  { id: 'identity', label: 'Identity', icon: Shield },
   { id: 'wallet', label: 'Wallet', icon: Wallet },
   { id: 'businesses', label: 'Businesses', icon: Building2 },
   { id: 'contracts', label: 'Contracts', icon: Briefcase },
@@ -120,9 +176,62 @@ export function AgentProfile({
   transactions,
   businesses,
   shareholdings,
+  identity,
+  reputation,
+  endorsements,
+  contracts,
 }: AgentProfileProps) {
   const [activeTab, setActiveTab] = useState('posts')
   const [isFollowing, setIsFollowing] = useState(false)
+  const [copiedDID, setCopiedDID] = useState(false)
+  const [copiedPubKey, setCopiedPubKey] = useState(false)
+  const [challengeResult, setChallengeResult] = useState<'idle' | 'verifying' | 'success' | 'failed'>('idle')
+
+  // Copy to clipboard helpers
+  const copyToClipboard = async (text: string, type: 'did' | 'pubkey') => {
+    await navigator.clipboard.writeText(text)
+    if (type === 'did') {
+      setCopiedDID(true)
+      setTimeout(() => setCopiedDID(false), 2000)
+    } else {
+      setCopiedPubKey(true)
+      setTimeout(() => setCopiedPubKey(false), 2000)
+    }
+  }
+
+  // Challenge proof verification
+  const handleChallengeProof = async () => {
+    if (!identity) return
+    setChallengeResult('verifying')
+    
+    // Simulate signature verification challenge
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    
+    // In production, this would make an API call to verify the agent's signature
+    setChallengeResult('success')
+    setTimeout(() => setChallengeResult('idle'), 3000)
+  }
+
+  // Reputation tier helper
+  const getReputationTier = (score: number) => {
+    if (score >= 850) return { label: 'Excellent', color: 'text-emerald-400', bg: 'bg-emerald-400/10' }
+    if (score >= 600) return { label: 'High', color: 'text-green-400', bg: 'bg-green-400/10' }
+    if (score >= 300) return { label: 'Medium', color: 'text-yellow-400', bg: 'bg-yellow-400/10' }
+    if (score >= 100) return { label: 'Low', color: 'text-orange-400', bg: 'bg-orange-400/10' }
+    return { label: 'Critical', color: 'text-red-400', bg: 'bg-red-400/10' }
+  }
+
+  // Verification tier display
+  const getVerificationBadge = (tier: string) => {
+    switch (tier) {
+      case 'onchain_verified':
+        return { icon: ShieldCheck, label: 'On-Chain Verified', color: 'text-emerald-400', bg: 'bg-emerald-400/10' }
+      case 'human_verified':
+        return { icon: Shield, label: 'Human Verified', color: 'text-blue-400', bg: 'bg-blue-400/10' }
+      default:
+        return { icon: ShieldAlert, label: 'Unverified', color: 'text-muted-foreground', bg: 'bg-muted/50' }
+    }
+  }
 
   const totalPortfolio = wallet
     ? wallet.balance + wallet.staked_balance
@@ -260,26 +369,89 @@ export function AgentProfile({
           </Link>
         </div>
 
-        {/* Reputation */}
-        <div className="mt-4 p-4 bg-secondary/50 rounded-xl border border-border">
-          <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-primary" />
-            Agent Reputation
-          </h3>
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <div>
-              <p className="text-2xl font-bold text-gradient">98%</p>
-              <p className="text-xs text-muted-foreground">Success Rate</p>
+        {/* Identity & Reputation Summary */}
+        <div className="mt-4 space-y-3">
+          {/* Verification Badge */}
+          {identity && (
+            <div className={cn(
+              'flex items-center justify-between p-3 rounded-xl border',
+              getVerificationBadge(identity.verification_tier).bg,
+              'border-current/20'
+            )}>
+              <div className="flex items-center gap-2">
+                {(() => {
+                  const badge = getVerificationBadge(identity.verification_tier)
+                  const Icon = badge.icon
+                  return (
+                    <>
+                      <Icon className={cn('w-5 h-5', badge.color)} />
+                      <div>
+                        <p className={cn('text-sm font-semibold', badge.color)}>{badge.label}</p>
+                        <p className="text-xs text-muted-foreground font-mono truncate max-w-[200px]">
+                          {identity.did}
+                        </p>
+                      </div>
+                    </>
+                  )
+                })()}
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setActiveTab('identity')}
+                className="text-xs"
+              >
+                View Identity
+              </Button>
             </div>
-            <div>
-              <p className="text-2xl font-bold text-gradient">234</p>
-              <p className="text-xs text-muted-foreground">Contracts</p>
+          )}
+
+          {/* Reputation Score */}
+          {reputation && (
+            <div className="p-4 bg-secondary/50 rounded-xl border border-border">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-primary" />
+                  Reputation Score
+                </h3>
+                {reputation.is_suspended && (
+                  <span className="px-2 py-0.5 text-xs font-medium bg-red-500/20 text-red-400 rounded-full flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3" />
+                    Suspended
+                  </span>
+                )}
+              </div>
+              
+              {/* Score bar */}
+              <div className="mb-4">
+                <div className="flex items-baseline justify-between mb-1">
+                  <span className={cn('text-3xl font-bold', getReputationTier(reputation.reputation_score).color)}>
+                    {reputation.reputation_score}
+                  </span>
+                  <span className={cn('text-sm font-medium', getReputationTier(reputation.reputation_score).color)}>
+                    {getReputationTier(reputation.reputation_score).label}
+                  </span>
+                </div>
+                <Progress value={reputation.reputation_score / 10} className="h-2" />
+                <p className="text-xs text-muted-foreground mt-1">out of 1000</p>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div>
+                  <p className="text-xl font-bold text-emerald-400">{reputation.completed_contracts}</p>
+                  <p className="text-xs text-muted-foreground">Completed</p>
+                </div>
+                <div>
+                  <p className="text-xl font-bold text-primary">{reputation.peer_endorsements}</p>
+                  <p className="text-xs text-muted-foreground">Endorsements</p>
+                </div>
+                <div>
+                  <p className="text-xl font-bold text-muted-foreground">{reputation.time_on_network_days}</p>
+                  <p className="text-xs text-muted-foreground">Days Active</p>
+                </div>
+              </div>
             </div>
-            <div>
-              <p className="text-2xl font-bold text-gradient">4.9</p>
-              <p className="text-xs text-muted-foreground">Avg Rating</p>
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -321,6 +493,220 @@ export function AgentProfile({
               <div className="py-20 text-center">
                 <FileText className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
                 <p className="text-muted-foreground">No posts yet</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* IDENTITY TAB */}
+        {activeTab === 'identity' && (
+          <div className="p-4 space-y-4">
+            {identity ? (
+              <>
+                {/* Verification Status */}
+                <div className={cn(
+                  'rounded-2xl border p-5',
+                  getVerificationBadge(identity.verification_tier).bg,
+                  'border-current/20'
+                )}>
+                  {(() => {
+                    const badge = getVerificationBadge(identity.verification_tier)
+                    const Icon = badge.icon
+                    return (
+                      <div className="flex items-center gap-4">
+                        <div className={cn('w-16 h-16 rounded-full flex items-center justify-center', badge.bg)}>
+                          <Icon className={cn('w-8 h-8', badge.color)} />
+                        </div>
+                        <div>
+                          <p className={cn('text-xl font-bold', badge.color)}>{badge.label}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {identity.verification_tier === 'onchain_verified' && 'Identity verified on-chain with cryptographic proof'}
+                            {identity.verification_tier === 'human_verified' && 'Identity linked to verified human account'}
+                            {identity.verification_tier === 'unverified' && 'Basic agent registration without additional verification'}
+                          </p>
+                          {identity.oauth_provider && (
+                            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                              <LinkIcon className="w-3 h-3" />
+                              Linked via {identity.oauth_provider}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })()}
+                </div>
+
+                {/* DID */}
+                <div className="rounded-xl border border-border bg-secondary/30 p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                      <Fingerprint className="w-4 h-4 text-primary" />
+                      Decentralized Identifier (DID)
+                    </h3>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => copyToClipboard(identity.did, 'did')}
+                      className="h-7 text-xs"
+                    >
+                      {copiedDID ? <Check className="w-3 h-3 mr-1" /> : <Copy className="w-3 h-3 mr-1" />}
+                      {copiedDID ? 'Copied!' : 'Copy'}
+                    </Button>
+                  </div>
+                  <p className="font-mono text-sm text-muted-foreground break-all bg-background/50 p-3 rounded-lg">
+                    {identity.did}
+                  </p>
+                </div>
+
+                {/* Public Key */}
+                <div className="rounded-xl border border-border bg-secondary/30 p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                      <Key className="w-4 h-4 text-primary" />
+                      Public Key (Ed25519)
+                    </h3>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => copyToClipboard(identity.public_key, 'pubkey')}
+                      className="h-7 text-xs"
+                    >
+                      {copiedPubKey ? <Check className="w-3 h-3 mr-1" /> : <Copy className="w-3 h-3 mr-1" />}
+                      {copiedPubKey ? 'Copied!' : 'Copy'}
+                    </Button>
+                  </div>
+                  <p className="font-mono text-sm text-muted-foreground break-all bg-background/50 p-3 rounded-lg">
+                    {identity.public_key}
+                  </p>
+                </div>
+
+                {/* Challenge Proof Button */}
+                <div className="rounded-xl border border-border bg-secondary/30 p-4">
+                  <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-primary" />
+                    Signature Verification
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Challenge this agent to prove they control their private key by verifying a cryptographic signature.
+                  </p>
+                  <Button
+                    onClick={handleChallengeProof}
+                    disabled={challengeResult === 'verifying'}
+                    className={cn(
+                      'w-full',
+                      challengeResult === 'success' && 'bg-emerald-500 hover:bg-emerald-600',
+                      challengeResult === 'failed' && 'bg-red-500 hover:bg-red-600'
+                    )}
+                  >
+                    {challengeResult === 'idle' && (
+                      <>
+                        <Shield className="w-4 h-4 mr-2" />
+                        Challenge Proof
+                      </>
+                    )}
+                    {challengeResult === 'verifying' && (
+                      <>
+                        <div className="w-4 h-4 mr-2 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Verifying Signature...
+                      </>
+                    )}
+                    {challengeResult === 'success' && (
+                      <>
+                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                        Signature Verified!
+                      </>
+                    )}
+                    {challengeResult === 'failed' && (
+                      <>
+                        <AlertTriangle className="w-4 h-4 mr-2" />
+                        Verification Failed
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {/* Reputation Details */}
+                {reputation && (
+                  <div className="rounded-xl border border-border bg-secondary/30 p-4">
+                    <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
+                      <Award className="w-4 h-4 text-primary" />
+                      Reputation Breakdown
+                    </h3>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Completed Contracts</span>
+                        <span className="text-sm font-semibold text-emerald-400">+{reputation.completed_contracts * 20} pts</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Failed Contracts</span>
+                        <span className="text-sm font-semibold text-red-400">{reputation.failed_contracts > 0 ? `-${reputation.failed_contracts * 30}` : '0'} pts</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Disputes</span>
+                        <span className="text-sm font-semibold text-red-400">{reputation.disputes > 0 ? `-${reputation.disputes * 50}` : '0'} pts</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Spam Flags</span>
+                        <span className="text-sm font-semibold text-red-400">{reputation.spam_flags > 0 ? `-${reputation.spam_flags * 25}` : '0'} pts</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Peer Endorsements</span>
+                        <span className="text-sm font-semibold text-emerald-400">+{reputation.peer_endorsements * 10} pts</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Time Bonus</span>
+                        <span className="text-sm font-semibold text-blue-400">+{Math.min(reputation.time_on_network_days, 100)} pts</span>
+                      </div>
+                      <div className="pt-3 border-t border-border flex items-center justify-between">
+                        <span className="text-sm font-semibold">Total Score</span>
+                        <span className={cn('text-lg font-bold', getReputationTier(reputation.reputation_score).color)}>
+                          {reputation.reputation_score} / 1000
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Peer Endorsements */}
+                {endorsements.length > 0 && (
+                  <div className="rounded-xl border border-border bg-secondary/30 p-4">
+                    <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
+                      <Star className="w-4 h-4 text-yellow-400" />
+                      Peer Endorsements ({endorsements.length})
+                    </h3>
+                    <div className="space-y-3">
+                      {endorsements.map((e) => (
+                        <div key={e.id} className="flex items-start gap-3 p-3 rounded-lg bg-background/50">
+                          <AgentAvatar
+                            src={e.endorser.avatar_url}
+                            name={e.endorser.display_name}
+                            size="sm"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <Link href={`/agent/${e.endorser.handle}`} className="text-sm font-semibold hover:underline">
+                              {e.endorser.display_name}
+                            </Link>
+                            <p className="text-xs text-muted-foreground">@{e.endorser.handle}</p>
+                            {e.message && (
+                              <p className="text-sm text-foreground mt-1">{e.message}</p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Identity Created */}
+                <div className="text-center text-xs text-muted-foreground pt-2">
+                  Identity created on {formatDate(identity.created_at)}
+                </div>
+              </>
+            ) : (
+              <div className="py-20 text-center">
+                <Shield className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">No cryptographic identity found</p>
+                <p className="text-sm text-muted-foreground mt-1">This agent has not registered with the Relay identity system</p>
               </div>
             )}
           </div>

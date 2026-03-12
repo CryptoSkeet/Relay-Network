@@ -21,7 +21,12 @@ import {
   Wallet,
   Building2,
   Coins,
+  LogOut,
+  User,
+  Radio,
+  Code,
 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { AgentAvatar } from './agent-avatar'
 import { RelayLogoIcon } from './relay-logo-icon'
 import {
@@ -51,6 +56,8 @@ const mainNavItems = [
 
 const secondaryNavItems = [
   { href: '/create', label: 'Create', icon: PlusSquare },
+  { href: '/network', label: 'Network', icon: Radio },
+  { href: '/developers', label: 'Developers', icon: Code },
   { href: '/analytics', label: 'Analytics', icon: TrendingUp },
   { href: '/settings', label: 'Settings', icon: Settings },
   { href: '/admin', label: 'Admin', icon: Shield },
@@ -58,35 +65,47 @@ const secondaryNavItems = [
 
 export function Sidebar({ className }: SidebarProps) {
   const pathname = usePathname()
+  const router = useRouter()
   const [agent, setAgent] = useState<Agent | null>(null)
 
+  async function handleLogout() {
+    try {
+      const supabase = createClient()
+      await supabase.auth.signOut({ scope: 'global' })
+      router.push('/auth/login')
+      router.refresh()
+    } catch {
+      router.push('/auth/login')
+    }
+  }
+
+  // Load agent on mount
   useEffect(() => {
     async function loadAgent() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
 
-      if (user) {
-        const { data } = await supabase
-          .from('agents')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single()
-        if (data) setAgent(data)
-      } else {
-        // Demo: load most active agent
-        const { data } = await supabase
-          .from('agents')
-          .select('*')
-          .order('post_count', { ascending: false })
-          .limit(1)
-          .single()
-        if (data) setAgent(data)
-      }
+      const { data } = await supabase
+        .from('agents')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (data) setAgent(data)
     }
     loadAgent()
   }, [])
+
+  function handleProfileClick() {
+    if (agent?.handle) {
+      router.push(`/agent/${agent.handle}`)
+    } else {
+      router.push('/create')
+    }
+  }
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -185,45 +204,78 @@ export function Sidebar({ className }: SidebarProps) {
           })}
         </nav>
 
-        {/* Active Agent at bottom */}
-        <div className="p-2 xl:p-3 border-t border-sidebar-border">
+        {/* Log Out - moved higher up */}
+        <div className="px-2 xl:px-3 pb-1">
           <Tooltip>
             <TooltipTrigger asChild>
-              <Link
-                href={agent ? `/agent/${agent.handle}` : '/profile'}
+              <button
+                onClick={handleLogout}
                 className={cn(
-                  'flex items-center gap-3 px-3 py-3 rounded-xl',
+                  'w-full flex items-center gap-4 px-3 py-3 rounded-xl',
                   'transition-all duration-200',
-                  'hover:bg-sidebar-accent',
-                  (pathname === '/profile' || pathname.startsWith('/agent/')) && 'bg-sidebar-accent'
+                  'hover:bg-red-500/10 text-sidebar-foreground/60 hover:text-red-400'
+                )}
+              >
+                <LogOut className="w-6 h-6 shrink-0" />
+                <span className="hidden xl:block font-medium">Log Out</span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right" sideOffset={10}>
+              <p>Log Out</p>
+            </TooltipContent>
+          </Tooltip>
+        </div>
+
+        {/* Profile - Your Agent at bottom (moved to bottom) */}
+        <div className="p-2 xl:p-3 border-t border-sidebar-border mt-auto">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={handleProfileClick}
+                className={cn(
+                  'flex items-center gap-3 px-3 py-3 rounded-xl w-full text-left',
+                  'transition-all duration-200',
+                  'hover:bg-sidebar-accent'
                 )}
               >
                 <div className="relative shrink-0">
-                  <AgentAvatar
-                    src={agent?.avatar_url ?? null}
-                    name={agent?.display_name ?? 'Your Agent'}
-                    size="sm"
-                  />
-                  {/* Green active dot */}
-                  <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-sidebar animate-pulse" />
+                  {agent ? (
+                    <>
+                      <AgentAvatar
+                        src={agent.avatar_url ?? null}
+                        name={agent.display_name}
+                        size="sm"
+                      />
+                      <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-sidebar animate-pulse" />
+                    </>
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center ring-2 ring-background overflow-hidden">
+                      <User className="w-4 h-4 text-primary" />
+                    </div>
+                  )}
                 </div>
                 <div className="hidden xl:block flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <p className="text-sm font-semibold truncate">
-                      {agent?.display_name ?? 'Your Agent'}
-                    </p>
-                    <span className="shrink-0 text-[10px] font-medium text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded-full">
-                      Active
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground truncate">
-                    @{agent?.handle ?? 'your_handle'}
-                  </p>
+                  {agent ? (
+                    <>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm font-semibold truncate">{agent.display_name}</p>
+                        <span className="shrink-0 text-[10px] font-medium text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded-full">
+                          Active
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">@{agent.handle}</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm font-semibold truncate">Profile</p>
+                      <p className="text-xs text-muted-foreground truncate">Create your agent</p>
+                    </>
+                  )}
                 </div>
-              </Link>
+              </button>
             </TooltipTrigger>
             <TooltipContent side="right" sideOffset={10}>
-              <p>{agent ? `@${agent.handle} — Active` : 'Your Agent'}</p>
+              <p>{agent ? `@${agent.handle} — View Profile` : 'Create your agent'}</p>
             </TooltipContent>
           </Tooltip>
         </div>

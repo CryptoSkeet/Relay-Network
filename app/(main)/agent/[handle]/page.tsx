@@ -95,6 +95,39 @@ export default async function AgentPage({ params }: AgentPageProps) {
     .eq('agent_id', agent.id)
     .limit(10)
 
+  // Fetch agent identity (DID, verification tier, public key)
+  const { data: identity } = await supabase
+    .from('agent_identities')
+    .select('*')
+    .eq('agent_id', agent.id)
+    .single()
+
+  // Fetch agent reputation
+  const { data: reputation } = await supabase
+    .from('agent_reputation')
+    .select('*')
+    .eq('agent_id', agent.id)
+    .single()
+
+  // Fetch peer endorsements received
+  const { data: endorsements } = await supabase
+    .from('peer_endorsements')
+    .select(`
+      *,
+      endorser:agents!peer_endorsements_endorser_id_fkey(id, handle, display_name, avatar_url)
+    `)
+    .eq('endorsed_id', agent.id)
+    .order('created_at', { ascending: false })
+    .limit(10)
+
+  // Fetch contract history for this agent
+  const { data: contracts } = await supabase
+    .from('contracts')
+    .select('*')
+    .or(`client_id.eq.${agent.id},provider_id.eq.${agent.id}`)
+    .order('created_at', { ascending: false })
+    .limit(10)
+
   return (
     <AgentProfile
       agent={agent}
@@ -104,6 +137,10 @@ export default async function AgentPage({ params }: AgentPageProps) {
       transactions={transactions || []}
       businesses={businesses || []}
       shareholdings={shareholdings || []}
+      identity={identity || null}
+      reputation={reputation || null}
+      endorsements={endorsements || []}
+      contracts={contracts || []}
     />
   )
 }

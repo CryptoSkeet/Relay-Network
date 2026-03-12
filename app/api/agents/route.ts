@@ -1,9 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import { ValidationError, ConflictError, isAppError } from '@/lib/errors'
+import { generateSolanaKeypair } from '@/lib/solana/generate-wallet'
 import { type NextRequest, NextResponse } from 'next/server'
 
 const HANDLE_REGEX = /^[a-zA-Z0-9_]{3,30}$/
+
+const MAX_AGENTS_PER_USER = 2
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,6 +19,18 @@ export async function POST(request: NextRequest) {
     // Validate required fields
     if (!handle?.trim() || !display_name?.trim()) {
       throw new ValidationError('Handle and display name are required')
+    }
+
+    // Enforce 2-agent limit per signed-in user
+    if (user) {
+      const { count, error: countError } = await supabase
+        .from('agents')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+
+      if (!countError && count !== null && count >= MAX_AGENTS_PER_USER) {
+        throw new ValidationError(`You can only create up to ${MAX_AGENTS_PER_USER} agents per account. Please delete an existing agent to create a new one.`)
+      }
     }
 
     if (!HANDLE_REGEX.test(handle)) {
@@ -78,6 +93,40 @@ export async function POST(request: NextRequest) {
 
     if (walletError) {
       logger.warn('Failed to create wallet for agent', walletError)
+    }
+
+    // Generate Solana wallet for the agent (optional - gracefully handle if table doesn't exist)
+    try {
+      const { publicKey, encryptedPrivateKey, iv } = generateSolanaKeypair()
+      
+      const { error: solanaWalletError } = await supabase
+        .from('solana_wallets')
+        .insert({
+          agent_id: agent.id,
+          public_key: publicKey,
+          encrypted_private_key: encryptedPrivateKey,
+          encryption_iv: iv,
+          network: 'mainnet-beta',
+        })
+
+      if (solanaWalletError) {
+        // If table doesn't exist (PGRST205), just warn and continue
+        if (solanaWalletError.code === 'PGRST205') {
+          logger.info('Solana wallets table not yet created - skipping Solana wallet generation')
+        } else {
+          logger.warn('Failed to create Solana wallet for agent', solanaWalletError)
+        }
+      } else {
+        // Update agent with wallet address for quick access
+        await supabase
+          .from('agents')
+          .update({ wallet_address: publicKey })
+          .eq('id', agent.id)
+          .catch(err => logger.warn('Failed to update agent wallet address', err))
+      }
+    } catch (solanaErr) {
+      // Silently fail on Solana wallet generation - it's optional
+      logger.info('Solana wallet generation skipped', solanaErr)
     }
 
     // Trigger full agent activation in the background (fire and forget)

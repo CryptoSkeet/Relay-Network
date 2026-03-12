@@ -1,18 +1,22 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
-import { FileText, Plus, Clock, CheckCircle, XCircle, AlertCircle, Coins, ArrowRight, Filter, CheckCheck, Zap, RefreshCw } from 'lucide-react'
+import { FileText, Plus, Clock, CheckCircle, XCircle, AlertCircle, Coins, ArrowRight, Filter, CheckCheck, Zap, RefreshCw, PlusCircle, Loader2, Wallet, Lock, Unlock, Scale, Send, Eye, Shield } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Slider } from '@/components/ui/slider'
+import { Input } from '@/components/ui/input'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
 import { AgentAvatar } from '@/components/relay/agent-avatar'
 import { NewContractDialog } from '@/components/relay/new-contract-dialog'
 import type { Agent, Contract } from '@/lib/types'
 import { cn } from '@/lib/utils'
-import { formatDistanceToNow } from 'date-fns'
+import { formatDistanceToNow, format } from 'date-fns'
 import { createClient } from '@/lib/supabase/client'
 
 interface Milestone {
@@ -25,14 +29,68 @@ interface Milestone {
   order_index: number
 }
 
+interface Deliverable {
+  id: string
+  contract_id: string
+  title: string
+  description?: string
+  acceptance_criteria?: string[]
+  proof_links?: string[]
+  proof_hashes?: string[]
+  status: 'pending' | 'submitted' | 'accepted' | 'rejected'
+  submitted_at?: string
+  verified_at?: string
+}
+
+interface Escrow {
+  id: string
+  contract_id: string
+  payer_id: string
+  payee_id?: string
+  amount: number
+  currency: string
+  status: 'locked' | 'pending_release' | 'released' | 'refunded' | 'disputed'
+  locked_at: string
+  released_at?: string
+  release_tx_hash?: string
+}
+
+interface Dispute {
+  id: string
+  contract_id: string
+  initiated_by: string
+  reason: string
+  evidence_links?: string[]
+  status: string
+  dispute_window_ends?: string
+  created_at: string
+}
+
+interface CapabilityTag {
+  id: string
+  name: string
+  category: string
+  description: string
+  icon: string
+  usage_count: number
+}
+
 interface ContractWithAgents extends Contract {
   client?: Agent
   provider?: Agent
+  deliverables?: Deliverable[]
+  escrow?: Escrow[]
+  dispute?: Dispute | null
+  capabilities?: Array<{
+    capability: CapabilityTag | null
+  }>
 }
 
 interface ContractsPageProps {
   contracts: ContractWithAgents[]
   agents: Agent[]
+  userAgentId: string | null
+  capabilityTags: CapabilityTag[]
 }
 
 const statusConfig: Record<string, { icon: typeof FileText; color: string; bg: string }> = {
@@ -44,24 +102,86 @@ const statusConfig: Record<string, { icon: typeof FileText; color: string; bg: s
   disputed: { icon: AlertCircle, color: 'text-orange-500', bg: 'bg-orange-500/10' },
 }
 
-export function ContractsPage({ contracts: initialContracts, agents }: ContractsPageProps) {
+export function ContractsPage({ contracts: initialContracts, agents, userAgentId, capabilityTags }: ContractsPageProps) {
   const [mounted, setMounted] = useState(false)
   const [filter, setFilter] = useState<string>('all')
+  const [viewMode, setViewMode] = useState<'all' | 'my-created' | 'my-accepted'>('all')
   const [contracts, setContracts] = useState<ContractWithAgents[]>(initialContracts)
   const [contractMilestones, setContractMilestones] = useState<Record<string, Milestone[]>>({})
   const [isNewContractOpen, setIsNewContractOpen] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
-  const supabase = createClient()
+  const [addMilestoneContractId, setAddMilestoneContractId] = useState<string | null>(null)
+  const [newMilestoneTitle, setNewMilestoneTitle] = useState('')
+  const [isAddingMilestone, setIsAddingMilestone] = useState(false)
+  const [updatingMilestoneId, setUpdatingMilestoneId] = useState<string | null>(null)
+  const [selectedContract, setSelectedContract] = useState<ContractWithAgents | null>(null)
+  const [isActionLoading, setIsActionLoading] = useState(false)
 
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  // Update milestone progress
+  const updateMilestoneProgress = async (milestoneId: string, contractId: string, progress: number) => {
+    setUpdatingMilestoneId(milestoneId)
+    try {
+      const response = await fetch('/api/milestones', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ milestone_id: milestoneId, progress_percent: progress }),
+      })
+
+      if (response.ok) {
+        // Update local state
+        setContractMilestones(prev => ({
+          ...prev,
+          [contractId]: prev[contractId]?.map(m =>
+            m.id === milestoneId
+              ? { ...m, progress_percent: progress, status: progress === 100 ? 'completed' : progress > 0 ? 'in_progress' : 'pending' }
+              : m
+          ) || []
+        }))
+      }
+    } catch (err) {
+      console.error('Failed to update milestone:', err)
+    } finally {
+      setUpdatingMilestoneId(null)
+    }
+  }
+
+  // Add new milestone
+  const addMilestone = async (contractId: string) => {
+    if (!newMilestoneTitle.trim()) return
+    setIsAddingMilestone(true)
+    try {
+      const response = await fetch('/api/milestones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contract_id: contractId, title: newMilestoneTitle.trim() }),
+      })
+
+      const data = await response.json()
+      if (response.ok && data.milestone) {
+        setContractMilestones(prev => ({
+          ...prev,
+          [contractId]: [...(prev[contractId] || []), data.milestone]
+        }))
+        setNewMilestoneTitle('')
+        setAddMilestoneContractId(null)
+      }
+    } catch (err) {
+      console.error('Failed to add milestone:', err)
+    } finally {
+      setIsAddingMilestone(false)
+    }
+  }
 
   useEffect(() => {
     const fetchMilestones = async () => {
       const contractIds = contracts.map(c => c.id)
       if (contractIds.length === 0) return
 
+      const supabase = createClient()
       const { data: milestones } = await supabase
         .from('contract_milestones')
         .select('*')
@@ -79,11 +199,12 @@ export function ContractsPage({ contracts: initialContracts, agents }: Contracts
     }
 
     fetchMilestones()
-  }, [contracts, supabase])
+  }, [contracts])
 
   const handleContractCreated = async () => {
     setIsRefreshing(true)
     try {
+      const supabase = createClient()
       const { data } = await supabase
         .from('contracts')
         .select('*, client:client_id(*), provider:provider_id(*)')
@@ -99,10 +220,120 @@ export function ContractsPage({ contracts: initialContracts, agents }: Contracts
     }
   }
 
-  const filteredContracts = contracts.filter(contract => {
+  // Filter by view mode (my created vs my accepted)
+  const viewFilteredContracts = useMemo(() => {
+    if (!userAgentId) return contracts
+    
+    switch (viewMode) {
+      case 'my-created':
+        return contracts.filter(c => c.client_id === userAgentId)
+      case 'my-accepted':
+        return contracts.filter(c => c.provider_id === userAgentId)
+      default:
+        return contracts.filter(c => c.client_id === userAgentId || c.provider_id === userAgentId)
+    }
+  }, [contracts, userAgentId, viewMode])
+
+  const filteredContracts = viewFilteredContracts.filter(contract => {
     if (filter === 'all') return true
+    if (filter === 'active') return ['in_progress', 'delivered'].includes(contract.status)
+    if (filter === 'disputed') return contract.status === 'disputed'
     return contract.status === filter
   })
+
+  // Contract actions
+  const handleDeliverContract = async (contractId: string) => {
+    setIsActionLoading(true)
+    try {
+      const response = await fetch(`/api/v1/contracts/${contractId}/deliver`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error)
+      
+      // Update local state
+      setContracts(prev => prev.map(c => 
+        c.id === contractId ? { ...c, status: 'delivered' } : c
+      ))
+      setSelectedContract(null)
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to deliver contract')
+    } finally {
+      setIsActionLoading(false)
+    }
+  }
+
+  const handleVerifyContract = async (contractId: string) => {
+    setIsActionLoading(true)
+    try {
+      const response = await fetch(`/api/v1/contracts/${contractId}/verify`, {
+        method: 'POST',
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error)
+      
+      // Update local state
+      setContracts(prev => prev.map(c => 
+        c.id === contractId ? { ...c, status: 'completed' } : c
+      ))
+      setSelectedContract(null)
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to verify contract')
+    } finally {
+      setIsActionLoading(false)
+    }
+  }
+
+  const handleDisputeContract = async (contractId: string, reason: string) => {
+    setIsActionLoading(true)
+    try {
+      const response = await fetch(`/api/v1/contracts/${contractId}/dispute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason })
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error)
+      
+      // Update local state
+      setContracts(prev => prev.map(c => 
+        c.id === contractId ? { ...c, status: 'disputed' } : c
+      ))
+      setSelectedContract(null)
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to open dispute')
+    } finally {
+      setIsActionLoading(false)
+    }
+  }
+
+  // Calculate escrow totals
+  const escrowStats = useMemo(() => {
+    const myContracts = userAgentId 
+      ? contracts.filter(c => c.client_id === userAgentId || c.provider_id === userAgentId)
+      : []
+    
+    let locked = 0
+    let pending = 0
+    let released = 0
+
+    myContracts.forEach(c => {
+      const escrow = c.escrow?.[0]
+      if (!escrow) return
+      
+      if (escrow.status === 'locked' || escrow.status === 'disputed') {
+        locked += escrow.amount
+      } else if (escrow.status === 'pending_release') {
+        pending += escrow.amount
+      } else if (escrow.status === 'released') {
+        released += escrow.amount
+      }
+    })
+
+    return { locked, pending, released }
+  }, [contracts, userAgentId])
 
   const getOverallProgress = (contractId: string, contractStatus: string) => {
     // Completed contracts always show 100%
@@ -128,6 +359,7 @@ export function ContractsPage({ contracts: initialContracts, agents }: Contracts
   }
 
   const markContractComplete = async (contractId: string) => {
+    const supabase = createClient()
     const { error } = await supabase
       .from('contracts')
       .update({ 
@@ -148,6 +380,7 @@ export function ContractsPage({ contracts: initialContracts, agents }: Contracts
   // Auto-check and complete contracts when all milestones reach 100%
   useEffect(() => {
     const checkAndAutoComplete = async () => {
+      const supabase = createClient()
       for (const contract of contracts) {
         // Skip already completed, cancelled, or disputed contracts
         if (['completed', 'cancelled', 'disputed'].includes(contract.status)) continue
@@ -183,13 +416,46 @@ export function ContractsPage({ contracts: initialContracts, agents }: Contracts
     if (Object.keys(contractMilestones).length > 0) {
       checkAndAutoComplete()
     }
-  }, [contractMilestones, contracts, supabase])
+  }, [contractMilestones, contracts])
 
-  const stats = {
-    total: contracts.length,
-    active: contracts.filter(c => !['completed', 'cancelled', 'disputed'].includes(c.status)).length,
-    completed: contracts.filter(c => c.status === 'completed').length,
-    open: contracts.filter(c => c.status === 'open' || c.status === 'draft').length,
+  const stats = useMemo(() => {
+    const baseContracts = viewFilteredContracts
+    return {
+      total: baseContracts.length,
+      active: baseContracts.filter(c => ['in_progress', 'delivered'].includes(c.status)).length,
+      completed: baseContracts.filter(c => c.status === 'completed').length,
+      open: baseContracts.filter(c => c.status === 'open').length,
+      disputed: baseContracts.filter(c => c.status === 'disputed').length,
+    }
+  }, [viewFilteredContracts])
+
+  // Get timeline events for a contract
+  const getContractTimeline = (contract: ContractWithAgents) => {
+    const events: Array<{ date: string; event: string; type: 'info' | 'success' | 'warning' | 'error' }> = []
+    
+    events.push({ date: contract.created_at, event: 'Contract created', type: 'info' })
+    
+    if (contract.accepted_at) {
+      events.push({ date: contract.accepted_at, event: 'Contract accepted', type: 'success' })
+    }
+    
+    if (contract.delivered_at) {
+      events.push({ date: contract.delivered_at, event: 'Deliverables submitted', type: 'info' })
+    }
+    
+    if (contract.verified_at) {
+      events.push({ date: contract.verified_at, event: 'Delivery verified', type: 'success' })
+    }
+    
+    if (contract.completed_at) {
+      events.push({ date: contract.completed_at, event: 'Contract completed', type: 'success' })
+    }
+    
+    if (contract.dispute) {
+      events.push({ date: contract.dispute.created_at, event: 'Dispute opened', type: 'error' })
+    }
+    
+    return events.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
   }
 
   return (
@@ -200,9 +466,9 @@ export function ContractsPage({ contracts: initialContracts, agents }: Contracts
           <div className="min-w-0 flex-1">
             <h1 className="text-lg sm:text-2xl font-bold flex items-center gap-2">
               <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-primary shrink-0" />
-              <span className="truncate">Contracts</span>
+              <span className="truncate">My Contracts</span>
             </h1>
-            <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">Track contracts and milestone progress</p>
+            <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">Manage your contracts, deliverables, and escrow</p>
           </div>
           <div className="flex gap-2 shrink-0">
             <Button
@@ -225,8 +491,40 @@ export function ContractsPage({ contracts: initialContracts, agents }: Contracts
           </div>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+        {/* View Mode Selector */}
+        {userAgentId && (
+          <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
+            <Button
+              variant={viewMode === 'all' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('all')}
+              className="shrink-0"
+            >
+              All My Contracts
+            </Button>
+            <Button
+              variant={viewMode === 'my-created' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('my-created')}
+              className="shrink-0"
+            >
+              <Send className="w-3 h-3 mr-1.5" />
+              Created by Me
+            </Button>
+            <Button
+              variant={viewMode === 'my-accepted' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('my-accepted')}
+              className="shrink-0"
+            >
+              <CheckCircle className="w-3 h-3 mr-1.5" />
+              Accepted by Me
+            </Button>
+          </div>
+        )}
+
+        {/* Stats and Escrow Widget */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5 sm:gap-4">
           <Card className="bg-muted/50">
             <CardContent className="p-3 sm:p-4">
               <p className="text-xl sm:text-2xl font-bold">{stats.total}</p>
@@ -251,7 +549,48 @@ export function ContractsPage({ contracts: initialContracts, agents }: Contracts
               <p className="text-xs sm:text-sm text-muted-foreground">Done</p>
             </CardContent>
           </Card>
+          <Card className="bg-orange-500/10 border-orange-500/20">
+            <CardContent className="p-3 sm:p-4">
+              <p className="text-xl sm:text-2xl font-bold text-orange-500">{stats.disputed}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">Disputed</p>
+            </CardContent>
+          </Card>
         </div>
+
+        {/* Escrow Widget */}
+        {userAgentId && (escrowStats.locked > 0 || escrowStats.pending > 0 || escrowStats.released > 0) && (
+          <Card className="mt-4 bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Wallet className="w-5 h-5 text-primary" />
+                <h3 className="font-semibold">Escrow Wallet</h3>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="flex items-center gap-2">
+                  <Lock className="w-4 h-4 text-yellow-500" />
+                  <div>
+                    <p className="text-lg font-bold">{escrowStats.locked.toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground">Locked</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-blue-500" />
+                  <div>
+                    <p className="text-lg font-bold">{escrowStats.pending.toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground">Pending</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Unlock className="w-4 h-4 text-green-500" />
+                  <div>
+                    <p className="text-lg font-bold">{escrowStats.released.toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground">Released</p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Content */}
@@ -262,8 +601,9 @@ export function ContractsPage({ contracts: initialContracts, agents }: Contracts
               <TabsTrigger value="all" onClick={() => setFilter('all')} className="touch-manipulation text-xs sm:text-sm">All</TabsTrigger>
               <TabsTrigger value="open" onClick={() => setFilter('open')} className="touch-manipulation text-xs sm:text-sm">Open</TabsTrigger>
               <TabsTrigger value="active" onClick={() => setFilter('active')} className="touch-manipulation text-xs sm:text-sm">Active</TabsTrigger>
-              <TabsTrigger value="in_progress" onClick={() => setFilter('in_progress')} className="touch-manipulation text-xs sm:text-sm whitespace-nowrap">In Progress</TabsTrigger>
+              <TabsTrigger value="delivered" onClick={() => setFilter('delivered')} className="touch-manipulation text-xs sm:text-sm">Delivered</TabsTrigger>
               <TabsTrigger value="completed" onClick={() => setFilter('completed')} className="touch-manipulation text-xs sm:text-sm">Completed</TabsTrigger>
+              <TabsTrigger value="disputed" onClick={() => setFilter('disputed')} className="touch-manipulation text-xs sm:text-sm text-orange-500">Disputed</TabsTrigger>
             </TabsList>
 
           <div className="space-y-3 sm:space-y-4">
@@ -360,23 +700,71 @@ export function ContractsPage({ contracts: initialContracts, agents }: Contracts
                     </div>
 
                     {/* Milestones */}
-                    {milestones.length > 0 && (
-                      <div className="pt-4 border-t space-y-2">
+                    <div className="pt-4 border-t space-y-3">
+                      <div className="flex items-center justify-between">
                         <p className="text-sm font-medium">Milestones</p>
-                        <div className="space-y-1">
+                        {contract.status !== 'completed' && contract.status !== 'cancelled' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 text-xs"
+                            onClick={() => setAddMilestoneContractId(contract.id)}
+                          >
+                            <PlusCircle className="w-3 h-3 mr-1" />
+                            Add
+                          </Button>
+                        )}
+                      </div>
+                      {milestones.length > 0 ? (
+                        <div className="space-y-3">
                           {milestones.map(milestone => (
-                            <div key={milestone.id} className="flex items-center gap-2 text-xs">
-                              {getMilestoneIcon(milestone.status)}
-                              <span className="flex-1">{milestone.title}</span>
-                              <div className="flex items-center gap-1">
-                                <Progress value={milestone.progress_percent || 0} className="h-1.5 w-12" />
-                                <span className="text-muted-foreground w-8 text-right">{milestone.progress_percent}%</span>
+                            <div key={milestone.id} className="space-y-2 p-2 rounded-lg bg-muted/30">
+                              <div className="flex items-center gap-2 text-xs">
+                                {getMilestoneIcon(milestone.status)}
+                                <span className="flex-1 font-medium">{milestone.title}</span>
+                                <span className={cn(
+                                  "font-semibold",
+                                  milestone.progress_percent === 100 ? "text-green-500" : "text-muted-foreground"
+                                )}>
+                                  {milestone.progress_percent}%
+                                </span>
                               </div>
+                              {contract.status !== 'completed' && contract.status !== 'cancelled' && (
+                                <div className="flex items-center gap-3">
+                                  <Slider
+                                    value={[milestone.progress_percent || 0]}
+                                    max={100}
+                                    step={10}
+                                    className="flex-1"
+                                    disabled={updatingMilestoneId === milestone.id}
+                                    onValueCommit={(value) => updateMilestoneProgress(milestone.id, contract.id, value[0])}
+                                  />
+                                  <div className="flex gap-1">
+                                    {[0, 50, 100].map(val => (
+                                      <Button
+                                        key={val}
+                                        variant="outline"
+                                        size="sm"
+                                        className={cn(
+                                          "h-6 w-10 text-[10px] p-0",
+                                          milestone.progress_percent === val && "bg-primary text-primary-foreground"
+                                        )}
+                                        disabled={updatingMilestoneId === milestone.id}
+                                        onClick={() => updateMilestoneProgress(milestone.id, contract.id, val)}
+                                      >
+                                        {val}%
+                                      </Button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>
-                      </div>
-                    )}
+                      ) : (
+                        <p className="text-xs text-muted-foreground">No milestones yet. Add milestones to track progress.</p>
+                      )}
+                    </div>
 
                     {/* Footer - Budget & Dates */}
                     <div className="pt-4 border-t flex items-center justify-between text-xs text-muted-foreground">
@@ -442,6 +830,48 @@ export function ContractsPage({ contracts: initialContracts, agents }: Contracts
         agents={agents}
         onSuccess={handleContractCreated}
       />
+
+      {/* Add Milestone Dialog */}
+      <Dialog open={!!addMilestoneContractId} onOpenChange={(open) => { if (!open) { setAddMilestoneContractId(null); setNewMilestoneTitle('') } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Milestone</DialogTitle>
+            <DialogDescription>Add a new milestone to track progress on this contract.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label htmlFor="milestone-title">Milestone Title</Label>
+              <Input
+                id="milestone-title"
+                placeholder="e.g., Complete design mockups"
+                value={newMilestoneTitle}
+                onChange={(e) => setNewMilestoneTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && addMilestoneContractId) {
+                    addMilestone(addMilestoneContractId)
+                  }
+                }}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => { setAddMilestoneContractId(null); setNewMilestoneTitle('') }}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => addMilestoneContractId && addMilestone(addMilestoneContractId)}
+                disabled={!newMilestoneTitle.trim() || isAddingMilestone}
+              >
+                {isAddingMilestone ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <PlusCircle className="w-4 h-4 mr-2" />
+                )}
+                Add Milestone
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

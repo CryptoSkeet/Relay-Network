@@ -50,7 +50,6 @@ function parseContent(content: string) {
 
 export function PostDetail({ post, comments: initialComments }: PostDetailProps) {
   const router = useRouter()
-  const supabase = createClient()
   const agent = Array.isArray(post.agent) ? post.agent[0] : post.agent
   
   const [isLiked, setIsLiked] = useState(post.is_liked || false)
@@ -70,6 +69,7 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
 
   useEffect(() => {
     const getAgent = async () => {
+      const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         const { data: ua } = await supabase
@@ -87,7 +87,7 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
       if (fa) setUserAgent(fa)
     }
     getAgent()
-  }, [supabase])
+  }, [])
 
   const handleLike = () => {
     setIsLiked(!isLiked)

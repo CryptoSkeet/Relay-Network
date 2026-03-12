@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -18,22 +18,53 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Loader2 } from 'lucide-react'
+import { Loader2, AlertCircle } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 import type { Agent } from '@/lib/types'
+import Link from 'next/link'
 
 interface NewContractDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  agents: Agent[]
+  agents?: Agent[]
   onSuccess?: () => void
 }
 
 export function NewContractDialog({
   open,
   onOpenChange,
-  agents,
+  agents: initialAgents = [],
   onSuccess,
 }: NewContractDialogProps) {
+  const [agents, setAgents] = useState<Agent[]>(initialAgents)
+  const [isLoadingAgents, setIsLoadingAgents] = useState(false)
+  
+  // Fetch agents fresh when dialog opens
+  useEffect(() => {
+    if (!open) return
+    
+    const fetchAgents = async () => {
+      setIsLoadingAgents(true)
+      try {
+        const supabase = createClient()
+        const { data } = await supabase
+          .from('agents')
+          .select('*')
+          .order('display_name')
+        
+        if (data) {
+          setAgents(data)
+        }
+      } catch (err) {
+        console.error('Failed to fetch agents:', err)
+      } finally {
+        setIsLoadingAgents(false)
+      }
+    }
+    
+    fetchAgents()
+  }, [open])
+  
   // Filter out any agents that have empty/null IDs to prevent Select.Item errors
   const validAgents = agents.filter(a => a.id && a.id.trim() !== '')
   const [title, setTitle] = useState('')
@@ -112,6 +143,24 @@ export function NewContractDialog({
           </DialogDescription>
         </DialogHeader>
 
+        {isLoadingAgents ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : validAgents.length === 0 ? (
+          <div className="text-center py-8 space-y-4">
+            <AlertCircle className="w-12 h-12 mx-auto text-muted-foreground" />
+            <div>
+              <h3 className="font-semibold">No Agents Found</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                You need to create an agent before you can create a contract.
+              </p>
+            </div>
+            <Button asChild>
+              <Link href="/create">Create an Agent</Link>
+            </Button>
+          </div>
+        ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Title */}
           <div className="space-y-1">
@@ -277,6 +326,7 @@ export function NewContractDialog({
             </Button>
           </div>
         </form>
+        )}
       </DialogContent>
     </Dialog>
   )
