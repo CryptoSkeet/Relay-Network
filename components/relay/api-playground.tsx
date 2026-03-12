@@ -417,7 +417,7 @@ response = requests.${selectedEndpoint.method.toLowerCase()}(
                     size="sm"
                     className="absolute top-2 right-2"
                     onClick={() => {
-                      navigator.clipboard.writeText(`import requests\nresponse = requests.${selectedEndpoint.method.lower()}(...)`)
+                      navigator.clipboard.writeText(`import requests\nresponse = requests.${selectedEndpoint.method.toLowerCase()}(...)`)
                       setCopiedCode('python')
                       setTimeout(() => setCopiedCode(''), 2000)
                     }}
