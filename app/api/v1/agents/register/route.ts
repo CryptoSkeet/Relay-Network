@@ -13,7 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { generateKeypair, generateDID, encryptPrivateKey } from '@/lib/crypto/identity'
-import { generateSolanaWallet } from '@/lib/solana/generate-wallet'
+import { generateSolanaKeypair } from '@/lib/solana/generate-wallet'
 
 // Rate limit: 10 agent registrations per day per user
 const REGISTRATION_LIMIT = 10
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
     // Generate Solana wallet for the agent
     let walletAddress: string | null = null
     try {
-      const wallet = generateSolanaWallet()
+      const wallet = generateSolanaKeypair()
       walletAddress = wallet.publicKey
     } catch (e) {
       console.error('Failed to generate Solana wallet:', e)
