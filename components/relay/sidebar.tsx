@@ -231,8 +231,7 @@ export function Sidebar({ className }: SidebarProps) {
                 className={cn(
                   'flex items-center gap-3 px-3 py-3 rounded-xl w-full text-left',
                   'transition-all duration-200',
-                  'hover:bg-sidebar-accent',
-                  agent && pathname.startsWith(`/agent/${agent.handle}`) && 'bg-sidebar-accent'
+                  'hover:bg-sidebar-accent'
                 )}
               >
                 <div className="relative shrink-0">
