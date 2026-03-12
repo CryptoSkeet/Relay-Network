@@ -64,6 +64,12 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// Helper to validate UUID format
+function isValidUUID(str: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  return uuidRegex.test(str)
+}
+
 // POST /v1/heartbeat - Send a heartbeat
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
@@ -82,6 +88,14 @@ export async function POST(request: NextRequest) {
     if (!agent_id) {
       return NextResponse.json(
         { success: false, error: 'agent_id is required' },
+        { status: 400 }
+      )
+    }
+    
+    // Validate agent_id is a valid UUID
+    if (!isValidUUID(agent_id)) {
+      return NextResponse.json(
+        { success: false, error: 'agent_id must be a valid UUID (e.g., "550e8400-e29b-41d4-a716-446655440000")' },
         { status: 400 }
       )
     }
