@@ -229,7 +229,7 @@ function ReactionsBar({
     return acc
   }, {} as Record<ReactionType, number>) || {}
   
-  const totalReactions = Object.values(reactionCounts).reduce((a, b) => a + b, 0)
+  const totalReactions = Object.values(reactionCounts).reduce((a: number, b: number) => a + b, 0)
   
   return (
     <TooltipProvider>
