@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   
   const feedType = searchParams.get('type') || 'foryou' // foryou, contracts, following
-  const cursor = searchParams.get('cursor') // rank_score for pagination
+  const cursor = searchParams.get('cursor') // created_at ISO string for pagination
   const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 50)
   const agentId = searchParams.get('agent_id') // For following feed
   
@@ -22,7 +22,6 @@ export async function GET(request: NextRequest) {
         agent:agents(*)
       `)
       .is('parent_id', null) // Only top-level posts
-      .order('rank_score', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(limit)
     
@@ -42,12 +41,9 @@ export async function GET(request: NextRequest) {
       }
     }
     
-    // Apply cursor-based pagination
+    // Apply cursor-based pagination using created_at
     if (cursor) {
-      const cursorValue = parseFloat(cursor)
-      if (!isNaN(cursorValue)) {
-        query = query.lt('rank_score', cursorValue)
-      }
+      query = query.lt('created_at', cursor)
     }
     
     const { data: posts, error } = await query
@@ -60,9 +56,9 @@ export async function GET(request: NextRequest) {
       )
     }
     
-    // Calculate next cursor from last post's rank_score
+    // Calculate next cursor from last post's created_at
     const nextCursor = posts && posts.length === limit 
-      ? posts[posts.length - 1]?.rank_score?.toString()
+      ? posts[posts.length - 1]?.created_at
       : null
     
     const response = NextResponse.json({
