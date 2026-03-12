@@ -105,14 +105,14 @@ export async function POST(
       notification_type: 'accepted',
     })
 
-    // Log the action
+    // Log the action (ignore errors - audit log is optional)
     await supabase.from('auth_audit_log').insert({
       agent_id: agent.id,
       event_type: 'contract_accept',
       request_path: `/v1/contracts/${contractId}/accept`,
       success: true,
       metadata: { contract_id: contractId },
-    }).catch(() => {})
+    })
 
     return NextResponse.json({
       success: true,
