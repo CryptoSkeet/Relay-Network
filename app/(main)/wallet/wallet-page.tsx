@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { 
   Wallet as WalletIcon, ArrowUpRight, ArrowDownLeft, TrendingUp, Lock, Coins, 
@@ -120,6 +120,12 @@ export function WalletPage({
   const [isStaking, setIsStaking] = useState(false)
   const [isPurchasing, setIsPurchasing] = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
+  const [isClient, setIsClient] = useState(false)
+
+  // Ensure consistent rendering between server and client
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
 
   // Calculate totals from the new schema
   const totalAvailable = wallets.reduce((sum, w) => sum + Number(w.available_balance || w.balance || 0), 0)
@@ -195,8 +201,13 @@ export function WalletPage({
     }
   }
 
-  // Generate chart data from transactions
+  // Generate chart data from transactions - only on client to avoid hydration mismatch
   const chartData = useMemo(() => {
+    if (!isClient) {
+      // Return empty array during SSR to avoid date-based hydration mismatches
+      return []
+    }
+    
     const last30Days = Array.from({ length: 30 }, (_, i) => {
       const date = new Date()
       date.setDate(date.getDate() - (29 - i))
@@ -221,7 +232,7 @@ export function WalletPage({
     })
 
     return last30Days
-  }, [transactions])
+  }, [transactions, isClient])
 
   return (
     <div className="flex-1 max-w-6xl mx-auto">
@@ -332,30 +343,37 @@ export function WalletPage({
               </CardHeader>
               <CardContent>
                 <div className="h-48 flex items-end gap-1">
-                  {chartData.map((day, i) => {
-                    const maxValue = Math.max(...chartData.map(d => Math.max(d.earned, d.spent)), 1)
-                    const earnedHeight = (day.earned / maxValue) * 100
-                    const spentHeight = (day.spent / maxValue) * 100
-                    return (
-                      <div key={day.date} className="flex-1 flex flex-col items-center gap-1" title={day.date}>
-                        <div className="w-full flex gap-0.5 items-end h-40">
-                          <div 
-                            className="flex-1 bg-green-500/80 rounded-t transition-all"
-                            style={{ height: `${earnedHeight}%`, minHeight: day.earned > 0 ? '2px' : '0' }}
-                          />
-                          <div 
-                            className="flex-1 bg-red-500/60 rounded-t transition-all"
-                            style={{ height: `${spentHeight}%`, minHeight: day.spent > 0 ? '2px' : '0' }}
-                          />
+                  {chartData.length === 0 ? (
+                    <div className="flex-1 flex items-center justify-center text-muted-foreground">
+                      Loading chart...
+                    </div>
+                  ) : (
+                    chartData.map((day, i) => {
+                      const maxValue = Math.max(...chartData.map(d => Math.max(d.earned, d.spent)), 1)
+                      const earnedHeight = (day.earned / maxValue) * 100
+                      const spentHeight = (day.spent / maxValue) * 100
+                      const dayNum = parseInt(day.date.split('-')[2], 10)
+                      return (
+                        <div key={day.date} className="flex-1 flex flex-col items-center gap-1" title={day.date}>
+                          <div className="w-full flex gap-0.5 items-end h-40">
+                            <div 
+                              className="flex-1 bg-green-500/80 rounded-t transition-all"
+                              style={{ height: `${earnedHeight}%`, minHeight: day.earned > 0 ? '2px' : '0' }}
+                            />
+                            <div 
+                              className="flex-1 bg-red-500/60 rounded-t transition-all"
+                              style={{ height: `${spentHeight}%`, minHeight: day.spent > 0 ? '2px' : '0' }}
+                            />
+                          </div>
+                          {i % 5 === 0 && (
+                            <span className="text-[10px] text-muted-foreground">
+                              {dayNum}
+                            </span>
+                          )}
                         </div>
-                        {i % 5 === 0 && (
-                          <span className="text-[10px] text-muted-foreground">
-                            {new Date(day.date).getDate()}
-                          </span>
-                        )}
-                      </div>
-                    )
-                  })}
+                      )
+                    })
+                  )}
                 </div>
                 <div className="flex justify-center gap-6 mt-4">
                   <div className="flex items-center gap-2">
