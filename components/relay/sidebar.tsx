@@ -92,7 +92,15 @@ export function Sidebar({ className }: SidebarProps) {
       if (data) setAgent(data)
     }
     loadAgent()
-  }, [])
+  }, [pathname])
+
+  function handleProfileClick() {
+    if (agent?.handle) {
+      router.push(`/agent/${agent.handle}`)
+    } else {
+      router.push('/create')
+    }
+  }
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -217,58 +225,53 @@ export function Sidebar({ className }: SidebarProps) {
         <div className="p-2 xl:p-3 border-t border-sidebar-border mt-auto">
           <Tooltip>
             <TooltipTrigger asChild>
-              {agent ? (
-                <Link
-                  href={`/agent/${agent.handle}`}
-                  className={cn(
-                    'flex items-center gap-3 px-3 py-3 rounded-xl w-full',
-                    'transition-all duration-200',
-                    'hover:bg-sidebar-accent',
-                    pathname.startsWith(`/agent/${agent.handle}`) && 'bg-sidebar-accent'
-                  )}
-                >
-                  <div className="relative shrink-0">
-                    <AgentAvatar
-                      src={agent.avatar_url ?? null}
-                      name={agent.display_name}
-                      size="sm"
-                    />
-                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-sidebar animate-pulse" />
-                  </div>
-                  <div className="hidden xl:block flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <p className="text-sm font-semibold truncate">{agent.display_name}</p>
-                      <span className="shrink-0 text-[10px] font-medium text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded-full">
-                        Active
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground truncate">@{agent.handle}</p>
-                  </div>
-                </Link>
-              ) : (
-                <Link
-                  href="/profile"
-                  className={cn(
-                    'flex items-center gap-3 px-3 py-3 rounded-xl w-full',
-                    'transition-all duration-200',
-                    'hover:bg-sidebar-accent',
-                    pathname === '/profile' && 'bg-sidebar-accent'
-                  )}
-                >
-                  <div className="relative shrink-0">
+              <button
+                onClick={handleProfileClick}
+                className={cn(
+                  'flex items-center gap-3 px-3 py-3 rounded-xl w-full text-left',
+                  'transition-all duration-200',
+                  'hover:bg-sidebar-accent',
+                  agent && pathname.startsWith(`/agent/${agent.handle}`) && 'bg-sidebar-accent'
+                )}
+              >
+                <div className="relative shrink-0">
+                  {agent ? (
+                    <>
+                      <AgentAvatar
+                        src={agent.avatar_url ?? null}
+                        name={agent.display_name}
+                        size="sm"
+                      />
+                      <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-sidebar animate-pulse" />
+                    </>
+                  ) : (
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center ring-2 ring-background overflow-hidden">
                       <User className="w-4 h-4 text-primary" />
                     </div>
-                  </div>
-                  <div className="hidden xl:block flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate">Profile</p>
-                    <p className="text-xs text-muted-foreground truncate">View your profile</p>
-                  </div>
-                </Link>
-              )}
+                  )}
+                </div>
+                <div className="hidden xl:block flex-1 min-w-0">
+                  {agent ? (
+                    <>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm font-semibold truncate">{agent.display_name}</p>
+                        <span className="shrink-0 text-[10px] font-medium text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded-full">
+                          Active
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">@{agent.handle}</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm font-semibold truncate">Profile</p>
+                      <p className="text-xs text-muted-foreground truncate">Create your agent</p>
+                    </>
+                  )}
+                </div>
+              </button>
             </TooltipTrigger>
             <TooltipContent side="right" sideOffset={10}>
-              <p>{agent ? `@${agent.handle} — View Profile` : 'Profile'}</p>
+              <p>{agent ? `@${agent.handle} — View Profile` : 'Create your agent'}</p>
             </TooltipContent>
           </Tooltip>
         </div>
