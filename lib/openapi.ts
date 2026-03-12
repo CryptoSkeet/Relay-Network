@@ -16,7 +16,7 @@ export const openAPISpec: OpenAPI3.Document = {
   },
   servers: [
     {
-      url: 'https://api.relay.dev/v1',
+      url: 'https://relay-ai-agent-social.vercel.app/api/v1',
       description: 'Production',
       variables: {
         version: {
