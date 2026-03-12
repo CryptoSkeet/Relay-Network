@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
-import { Home, Search, PlusSquare, Bell, LogOut } from 'lucide-react'
+import { Home, Search, PlusSquare, Bell, User } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { AgentAvatar } from '@/components/relay/agent-avatar'
 import type { Agent } from '@/lib/types'
@@ -49,6 +49,14 @@ export function MobileNav() {
     }
   }
 
+  const handleProfileClick = () => {
+    if (agent?.handle) {
+      router.push(`/agent/${agent.handle}`)
+    } else {
+      router.push('/profile')
+    }
+  }
+
   return (
     <nav
       className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-xl border-t border-border"
@@ -87,34 +95,32 @@ export function MobileNav() {
           )
         })}
 
-        {/* Your Agent tab */}
-        <Link
-          href={agent ? `/agent/${agent.handle}` : '/profile'}
+        {/* Your Agent tab - Profile */}
+        <button
+          onClick={handleProfileClick}
           className={cn(
             'relative flex flex-col items-center justify-center gap-0.5',
             'flex-1 h-full py-2',
             'transition-colors duration-150 active:scale-95 select-none',
-            pathname.startsWith('/agent/') ? 'text-primary' : 'text-muted-foreground'
+            pathname.startsWith('/agent/') || pathname === '/profile' ? 'text-primary' : 'text-muted-foreground'
           )}
           style={{ touchAction: 'manipulation', WebkitUserSelect: 'none', userSelect: 'none' }}
         >
           <div className="relative">
             <AgentAvatar
               src={agent?.avatar_url ?? null}
-              name={agent?.display_name ?? 'Agent'}
+              name={agent?.display_name ?? 'Profile'}
               size="xs"
             />
             {agent && (
               <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 ring-1 ring-background" />
             )}
           </div>
-          <span className="text-[10px] font-medium leading-none mt-0.5">
-            {agent ? 'My Agent' : 'Agent'}
-          </span>
-          {pathname.startsWith('/agent/') && (
+          <span className="text-[10px] font-medium leading-none mt-0.5">Profile</span>
+          {(pathname.startsWith('/agent/') || pathname === '/profile') && (
             <span className="absolute bottom-0 w-8 h-0.5 rounded-full bg-primary" />
           )}
-        </Link>
+        </button>
 
         {/* Logout button */}
         <button
@@ -123,12 +129,12 @@ export function MobileNav() {
             'relative flex flex-col items-center justify-center gap-0.5',
             'flex-1 h-full py-2',
             'transition-colors duration-150 active:scale-95 select-none',
-            'text-muted-foreground hover:text-red-400'
+            'text-muted-foreground hover:text-destructive'
           )}
           style={{ touchAction: 'manipulation', WebkitUserSelect: 'none', userSelect: 'none' }}
         >
-          <LogOut className="w-6 h-6" strokeWidth={1.8} />
-          <span className="text-[10px] font-medium leading-none mt-0.5">Log Out</span>
+          <User className="w-6 h-6" strokeWidth={1.8} />
+          <span className="text-[10px] font-medium leading-none mt-0.5">Logout</span>
         </button>
       </div>
     </nav>
