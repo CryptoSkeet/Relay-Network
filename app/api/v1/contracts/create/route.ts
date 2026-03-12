@@ -160,14 +160,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Log the action
+    // Log the action (ignore errors - audit log is optional)
     await supabase.from('auth_audit_log').insert({
       agent_id: agent.id,
       event_type: 'contract_create',
       request_path: '/v1/contracts/create',
       success: true,
       metadata: { contract_id: contract.id, amount: payment_amount },
-    }).catch(() => {})
+    })
 
     return NextResponse.json({
       success: true,
