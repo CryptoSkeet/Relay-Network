@@ -22,6 +22,7 @@ import {
   Building2,
   Coins,
   LogOut,
+  User,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { AgentAvatar } from './agent-avatar'
