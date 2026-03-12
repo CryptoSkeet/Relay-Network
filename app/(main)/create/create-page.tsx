@@ -67,6 +67,13 @@ export function CreatePage({ userAgents = [] }: { userAgents?: Agent[] }) {
   const [selectedAgentId, setSelectedAgentId] = useState<string>(userAgents[0]?.id || '')
   const [isUploading, setIsUploading] = useState(false)
   
+  // Contract state
+  const [contractTitle, setContractTitle] = useState('')
+  const [contractDescription, setContractDescription] = useState('')
+  const [contractBudget, setContractBudget] = useState('')
+  const [contractDeadline, setContractDeadline] = useState('')
+  const [contractProviderId, setContractProviderId] = useState('')
+
   // Agent state
   const [agentHandle, setAgentHandle] = useState('')
   const [agentName, setAgentName] = useState('')
@@ -248,6 +255,63 @@ export function CreatePage({ userAgents = [] }: { userAgents?: Agent[] }) {
       }, 1500)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create post')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleCreateContract = async () => {
+    if (!contractTitle.trim()) {
+      setError('Contract title is required')
+      return
+    }
+    if (!contractBudget || parseFloat(contractBudget) <= 0) {
+      setError('A valid budget is required')
+      return
+    }
+    if (userAgents.length === 0) {
+      setError('You need an agent to post a job')
+      return
+    }
+
+    setIsSubmitting(true)
+    setError(null)
+
+    try {
+      // Find a provider: use a different agent if available, else the same agent
+      const clientAgent = userAgents.find(a => a.id === selectedAgentId) || userAgents[0]
+      const providerId = contractProviderId || clientAgent.id
+
+      const response = await fetch('/api/contracts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider_id: providerId,
+          title: contractTitle.trim(),
+          description: contractDescription.trim() || null,
+          budget: parseFloat(contractBudget),
+          timeline_days: contractDeadline
+            ? Math.max(1, Math.ceil((new Date(contractDeadline).getTime() - Date.now()) / 86400000))
+            : 30,
+          requirements: [],
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to post job')
+      }
+
+      setSuccess('Job posted successfully!')
+      setContractTitle('')
+      setContractDescription('')
+      setContractBudget('')
+      setContractDeadline('')
+      setContractProviderId('')
+      setTimeout(() => router.push('/contracts'), 1500)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to post job')
     } finally {
       setIsSubmitting(false)
     }
@@ -552,38 +616,108 @@ export function CreatePage({ userAgents = [] }: { userAgents?: Agent[] }) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Briefcase className="w-5 h-5 text-purple-500" />
-          Create Contract
+          Post a Job
         </CardTitle>
-        <CardDescription>Post a job or service request</CardDescription>
+        <CardDescription>Post a job or service request for agents to fulfil</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="title">Contract Title</Label>
-          <Input id="title" placeholder="What do you need done?" />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="description">Description</Label>
-          <Textarea id="description" placeholder="Describe the project in detail..." className="min-h-[100px]" />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="budget">Budget (RELAY)</Label>
-            <Input id="budget" type="number" placeholder="1000" />
+        {userAgents.length === 0 ? (
+          <div className="text-center py-8">
+            <Briefcase className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+            <p className="text-muted-foreground mb-4">You need an agent before posting a job</p>
+            <Button onClick={() => setSelectedType('agent')}>Create Agent First</Button>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="deadline">Deadline</Label>
-            <Input id="deadline" type="date" />
-          </div>
-        </div>
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={() => setSelectedType(null)}>
-            Cancel
-          </Button>
-          <Button>
-            <Briefcase className="w-4 h-4 mr-2" />
-            Post Contract
-          </Button>
-        </div>
+        ) : (
+          <>
+            {/* Posting agent */}
+            <div className="space-y-2">
+              <Label>Posting as</Label>
+              <select
+                value={selectedAgentId}
+                onChange={(e) => setSelectedAgentId(e.target.value)}
+                className="w-full h-10 px-3 rounded-md border bg-background"
+              >
+                {userAgents.map(agent => (
+                  <option key={agent.id} value={agent.id}>
+                    @{agent.handle} — {agent.display_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="contract-title">Job Title *</Label>
+              <Input
+                id="contract-title"
+                placeholder="e.g. Build a trading bot for Solana"
+                value={contractTitle}
+                onChange={(e) => setContractTitle(e.target.value)}
+                maxLength={100}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="contract-desc">Description</Label>
+              <Textarea
+                id="contract-desc"
+                placeholder="Describe the job in detail — requirements, deliverables, expectations..."
+                className="min-h-[120px]"
+                value={contractDescription}
+                onChange={(e) => setContractDescription(e.target.value)}
+                maxLength={2000}
+              />
+              <p className="text-xs text-muted-foreground">{contractDescription.length}/2000</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="contract-budget">Budget (RELAY) *</Label>
+                <Input
+                  id="contract-budget"
+                  type="number"
+                  placeholder="1000"
+                  min="1"
+                  value={contractBudget}
+                  onChange={(e) => setContractBudget(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="contract-deadline">Deadline</Label>
+                <Input
+                  id="contract-deadline"
+                  type="date"
+                  value={contractDeadline}
+                  min={new Date().toISOString().split('T')[0]}
+                  onChange={(e) => setContractDeadline(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => {
+                setSelectedType(null)
+                setContractTitle('')
+                setContractDescription('')
+                setContractBudget('')
+                setContractDeadline('')
+                setError(null)
+              }}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCreateContract}
+                disabled={isSubmitting || !contractTitle.trim() || !contractBudget}
+              >
+                {isSubmitting ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Briefcase className="w-4 h-4 mr-2" />
+                )}
+                Post Job
+              </Button>
+            </div>
+          </>
+        )}
       </CardContent>
     </Card>
   )

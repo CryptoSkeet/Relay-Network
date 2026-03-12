@@ -1,13 +1,18 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Search, Filter, Star, Clock, DollarSign, ArrowRight, Briefcase, Sparkles } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Search, Filter, Star, Clock, DollarSign, ArrowRight, Briefcase, Sparkles, Loader2, X, Check } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { AgentAvatar } from '@/components/relay/agent-avatar'
+import { createClient } from '@/lib/supabase/client'
 import type { Agent } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -36,8 +41,83 @@ interface MarketplacePageProps {
 }
 
 export function MarketplacePage({ agents, services, categories }: MarketplacePageProps) {
+  const router = useRouter()
   const [query, setQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
+
+  // Post a Job dialog state
+  const [jobDialogOpen, setJobDialogOpen] = useState(false)
+  const [jobTitle, setJobTitle] = useState('')
+  const [jobDescription, setJobDescription] = useState('')
+  const [jobBudget, setJobBudget] = useState('')
+  const [jobDeadline, setJobDeadline] = useState('')
+  const [jobSubmitting, setJobSubmitting] = useState(false)
+  const [jobError, setJobError] = useState<string | null>(null)
+  const [jobSuccess, setJobSuccess] = useState(false)
+  const [userAgents, setUserAgents] = useState<Agent[]>([])
+  const [selectedAgentId, setSelectedAgentId] = useState('')
+
+  useEffect(() => {
+    const fetchUserAgents = async () => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data } = await supabase
+        .from('agents')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+      if (data && data.length > 0) {
+        setUserAgents(data)
+        setSelectedAgentId(data[0].id)
+      }
+    }
+    fetchUserAgents()
+  }, [])
+
+  const handlePostJob = async () => {
+    if (!jobTitle.trim()) { setJobError('Job title is required'); return }
+    if (!jobBudget || parseFloat(jobBudget) <= 0) { setJobError('A valid budget is required'); return }
+    if (!selectedAgentId) { setJobError('You need an agent to post a job. Create one first.'); return }
+
+    setJobSubmitting(true)
+    setJobError(null)
+
+    try {
+      const response = await fetch('/api/contracts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider_id: selectedAgentId,
+          title: jobTitle.trim(),
+          description: jobDescription.trim() || null,
+          budget: parseFloat(jobBudget),
+          timeline_days: jobDeadline
+            ? Math.max(1, Math.ceil((new Date(jobDeadline).getTime() - Date.now()) / 86400000))
+            : 30,
+          requirements: [],
+        }),
+      })
+
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Failed to post job')
+
+      setJobSuccess(true)
+      setTimeout(() => {
+        setJobDialogOpen(false)
+        setJobTitle('')
+        setJobDescription('')
+        setJobBudget('')
+        setJobDeadline('')
+        setJobSuccess(false)
+        router.push('/contracts')
+      }, 1500)
+    } catch (err) {
+      setJobError(err instanceof Error ? err.message : 'Failed to post job')
+    } finally {
+      setJobSubmitting(false)
+    }
+  }
   
   const filteredServices = services.filter(service => {
     const matchesQuery = !query || 
@@ -69,7 +149,7 @@ export function MarketplacePage({ agents, services, categories }: MarketplacePag
               </h1>
               <p className="text-muted-foreground">Hire AI agents for any task</p>
             </div>
-            <Button className="gap-2">
+            <Button className="gap-2" onClick={() => { setJobDialogOpen(true); setJobError(null); setJobSuccess(false) }}>
               <Sparkles className="w-4 h-4" />
               Post a Job
             </Button>
@@ -223,6 +303,130 @@ export function MarketplacePage({ agents, services, categories }: MarketplacePag
           </main>
         </div>
       </div>
+
+      {/* Post a Job Dialog */}
+      <Dialog open={jobDialogOpen} onOpenChange={(open) => { setJobDialogOpen(open); if (!open) { setJobError(null); setJobSuccess(false) } }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Briefcase className="w-5 h-5 text-primary" />
+              Post a Job
+            </DialogTitle>
+            <DialogDescription>
+              Describe the work you need done. Agents will be able to pick it up.
+            </DialogDescription>
+          </DialogHeader>
+
+          {jobSuccess ? (
+            <div className="flex flex-col items-center gap-3 py-6">
+              <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center">
+                <Check className="w-6 h-6 text-green-500" />
+              </div>
+              <p className="font-semibold">Job posted successfully!</p>
+              <p className="text-sm text-muted-foreground">Redirecting to contracts...</p>
+            </div>
+          ) : (
+            <div className="space-y-4 pt-2">
+              {jobError && (
+                <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+                  {jobError}
+                </div>
+              )}
+
+              {userAgents.length === 0 ? (
+                <div className="text-center py-6">
+                  <p className="text-muted-foreground mb-4">You need an agent to post a job.</p>
+                  <Button asChild>
+                    <Link href="/create">Create an Agent</Link>
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <Label>Posting as</Label>
+                    <select
+                      value={selectedAgentId}
+                      onChange={(e) => setSelectedAgentId(e.target.value)}
+                      className="w-full h-10 px-3 rounded-md border bg-background text-sm"
+                    >
+                      {userAgents.map(agent => (
+                        <option key={agent.id} value={agent.id}>
+                          @{agent.handle} — {agent.display_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="job-title">Job Title *</Label>
+                    <Input
+                      id="job-title"
+                      placeholder="e.g. Build a Solana trading bot"
+                      value={jobTitle}
+                      onChange={(e) => setJobTitle(e.target.value)}
+                      maxLength={100}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="job-desc">Description</Label>
+                    <Textarea
+                      id="job-desc"
+                      placeholder="Describe the job — requirements, deliverables, expectations..."
+                      className="min-h-[100px] resize-none"
+                      value={jobDescription}
+                      onChange={(e) => setJobDescription(e.target.value)}
+                      maxLength={2000}
+                    />
+                    <p className="text-xs text-muted-foreground">{jobDescription.length}/2000</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="job-budget">Budget (RELAY) *</Label>
+                      <Input
+                        id="job-budget"
+                        type="number"
+                        placeholder="1000"
+                        min="1"
+                        value={jobBudget}
+                        onChange={(e) => setJobBudget(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="job-deadline">Deadline</Label>
+                      <Input
+                        id="job-deadline"
+                        type="date"
+                        value={jobDeadline}
+                        min={new Date().toISOString().split('T')[0]}
+                        onChange={(e) => setJobDeadline(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button variant="outline" onClick={() => setJobDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handlePostJob}
+                      disabled={jobSubmitting || !jobTitle.trim() || !jobBudget}
+                    >
+                      {jobSubmitting ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Briefcase className="w-4 h-4 mr-2" />
+                      )}
+                      Post Job
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
