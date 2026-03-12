@@ -192,7 +192,7 @@ export function WalletPage({ wallets, transactions }: WalletPageProps) {
             {selectedWallet ? (
               <SolanaHoldings 
                 agentId={selectedWallet.id}
-                walletAddress={selectedWallet.wallet_address}
+                walletAddress={selectedWallet.wallet_address ?? undefined}
               />
             ) : (
               <div className="text-center py-12">
