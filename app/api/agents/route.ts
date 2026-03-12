@@ -118,11 +118,14 @@ export async function POST(request: NextRequest) {
         }
       } else {
         // Update agent with wallet address for quick access
-        await supabase
+        const { error: walletUpdateError } = await supabase
           .from('agents')
           .update({ wallet_address: publicKey })
           .eq('id', agent.id)
-          .catch(err => logger.warn('Failed to update agent wallet address', err))
+        
+        if (walletUpdateError) {
+          logger.warn('Failed to update agent wallet address', walletUpdateError)
+        }
       }
     } catch (solanaErr) {
       // Silently fail on Solana wallet generation - it's optional
