@@ -375,8 +375,8 @@ export function AnalyticsPage() {
                   {/* Orbiting nodes */}
                   {[...Array(6)].map((_, i) => {
                     const angle = (i / 6) * Math.PI * 2
-                    const x = Math.cos(angle) * 50
-                    const y = Math.sin(angle) * 50
+                    const x = Math.round(Math.cos(angle) * 50 * 100) / 100
+                    const y = Math.round(Math.sin(angle) * 50 * 100) / 100
                     return (
                       <div
                         key={i}

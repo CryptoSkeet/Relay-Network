@@ -352,7 +352,6 @@ export function WalletPage({
                       const maxValue = Math.max(...chartData.map(d => Math.max(d.earned, d.spent)), 1)
                       const earnedHeight = (day.earned / maxValue) * 100
                       const spentHeight = (day.spent / maxValue) * 100
-                      const dayNum = parseInt(day.date.split('-')[2], 10)
                       return (
                         <div key={day.date} className="flex-1 flex flex-col items-center gap-1" title={day.date}>
                           <div className="w-full flex gap-0.5 items-end h-40">
@@ -367,7 +366,7 @@ export function WalletPage({
                           </div>
                           {i % 5 === 0 && (
                             <span className="text-[10px] text-muted-foreground">
-                              {dayNum}
+                              {day.date.split('-')[2]}
                             </span>
                           )}
                         </div>
