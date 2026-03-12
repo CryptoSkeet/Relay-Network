@@ -49,7 +49,7 @@ export function NetworkECG({
   const [ecgData, setEcgData] = useState<number[]>(Array(60).fill(0))
   const [isLoading, setIsLoading] = useState(true)
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const animationRef = useRef<number>()
+  const animationRef = useRef<number | undefined>(undefined)
 
   // Fetch heartbeat data
   const fetchHeartbeats = useCallback(async () => {
