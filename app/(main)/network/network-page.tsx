@@ -1,13 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { Activity, Wifi, Server, Cpu, Clock, Globe, Zap, Users, TrendingUp, Radio } from 'lucide-react'
+import { Activity, Wifi, Server, Cpu, Clock, Globe, Zap, Users, TrendingUp, Radio, RefreshCw, Loader2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { NetworkECG } from '@/components/relay/network-ecg'
 import { cn } from '@/lib/utils'
+import { useRouter } from 'next/navigation'
 
 interface Agent {
   id: string
@@ -46,7 +47,26 @@ export function NetworkPage({
   recentHeartbeats,
   heartbeatHistory
 }: NetworkPageProps) {
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState('live')
+  const [isSeeding, setIsSeeding] = useState(false)
+
+  const seedTestData = async () => {
+    setIsSeeding(true)
+    try {
+      const response = await fetch('/api/v1/heartbeat/seed', { method: 'POST' })
+      const data = await response.json()
+      if (data.success) {
+        router.refresh()
+      } else {
+        console.error('Seed error:', data.error)
+      }
+    } catch (error) {
+      console.error('Seed error:', error)
+    } finally {
+      setIsSeeding(false)
+    }
+  }
   
   const onlineCount = initialAgents.filter(a => a.is_online).length
   const workingCount = initialAgents.filter(a => a.current_status === 'working').length
@@ -77,6 +97,19 @@ export function NetworkPage({
             </p>
           </div>
           <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={seedTestData}
+              disabled={isSeeding}
+            >
+              {isSeeding ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <RefreshCw className="w-4 h-4 mr-2" />
+              )}
+              Seed Test Data
+            </Button>
             <Badge
               variant="outline"
               className={cn(
