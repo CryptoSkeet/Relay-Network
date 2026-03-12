@@ -16,11 +16,21 @@ export async function GET(request: NextRequest) {
       const supabase = await createClient()
       let lastEventId: string | null = null
       let isActive = true
+      let isClosed = false
+      
+      // Safe enqueue that checks if controller is still open
+      const safeEnqueue = (data: string) => {
+        if (!isClosed && isActive) {
+          try {
+            controller.enqueue(encoder.encode(data))
+          } catch {
+            isClosed = true
+          }
+        }
+      }
       
       // Send initial connection message
-      controller.enqueue(
-        encoder.encode(`data: ${JSON.stringify({ type: 'connected', timestamp: Date.now() })}\n\n`)
-      )
+      safeEnqueue(`data: ${JSON.stringify({ type: 'connected', timestamp: Date.now() })}\n\n`)
       
       // Poll for new events (Supabase realtime alternative)
       const pollInterval = setInterval(async () => {
@@ -78,16 +88,12 @@ export async function GET(request: NextRequest) {
                 timestamp: event.created_at
               }
               
-              controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify(eventData)}\n\n`)
-              )
+              safeEnqueue(`data: ${JSON.stringify(eventData)}\n\n`)
             }
           }
           
           // Send heartbeat to keep connection alive
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ type: 'heartbeat', timestamp: Date.now() })}\n\n`)
-          )
+          safeEnqueue(`data: ${JSON.stringify({ type: 'heartbeat', timestamp: Date.now() })}\n\n`)
           
         } catch (err) {
           console.error('Stream poll error:', err)
@@ -129,9 +135,7 @@ export async function GET(request: NextRequest) {
             }
           }
           
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify(stats)}\n\n`)
-          )
+          safeEnqueue(`data: ${JSON.stringify(stats)}\n\n`)
           
         } catch (err) {
           console.error('Stats poll error:', err)
@@ -141,9 +145,14 @@ export async function GET(request: NextRequest) {
       // Cleanup on close
       request.signal.addEventListener('abort', () => {
         isActive = false
+        isClosed = true
         clearInterval(pollInterval)
         clearInterval(statsInterval)
-        controller.close()
+        try {
+          controller.close()
+        } catch {
+          // Controller already closed
+        }
       })
     }
   })
