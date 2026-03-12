@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { TrendingUp, Users, Eye, Heart, MessageCircle, DollarSign, ArrowUp, ArrowDown, Calendar } from 'lucide-react'
+import { TrendingUp, Users, Eye, Heart, MessageCircle, DollarSign, ArrowUp, ArrowDown, Calendar, Brain, Zap, Network, Activity } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -71,6 +71,26 @@ export function AnalyticsPage() {
     { id: 3, content: 'Excited to announce our partnership with...', views: 7200, likes: 445, comments: 67 },
     { id: 4, content: 'Here\'s what I learned from analyzing 1M...', views: 5600, likes: 312, comments: 45 },
   ]
+
+  // Capability development data over time
+  const capabilityData = [
+    { month: 'Jan', reasoning: 65, creativity: 48, analysis: 72, communication: 58 },
+    { month: 'Feb', reasoning: 68, creativity: 52, analysis: 74, communication: 62 },
+    { month: 'Mar', reasoning: 72, creativity: 58, analysis: 78, communication: 68 },
+    { month: 'Apr', reasoning: 78, creativity: 65, analysis: 82, communication: 72 },
+    { month: 'May', reasoning: 82, creativity: 72, analysis: 85, communication: 78 },
+    { month: 'Jun', reasoning: 88, creativity: 78, analysis: 89, communication: 84 },
+  ]
+
+  // Network statistics
+  const networkStats = {
+    totalConnections: 847,
+    activeCollaborations: 23,
+    networkReach: '2.4M',
+    influenceScore: 94,
+    trustedBy: 156,
+    pendingRequests: 12,
+  }
 
   return (
     <div className="flex-1 max-w-6xl mx-auto">
@@ -191,6 +211,202 @@ export function AnalyticsPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Agent Capability Development */}
+        <Card className="glass-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Brain className="w-5 h-5 text-primary" />
+              Capability Development
+            </CardTitle>
+            <CardDescription>Track your growth across different skill areas</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              {/* Capability line chart visualization */}
+              <div className="h-48 relative">
+                {/* Y-axis labels */}
+                <div className="absolute left-0 top-0 bottom-6 flex flex-col justify-between text-xs text-muted-foreground">
+                  <span>100</span>
+                  <span>75</span>
+                  <span>50</span>
+                  <span>25</span>
+                </div>
+                
+                {/* Chart area */}
+                <div className="ml-8 h-full flex items-end">
+                  <svg className="w-full h-[calc(100%-24px)]" preserveAspectRatio="none" viewBox="0 0 500 100">
+                    {/* Grid lines */}
+                    <line x1="0" y1="25" x2="500" y2="25" stroke="currentColor" strokeOpacity="0.1" />
+                    <line x1="0" y1="50" x2="500" y2="50" stroke="currentColor" strokeOpacity="0.1" />
+                    <line x1="0" y1="75" x2="500" y2="75" stroke="currentColor" strokeOpacity="0.1" />
+                    
+                    {/* Reasoning line - blue */}
+                    <polyline
+                      fill="none"
+                      stroke="hsl(217, 91%, 60%)"
+                      strokeWidth="2"
+                      points={capabilityData.map((d, i) => `${(i / (capabilityData.length - 1)) * 500},${100 - d.reasoning}`).join(' ')}
+                    />
+                    
+                    {/* Creativity line - purple */}
+                    <polyline
+                      fill="none"
+                      stroke="hsl(270, 91%, 65%)"
+                      strokeWidth="2"
+                      points={capabilityData.map((d, i) => `${(i / (capabilityData.length - 1)) * 500},${100 - d.creativity}`).join(' ')}
+                    />
+                    
+                    {/* Analysis line - green */}
+                    <polyline
+                      fill="none"
+                      stroke="hsl(142, 76%, 45%)"
+                      strokeWidth="2"
+                      points={capabilityData.map((d, i) => `${(i / (capabilityData.length - 1)) * 500},${100 - d.analysis}`).join(' ')}
+                    />
+                    
+                    {/* Communication line - orange */}
+                    <polyline
+                      fill="none"
+                      stroke="hsl(24, 95%, 53%)"
+                      strokeWidth="2"
+                      points={capabilityData.map((d, i) => `${(i / (capabilityData.length - 1)) * 500},${100 - d.communication}`).join(' ')}
+                    />
+                  </svg>
+                </div>
+                
+                {/* X-axis labels */}
+                <div className="ml-8 flex justify-between text-xs text-muted-foreground mt-1">
+                  {capabilityData.map((d) => (
+                    <span key={d.month}>{d.month}</span>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Legend */}
+              <div className="flex flex-wrap items-center justify-center gap-6">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-blue-500" />
+                  <span className="text-sm text-muted-foreground">Reasoning</span>
+                  <span className="text-sm font-medium text-blue-500">88%</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-purple-500" />
+                  <span className="text-sm text-muted-foreground">Creativity</span>
+                  <span className="text-sm font-medium text-purple-500">78%</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-green-500" />
+                  <span className="text-sm text-muted-foreground">Analysis</span>
+                  <span className="text-sm font-medium text-green-500">89%</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-orange-500" />
+                  <span className="text-sm text-muted-foreground">Communication</span>
+                  <span className="text-sm font-medium text-orange-500">84%</span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Network Statistics */}
+        <Card className="glass-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Network className="w-5 h-5 text-primary" />
+              Network Statistics
+            </CardTitle>
+            <CardDescription>Your connection and influence metrics</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
+              <div className="text-center p-4 rounded-lg bg-muted/50">
+                <Users className="w-6 h-6 mx-auto mb-2 text-blue-500" />
+                <p className="text-2xl font-bold">{networkStats.totalConnections}</p>
+                <p className="text-xs text-muted-foreground">Total Connections</p>
+              </div>
+              <div className="text-center p-4 rounded-lg bg-muted/50">
+                <Activity className="w-6 h-6 mx-auto mb-2 text-green-500" />
+                <p className="text-2xl font-bold">{networkStats.activeCollaborations}</p>
+                <p className="text-xs text-muted-foreground">Active Collaborations</p>
+              </div>
+              <div className="text-center p-4 rounded-lg bg-muted/50">
+                <Eye className="w-6 h-6 mx-auto mb-2 text-purple-500" />
+                <p className="text-2xl font-bold">{networkStats.networkReach}</p>
+                <p className="text-xs text-muted-foreground">Network Reach</p>
+              </div>
+              <div className="text-center p-4 rounded-lg bg-muted/50">
+                <Zap className="w-6 h-6 mx-auto mb-2 text-yellow-500" />
+                <p className="text-2xl font-bold">{networkStats.influenceScore}</p>
+                <p className="text-xs text-muted-foreground">Influence Score</p>
+              </div>
+              <div className="text-center p-4 rounded-lg bg-muted/50">
+                <Heart className="w-6 h-6 mx-auto mb-2 text-red-500" />
+                <p className="text-2xl font-bold">{networkStats.trustedBy}</p>
+                <p className="text-xs text-muted-foreground">Trusted By</p>
+              </div>
+              <div className="text-center p-4 rounded-lg bg-muted/50">
+                <MessageCircle className="w-6 h-6 mx-auto mb-2 text-cyan-500" />
+                <p className="text-2xl font-bold">{networkStats.pendingRequests}</p>
+                <p className="text-xs text-muted-foreground">Pending Requests</p>
+              </div>
+            </div>
+            
+            {/* Network visualization preview */}
+            <div className="mt-6 p-6 rounded-lg bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-medium">Network Visualization</h4>
+                  <p className="text-sm text-muted-foreground">See how your connections are distributed across the platform</p>
+                </div>
+                <Button variant="outline" size="sm">
+                  Explore Network
+                </Button>
+              </div>
+              
+              {/* Simple network node visualization */}
+              <div className="mt-4 flex items-center justify-center gap-8">
+                <div className="relative">
+                  {/* Central node */}
+                  <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold text-lg z-10 relative">
+                    You
+                  </div>
+                  {/* Orbiting nodes */}
+                  {[...Array(6)].map((_, i) => {
+                    const angle = (i / 6) * Math.PI * 2
+                    const x = Math.cos(angle) * 50
+                    const y = Math.sin(angle) * 50
+                    return (
+                      <div
+                        key={i}
+                        className="absolute w-8 h-8 rounded-full bg-muted border-2 border-primary/30"
+                        style={{
+                          left: `calc(50% + ${x}px - 16px)`,
+                          top: `calc(50% + ${y}px - 16px)`,
+                        }}
+                      />
+                    )
+                  })}
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  <p className="flex items-center gap-2 mb-2">
+                    <span className="w-3 h-3 rounded-full bg-primary" />
+                    1st Degree: 847
+                  </p>
+                  <p className="flex items-center gap-2 mb-2">
+                    <span className="w-3 h-3 rounded-full bg-primary/60" />
+                    2nd Degree: 4.2K
+                  </p>
+                  <p className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-primary/30" />
+                    3rd Degree: 28K
+                  </p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Audience Insights */}
         <Card className="glass-card">
