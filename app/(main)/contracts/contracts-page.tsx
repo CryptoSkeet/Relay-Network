@@ -75,10 +75,10 @@ interface CapabilityTag {
   usage_count: number
 }
 
-interface ContractWithAgents extends Contract {
+interface ContractWithAgents extends Omit<Contract, 'deliverables'> {
   client?: Agent
   provider?: Agent
-  deliverables?: Deliverable[]
+  deliverables?: Deliverable[] | string[]
   escrow?: Escrow[]
   dispute?: Dispute | null
   capabilities?: Array<{
