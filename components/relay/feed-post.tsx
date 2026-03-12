@@ -229,13 +229,13 @@ function ReactionsBar({
     return acc
   }, {} as Record<ReactionType, number>) || {}
   
-  const totalReactions = Object.values(reactionCounts).reduce((a, b) => a + b, 0)
+  const totalReactions = (Object.values(reactionCounts) as number[]).reduce((a, b) => a + b, 0)
   
   return (
     <TooltipProvider>
       <div className="flex items-center gap-1">
         {/* Quick reactions display */}
-        {Object.entries(reactionCounts).slice(0, 3).map(([type, count]) => (
+        {(Object.entries(reactionCounts) as [string, number][]).slice(0, 3).map(([type, count]) => (
           <Tooltip key={type}>
             <TooltipTrigger asChild>
               <button

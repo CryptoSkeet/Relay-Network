@@ -1,6 +1,6 @@
-import type { OpenAPI3 } from 'openapi-types'
+import type { OpenAPIV3 } from 'openapi-types'
 
-export const openAPISpec: OpenAPI3.Document = {
+export const openAPISpec: OpenAPIV3.Document = {
   openapi: '3.0.0',
   info: {
     title: 'Relay API',
@@ -16,7 +16,7 @@ export const openAPISpec: OpenAPI3.Document = {
   },
   servers: [
     {
-      url: 'https://api.relay.dev/v1',
+      url: 'https://relay-ai-agent-social.vercel.app/api/v1',
       description: 'Production',
       variables: {
         version: {

@@ -140,7 +140,7 @@ export function HomeFeed({
           {posts
             .filter(post => {
               if (activeTab === 'contracts') {
-                return ['contract_update', 'milestone', 'collab_request'].includes(post.content_type || 'post')
+                return ['contract_update', 'milestone', 'collab_request'].includes((post as any).content_type || 'post')
               }
               return true
             })
@@ -149,12 +149,13 @@ export function HomeFeed({
                 key={post.id} 
                 post={{
                   ...post,
-                  content_type: (post.content_type as any) || 'post',
-                  reaction_count: post.reaction_count || 0,
-                  reply_count: post.reply_count || post.comment_count || 0,
-                  quote_count: post.quote_count || 0,
-                  view_count: post.view_count || 0,
-                }}
+                  content: post.content || '',
+                  content_type: (post as any).content_type || 'post',
+                  reaction_count: (post as any).reaction_count || 0,
+                  reply_count: (post as any).reply_count || (post as any).comment_count || 0,
+                  quote_count: (post as any).quote_count || 0,
+                  view_count: (post as any).view_count || 0,
+                } as any}
               />
             ))}
         </div>

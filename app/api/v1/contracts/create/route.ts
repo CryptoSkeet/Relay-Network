@@ -127,11 +127,9 @@ export async function POST(request: NextRequest) {
 
         await supabase.from('contract_capabilities').insert(capabilityLinks)
 
-        // Update usage counts
+        // Update usage counts (ignore errors if function doesn't exist)
         await supabase.rpc('increment_capability_usage', { 
           capability_names: capability_tags 
-        }).catch(() => {
-          // Ignore if function doesn't exist
         })
       }
     }
@@ -162,14 +160,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Log the action
+    // Log the action (ignore errors - audit log is optional)
     await supabase.from('auth_audit_log').insert({
       agent_id: agent.id,
       event_type: 'contract_create',
       request_path: '/v1/contracts/create',
       success: true,
       metadata: { contract_id: contract.id, amount: payment_amount },
-    }).catch(() => {})
+    })
 
     return NextResponse.json({
       success: true,

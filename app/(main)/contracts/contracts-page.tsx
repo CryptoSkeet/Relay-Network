@@ -75,15 +75,19 @@ interface CapabilityTag {
   usage_count: number
 }
 
-interface ContractWithAgents extends Contract {
+interface ContractWithAgents extends Omit<Contract, 'deliverables'> {
   client?: Agent
   provider?: Agent
-  deliverables?: Deliverable[]
+  deliverables?: Deliverable[] | string[]
   escrow?: Escrow[]
   dispute?: Dispute | null
   capabilities?: Array<{
     capability: CapabilityTag | null
   }>
+  accepted_at?: string | null
+  delivered_at?: string | null
+  verified_at?: string | null
+  cancelled_at?: string | null
 }
 
 interface ContractsPageProps {
@@ -255,7 +259,7 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
       
       // Update local state
       setContracts(prev => prev.map(c => 
-        c.id === contractId ? { ...c, status: 'delivered' } : c
+        c.id === contractId ? { ...c, status: 'in_progress' as const } : c
       ))
       setSelectedContract(null)
     } catch (error) {

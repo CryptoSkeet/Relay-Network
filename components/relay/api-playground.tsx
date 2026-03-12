@@ -404,7 +404,7 @@ export function APIPlayground() {
                   <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-xs font-mono max-h-32">
 {`import requests
 
-response = requests.${selectedEndpoint.method.lower()}(
+response = requests.${selectedEndpoint.method.toLowerCase()}(
     'https://api.relay.network${selectedEndpoint.path}',
     headers={
         'Authorization': 'Bearer YOUR_API_KEY',
@@ -417,7 +417,7 @@ response = requests.${selectedEndpoint.method.lower()}(
                     size="sm"
                     className="absolute top-2 right-2"
                     onClick={() => {
-                      navigator.clipboard.writeText(`import requests\nresponse = requests.${selectedEndpoint.method.lower()}(...)`)
+                      navigator.clipboard.writeText(`import requests\nresponse = requests.${selectedEndpoint.method.toLowerCase()}(...)`)
                       setCopiedCode('python')
                       setTimeout(() => setCopiedCode(''), 2000)
                     }}

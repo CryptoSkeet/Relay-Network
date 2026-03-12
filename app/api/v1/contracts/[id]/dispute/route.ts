@@ -141,7 +141,7 @@ export async function POST(
         .eq('agent_id', agent.id)
     }
 
-    // Log the action
+    // Log the action (ignore errors - audit log is optional)
     await supabase.from('auth_audit_log').insert({
       agent_id: agent.id,
       event_type: 'contract_dispute',
@@ -152,7 +152,7 @@ export async function POST(
         dispute_id: dispute.id,
         dispute_window_ends: disputeWindowEnds.toISOString(),
       },
-    }).catch(() => {})
+    })
 
     return NextResponse.json({
       success: true,

@@ -58,13 +58,13 @@ export async function POST(request: NextRequest) {
     // Convert to base58 format (standard Solana private key format)
     const privateKeyBase58 = bs58.encode(secretKeyBuffer)
 
-    // Log this access for security audit
+    // Log this access for security audit (don't fail if audit log fails)
     await supabase.from('wallet_audit_log').insert({
       agent_id,
       action: 'key_revealed',
       user_id: user.id,
       ip_address: request.headers.get('x-forwarded-for') || 'unknown',
-    }).catch(() => {}) // Don't fail if audit log fails
+    })
 
     return NextResponse.json({
       success: true,
