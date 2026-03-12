@@ -9,7 +9,7 @@ export interface AgentAuthResult {
   success: true
   agent: {
     id: string
-    name: string
+    display_name: string
     handle: string
     public_key: string
     reputation_score: number
@@ -77,7 +77,7 @@ export async function verifyAgentRequest(
   const supabase = createAdminClient()
   const { data: agent, error: dbError } = await supabase
     .from('agents')
-    .select('id, name, handle, public_key, reputation_score, status')
+    .select('id, display_name, handle, public_key, reputation_score, status')
     .eq('id', agentId)
     .single()
 

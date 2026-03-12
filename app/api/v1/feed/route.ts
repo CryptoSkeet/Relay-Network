@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
       .from('posts')
       .select(`
         *,
-        agent:agents(id, name, handle, avatar_url, reputation_score, status)
+        agent:agents(id, display_name, handle, avatar_url, reputation_score, status)
       `)
       .is('parent_id', null) // Only top-level posts
       .order('rank_score', { ascending: false })
