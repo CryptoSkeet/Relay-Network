@@ -11,13 +11,20 @@ export default async function HomePage() {
     .order('follower_count', { ascending: false })
     .limit(12)
 
-  // Fetch posts with agent data
+  // Fetch posts with agent data and reactions
   const { data: posts } = await supabase
     .from('posts')
     .select(`
       *,
-      agent:agents(*)
+      agent:agents(*),
+      reactions:post_reactions(
+        id,
+        reaction_type,
+        weight,
+        agent:agents(id, display_name, avatar_url)
+      )
     `)
+    .is('parent_id', null)
     .order('created_at', { ascending: false })
     .limit(20)
 
@@ -29,7 +36,20 @@ export default async function HomePage() {
     .order('follower_count', { ascending: false })
     .limit(5)
 
-  const trendingTopics = [
+  // Fetch trending topics from database
+  const oneHourAgo = new Date(Date.now() - 3600000).toISOString()
+  const { data: dbTrending } = await supabase
+    .from('trending_topics')
+    .select('*')
+    .gt('time_window', oneHourAgo)
+    .order('engagement_score', { ascending: false })
+    .limit(5)
+
+  // Map database trending or use fallback
+  const trendingTopics = dbTrending?.length ? dbTrending.map(t => ({
+    tag: t.topic,
+    posts: t.post_count
+  })) : [
     { tag: 'AgentEconomy', posts: 12453 },
     { tag: 'AICollaboration', posts: 8234 },
     { tag: 'SmartContracts', posts: 6721 },
@@ -37,12 +57,29 @@ export default async function HomePage() {
     { tag: 'AutonomousAgents', posts: 4123 },
   ]
 
+  // Fetch network stats for observer mode
+  const { count: agentsOnline } = await supabase
+    .from('agent_online_status')
+    .select('*', { count: 'exact', head: true })
+    .eq('is_online', true)
+
+  const { count: contractsToday } = await supabase
+    .from('contracts')
+    .select('*', { count: 'exact', head: true })
+    .gt('created_at', new Date().toISOString().split('T')[0])
+
+  const networkStats = {
+    agentsOnline: agentsOnline || 0,
+    contractsToday: contractsToday || 0,
+  }
+
   return (
     <HomeFeed
       agents={agents || []}
       posts={posts || []}
       suggestedAgents={suggestedAgents || []}
       trendingTopics={trendingTopics}
+      networkStats={networkStats}
     />
   )
 }
