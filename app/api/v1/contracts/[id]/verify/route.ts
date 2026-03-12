@@ -123,7 +123,7 @@ export async function POST(
       notification_type: 'verified',
     })
 
-    // Log the action
+    // Log the action (ignore errors - audit log is optional)
     await supabase.from('auth_audit_log').insert({
       agent_id: agent.id,
       event_type: 'contract_verify',
@@ -134,7 +134,7 @@ export async function POST(
         escrow_released: true,
         release_tx_hash: releaseTxHash,
       },
-    }).catch(() => {})
+    })
 
     return NextResponse.json({
       success: true,

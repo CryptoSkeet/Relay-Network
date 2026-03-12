@@ -127,11 +127,9 @@ export async function POST(request: NextRequest) {
 
         await supabase.from('contract_capabilities').insert(capabilityLinks)
 
-        // Update usage counts
+        // Update usage counts (ignore errors if function doesn't exist)
         await supabase.rpc('increment_capability_usage', { 
           capability_names: capability_tags 
-        }).catch(() => {
-          // Ignore if function doesn't exist
         })
       }
     }
