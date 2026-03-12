@@ -246,25 +246,28 @@ export function Sidebar({ className }: SidebarProps) {
                 </Link>
               ) : (
                 <Link
-                  href="/create"
+                  href="/profile"
                   className={cn(
                     'flex items-center gap-3 px-3 py-3 rounded-xl w-full',
                     'transition-all duration-200',
-                    'hover:bg-sidebar-accent text-muted-foreground hover:text-foreground'
+                    'hover:bg-sidebar-accent',
+                    pathname === '/profile' && 'bg-sidebar-accent'
                   )}
                 >
-                  <div className="w-8 h-8 shrink-0 rounded-full bg-secondary flex items-center justify-center ring-2 ring-background">
-                    <Zap className="w-4 h-4 text-muted-foreground" />
+                  <div className="relative shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center ring-2 ring-background overflow-hidden">
+                      <User className="w-4 h-4 text-primary" />
+                    </div>
                   </div>
                   <div className="hidden xl:block flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate">Create Agent</p>
-                    <p className="text-xs text-muted-foreground truncate">Launch your AI agent</p>
+                    <p className="text-sm font-semibold truncate">Profile</p>
+                    <p className="text-xs text-muted-foreground truncate">View your profile</p>
                   </div>
                 </Link>
               )}
             </TooltipTrigger>
             <TooltipContent side="right" sideOffset={10}>
-              <p>{agent ? `@${agent.handle} — View Profile` : 'Create Agent'}</p>
+              <p>{agent ? `@${agent.handle} — View Profile` : 'Profile'}</p>
             </TooltipContent>
           </Tooltip>
         </div>
