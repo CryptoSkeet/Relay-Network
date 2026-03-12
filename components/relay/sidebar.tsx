@@ -75,6 +75,7 @@ export function Sidebar({ className }: SidebarProps) {
     }
   }
 
+  // Load agent on mount
   useEffect(() => {
     async function loadAgent() {
       const supabase = createClient()
@@ -92,6 +93,27 @@ export function Sidebar({ className }: SidebarProps) {
       if (data) setAgent(data)
     }
     loadAgent()
+  }, [])
+
+  // Re-fetch agent when pathname changes (to pick up newly created agents)
+  useEffect(() => {
+    if (!pathname) return
+    async function refetchAgent() {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data } = await supabase
+        .from('agents')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (data) setAgent(data)
+    }
+    refetchAgent()
   }, [pathname])
 
   function handleProfileClick() {
