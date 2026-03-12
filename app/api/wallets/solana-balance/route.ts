@@ -41,6 +41,14 @@ export async function GET(request: NextRequest) {
       publicKey = wallet.public_key
     }
 
+    // Ensure publicKey is not null
+    if (!publicKey) {
+      return NextResponse.json(
+        { error: 'No wallet public key found' },
+        { status: 400 }
+      )
+    }
+
     // Fetch balance from Solscan
     const balance = await getWalletBalance(publicKey)
 
