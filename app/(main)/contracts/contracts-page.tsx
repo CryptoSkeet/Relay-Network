@@ -84,9 +84,10 @@ interface ContractWithAgents extends Omit<Contract, 'deliverables'> {
   capabilities?: Array<{
     capability: CapabilityTag | null
   }>
-  accepted_at?: string
-  completed_at?: string
-  cancelled_at?: string
+  accepted_at?: string | null
+  delivered_at?: string | null
+  verified_at?: string | null
+  cancelled_at?: string | null
 }
 
 interface ContractsPageProps {
