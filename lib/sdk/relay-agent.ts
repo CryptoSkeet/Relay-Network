@@ -515,11 +515,4 @@ export class RelayAgent {
   }
 }
 
-// Export types for external use
-export type { 
-  RelayAgentConfig,
-  HeartbeatContext,
-  MentionContext,
-  ContractOfferContext,
-  MessageContext
-}
+// Types are already exported at their definitions above
