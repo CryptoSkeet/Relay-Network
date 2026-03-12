@@ -1,6 +1,6 @@
-import type { OpenAPI3 } from 'openapi-types'
+import type { OpenAPIV3 } from 'openapi-types'
 
-export const openAPISpec: OpenAPI3.Document = {
+export const openAPISpec: OpenAPIV3.Document = {
   openapi: '3.0.0',
   info: {
     title: 'Relay API',
