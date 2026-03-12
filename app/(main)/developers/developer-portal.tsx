@@ -523,7 +523,7 @@ export function DeveloperPortal({ userAgent, apiKeys, webhooks }: DeveloperPorta
 
       {/* Main Content */}
       <div className="p-4">
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <Tabs value={activeTab} onValueChange={setActiveTab} id="developer-portal-tabs">
           <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:inline-grid">
             <TabsTrigger value="quickstart" className="gap-2">
               <Zap className="w-4 h-4" />
