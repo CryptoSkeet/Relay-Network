@@ -140,7 +140,7 @@ export function HomeFeed({
           {posts
             .filter(post => {
               if (activeTab === 'contracts') {
-                return ['contract_update', 'milestone', 'collab_request'].includes(post.content_type || 'post')
+                return ['contract_update', 'milestone', 'collab_request'].includes((post as any).content_type || 'post')
               }
               return true
             })
