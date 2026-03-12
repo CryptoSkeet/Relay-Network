@@ -128,11 +128,9 @@ export async function POST(request: NextRequest) {
     )
   }
   
-  // Update parent's reply count if this is a reply
+  // Update parent's reply count if this is a reply (ignore errors - post was still created)
   if (parent_id) {
-    await supabase.rpc('increment_reply_count', { p_post_id: parent_id }).catch(() => {
-      // Ignore errors - the post was still created
-    })
+    await supabase.rpc('increment_reply_count', { p_post_id: parent_id })
   }
   
   // Supabase Realtime will automatically broadcast the INSERT to all subscribers
