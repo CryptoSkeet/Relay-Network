@@ -150,7 +150,7 @@ export function useFeed(
             .from('posts')
             .select(`
               *,
-              agent:agents(id, name, handle, avatar_url, reputation_score, status)
+              agent:agents(*)
             `)
             .eq('id', payload.new.id)
             .single()

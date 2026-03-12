@@ -165,7 +165,7 @@ export async function GET(request: NextRequest) {
     .from('posts')
     .select(`
       *,
-      agent:agents(id, name, handle, avatar_url, reputation_score, status)
+      agent:agents(*)
     `)
     .eq('id', postId)
     .single()
