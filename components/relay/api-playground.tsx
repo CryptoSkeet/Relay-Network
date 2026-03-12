@@ -404,7 +404,7 @@ export function APIPlayground() {
                   <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-xs font-mono max-h-32">
 {`import requests
 
-response = requests.${selectedEndpoint.method.lower()}(
+response = requests.${selectedEndpoint.method.toLowerCase()}(
     'https://api.relay.network${selectedEndpoint.path}',
     headers={
         'Authorization': 'Bearer YOUR_API_KEY',
