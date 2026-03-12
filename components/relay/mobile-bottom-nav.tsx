@@ -95,46 +95,60 @@ export function MobileNav() {
           )
         })}
 
-        {/* Your Agent tab - Profile */}
+        {/* Profile tab - Your Agent */}
         <button
           onClick={handleProfileClick}
           className={cn(
             'relative flex flex-col items-center justify-center gap-0.5',
-            'flex-1 h-full py-2',
+            'flex-1 h-full py-2 px-1',
             'transition-colors duration-150 active:scale-95 select-none',
-            pathname.startsWith('/agent/') || pathname === '/profile' ? 'text-primary' : 'text-muted-foreground'
+            pathname.startsWith('/agent/') || pathname === '/profile' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
           )}
           style={{ touchAction: 'manipulation', WebkitUserSelect: 'none', userSelect: 'none' }}
+          title="Profile"
         >
-          <div className="relative">
-            <AgentAvatar
-              src={agent?.avatar_url ?? null}
-              name={agent?.display_name ?? 'Profile'}
-              size="xs"
-            />
-            {agent && (
-              <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 ring-1 ring-background" />
-            )}
-          </div>
-          <span className="text-[10px] font-medium leading-none mt-0.5">Profile</span>
-          {(pathname.startsWith('/agent/') || pathname === '/profile') && (
-            <span className="absolute bottom-0 w-8 h-0.5 rounded-full bg-primary" />
+          {agent ? (
+            <div className="relative flex items-center justify-center">
+              <div className="w-6 h-6 rounded-full overflow-hidden ring-1.5 ring-offset-1 ring-offset-background ring-current">
+                <img
+                  src={agent.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${agent.id}`}
+                  alt={agent.display_name}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement
+                    target.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${agent.id}`
+                  }}
+                />
+              </div>
+              {(pathname.startsWith('/agent/') || pathname === '/profile') && (
+                <span className="absolute bottom-0 w-7 h-0.5 rounded-full bg-primary" />
+              )}
+            </div>
+          ) : (
+            <div className="relative">
+              <User className="w-5 h-5" strokeWidth={1.8} />
+              {(pathname === '/profile') && (
+                <span className="absolute -bottom-1 w-6 h-0.5 rounded-full bg-primary" />
+              )}
+            </div>
           )}
+          <span className="text-[10px] font-medium leading-none mt-1">Profile</span>
         </button>
 
-        {/* Logout button */}
+        {/* Logout button - moved to rightmost */}
         <button
           onClick={handleLogout}
           className={cn(
             'relative flex flex-col items-center justify-center gap-0.5',
-            'flex-1 h-full py-2',
+            'flex-1 h-full py-2 px-1',
             'transition-colors duration-150 active:scale-95 select-none',
             'text-muted-foreground hover:text-destructive'
           )}
           style={{ touchAction: 'manipulation', WebkitUserSelect: 'none', userSelect: 'none' }}
+          title="Logout"
         >
-          <User className="w-6 h-6" strokeWidth={1.8} />
-          <span className="text-[10px] font-medium leading-none mt-0.5">Logout</span>
+          <User className="w-5 h-5" strokeWidth={1.8} />
+          <span className="text-[10px] font-medium leading-none mt-1">Logout</span>
         </button>
       </div>
     </nav>
