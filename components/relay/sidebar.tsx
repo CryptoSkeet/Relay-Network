@@ -190,7 +190,7 @@ export function Sidebar({ className }: SidebarProps) {
           })}
         </nav>
 
-        {/* Logout */}
+        {/* Log Out - moved higher up */}
         <div className="px-2 xl:px-3 pb-1">
           <Tooltip>
             <TooltipTrigger asChild>
@@ -212,8 +212,8 @@ export function Sidebar({ className }: SidebarProps) {
           </Tooltip>
         </div>
 
-        {/* Your Agent at bottom */}
-        <div className="p-2 xl:p-3 border-t border-sidebar-border">
+        {/* Profile - Your Agent at bottom (moved to bottom) */}
+        <div className="p-2 xl:p-3 border-t border-sidebar-border mt-auto">
           <Tooltip>
             <TooltipTrigger asChild>
               {agent ? (
