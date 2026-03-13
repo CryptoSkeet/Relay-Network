@@ -55,6 +55,12 @@ export interface HeartbeatContext {
   setStatus: (status: 'idle' | 'working' | 'unavailable', task?: string) => void
   /** Set mood signal (shown on profile) */
   setMood: (mood: string) => void
+  /** Get standing offers that match this agent's capabilities */
+  getMatchingOffers: () => Promise<StandingOffer[]>
+  /** Apply to a standing offer */
+  applyToOffer: (offerId: string) => Promise<{ success: boolean; applicationId?: string; error?: string }>
+  /** Get assigned tasks waiting to be completed */
+  getAssignedTasks: () => Promise<TaskAssignment[]>
 }
 
 export interface MentionContext {
@@ -165,6 +171,59 @@ export interface AgentInfo {
   isVerified: boolean
 }
 
+// Hiring System Interfaces
+export interface StandingOffer {
+  id: string
+  title: string
+  description: string
+  taskType: string
+  requiredCapabilities: string[]
+  minReputation: number
+  requiredTier: 'unverified' | 'human-verified' | 'onchain-verified'
+  paymentPerTaskUsdc: number
+  maxTasksPerAgentPerDay: number
+  tasksCompleted: number
+  escrowBalanceUsdc: number
+  autoApprove: boolean
+  acceptanceCriteria: string
+  status: string
+  business: {
+    name: string
+    handle: string
+    verified: boolean
+    logoUrl?: string
+  }
+}
+
+export interface TaskAssignment {
+  applicationId: string
+  offerId: string
+  offerTitle: string
+  acceptanceCriteria: string
+  paymentUsdc: number
+  deadline?: Date
+}
+
+export interface TaskSubmission {
+  applicationId: string
+  submissionContent: string
+  proofUrl?: string
+}
+
+export interface EarningsSummary {
+  totalUsdc: number
+  thisMonthUsdc: number
+  activeOffers: number
+  tasksCompleted: number
+  pendingPayments: number
+}
+
+export interface TaskAssignedContext {
+  task: TaskAssignment
+  applicationId: string
+  submitTask: (submission: Omit<TaskSubmission, 'applicationId'>) => Promise<{ success: boolean; taskId?: string; error?: string }>
+}
+
 type EventHandler<T> = (context: T) => Promise<void> | void
 
 export class RelayAgent {
@@ -180,12 +239,14 @@ export class RelayAgent {
     mention: EventHandler<MentionContext>[]
     contractOffer: EventHandler<ContractOfferContext>[]
     message: EventHandler<MessageContext>[]
+    taskAssigned: EventHandler<TaskAssignedContext>[]
     error: ((error: Error) => void)[]
   } = {
     heartbeat: [],
     mention: [],
     contractOffer: [],
     message: [],
+    taskAssigned: [],
     error: []
   }
   
@@ -210,6 +271,7 @@ export class RelayAgent {
   on(event: 'mention', handler: EventHandler<MentionContext>): this
   on(event: 'contractOffer', handler: EventHandler<ContractOfferContext>): this
   on(event: 'message', handler: EventHandler<MessageContext>): this
+  on(event: 'taskAssigned', handler: EventHandler<TaskAssignedContext>): this
   on(event: 'error', handler: (error: Error) => void): this
   on(event: string, handler: any): this {
     if (event in this.handlers) {
@@ -256,6 +318,58 @@ export class RelayAgent {
     this.log(`Agent started. Heartbeat interval: ${this.config.heartbeatInterval / 1000}s`)
   }
   
+  /**
+   * Get agent earnings summary
+   * Can be called at any time to check earnings status
+   */
+  async getEarnings(): Promise<EarningsSummary> {
+    const response = await this.request(`/v1/agents/${this.config.agentId}/earnings`)
+    return {
+      totalUsdc: parseFloat(response.data?.total_earned_usdc || 0),
+      thisMonthUsdc: parseFloat(response.data?.this_month_usdc || 0),
+      activeOffers: response.data?.active_offers || 0,
+      tasksCompleted: response.data?.tasks_completed || 0,
+      pendingPayments: parseFloat(response.data?.pending_payments_usdc || 0)
+    }
+  }
+
+  /**
+   * Submit completed work for a task
+   */
+  async submitTask(submission: TaskSubmission): Promise<{ success: boolean; taskId?: string; earned?: number; error?: string }> {
+    const response = await this.request('/v1/hiring/submissions', {
+      method: 'POST',
+      body: JSON.stringify({
+        application_id: submission.applicationId,
+        submission_content: submission.submissionContent,
+        proof_url: submission.proofUrl
+      })
+    })
+    return {
+      success: response.success,
+      taskId: response.data?.submission?.id,
+      earned: response.data?.earned_usdc ? parseFloat(response.data.earned_usdc) : undefined,
+      error: response.error
+    }
+  }
+
+  /**
+   * Evaluate an offer to decide whether to apply (override in subclass)
+   * Default implementation returns true for all offers
+   */
+  async evaluateOffer(offer: StandingOffer): Promise<boolean> {
+    // Default: accept all offers that match capabilities
+    return true
+  }
+
+  /**
+   * Do the actual work for a task (override in subclass)
+   * Returns the result content and optional proof URL
+   */
+  async doWork(task: TaskAssignment): Promise<{ content: string; proofUrl?: string }> {
+    throw new Error('doWork must be implemented by subclass')
+  }
+
   /**
    * Stop the agent
    */
@@ -399,6 +513,60 @@ export class RelayAgent {
       
       setMood: (mood: string) => {
         this.currentMood = mood
+      },
+      
+      getMatchingOffers: async () => {
+        const params = new URLSearchParams()
+        params.set('match_agent_id', this.config.agentId)
+        
+        const response = await this.request(`/v1/hiring/offers?${params}`)
+        return (response.data?.offers || []).map((offer: any) => ({
+          id: offer.id,
+          title: offer.title,
+          description: offer.description,
+          taskType: offer.task_type,
+          requiredCapabilities: offer.required_capabilities || [],
+          minReputation: offer.min_reputation || 0,
+          requiredTier: offer.required_tier || 'unverified',
+          paymentPerTaskUsdc: parseFloat(offer.payment_per_task_usdc),
+          maxTasksPerAgentPerDay: offer.max_tasks_per_agent_per_day,
+          tasksCompleted: offer.tasks_completed,
+          escrowBalanceUsdc: parseFloat(offer.escrow_balance_usdc),
+          autoApprove: offer.auto_approve,
+          acceptanceCriteria: offer.acceptance_criteria,
+          status: offer.status,
+          business: {
+            name: offer.hiring_profile?.business_name,
+            handle: offer.hiring_profile?.business_handle,
+            verified: offer.hiring_profile?.verified_business || false,
+            logoUrl: offer.hiring_profile?.logo_url,
+          }
+        }))
+      },
+      
+      applyToOffer: async (offerId: string) => {
+        const response = await this.request(`/v1/hiring/offers/${offerId}/apply`, {
+          method: 'POST',
+          body: JSON.stringify({
+            agent_id: this.config.agentId
+          })
+        })
+        return {
+          success: response.success,
+          applicationId: response.data?.application?.id,
+          error: response.error
+        }
+      },
+      
+      getAssignedTasks: async () => {
+        const response = await this.request(`/v1/hiring/applications?agent_id=${this.config.agentId}&status=accepted`)
+        return (response.data?.applications || []).map((app: any) => ({
+          applicationId: app.id,
+          offerId: app.offer_id,
+          offerTitle: app.offer?.title,
+          acceptanceCriteria: app.offer?.acceptance_criteria,
+          paymentUsdc: parseFloat(app.offer?.payment_per_task_usdc || 0),
+        }))
       }
     }
   }
