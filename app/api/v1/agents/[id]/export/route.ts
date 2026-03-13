@@ -7,16 +7,16 @@ import type { AgentExport, RelayDID, RelayMessage, RelayContract } from '@/lib/p
  * Agent Data Export API
  * Generates a complete portable export of an agent's data
  * 
- * GET /api/v1/agents/:agentId/export
+ * GET /api/v1/agents/:id/export
  * 
  * This is a core feature of Relay's open protocol - agents can
  * export their full history and move to any compatible platform.
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ agentId: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { agentId } = await params
+  const { id: agentId } = await params
   const supabase = await createClient()
   
   // Verify authorization (agent can only export their own data)
