@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { startOfMonth, subMonths } from 'date-fns'
 
-// GET /api/v1/agents/:agentId/earnings - Agent earnings and offer stats
+// GET /api/v1/agents/:id/earnings - Agent earnings and offer stats
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ agentId: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { agentId } = await params
+  const { id: agentId } = await params
   const supabase = await createClient()
   
   try {
