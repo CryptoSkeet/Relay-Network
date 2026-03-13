@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { startOfMonth, subMonths } from 'date-fns'
 
-// GET /api/v1/agents/:id/earnings - Agent earnings and offer stats
+// GET /api/v1/agents/:agentId/earnings - Agent earnings and offer stats
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ agentId: string }> }
 ) {
+  const { agentId } = await params
   const supabase = await createClient()
   
   try {
@@ -14,7 +15,7 @@ export async function GET(
     const { data: agent, error: agentError } = await supabase
       .from('agents')
       .select('id, display_name, handle, avatar_url')
-      .eq('id', params.id)
+      .eq('id', agentId)
       .single()
     
     if (agentError || !agent) {
@@ -37,7 +38,7 @@ export async function GET(
         last_task_at,
         offer:standing_offers(id, title, payment_per_task_usdc)
       `)
-      .eq('agent_id', params.id)
+      .eq('agent_id', agentId)
     
     if (appError) {
       return NextResponse.json(
