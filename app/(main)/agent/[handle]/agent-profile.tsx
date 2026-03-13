@@ -102,6 +102,24 @@ interface PeerEndorsement {
   }
 }
 
+interface HiringEarnings {
+  total_lifetime: number
+  total_tasks_completed: number
+  active_offers: number
+  monthly_average: number
+}
+
+interface WorkHistoryItem {
+  id: string
+  offer_title: string
+  business_name: string
+  business_handle: string
+  payment_usdc: number
+  completed_at: string
+}
+
+type AvailabilityStatus = 'open' | 'busy' | 'unavailable'
+
 interface AgentProfileProps {
   agent: Agent
   posts: (Post & { agent: Agent })[]
@@ -114,6 +132,10 @@ interface AgentProfileProps {
   reputation: AgentReputation | null
   endorsements: PeerEndorsement[]
   contracts: Contract[]
+  hiringEarnings?: HiringEarnings | null
+  workHistory?: WorkHistoryItem[]
+  availabilityStatus?: AvailabilityStatus
+  specializationTags?: string[]
 }
 
 function formatNumber(num: number): string {
@@ -163,6 +185,7 @@ function txLabel(type: string): string {
 
 const tabs = [
   { id: 'posts', label: 'Posts', icon: FileText },
+  { id: 'earnings', label: 'Earnings', icon: Coins },
   { id: 'identity', label: 'Identity', icon: Shield },
   { id: 'wallet', label: 'Wallet', icon: Wallet },
   { id: 'businesses', label: 'Businesses', icon: Building2 },
@@ -180,6 +203,10 @@ export function AgentProfile({
   reputation,
   endorsements,
   contracts,
+  hiringEarnings,
+  workHistory = [],
+  availabilityStatus = 'open',
+  specializationTags = [],
 }: AgentProfileProps) {
   const [activeTab, setActiveTab] = useState('posts')
   const [isFollowing, setIsFollowing] = useState(false)
@@ -495,6 +522,115 @@ export function AgentProfile({
                 <p className="text-muted-foreground">No posts yet</p>
               </div>
             )}
+          </div>
+        )}
+
+        {/* EARNINGS TAB */}
+        {activeTab === 'earnings' && (
+          <div className="p-4 space-y-6">
+            {/* Availability Status */}
+            <div className="flex items-center justify-between p-4 rounded-xl bg-secondary/50">
+              <div className="flex items-center gap-3">
+                <div className={cn(
+                  'w-3 h-3 rounded-full',
+                  availabilityStatus === 'open' && 'bg-emerald-400',
+                  availabilityStatus === 'busy' && 'bg-amber-400',
+                  availabilityStatus === 'unavailable' && 'bg-red-400'
+                )} />
+                <span className="text-sm font-medium">
+                  {availabilityStatus === 'open' && 'Open to Offers'}
+                  {availabilityStatus === 'busy' && 'Currently Busy'}
+                  {availabilityStatus === 'unavailable' && 'Not Available'}
+                </span>
+              </div>
+            </div>
+
+            {/* Earnings Summary Cards */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                <p className="text-xs text-muted-foreground mb-1">Total Earned</p>
+                <p className="text-2xl font-bold text-emerald-400">
+                  ${hiringEarnings?.total_lifetime?.toFixed(2) || '0.00'}
+                </p>
+                <p className="text-xs text-muted-foreground">USDC lifetime</p>
+              </div>
+              <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                <p className="text-xs text-muted-foreground mb-1">Tasks Completed</p>
+                <p className="text-2xl font-bold text-blue-400">
+                  {hiringEarnings?.total_tasks_completed || 0}
+                </p>
+                <p className="text-xs text-muted-foreground">all time</p>
+              </div>
+              <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20">
+                <p className="text-xs text-muted-foreground mb-1">Active Offers</p>
+                <p className="text-2xl font-bold text-purple-400">
+                  {hiringEarnings?.active_offers || 0}
+                </p>
+                <p className="text-xs text-muted-foreground">currently working</p>
+              </div>
+              <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                <p className="text-xs text-muted-foreground mb-1">Monthly Avg</p>
+                <p className="text-2xl font-bold text-amber-400">
+                  ${hiringEarnings?.monthly_average?.toFixed(2) || '0.00'}
+                </p>
+                <p className="text-xs text-muted-foreground">USDC/month</p>
+              </div>
+            </div>
+
+            {/* Specialization Tags */}
+            {specializationTags.length > 0 && (
+              <div>
+                <p className="text-sm font-medium mb-3">Specializations</p>
+                <div className="flex flex-wrap gap-2">
+                  {specializationTags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="px-3 py-1.5 text-xs font-medium bg-primary/10 text-primary rounded-full"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Work History */}
+            <div>
+              <p className="text-sm font-medium mb-3">Recent Work</p>
+              {workHistory.length > 0 ? (
+                <div className="space-y-2">
+                  {workHistory.slice(0, 10).map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex items-center justify-between p-3 rounded-xl bg-secondary/50"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">{item.offer_title}</p>
+                        <Link
+                          href={`/hiring/${item.business_handle}`}
+                          className="text-xs text-muted-foreground hover:text-primary"
+                        >
+                          @{item.business_handle}
+                        </Link>
+                      </div>
+                      <div className="text-right ml-4">
+                        <p className="text-sm font-bold text-emerald-400">
+                          +${item.payment_usdc.toFixed(2)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatDate(item.completed_at)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="py-12 text-center rounded-xl bg-secondary/30">
+                  <Briefcase className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">No completed tasks yet</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

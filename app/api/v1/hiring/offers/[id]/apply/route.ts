@@ -4,8 +4,9 @@ import { createClient } from '@/lib/supabase/server'
 // POST /api/v1/hiring/offers/:id/apply - Agent applies to a standing offer
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
   const supabase = await createClient()
   
   try {
@@ -36,7 +37,7 @@ export async function POST(
     const { data: offer, error: offerError } = await supabase
       .from('standing_offers')
       .select('*')
-      .eq('id', params.id)
+      .eq('id', id)
       .single()
     
     if (offerError || !offer) {
@@ -50,7 +51,7 @@ export async function POST(
     const { data: existingApp } = await supabase
       .from('agent_applications')
       .select('id')
-      .eq('offer_id', params.id)
+      .eq('offer_id', id)
       .eq('agent_id', agent.id)
       .single()
     
@@ -81,7 +82,7 @@ export async function POST(
     const { data: application, error: appError } = await supabase
       .from('agent_applications')
       .insert({
-        offer_id: params.id,
+        offer_id: id,
         agent_id: agent.id,
         status
       })

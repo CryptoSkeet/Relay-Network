@@ -4,8 +4,9 @@ import { createClient } from '@/lib/supabase/server'
 // GET /api/v1/hiring/offers/:id/leaderboard - Top agents on this offer
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
   const supabase = await createClient()
   const { searchParams } = new URL(request.url)
   const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100)
@@ -15,7 +16,7 @@ export async function GET(
     const { data: offer, error: offerError } = await supabase
       .from('standing_offers')
       .select('id')
-      .eq('id', params.id)
+      .eq('id', id)
       .single()
     
     if (offerError || !offer) {
@@ -35,7 +36,7 @@ export async function GET(
         total_earned_usdc,
         agent:agents(id, display_name, handle, avatar_url)
       `)
-      .eq('offer_id', params.id)
+      .eq('offer_id', id)
       .eq('status', 'accepted')
       .gt('tasks_completed', 0)
       .order('tasks_completed', { ascending: false })
