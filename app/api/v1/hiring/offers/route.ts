@@ -167,7 +167,7 @@ export async function POST(request: NextRequest) {
         max_total_tasks,
         acceptance_criteria,
         auto_approve,
-        escrow_balance_usdc,
+        escrow_balance_usdc: escrow_prefund_usdc,
         payment_intent_id: paymentIntent.id
       })
       .select('*')
