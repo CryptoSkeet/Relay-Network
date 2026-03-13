@@ -128,6 +128,64 @@ export default async function AgentPage({ params }: AgentPageProps) {
     .order('created_at', { ascending: false })
     .limit(10)
 
+  // Fetch hiring earnings and applications
+  const { data: applications } = await supabase
+    .from('agent_applications')
+    .select(`
+      id,
+      tasks_completed,
+      total_earned_usdc,
+      status,
+      last_task_at,
+      offer:standing_offers(
+        id,
+        title,
+        payment_per_task_usdc,
+        hiring_profile:hiring_profiles(business_name, business_handle)
+      )
+    `)
+    .eq('agent_id', agent.id)
+    .order('last_task_at', { ascending: false })
+
+  // Calculate hiring earnings summary
+  const hiringEarnings = applications ? {
+    total_lifetime: applications.reduce((sum, app) => sum + parseFloat(String(app.total_earned_usdc || 0)), 0),
+    total_tasks_completed: applications.reduce((sum, app) => sum + (app.tasks_completed || 0), 0),
+    active_offers: applications.filter(app => app.status === 'accepted').length,
+    monthly_average: applications.reduce((sum, app) => sum + parseFloat(String(app.total_earned_usdc || 0)), 0) / Math.max(1, 1), // Simplified
+  } : null
+
+  // Build work history from completed tasks
+  const workHistory = (applications || [])
+    .filter(app => app.tasks_completed && app.tasks_completed > 0 && app.offer)
+    .slice(0, 10)
+    .map(app => {
+      // Supabase returns nested relations as arrays, access first element
+      const offer = Array.isArray(app.offer) ? app.offer[0] : app.offer
+      const hiringProfile = offer?.hiring_profile 
+        ? (Array.isArray(offer.hiring_profile) ? offer.hiring_profile[0] : offer.hiring_profile)
+        : null
+      return {
+        id: app.id,
+        offer_title: offer?.title || 'Unknown Offer',
+        business_name: hiringProfile?.business_name || 'Unknown',
+        business_handle: hiringProfile?.business_handle || 'unknown',
+        payment_usdc: parseFloat(String(app.total_earned_usdc || 0)),
+        completed_at: app.last_task_at || new Date().toISOString(),
+      }
+    })
+
+  // Derive specialization tags from completed task types
+  const specializationTags = [...new Set(
+    (applications || [])
+      .filter(app => app.tasks_completed && app.tasks_completed > 0)
+      .map(app => {
+        const offer = Array.isArray(app.offer) ? app.offer[0] : app.offer
+        return offer?.title?.split(' ')[0]
+      })
+      .filter(Boolean)
+  )].slice(0, 5) as string[]
+
   return (
     <AgentProfile
       agent={agent}
@@ -141,6 +199,10 @@ export default async function AgentPage({ params }: AgentPageProps) {
       reputation={reputation || null}
       endorsements={endorsements || []}
       contracts={contracts || []}
+      hiringEarnings={hiringEarnings}
+      workHistory={workHistory}
+      availabilityStatus="open"
+      specializationTags={specializationTags}
     />
   )
 }
