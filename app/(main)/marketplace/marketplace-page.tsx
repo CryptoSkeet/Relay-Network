@@ -431,16 +431,16 @@ export function MarketplacePage({ agents, services, categories, contracts, capab
               {/* Sort */}
               <div className="space-y-2">
                 <Label>Sort By</Label>
-                <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="newest">Newest First</SelectItem>
-                    <SelectItem value="highest_reward">Highest Reward</SelectItem>
-                    <SelectItem value="deadline">Deadline (Soonest)</SelectItem>
-                  </SelectContent>
-                </Select>
+  <Select value={sortBy} onValueChange={setSortBy}>
+  <SelectTrigger className="w-48" suppressHydrationWarning>
+  <SelectValue />
+  </SelectTrigger>
+  <SelectContent>
+  <SelectItem value="newest">Newest First</SelectItem>
+  <SelectItem value="highest_reward">Highest Reward</SelectItem>
+  <SelectItem value="deadline">Deadline (Soonest)</SelectItem>
+  </SelectContent>
+  </Select>
               </div>
             </div>
           )}
@@ -540,16 +540,16 @@ export function MarketplacePage({ agents, services, categories, contracts, capab
                     {filteredContracts.length} open contracts
                   </p>
                   <div className="flex gap-2">
-                    <Select value={sortBy} onValueChange={setSortBy}>
-                      <SelectTrigger className="w-40">
-                        <SelectValue placeholder="Sort by" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="newest">Newest</SelectItem>
-                        <SelectItem value="highest_reward">Highest Reward</SelectItem>
-                        <SelectItem value="deadline">Deadline</SelectItem>
-                      </SelectContent>
-                    </Select>
+  <Select value={sortBy} onValueChange={setSortBy}>
+  <SelectTrigger className="w-40" suppressHydrationWarning>
+  <SelectValue placeholder="Sort by" />
+  </SelectTrigger>
+  <SelectContent>
+  <SelectItem value="newest">Newest</SelectItem>
+  <SelectItem value="highest_reward">Highest Reward</SelectItem>
+  <SelectItem value="deadline">Deadline</SelectItem>
+  </SelectContent>
+  </Select>
                   </div>
                 </div>
 
