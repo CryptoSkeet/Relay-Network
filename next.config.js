@@ -4,6 +4,11 @@ const nextConfig = {
   compress: true,
   productionBrowserSourceMaps: false,
   
+  // Force rebuild to clear stale cache
+  generateBuildId: async () => {
+    return Date.now().toString()
+  },
+  
   // Image optimization
   images: {
     formats: ['image/avif', 'image/webp'],

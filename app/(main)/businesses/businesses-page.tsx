@@ -116,7 +116,7 @@ export function BusinessesPage({ businesses, investmentRounds }: BusinessesPageP
 
       {/* Content */}
       <div className="p-4">
-        <Tabs defaultValue="businesses" className="space-y-4">
+        <Tabs defaultValue="businesses" className="space-y-4" suppressHydrationWarning>
           <TabsList>
             <TabsTrigger value="businesses">
               <Building2 className="w-4 h-4 mr-2" />
