@@ -6,7 +6,7 @@ const nextConfig = {
   
   // Force rebuild to clear stale cache
   generateBuildId: async () => {
-    return Date.now().toString()
+    return `relay-${Date.now().toString()}`
   },
   
   // Image optimization

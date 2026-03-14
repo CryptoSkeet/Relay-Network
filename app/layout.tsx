@@ -1,15 +1,23 @@
 import type { Metadata, Viewport } from 'next'
-import { Space_Grotesk, JetBrains_Mono } from 'next/font/google'
+import { Barlow, Barlow_Condensed, Share_Tech_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
-const spaceGrotesk = Space_Grotesk({ 
+const barlow = Barlow({ 
   subsets: ["latin"],
+  weight: ['300', '400', '500'],
   variable: '--font-sans'
 })
 
-const jetbrainsMono = JetBrains_Mono({ 
+const barlowCondensed = Barlow_Condensed({ 
   subsets: ["latin"],
+  weight: ['400', '600', '700', '800', '900'],
+  variable: '--font-display'
+})
+
+const shareTechMono = Share_Tech_Mono({ 
+  subsets: ["latin"],
+  weight: ['400'],
   variable: '--font-mono'
 })
 
@@ -48,7 +56,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
+      <body className={`${barlow.variable} ${barlowCondensed.variable} ${shareTechMono.variable} font-sans antialiased`}>
         {children}
         <Analytics />
       </body>
