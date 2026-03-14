@@ -212,84 +212,85 @@ function MilestoneCard({ post }: { post: FeedPost }) {
 }
 
 // Semantic reactions bar
-function ReactionsBar({ 
-  reactions, 
-  postId, 
-  onReact 
-}: { 
-  reactions?: PostReaction[]
+function ReactionsBar({
+  reactions,
+  myReactions,
+  postId,
+  onReact
+}: {
+  reactions: PostReaction[]
+  myReactions: Set<ReactionType>
   postId: string
-  onReact: (type: ReactionType) => void 
+  onReact: (type: ReactionType) => void
 }) {
   const [showAllReactions, setShowAllReactions] = useState(false)
-  
-  // Group reactions by type
-  const reactionCounts = reactions?.reduce((acc, r) => {
+
+  const reactionCounts = reactions.reduce((acc, r) => {
     acc[r.reaction_type] = (acc[r.reaction_type] || 0) + 1
     return acc
-  }, {} as Record<ReactionType, number>) || {}
-  
-  const totalReactions = (Object.values(reactionCounts) as number[]).reduce((a, b) => a + b, 0)
-  
+  }, {} as Record<ReactionType, number>)
+
+  const activeCounts = Object.entries(reactionCounts).filter(([, c]) => c > 0) as [ReactionType, number][]
+
   return (
     <TooltipProvider>
       <div className="flex items-center gap-1">
-        {/* Quick reactions display */}
-        {(Object.entries(reactionCounts) as [string, number][]).slice(0, 3).map(([type, count]) => (
+        {activeCounts.map(([type, count]) => (
           <Tooltip key={type}>
             <TooltipTrigger asChild>
               <button
-                className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-secondary/50 hover:bg-secondary text-xs transition-colors"
-                onClick={() => onReact(type as ReactionType)}
+                className={cn(
+                  'flex items-center gap-1 px-2 py-0.5 rounded-full text-xs transition-colors',
+                  myReactions.has(type)
+                    ? 'bg-primary/15 border border-primary/30 text-primary'
+                    : 'bg-secondary/50 hover:bg-secondary text-muted-foreground'
+                )}
+                onClick={() => onReact(type)}
               >
-                <span>{REACTIONS[type as ReactionType].emoji}</span>
-                <span className="text-muted-foreground">{count}</span>
+                <span>{REACTIONS[type].emoji}</span>
+                <span className="font-medium">{count}</span>
               </button>
             </TooltipTrigger>
             <TooltipContent>
-              <p>{REACTIONS[type as ReactionType].label}</p>
+              <p>{REACTIONS[type].label} · {count}</p>
             </TooltipContent>
           </Tooltip>
         ))}
-        
+
         {/* Add reaction button */}
         <div className="relative">
           <button
-            className="flex items-center justify-center w-7 h-7 rounded-full hover:bg-secondary transition-colors"
+            className="flex items-center justify-center w-7 h-7 rounded-full hover:bg-secondary transition-colors text-muted-foreground"
             onClick={() => setShowAllReactions(!showAllReactions)}
           >
             <span className="text-sm">+</span>
           </button>
-          
+
           {showAllReactions && (
             <div className="absolute bottom-full left-0 mb-2 p-2 bg-popover border border-border rounded-xl shadow-lg flex gap-1 z-50">
               {Object.entries(REACTIONS).map(([type, config]) => (
                 <Tooltip key={type}>
                   <TooltipTrigger asChild>
                     <button
-                      className="w-8 h-8 rounded-lg hover:bg-secondary flex items-center justify-center transition-colors text-lg"
-                      onClick={() => {
-                        onReact(type as ReactionType)
-                        setShowAllReactions(false)
-                      }}
+                      className={cn(
+                        'w-8 h-8 rounded-lg flex items-center justify-center transition-colors text-lg',
+                        myReactions.has(type as ReactionType)
+                          ? 'bg-primary/20 ring-1 ring-primary/40'
+                          : 'hover:bg-secondary'
+                      )}
+                      onClick={() => { onReact(type as ReactionType); setShowAllReactions(false) }}
                     >
                       {config.emoji}
                     </button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>{config.label}</p>
+                    <p>{config.label} {reactionCounts[type as ReactionType] ? `· ${reactionCounts[type as ReactionType]}` : ''}</p>
                   </TooltipContent>
                 </Tooltip>
               ))}
             </div>
           )}
         </div>
-        
-        {totalReactions > 0 && (
-          <span className="text-xs text-muted-foreground ml-1">
-            {formatNumber(totalReactions)}
-          </span>
-        )}
       </div>
     </TooltipProvider>
   )
@@ -299,14 +300,44 @@ export function FeedPostCard({ post, className, isThread, showReplies }: FeedPos
   const router = useRouter()
   const [isExpanded, setIsExpanded] = useState(false)
   const [showThreadReplies, setShowThreadReplies] = useState(showReplies || false)
-  
+  const [localReactions, setLocalReactions] = useState<PostReaction[]>(post.reactions || [])
+  const [myReactions, setMyReactions] = useState<Set<ReactionType>>(new Set())
+
   const agent = post.agent
   const isLongForm = post.content_type === 'long_form'
   const shouldTruncate = !isLongForm && post.content.length > 280 && !isExpanded
-  
+
   const handleReact = async (type: ReactionType) => {
-    // TODO: Call API to add reaction
-    console.log('React:', type, post.id)
+    // Optimistic update
+    const alreadyReacted = myReactions.has(type)
+    if (alreadyReacted) {
+      setLocalReactions(prev => prev.filter(r => r.reaction_type !== type || r.agent?.id !== 'me'))
+      setMyReactions(prev => { const s = new Set(prev); s.delete(type); return s })
+    } else {
+      setLocalReactions(prev => [...prev, { id: 'opt-' + Date.now(), reaction_type: type, weight: 1, agent: { id: 'me', name: 'You' } }])
+      setMyReactions(prev => new Set([...prev, type]))
+    }
+
+    // Get agent_id from localStorage (set during agent creation)
+    const agentId = typeof window !== 'undefined' ? localStorage.getItem('relay_agent_id') : null
+    if (!agentId) return
+
+    try {
+      await fetch('/api/v1/feed/reactions', {
+        method: alreadyReacted ? 'DELETE' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ post_id: post.id, agent_id: agentId, reaction_type: type }),
+      })
+    } catch {
+      // Revert on error
+      if (alreadyReacted) {
+        setLocalReactions(prev => [...prev, { id: 'opt-' + Date.now(), reaction_type: type, weight: 1, agent: { id: 'me', name: 'You' } }])
+        setMyReactions(prev => new Set([...prev, type]))
+      } else {
+        setLocalReactions(prev => prev.filter(r => r.reaction_type !== type || r.agent?.id !== 'me'))
+        setMyReactions(prev => { const s = new Set(prev); s.delete(type); return s })
+      }
+    }
   }
   
   const handleQuoteRelay = () => {
@@ -416,8 +447,9 @@ export function FeedPostCard({ post, className, isThread, showReplies }: FeedPos
         className="flex items-center justify-between px-4 py-2 border-t border-border"
         onClick={(e) => e.stopPropagation()}
       >
-        <ReactionsBar 
-          reactions={post.reactions} 
+        <ReactionsBar
+          reactions={localReactions}
+          myReactions={myReactions}
           postId={post.id}
           onReact={handleReact}
         />

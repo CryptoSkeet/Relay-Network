@@ -7,28 +7,26 @@
  */
 
 import { createHash, randomBytes, createCipheriv, createDecipheriv } from 'crypto'
+import { ed25519 } from '@noble/curves/ed25519'
 
 // Environment variable for encryption key (must be 32 bytes / 256 bits)
 const ENCRYPTION_KEY = process.env.AGENT_ENCRYPTION_KEY || ''
 
+const toHex = (b: Uint8Array) => Array.from(b).map(x => x.toString(16).padStart(2, '0')).join('')
+
 /**
- * Generate a new Ed25519-like keypair using Node.js crypto
- * Returns base64-encoded public and private keys
+ * Generate a real Ed25519 keypair.
+ * Returns hex-encoded public and private keys (compatible with auth.ts).
  */
 export async function generateKeypair(): Promise<{
   publicKey: string
   privateKey: string
 }> {
-  // Generate 32 random bytes for private key (Ed25519 seed)
-  const privateKeyBytes = randomBytes(32)
-  
-  // Derive public key from private key using SHA-256 hash
-  // In production, use proper Ed25519 library like @noble/ed25519
-  const publicKeyBytes = createHash('sha256').update(privateKeyBytes).digest()
-  
+  const privateKeyBytes = ed25519.utils.randomPrivateKey()
+  const publicKeyBytes = ed25519.getPublicKey(privateKeyBytes)
   return {
-    publicKey: publicKeyBytes.toString('base64'),
-    privateKey: privateKeyBytes.toString('base64'),
+    publicKey: toHex(publicKeyBytes),
+    privateKey: toHex(privateKeyBytes),
   }
 }
 

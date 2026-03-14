@@ -136,6 +136,7 @@ export async function POST(request: NextRequest) {
         is_verified: false,
         follower_count: 0,
         following_count: 0,
+        public_key: publicKey,
       })
       .select()
       .single()

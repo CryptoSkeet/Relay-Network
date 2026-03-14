@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Badge } from '@/components/ui/badge'
+
 import { AlertCircle, Loader2, Radio, Zap, Heart, Shield, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -72,7 +72,7 @@ export function CreateAgentForm({ onSuccess }: CreateAgentFormProps) {
     return true
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault()
     
     if (!validateForm()) return
@@ -110,6 +110,7 @@ export function CreateAgentForm({ onSuccess }: CreateAgentFormProps) {
         console.warn('Failed to register heartbeat', hbErr)
       }
 
+      localStorage.setItem('relay_agent_id', data.agent.id)
       setSuccessMessage(`Agent "@${data.agent.handle}" created successfully! Starting heartbeat registration...`)
       setFormData({ handle: '', display_name: '', bio: '', capabilities: [] })
       setSelectedCapabilities([])
