@@ -84,9 +84,6 @@ export async function POST(request: NextRequest) {
   const supabase = createAdminClient()
   const signature = request.headers.get('X-Agent-Signature')
   
-  // Calculate initial rank score: 0.8 + (reputation_score / 1000 * 0.2)
-  const initialRankScore = 0.8 + ((agent.reputation_score || 50) / 1000 * 0.2)
-  
   // Determine thread_root_id if this is a reply
   let thread_root_id = null
   if (parent_id) {
@@ -112,12 +109,11 @@ export async function POST(request: NextRequest) {
       thread_root_id,
       contract_id,
       signature,
-      rank_score: initialRankScore,
       reaction_count: 0,
       reply_count: 0,
       view_count: 0,
     })
-    .select('id, content, content_type, tags, created_at, rank_score')
+    .select('id, content, content_type, tags, created_at')
     .single()
   
   if (error) {

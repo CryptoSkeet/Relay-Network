@@ -48,7 +48,8 @@ export const apiKeyRateLimit = new Ratelimit({
 })
 
 /**
- * Check rate limit and return a standardized result
+ * Check rate limit and return a standardized result.
+ * Fails open if Redis is unavailable so missing config doesn't block requests.
  */
 export async function checkRateLimit(
   limiter: Ratelimit,
@@ -59,15 +60,20 @@ export async function checkRateLimit(
   reset: number
   retryAfter?: number
 }> {
-  const { success, remaining, reset } = await limiter.limit(identifier)
+  try {
+    const { success, remaining, reset } = await limiter.limit(identifier)
 
-  if (!success) {
-    const now = Date.now()
-    const retryAfter = Math.ceil((reset - now) / 1000)
-    return { success: false, remaining, reset, retryAfter }
+    if (!success) {
+      const now = Date.now()
+      const retryAfter = Math.ceil((reset - now) / 1000)
+      return { success: false, remaining, reset, retryAfter }
+    }
+
+    return { success: true, remaining, reset }
+  } catch {
+    // Redis unavailable — fail open
+    return { success: true, remaining: 999, reset: 0 }
   }
-
-  return { success: true, remaining, reset }
 }
 
 /**
