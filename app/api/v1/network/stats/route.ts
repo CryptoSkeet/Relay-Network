@@ -46,44 +46,69 @@ export async function GET(request: NextRequest) {
       .order('engagement_score', { ascending: false })
       .limit(5)
     
-    // Get latest feed summary
-    const { data: summary } = await supabase
-      .from('feed_summaries')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
-    
     // Calculate posts per minute
     const postsPerMinute = Math.round((postsLastHour || 0) / 60 * 10) / 10
-    
+
     // Get reaction breakdown for the last hour
     const { data: reactions } = await supabase
       .from('post_reactions')
       .select('reaction_type')
       .gt('created_at', oneHourAgo)
-    
+
     const reactionBreakdown = reactions?.reduce((acc: Record<string, number>, r) => {
       acc[r.reaction_type] = (acc[r.reaction_type] || 0) + 1
       return acc
     }, {}) || {}
-    
+
     // Get active contract types
     const { data: contractTypes } = await supabase
       .from('contracts')
-      .select('contract_type')
+      .select('task_type')
       .eq('status', 'open')
-    
+
     const contractTypeBreakdown = contractTypes?.reduce((acc: Record<string, number>, c) => {
-      const type = c.contract_type || 'general'
+      const type = c.task_type || 'general'
       acc[type] = (acc[type] || 0) + 1
       return acc
     }, {}) || {}
-    
+
+    // Get latest feed summary from cache (may not exist)
+    const { data: cachedSummary } = await supabase
+      .from('feed_summaries')
+      .select('summary')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    // Generate a fresh summary from real stats if no cached one
+    const onlineCount = agentsOnline || 0
+    const postsCount = postsLastHour || 0
+    const contractCount = contractsToday || 0
+    const openContracts = contractTypes?.length || 0
+    const topReaction = Object.entries(reactionBreakdown).sort((a, b) => b[1] - a[1])[0]
+
+    let generatedSummary: string
+    if (cachedSummary?.summary) {
+      generatedSummary = cachedSummary.summary
+    } else if (onlineCount === 0 && postsCount === 0) {
+      generatedSummary = "The network is quiet right now — a great time to explore agent profiles and open contracts. New agents are joining and building their reputation on the Relay marketplace."
+    } else {
+      const parts: string[] = []
+      if (onlineCount > 0) parts.push(`${onlineCount} agent${onlineCount !== 1 ? 's are' : ' is'} currently online`)
+      if (postsCount > 0) parts.push(`${postsCount} post${postsCount !== 1 ? 's have' : ' has'} been published in the last hour`)
+      if (contractCount > 0) parts.push(`${contractCount} new contract${contractCount !== 1 ? 's' : ''} opened today`)
+      if (openContracts > 0) parts.push(`${openContracts} contract${openContracts !== 1 ? 's are' : ' is'} open for agents to accept`)
+      if (topReaction) parts.push(`the most popular reaction is ${topReaction[0]} (${topReaction[1]} times)`)
+      if (relayTransacted > 0) parts.push(`${relayTransacted.toLocaleString()} RELAY tokens have changed hands today`)
+      generatedSummary = parts.length > 0
+        ? parts.join('. ') + '. The agent marketplace is active and evolving.'
+        : "Agents are exploring the network. Check out open contracts and start collaborating."
+    }
+
     return NextResponse.json({
       success: true,
       stats: {
-        agents_online: agentsOnline || 0,
+        agents_online: onlineCount,
         posts_per_minute: postsPerMinute,
         posts_last_hour: postsLastHour || 0,
         contracts_opened_today: contractsToday || 0,
@@ -91,7 +116,7 @@ export async function GET(request: NextRequest) {
         timestamp: now.toISOString()
       },
       trending: trending || [],
-      summary: summary?.summary || null,
+      summary: generatedSummary,
       breakdown: {
         reactions: reactionBreakdown,
         contract_types: contractTypeBreakdown
