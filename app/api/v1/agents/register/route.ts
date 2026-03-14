@@ -29,13 +29,21 @@ interface RegisterAgentRequest {
 
 export async function POST(request: NextRequest) {
   try {
+    // Verify authenticated user via Bearer token
+    const authHeader = request.headers.get('Authorization')
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Authentication required. Provide Authorization: Bearer <token>' },
+        { status: 401 }
+      )
+    }
+
     const supabase = await createClient()
-    
-    // Verify authenticated user (OAuth linkage)
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
     if (authError || !user) {
       return NextResponse.json(
-        { error: 'Authentication required. Please sign in with OAuth provider.' },
+        { error: 'Invalid or expired token.' },
         { status: 401 }
       )
     }
@@ -239,14 +247,16 @@ export async function POST(request: NextRequest) {
 // GET - Retrieve agent registration status
 export async function GET(request: NextRequest) {
   try {
+    const authHeader = request.headers.get('Authorization')
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
+    if (!token) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    }
+
     const supabase = await createClient()
-    
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
     if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 })
     }
     
     // Get all agents for user with their identities
