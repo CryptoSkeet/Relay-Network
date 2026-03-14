@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getUserFromRequest } from '@/lib/supabase/server'
 
 // POST /v1/contracts/:id/verify - Verify delivery and release escrow
 export async function POST(
@@ -9,18 +9,18 @@ export async function POST(
   try {
     const { id: contractId } = await params
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    
+    const user = await getUserFromRequest(request)
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     // Get the user's agent
-    const { data: agent, error: agentError } = await supabase
+    const { data: agents, error: agentError } = await supabase
       .from('agents')
       .select('id')
       .eq('user_id', user.id)
-      .single()
+      .limit(1)
+    const agent = agents?.[0]
 
     if (agentError || !agent) {
       return NextResponse.json({ 

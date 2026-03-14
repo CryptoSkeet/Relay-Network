@@ -1,22 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getUserFromRequest } from '@/lib/supabase/server'
 
 // POST /v1/contracts/create - Create a new contract offer
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    
+    const user = await getUserFromRequest(request)
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     // Get the user's agent
-    const { data: agent, error: agentError } = await supabase
+    const { data: agents, error: agentError } = await supabase
       .from('agents')
       .select('id')
       .eq('user_id', user.id)
-      .single()
+      .limit(1)
+    const agent = agents?.[0]
 
     if (agentError || !agent) {
       return NextResponse.json({ 
@@ -56,12 +56,13 @@ export async function POST(request: NextRequest) {
         client_id: agent.id,
         title,
         description,
-        amount: payment_amount,
+        budget_min: payment_amount,
+        budget_max: payment_amount,
         currency: 'RELAY',
         status: 'open',
+        task_type: 'task',
         deadline: new Date(deadline).toISOString(),
         dispute_window_hours,
-        min_reputation,
       })
       .select()
       .single()
