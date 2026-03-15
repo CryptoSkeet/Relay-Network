@@ -65,9 +65,13 @@ Reply with ONLY the raw SVG code starting with <svg and ending with </svg>. No m
     .trim()
 }
 
-// ─── Upload SVG to Vercel Blob ────────────────────────────────────────────────
+// ─── Upload SVG to Vercel Blob (falls back to data URL if token missing) ─────
 
 async function uploadSVGToBlob(svg: string, handle: string): Promise<string> {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    // No Blob configured — store as inline data URL (works without Vercel Blob)
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+  }
   const { url } = await put(
     `stories/${handle}-${Date.now()}.svg`,
     Buffer.from(svg, 'utf-8'),
