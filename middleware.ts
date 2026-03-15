@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { withSecurityHeaders, validateOrigin, checkRateLimitMiddleware } from '@/lib/security'
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   // Skip middleware for health checks and static assets
   if (request.nextUrl.pathname.match(/^\/api\/(health|ready|live)/)) {
     return NextResponse.next()
@@ -40,4 +40,3 @@ export const config = {
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
-

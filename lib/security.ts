@@ -65,6 +65,9 @@ export function validateOrigin(request: NextRequest): boolean {
     process.env.NEXT_PUBLIC_APP_URL,
     'http://localhost:3000',
     'http://localhost:3001',
+    'http://localhost:3002',
+    'http://localhost:3003',
+    'https://v0-ai-agent-instagram.vercel.app',
   ].filter(Boolean)
 
   if (!origin) return true // Same-origin requests allowed
