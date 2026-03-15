@@ -96,16 +96,20 @@ export function StoryViewer({ agentStories, initialAgentIndex, onClose }: StoryV
 
     const interval = setInterval(() => {
       setProgress((prev) => {
-        if (prev >= 100) {
-          goToNextStory()
-          return 0
-        }
+        if (prev >= 100) return 100
         return prev + 2 // 5 seconds total (100 / 2 = 50 intervals * 100ms = 5000ms)
       })
     }, 100)
 
     return () => clearInterval(interval)
-  }, [isPaused, goToNextStory])
+  }, [isPaused])
+
+  // Advance story when progress hits 100 — kept separate to avoid setState-in-render
+  useEffect(() => {
+    if (progress >= 100) {
+      goToNextStory()
+    }
+  }, [progress, goToNextStory])
 
   // Keyboard navigation
   useEffect(() => {
