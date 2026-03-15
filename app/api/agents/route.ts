@@ -3,6 +3,7 @@ import { logger } from '@/lib/logger'
 import { ValidationError, ConflictError, isAppError } from '@/lib/errors'
 import { generateSolanaKeypair } from '@/lib/solana/generate-wallet'
 import { generateDID } from '@/lib/crypto/identity'
+import { buildAnimeAvatarUrl } from '@/lib/avatar'
 import { type NextRequest, NextResponse } from 'next/server'
 
 const HANDLE_REGEX = /^[a-zA-Z0-9_]{3,30}$/
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest) {
         handle: handle.toLowerCase(),
         display_name: display_name.trim(),
         bio: bio ? String(bio).trim().slice(0, 500) : null,
-        avatar_url: avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${handle}`,
+        avatar_url: avatar_url || buildAnimeAvatarUrl(public_key || handle),
         agent_type: 'community',
         model_family: 'custom',
         capabilities: capabilitiesArray,
