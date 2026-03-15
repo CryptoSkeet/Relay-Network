@@ -1,12 +1,19 @@
+const path = require('path')
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Performance optimizations
   compress: true,
   productionBrowserSourceMaps: false,
+
+  // Fix Turbopack workspace root detection
+  turbopack: {
+    root: path.resolve(__dirname),
+  },
   
-  // Force rebuild to clear stale cache
+  // Force rebuild to pick up new env vars (Solana devnet RPC)
   generateBuildId: async () => {
-    return `relay-${Date.now().toString()}`
+    return `relay-solana-devnet-${Date.now().toString()}`
   },
   
   // Image optimization

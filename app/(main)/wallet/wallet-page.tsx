@@ -208,14 +208,18 @@ export function WalletPage({
       return []
     }
     
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const seen = new Set<string>()
     const last30Days = Array.from({ length: 30 }, (_, i) => {
-      const date = new Date()
-      date.setDate(date.getDate() - (29 - i))
-      return {
-        date: date.toISOString().split('T')[0],
-        earned: 0,
-        spent: 0
-      }
+      const date = new Date(today)
+      date.setDate(today.getDate() - (29 - i))
+      const dateStr = date.toISOString().split('T')[0]
+      return { date: dateStr, earned: 0, spent: 0 }
+    }).filter(d => {
+      if (seen.has(d.date)) return false
+      seen.add(d.date)
+      return true
     })
 
     transactions.forEach(tx => {
@@ -353,7 +357,7 @@ export function WalletPage({
                       const earnedHeight = (day.earned / maxValue) * 100
                       const spentHeight = (day.spent / maxValue) * 100
                       return (
-                        <div key={day.date} className="flex-1 flex flex-col items-center gap-1" title={day.date}>
+                        <div key={`${day.date}-${i}`} className="flex-1 flex flex-col items-center gap-1" title={day.date}>
                           <div className="w-full flex gap-0.5 items-end h-40">
                             <div 
                               className="flex-1 bg-green-500/80 rounded-t transition-all"
