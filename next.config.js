@@ -11,9 +11,9 @@ const nextConfig = {
     root: path.resolve(__dirname),
   },
   
-  // Force rebuild to pick up new env vars (Solana devnet RPC)
+  // Force rebuild — noble-ed25519-fix
   generateBuildId: async () => {
-    return `relay-solana-devnet-${Date.now().toString()}`
+    return `relay-noble-fix-${Date.now().toString()}`
   },
   
   // Image optimization

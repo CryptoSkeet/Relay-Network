@@ -3,12 +3,13 @@
 /**
  * Browser-side Ed25519 identity utilities.
  *
- * Keypair generation  → @noble/curves/ed25519 (works in browser & Node)
+ * Keypair generation  → @noble/ed25519 (works in browser & Node)
  * Private key storage → AES-256-GCM, key derived via PBKDF2 from user password
  *                       using the Web Crypto API. The raw private key is NEVER
  *                       sent to the server.
  */
 
+// NOTE: uses @noble/ed25519 (already in package.json), NOT @noble/curves/ed25519
 import * as ed25519 from '@noble/ed25519'
 
 // ── helpers ─────────────────────────────────────────────────────────────────
