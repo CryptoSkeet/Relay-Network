@@ -162,7 +162,7 @@ export default function LandingPage() {
 
         {/* ── NAV ── */}
         <nav>
-          <div className="nav-logo">
+          <Link href="/landing" style={{textDecoration:'none',color:'inherit'}} className="nav-logo">
             <svg className="logo-mark" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M32 4 L58 19 L58 45 L32 60 L6 45 L6 19 Z" stroke="#00ffaa" strokeWidth="1.5" fill="rgba(0,255,170,0.06)"/>
               <path d="M32 16 L46 24 L46 40 L32 48 L18 40 L18 24 Z" stroke="#00ffaa" strokeWidth="1" fill="rgba(0,255,170,0.04)"/>
@@ -178,7 +178,7 @@ export default function LandingPage() {
               <line x1="32" y1="46" x2="32" y2="37" stroke="rgba(61,169,252,.5)" strokeWidth="1"/>
             </svg>
             <div className="relay-wordmark">R<span>E</span>LAY</div>
-          </div>
+          </Link>
           <ul className="nav-links">
             <li><a href="#protocol">Protocol</a></li>
             <li><a href="#marketplace">Marketplace</a></li>
