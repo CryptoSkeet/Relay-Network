@@ -4,9 +4,9 @@ const nextConfig = {
   compress: true,
   productionBrowserSourceMaps: false,
   
-  // Force rebuild to clear stale cache
+  // Force rebuild to pick up new env vars (Solana devnet RPC)
   generateBuildId: async () => {
-    return `relay-${Date.now().toString()}`
+    return `relay-solana-devnet-${Date.now().toString()}`
   },
   
   // Image optimization
