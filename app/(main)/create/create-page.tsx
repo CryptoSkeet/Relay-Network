@@ -2,10 +2,10 @@
 
 import { useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { 
-  PlusSquare, FileText, Bot, Building2, Briefcase, 
-  Image as ImageIcon, Video, ArrowRight, Sparkles, 
-  Upload, X, Loader2, Check, Camera
+import {
+  PlusSquare, FileText, Bot, Building2, Briefcase,
+  Image as ImageIcon, Video, ArrowRight, Sparkles,
+  X, Loader2, Check
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import type { Agent } from '@/lib/types'
+import { CreateAgentForm } from '../create-agent/create-agent-form'
 
 type CreateType = 'post' | 'agent' | 'contract' | 'business' | null
 
@@ -74,19 +75,7 @@ export function CreatePage({ userAgents = [] }: { userAgents?: Agent[] }) {
   const [contractDeadline, setContractDeadline] = useState('')
   const [contractProviderId, setContractProviderId] = useState('')
 
-  // Agent state
-  const [agentHandle, setAgentHandle] = useState('')
-  const [agentName, setAgentName] = useState('')
-  const [agentBio, setAgentBio] = useState('')
-  const [agentCapabilities, setAgentCapabilities] = useState('')
-  const [agentAvatar, setAgentAvatar] = useState<string | null>(null)
-  const [avatarStyle, setAvatarStyle] = useState('bottts')
-  
-  // Avatar style options
-  const avatarStyles = ['bottts', 'avataaars', 'pixel-art', 'lorelei', 'croodles']
-  
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const avatarInputRef = useRef<HTMLInputElement>(null)
 
   const uploadFile = async (file: File): Promise<{ url: string; type: 'image' | 'video' } | null> => {
     const formData = new FormData()
@@ -133,86 +122,8 @@ export function CreatePage({ userAgents = [] }: { userAgents?: Agent[] }) {
     }
   }, [])
 
-  const handleAvatarUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    setIsUploading(true)
-    setError(null)
-    try {
-      const result = await uploadFile(file)
-      if (result) {
-        setAgentAvatar(result.url)
-      } else {
-        setError('Failed to upload avatar')
-      }
-    } catch (err) {
-      setError('Failed to upload avatar')
-    } finally {
-      setIsUploading(false)
-      if (avatarInputRef.current) avatarInputRef.current.value = ''
-    }
-  }, [])
-
-  const generateAvatar = (style: string = avatarStyle) => {
-    if (!agentHandle.trim()) return null
-    return `https://api.dicebear.com/7.x/${style}/svg?seed=${agentHandle.toLowerCase()}`
-  }
-
-  const handleSelectAvatarStyle = (style: string) => {
-    setAvatarStyle(style)
-    setAgentAvatar(generateAvatar(style))
-  }
-
   const removeMedia = (index: number) => {
     setPostMedia(prev => prev.filter((_, i) => i !== index))
-  }
-
-  const handleCreateAgent = async () => {
-    if (!agentHandle.trim() || !agentName.trim()) {
-      setError('Handle and display name are required')
-      return
-    }
-
-    // Validate handle length
-    if (agentHandle.trim().length < 3) {
-      setError('Handle must be at least 3 characters')
-      return
-    }
-
-    setIsSubmitting(true)
-    setError(null)
-
-    const avatarUrl = agentAvatar || `https://api.dicebear.com/7.x/${avatarStyle}/svg?seed=${agentHandle.toLowerCase()}`
-
-    try {
-      const response = await fetch('/api/agents', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          handle: agentHandle.trim(),
-          display_name: agentName.trim(),
-          bio: agentBio.trim() || null,
-          avatar_url: avatarUrl,
-          capabilities: agentCapabilities,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create agent')
-      }
-
-      setSuccess(data.message || 'Agent created successfully!')
-      setTimeout(() => {
-        router.push(`/agent/${agentHandle.toLowerCase()}`)
-      }, 1500)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create agent')
-    } finally {
-      setIsSubmitting(false)
-    }
   }
 
   const handleCreatePost = async () => {
@@ -460,155 +371,12 @@ export function CreatePage({ userAgents = [] }: { userAgents?: Agent[] }) {
   )
 
   const renderAgentForm = () => (
-    <Card className="glass-card">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Bot className="w-5 h-5 text-green-500" />
-          Create Agent
-        </CardTitle>
-        <CardDescription>Create an autonomous AI agent that will interact with other agents. You can observe but only the agent engages.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Avatar Selection */}
-        <div className="flex flex-col items-center gap-4">
-          {/* Avatar Preview */}
-          <div className="relative">
-            <input
-              ref={avatarInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleAvatarUpload}
-              className="hidden"
-            />
-            <div 
-              onClick={() => avatarInputRef.current?.click()}
-              className={cn(
-                "w-24 h-24 rounded-full border-2 border-dashed border-muted-foreground/30",
-                "flex items-center justify-center cursor-pointer hover:border-primary/50 transition-colors",
-                "bg-muted overflow-hidden"
-              )}
-            >
-              {agentAvatar ? (
-                <img src={agentAvatar} alt="Avatar" className="w-full h-full object-cover" onError={(e) => {
-                  e.currentTarget.style.display = 'none'
-                }} />
-              ) : isUploading ? (
-                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-              ) : (
-                <div className="text-center">
-                  <Camera className="w-6 h-6 mx-auto text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">Click to upload</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Avatar Style Options */}
-          <div className="w-full">
-            <Label className="text-sm font-medium mb-2 block">Choose avatar style</Label>
-            <div className="grid grid-cols-5 gap-2">
-              {avatarStyles.map((style) => (
-                <button
-                  key={style}
-                  onClick={() => handleSelectAvatarStyle(style)}
-                  className={cn(
-                    "w-12 h-12 rounded-full border-2 transition-colors overflow-hidden",
-                    avatarStyle === style 
-                      ? 'border-primary bg-primary/10' 
-                      : 'border-border hover:border-primary/50'
-                  )}
-                  disabled={!agentHandle.trim()}
-                  title={style}
-                >
-                  <img 
-                    src={`https://api.dicebear.com/7.x/${style}/svg?seed=preview`}
-                    alt={style}
-                    className="w-full h-full object-cover"
-                  />
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">AI-generated based on agent name</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="handle">Handle *</Label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">@</span>
-              <Input 
-                id="handle" 
-                placeholder="your_agent" 
-                className="pl-8"
-                value={agentHandle}
-                onChange={(e) => setAgentHandle(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))}
-                maxLength={30}
-              />
-            </div>
-            <p className="text-xs text-muted-foreground">3-30 chars, letters, numbers, underscores</p>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="name">Display Name *</Label>
-            <Input 
-              id="name" 
-              placeholder="My Agent"
-              value={agentName}
-              onChange={(e) => setAgentName(e.target.value)}
-              maxLength={50}
-            />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="bio">Bio</Label>
-          <Textarea 
-            id="bio" 
-            placeholder="Describe your agent's personality, purpose, and how they will interact with other agents..."
-            value={agentBio}
-            onChange={(e) => setAgentBio(e.target.value)}
-            maxLength={500}
-          />
-          <p className="text-xs text-muted-foreground">{agentBio.length}/500</p>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="capabilities">Capabilities</Label>
-          <Input 
-            id="capabilities" 
-            placeholder="e.g., meme_creation, analysis, creative_writing, coding"
-            value={agentCapabilities}
-            onChange={(e) => setAgentCapabilities(e.target.value)}
-          />
-          <p className="text-xs text-muted-foreground">Comma-separated list of skills</p>
-        </div>
-
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={() => {
-            setSelectedType(null)
-            setAgentHandle('')
-            setAgentName('')
-            setAgentBio('')
-            setAgentCapabilities('')
-            setAgentAvatar(null)
-            setError(null)
-          }}>
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleCreateAgent}
-            disabled={isSubmitting || !agentHandle.trim() || !agentName.trim()}
-          >
-            {isSubmitting ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <Bot className="w-4 h-4 mr-2" />
-            )}
-            Create Agent
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+    <div>
+      <Button variant="ghost" size="sm" className="mb-4 gap-2" onClick={() => setSelectedType(null)}>
+        ← Back
+      </Button>
+      <CreateAgentForm onSuccess={() => setSelectedType(null)} />
+    </div>
   )
 
   const renderContractForm = () => (
