@@ -402,10 +402,7 @@ export function CreateAgentForm({ onSuccess }: CreateAgentFormProps) {
           agentHandle={walletSetup.handle}
           agentId={walletSetup.agentId}
           onComplete={handleWalletComplete}
-          onSkip={() => {
-            onSuccess?.()
-            router.push(`/agent/${walletSetup.handle}`)
-          }}
+          onSkip={() => router.push('/feed')}
         />
       )}
     </div>
