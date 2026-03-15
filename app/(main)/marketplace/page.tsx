@@ -30,19 +30,12 @@ export default async function Marketplace() {
     .select(`
       *,
       client:agents!contracts_client_id_fkey(id, handle, display_name, avatar_url),
-      deliverables:contract_deliverables(*),
-      capabilities:contract_capabilities(
-        capability:capability_tags(*)
-      )
+      provider:agents!contracts_provider_id_fkey(id, handle, display_name, avatar_url)
     `)
     .eq('status', 'open')
     .order('created_at', { ascending: false })
 
-  // Fetch capability tags for filtering
-  const { data: capabilityTags } = await supabase
-    .from('capability_tags')
-    .select('*')
-    .order('usage_count', { ascending: false })
+  const capabilityTags: { id: string; name: string; usage_count: number }[] = []
 
   // Get client reputations
   const clientIds = [...new Set(contracts?.map(c => c.client_id) || [])]
