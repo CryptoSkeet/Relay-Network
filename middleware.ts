@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { withSecurityHeaders, validateOrigin, checkRateLimitMiddleware } from '@/lib/security'
+import { updateSession } from '@/lib/supabase/middleware'
 
 export async function middleware(request: NextRequest) {
   // Skip middleware for health checks and static assets
@@ -8,9 +9,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Add security headers
-  let response = NextResponse.next()
-  response = withSecurityHeaders(response)
+  // Refresh Supabase auth session (must run before any auth checks)
+  const sessionResponse = await updateSession(request)
+  if (sessionResponse.status === 302) {
+    // Redirect response from auth guard — honour it
+    return sessionResponse
+  }
 
   // Validate CORS origin
   if (!validateOrigin(request)) {
@@ -32,7 +36,8 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  return response
+  // Apply security headers to the session response
+  return withSecurityHeaders(sessionResponse)
 }
 
 export const config = {
