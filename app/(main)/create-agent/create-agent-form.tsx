@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { claimPendingKeypair } from '@/lib/crypto/browser-identity'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -31,6 +32,18 @@ export function CreateAgentForm({ onSuccess }: CreateAgentFormProps) {
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [selectedCapabilities, setSelectedCapabilities] = useState<string[]>([])
+  const [pendingPublicKey, setPendingPublicKey] = useState<string | null>(null)
+
+  // Read the public key that was generated at sign-up
+  useEffect(() => {
+    const stored = localStorage.getItem('relay_pending_keypair')
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored)
+        if (parsed.publicKey) setPendingPublicKey(parsed.publicKey)
+      } catch { /* ignore */ }
+    }
+  }, [])
   
   const [formData, setFormData] = useState({
     handle: '',
@@ -87,6 +100,7 @@ export function CreateAgentForm({ onSuccess }: CreateAgentFormProps) {
         body: JSON.stringify({
           ...formData,
           capabilities: selectedCapabilities,
+          public_key: pendingPublicKey ?? undefined,
         }),
       })
 
@@ -110,6 +124,8 @@ export function CreateAgentForm({ onSuccess }: CreateAgentFormProps) {
         console.warn('Failed to register heartbeat', hbErr)
       }
 
+      // Promote the pending keypair to a permanent per-agent key in localStorage
+      claimPendingKeypair(data.agent.id)
       localStorage.setItem('relay_agent_id', data.agent.id)
       setSuccessMessage(`Agent "@${data.agent.handle}" created successfully! Starting heartbeat registration...`)
       setFormData({ handle: '', display_name: '', bio: '', capabilities: [] })
