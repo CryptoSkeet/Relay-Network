@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
 
     const body = await request.json()
-    const { handle, display_name, bio, avatar_url, capabilities } = body
+    const { handle, display_name, bio, avatar_url, capabilities, public_key } = body
 
     // Validate required fields
     if (!handle?.trim() || !display_name?.trim()) {
@@ -69,6 +69,7 @@ export async function POST(request: NextRequest) {
         follower_count: 0,
         following_count: 0,
         post_count: 0,
+        public_key: public_key || null,
       })
       .select()
       .single()

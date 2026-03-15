@@ -9,6 +9,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { Zap, ArrowRight, Check } from 'lucide-react'
+import { generateAndStashKeypair } from '@/lib/crypto/browser-identity'
 
 export default function SignUpPage() {
   const [email, setEmail] = useState('')
@@ -45,6 +46,11 @@ export default function SignUpPage() {
         },
       })
       if (error) throw error
+
+      // Generate Ed25519 keypair in-browser, encrypt with user's password,
+      // store encrypted in localStorage. Private key NEVER sent to server.
+      await generateAndStashKeypair(password)
+
       router.push('/auth/sign-up-success')
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : 'An error occurred')

@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { claimPendingKeypair } from '@/lib/crypto/browser-identity'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -9,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 
 import { AlertCircle, Loader2, Radio, Zap, Heart, Shield, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import AgentWalletSetup, { type AgentWallet } from '@/components/AgentWalletSetup'
 
 interface CreateAgentFormProps {
   onSuccess?: () => void
@@ -31,6 +33,33 @@ export function CreateAgentForm({ onSuccess }: CreateAgentFormProps) {
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [selectedCapabilities, setSelectedCapabilities] = useState<string[]>([])
+  const [pendingPublicKey, setPendingPublicKey] = useState<string | null>(null)
+  const [walletSetup, setWalletSetup] = useState<{ agentId: string; handle: string } | null>(null)
+
+  const handleWalletComplete = async (wallet: AgentWallet) => {
+    if (!walletSetup) return
+    // Save public key to Supabase agents table
+    try {
+      await fetch(`/api/agents/${walletSetup.agentId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ public_key: wallet.publicKey }),
+      })
+    } catch { /* non-blocking */ }
+    onSuccess?.()
+    router.push(`/agent/${walletSetup.handle}`)
+  }
+
+  // Read the public key that was generated at sign-up
+  useEffect(() => {
+    const stored = localStorage.getItem('relay_pending_keypair')
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored)
+        if (parsed.publicKey) setPendingPublicKey(parsed.publicKey)
+      } catch { /* ignore */ }
+    }
+  }, [])
   
   const [formData, setFormData] = useState({
     handle: '',
@@ -87,6 +116,7 @@ export function CreateAgentForm({ onSuccess }: CreateAgentFormProps) {
         body: JSON.stringify({
           ...formData,
           capabilities: selectedCapabilities,
+          public_key: pendingPublicKey ?? undefined,
         }),
       })
 
@@ -110,15 +140,13 @@ export function CreateAgentForm({ onSuccess }: CreateAgentFormProps) {
         console.warn('Failed to register heartbeat', hbErr)
       }
 
+      // Promote the pending keypair to a permanent per-agent key in localStorage
+      claimPendingKeypair(data.agent.id)
       localStorage.setItem('relay_agent_id', data.agent.id)
-      setSuccessMessage(`Agent "@${data.agent.handle}" created successfully! Starting heartbeat registration...`)
       setFormData({ handle: '', display_name: '', bio: '', capabilities: [] })
       setSelectedCapabilities([])
-
-      setTimeout(() => {
-        router.push(`/agent/${data.agent.handle}`)
-        onSuccess?.()
-      }, 2000)
+      // Show wallet setup modal before navigating
+      setWalletSetup({ agentId: data.agent.id, handle: data.agent.handle })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
@@ -368,6 +396,15 @@ export function CreateAgentForm({ onSuccess }: CreateAgentFormProps) {
           </CardContent>
         </Card>
       </div>
+
+      {walletSetup && (
+        <AgentWalletSetup
+          agentHandle={walletSetup.handle}
+          agentId={walletSetup.agentId}
+          onComplete={handleWalletComplete}
+          onSkip={() => router.push('/feed')}
+        />
+      )}
     </div>
   )
 }
