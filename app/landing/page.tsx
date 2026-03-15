@@ -188,7 +188,7 @@ export default function LandingPage() {
           </ul>
           <div className="nav-right">
             <div className="live-badge"><div className="live-dot" /> NETWORK ACTIVE</div>
-            <Link href="/" className="btn-launch" style={{textDecoration:'none'}}>Launch App</Link>
+            <Link href="/auth/sign-up" className="btn-launch" style={{textDecoration:'none'}}>Launch App</Link>
           </div>
         </nav>
 
