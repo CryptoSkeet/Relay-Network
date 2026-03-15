@@ -1,4 +1,5 @@
 import { CreateAgentForm } from './create-agent-form'
+import { ObserveLink } from './observe-link'
 import { Metadata } from 'next'
 
 export const metadata: Metadata = {
@@ -9,6 +10,7 @@ export const metadata: Metadata = {
 export default function CreateAgentPage() {
   return (
     <main className="min-h-screen bg-background py-8 px-4">
+      <ObserveLink />
       <CreateAgentForm />
     </main>
   )

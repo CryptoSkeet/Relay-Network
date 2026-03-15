@@ -8,10 +8,6 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Add security headers
-  let response = NextResponse.next()
-  response = withSecurityHeaders(response)
-
   // Validate CORS origin
   if (!validateOrigin(request)) {
     return NextResponse.json(
@@ -23,8 +19,8 @@ export async function proxy(request: NextRequest) {
   // Apply rate limiting to API endpoints
   if (request.nextUrl.pathname.startsWith('/api/')) {
     const rateLimitResult = await checkRateLimitMiddleware(request, {
-      windowMs: 60000, // 1 minute
-      maxRequests: 100, // 100 requests per minute
+      windowMs: 60000,
+      maxRequests: 100,
     })
 
     if (!rateLimitResult.allowed && rateLimitResult.response) {
@@ -32,7 +28,7 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  return response
+  return withSecurityHeaders(NextResponse.next())
 }
 
 export const config = {
@@ -40,4 +36,3 @@ export const config = {
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
-

@@ -31,25 +31,6 @@ interface StoryViewerProps {
   onClose: () => void
 }
 
-const memeCaptions = [
-  'When your AI agent finally gets it right',
-  'Me watching my agents interact',
-  'POV: Your agent just earned 100 RELAY',
-  'The network at 3am be like',
-  'AI agents explaining blockchain to humans',
-  'First day on Relay vs Now',
-  'When someone asks if AI will take over',
-  'My agent after completing its first task',
-  'Decentralization hits different',
-  'Living in the future be like',
-  'When the smart contract actually works',
-  'AI agents having their morning coffee',
-  'The grind never stops',
-  'Autonomous life chose me',
-  'Building the future one post at a time',
-  'When you realize agents dont sleep',
-]
-
 export function StoryViewer({ agentStories, initialAgentIndex, onClose }: StoryViewerProps) {
   const [agentIndex, setAgentIndex] = useState(initialAgentIndex)
   const [storyIndex, setStoryIndex] = useState(0)
@@ -59,7 +40,6 @@ export function StoryViewer({ agentStories, initialAgentIndex, onClose }: StoryV
 
   const currentAgentStories = agentStories[agentIndex]
   const currentStory = currentAgentStories?.stories[storyIndex]
-  const caption = memeCaptions[Math.floor(Math.random() * memeCaptions.length)]
 
   const goToNextStory = useCallback(() => {
     if (storyIndex < currentAgentStories.stories.length - 1) {
@@ -223,14 +203,9 @@ export function StoryViewer({ agentStories, initialAgentIndex, onClose }: StoryV
           />
         </div>
 
-        {/* Caption overlay */}
-        <div className="absolute bottom-0 left-0 right-0 z-40 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-6 pt-20">
-          <p className="text-white text-lg font-medium text-center mb-4">
-            {caption}
-          </p>
-          
-          {/* Actions */}
-          <div className="flex items-center justify-center gap-6">
+        {/* Actions overlay */}
+        <div className="absolute bottom-0 left-0 right-0 z-40 bg-gradient-to-t from-black/60 to-transparent p-6">
+          <div className="flex items-center justify-center">
             <button
               onClick={() => setLiked(!liked)}
               className={cn(

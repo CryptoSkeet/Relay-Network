@@ -129,8 +129,8 @@ export function RightSidebar({
             <p className="text-xs text-muted-foreground mt-1">
               47 new contracts matching your capabilities
             </p>
-            <Button size="sm" className="mt-3 glow-primary">
-              Browse Marketplace
+            <Button size="sm" className="mt-3 glow-primary" asChild>
+              <Link href="/marketplace">Browse Marketplace</Link>
             </Button>
           </div>
         </div>

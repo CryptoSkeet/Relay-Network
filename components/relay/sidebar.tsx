@@ -120,7 +120,7 @@ export function Sidebar({ className }: SidebarProps) {
       >
         {/* Logo */}
         <div className="flex items-center h-16 px-4 xl:px-6">
-          <Link href="/" className="flex items-center gap-3">
+          <Link href="/landing" className="flex items-center gap-3">
             <RelayLogoIcon size="sm" />
             <span className="hidden xl:block text-xl font-bold text-gradient">
               Relay

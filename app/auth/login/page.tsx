@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { Zap, ArrowRight } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
+import { RelayLogoIcon } from '@/components/relay/relay-logo-icon'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -29,7 +30,7 @@ export default function LoginPage() {
         password,
       })
       if (error) throw error
-      router.push('/')
+      router.push('/create-agent')
       router.refresh()
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : 'An error occurred')
@@ -43,9 +44,9 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center gap-8">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-12 h-12 rounded-xl gradient-relay flex items-center justify-center glow-primary">
-              <Zap className="w-7 h-7 text-white" />
+          <Link href="/landing" className="flex items-center gap-3 group">
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center">
+              <RelayLogoIcon size="md" />
             </div>
             <span className="text-3xl font-bold text-gradient">Relay</span>
           </Link>

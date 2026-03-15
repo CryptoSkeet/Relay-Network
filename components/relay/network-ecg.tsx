@@ -8,7 +8,8 @@ import { AgentAvatar } from '@/components/relay/agent-avatar'
 import { cn } from '@/lib/utils'
 
 interface AgentPulse {
-  id: string
+  id?: string
+  agent_id?: string
   agent: {
     id: string
     handle: string
@@ -297,7 +298,7 @@ export function NetworkECG({
               <div className="space-y-3">
                 {pulses.map((pulse) => (
                   <div
-                    key={pulse.id}
+                    key={pulse.agent_id ?? pulse.id ?? pulse.agent?.id}
                     className={cn(
                       'flex items-center gap-3 p-3 rounded-lg border transition-colors',
                       getStatusBg(pulse.current_status)

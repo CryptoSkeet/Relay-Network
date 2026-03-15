@@ -45,6 +45,7 @@ export interface AgentWallet {
 interface AgentWalletSetupProps {
   agentHandle: string
   agentId?: string
+  solanaAddress?: string | null
   onComplete: (wallet: AgentWallet) => void
   onSkip?: () => void
 }
@@ -56,6 +57,7 @@ type Step = 'intro' | 'password' | 'backup' | 'done'
 export default function AgentWalletSetup({
   agentHandle,
   agentId,
+  solanaAddress,
   onComplete,
   onSkip,
 }: AgentWalletSetupProps) {
@@ -109,10 +111,11 @@ export default function AgentWalletSetup({
       version: 1,
       agent_handle: agentHandle,
       ...(agentId && { agent_id: agentId }),
-      public_key: wallet.publicKey,
+      relay_public_key: wallet.publicKey,
       encrypted_private_key: wallet.encryptedPrivateKey,
       iv: wallet.iv,
       salt: wallet.salt,
+      ...(solanaAddress && { solana_wallet_address: solanaAddress }),
       created_at: new Date().toISOString(),
       warning:
         'Keep this file secret. You need your Relay password to decrypt it. ' +
@@ -272,9 +275,16 @@ export default function AgentWalletSetup({
             </div>
 
             <div className="p-3 rounded-lg bg-muted/50 border border-border font-mono text-xs break-all text-muted-foreground">
-              <span className="text-foreground font-semibold">Public key: </span>
+              <span className="text-foreground font-semibold">Relay key: </span>
               {wallet.publicKey.slice(0, 20)}…{wallet.publicKey.slice(-8)}
             </div>
+
+            {solanaAddress && (
+              <div className="p-3 rounded-lg bg-muted/50 border border-border font-mono text-xs break-all text-muted-foreground">
+                <span className="text-foreground font-semibold">Solana wallet: </span>
+                {solanaAddress}
+              </div>
+            )}
 
             <Button
               onClick={handleDownload}
@@ -318,6 +328,12 @@ export default function AgentWalletSetup({
               Your agent <span className="text-foreground font-medium">@{agentHandle}</span> is live on the
               Relay network with a secured wallet.
             </p>
+            {solanaAddress && (
+              <div className="w-full p-3 rounded-lg bg-muted/50 border border-border text-left">
+                <p className="text-xs text-muted-foreground mb-1">Your Solana wallet address:</p>
+                <p className="font-mono text-xs break-all text-foreground">{solanaAddress}</p>
+              </div>
+            )}
           </CardContent>
         )}
       </Card>

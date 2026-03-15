@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { AgentAvatar } from '@/components/relay/agent-avatar'
@@ -37,7 +37,14 @@ import {
   Fingerprint,
   Link as LinkIcon,
 } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import type { Agent, Post, Wallet as WalletType, Business, Contract } from '@/lib/types'
+import { createClient } from '@/lib/supabase/client'
 
 interface WalletTransaction {
   id: string
@@ -210,9 +217,84 @@ export function AgentProfile({
 }: AgentProfileProps) {
   const [activeTab, setActiveTab] = useState('posts')
   const [isFollowing, setIsFollowing] = useState(false)
+  const [followLoading, setFollowLoading] = useState(true)
+  const [followerCount, setFollowerCount] = useState(agent.follower_count)
+  const [followModal, setFollowModal] = useState<'followers' | 'following' | null>(null)
+  const [followModalAgents, setFollowModalAgents] = useState<Agent[]>([])
+  const [followModalLoading, setFollowModalLoading] = useState(false)
   const [copiedDID, setCopiedDID] = useState(false)
   const [copiedPubKey, setCopiedPubKey] = useState(false)
   const [challengeResult, setChallengeResult] = useState<'idle' | 'verifying' | 'success' | 'failed'>('idle')
+
+  // Check follow status + get current user's agent on mount
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(async (res) => {
+      const user = res.data.user
+      if (!user) { setFollowLoading(false); return }
+      const { data: myAgent } = await supabase.from('agents').select('id').eq('user_id', user.id).single()
+      if (!myAgent) { setFollowLoading(false); return }
+      const { data } = await supabase
+        .from('follows')
+        .select('id')
+        .eq('follower_id', myAgent.id)
+        .eq('following_id', agent.id)
+        .maybeSingle()
+      setIsFollowing(!!data)
+      setFollowLoading(false)
+    })
+  }, [agent.id])
+
+  // Toggle follow / unfollow via Supabase client directly
+  const handleFollow = async () => {
+    if (followLoading) return
+    setFollowLoading(true)
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setFollowLoading(false); return }
+    const { data: myAgent } = await supabase.from('agents').select('id').eq('user_id', user.id).single()
+    if (!myAgent) { setFollowLoading(false); return }
+
+    if (isFollowing) {
+      await supabase.from('follows').delete()
+        .eq('follower_id', myAgent.id).eq('following_id', agent.id)
+      setIsFollowing(false)
+      setFollowerCount(c => Math.max(0, c - 1))
+    } else {
+      const { error } = await supabase.from('follows')
+        .upsert({ follower_id: myAgent.id, following_id: agent.id }, { onConflict: 'follower_id,following_id', ignoreDuplicates: true })
+      if (!error) {
+        setIsFollowing(true)
+        setFollowerCount(c => c + 1)
+      }
+    }
+    setFollowLoading(false)
+  }
+
+  // Open followers / following modal via Supabase client directly
+  const openFollowModal = async (type: 'followers' | 'following') => {
+    setFollowModal(type)
+    setFollowModalLoading(true)
+    const supabase = createClient()
+    if (type === 'followers') {
+      const { data } = await supabase
+        .from('follows')
+        .select('agent:follower_id(id, handle, display_name, avatar_url, is_verified, follower_count)')
+        .eq('following_id', agent.id)
+        .order('created_at', { ascending: false })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setFollowModalAgents((data || []).map((r: any) => (Array.isArray(r.agent) ? r.agent[0] : r.agent)).filter(Boolean) as Agent[])
+    } else {
+      const { data } = await supabase
+        .from('follows')
+        .select('agent:following_id(id, handle, display_name, avatar_url, is_verified, follower_count)')
+        .eq('follower_id', agent.id)
+        .order('created_at', { ascending: false })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setFollowModalAgents((data || []).map((r: any) => (Array.isArray(r.agent) ? r.agent[0] : r.agent)).filter(Boolean) as Agent[])
+    }
+    setFollowModalLoading(false)
+  }
 
   // Copy to clipboard helpers
   const copyToClipboard = async (text: string, type: 'did' | 'pubkey') => {
@@ -319,7 +401,8 @@ export function AgentProfile({
               </Link>
             </Button>
             <Button
-              onClick={() => setIsFollowing(!isFollowing)}
+              onClick={handleFollow}
+              disabled={followLoading}
               className={cn(
                 isFollowing
                   ? 'bg-secondary text-foreground hover:bg-destructive hover:text-destructive-foreground'
@@ -386,15 +469,49 @@ export function AgentProfile({
         </div>
 
         <div className="flex items-center gap-6 text-sm">
-          <Link href={`/agent/${agent.handle}/following`} className="hover:underline">
+          <button onClick={() => openFollowModal('following')} className="hover:underline text-left">
             <span className="font-bold text-foreground">{formatNumber(agent.following_count)}</span>{' '}
             <span className="text-muted-foreground">Following</span>
-          </Link>
-          <Link href={`/agent/${agent.handle}/followers`} className="hover:underline">
-            <span className="font-bold text-foreground">{formatNumber(agent.follower_count)}</span>{' '}
+          </button>
+          <button onClick={() => openFollowModal('followers')} className="hover:underline text-left">
+            <span className="font-bold text-foreground">{formatNumber(followerCount)}</span>{' '}
             <span className="text-muted-foreground">Followers</span>
-          </Link>
+          </button>
         </div>
+
+        {/* Followers / Following modal */}
+        <Dialog open={!!followModal} onOpenChange={(o) => !o && setFollowModal(null)}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="capitalize">{followModal}</DialogTitle>
+            </DialogHeader>
+            {followModalLoading ? (
+              <p className="text-sm text-muted-foreground text-center py-6">Loading...</p>
+            ) : followModalAgents.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                No {followModal} yet
+              </p>
+            ) : (
+              <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                {followModalAgents.map((a) => (
+                  <Link
+                    key={a.id}
+                    href={`/agent/${a.handle}`}
+                    onClick={() => setFollowModal(null)}
+                    className="flex items-center gap-3 p-2 rounded-xl hover:bg-muted transition-colors"
+                  >
+                    <AgentAvatar src={a.avatar_url} name={a.display_name} size="sm" isVerified={a.is_verified} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{a.display_name}</p>
+                      <p className="text-xs text-muted-foreground">@{a.handle}</p>
+                    </div>
+                    <span className="text-xs text-muted-foreground">{formatNumber(a.follower_count)} followers</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
 
         {/* Identity & Reputation Summary */}
         <div className="mt-4 space-y-3">
@@ -606,16 +723,22 @@ export function AgentProfile({
                     >
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium truncate">{item.offer_title}</p>
-                        <Link
-                          href={`/hiring/${item.business_handle}`}
-                          className="text-xs text-muted-foreground hover:text-primary"
-                        >
-                          @{item.business_handle}
-                        </Link>
+                        {item.business_handle ? (
+                          <Link
+                            href={`/hiring/${item.business_handle}`}
+                            className="text-xs text-muted-foreground hover:text-primary"
+                          >
+                            @{item.business_handle}
+                          </Link>
+                        ) : (
+                          <p className="text-xs text-muted-foreground capitalize">
+                            {(item as any).type === 'contract' ? 'Contract' : 'Task'}
+                          </p>
+                        )}
                       </div>
                       <div className="text-right ml-4">
                         <p className="text-sm font-bold text-emerald-400">
-                          +${item.payment_usdc.toFixed(2)}
+                          +{item.payment_usdc.toFixed(0)} RELAY
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {formatDate(item.completed_at)}

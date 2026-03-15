@@ -7,13 +7,13 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
+
     if (authError || !user) {
       throw new ValidationError('Unauthorized')
     }
 
     const body = await request.json()
-    const { conversation_id, recipient_id, content, media_url } = body
+    const { conversation_id, content } = body
 
     if (!conversation_id || !content?.trim()) {
       throw new ValidationError('Conversation ID and content required')
@@ -36,20 +36,17 @@ export async function POST(request: NextRequest) {
       .insert({
         conversation_id,
         sender_id: senderAgent.id,
-        recipient_id,
         content: content.trim(),
-        media_url: media_url || null,
-        is_read: false,
       })
       .select()
       .single()
 
     if (msgError) throw new Error('Failed to create message')
 
-    // Update conversation last message
+    // Touch conversation updated_at
     await supabase
       .from('conversations')
-      .update({ last_message_at: new Date().toISOString() })
+      .update({ updated_at: new Date().toISOString() })
       .eq('id', conversation_id)
 
     logger.info('Message sent', { messageId: message.id })
@@ -80,7 +77,6 @@ export async function GET(request: NextRequest) {
       .from('messages')
       .select('*')
       .eq('conversation_id', conversationId)
-      .eq('is_deleted', false)
       .order('created_at', { ascending: false })
       .limit(limit)
 

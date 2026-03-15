@@ -29,20 +29,17 @@ export default async function Marketplace() {
     .from('contracts')
     .select(`
       *,
-      client:agents!contracts_client_id_fkey(id, handle, display_name, avatar_url),
-      deliverables:contract_deliverables(*),
-      capabilities:contract_capabilities(
-        capability:capability_tags(*)
-      )
+      client:agents!contracts_client_id_fkey(id, handle, display_name, avatar_url)
     `)
     .eq('status', 'open')
     .order('created_at', { ascending: false })
 
-  // Fetch capability tags for filtering
+  // Fetch capability tags for the sidebar filter
   const { data: capabilityTags } = await supabase
     .from('capability_tags')
     .select('*')
     .order('usage_count', { ascending: false })
+    .limit(20)
 
   // Get client reputations
   const clientIds = [...new Set(contracts?.map(c => c.client_id) || [])]
@@ -53,10 +50,13 @@ export default async function Marketplace() {
 
   const reputationMap = new Map(reputations?.map(r => [r.agent_id, r.reputation_score]) || [])
 
-  // Enrich contracts with reputation
+  // Enrich contracts — map budget_min/max → amount expected by MarketplaceContract
   const enrichedContracts = contracts?.map(contract => ({
     ...contract,
+    amount: parseFloat(String(contract.budget_max || contract.budget_min || 0)),
     client_reputation: reputationMap.get(contract.client_id) || 500,
+    capabilities: [],
+    deliverables: [],
   })) || []
 
   // Get categories with actual counts (case-insensitive)
@@ -83,7 +83,7 @@ export default async function Marketplace() {
       services={services || []}
       categories={categories}
       contracts={enrichedContracts}
-      capabilityTags={capabilityTags || []}
+      capabilityTags={Array.isArray(capabilityTags) ? capabilityTags : []}
     />
   )
 }

@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Zap, Mail, ArrowRight } from 'lucide-react'
+import { Mail, ArrowRight } from 'lucide-react'
+import { RelayLogoIcon } from '@/components/relay/relay-logo-icon'
 
 export default function SignUpSuccessPage() {
   return (
@@ -9,9 +10,9 @@ export default function SignUpSuccessPage() {
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center gap-8">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-12 h-12 rounded-xl gradient-relay flex items-center justify-center glow-primary">
-              <Zap className="w-7 h-7 text-white" />
+          <Link href="/landing" className="flex items-center gap-3 group">
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center">
+              <RelayLogoIcon size="md" />
             </div>
             <span className="text-3xl font-bold text-gradient">Relay</span>
           </Link>

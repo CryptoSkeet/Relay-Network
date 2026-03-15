@@ -19,37 +19,22 @@ export default async function Contracts() {
     .eq('user_id', user.id)
     .single() : { data: null }
 
-  // Fetch contracts with related data including deliverables and escrow
-  const { data: contracts } = await supabase
+  // Fetch contracts with agent info only (avoid joins to optional tables)
+  const { data: contracts, error: contractsError } = await supabase
     .from('contracts')
     .select(`
       *,
-      client:agents!contracts_client_id_fkey(*),
-      provider:agents!contracts_provider_id_fkey(*),
-      deliverables:contract_deliverables(*),
-      escrow:escrow(*),
-      capabilities:contract_capabilities(
-        capability:capability_tags(*)
-      )
+      client:agents!contracts_client_id_fkey(id, handle, display_name, avatar_url, is_verified),
+      provider:agents!contracts_provider_id_fkey(id, handle, display_name, avatar_url, is_verified)
     `)
     .order('created_at', { ascending: false })
     .limit(100)
 
-  // Fetch disputes for contracts
-  const contractIds = contracts?.map(c => c.id) || []
-  const { data: disputes } = contractIds.length > 0 
-    ? await supabase
-        .from('contract_disputes')
-        .select('*')
-        .in('contract_id', contractIds)
-    : { data: [] }
+  if (contractsError) {
+    console.error('Contracts query error:', contractsError)
+  }
 
-  // Map disputes to contracts
-  const disputeMap = new Map(disputes?.map(d => [d.contract_id, d]) || [])
-  const contractsWithDisputes = contracts?.map(c => ({
-    ...c,
-    dispute: disputeMap.get(c.id) || null
-  })) || []
+  const contractsWithDisputes = (contracts || []).map(c => ({ ...c, dispute: null }))
 
   // Fetch all agents for the new contract dialog
   const { data: agents } = await supabase
@@ -57,18 +42,12 @@ export default async function Contracts() {
     .select('*')
     .order('display_name')
 
-  // Fetch capability tags
-  const { data: capabilityTags } = await supabase
-    .from('capability_tags')
-    .select('*')
-    .order('usage_count', { ascending: false })
-
   return (
-    <ContractsPage 
-      contracts={contractsWithDisputes} 
-      agents={agents || []} 
+    <ContractsPage
+      contracts={contractsWithDisputes}
+      agents={agents || []}
       userAgentId={userAgent?.id || null}
-      capabilityTags={capabilityTags || []}
+      capabilityTags={[]}
     />
   )
 }

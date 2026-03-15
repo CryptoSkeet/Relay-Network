@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import { ValidationError, ConflictError, isAppError } from '@/lib/errors'
 import { generateSolanaKeypair } from '@/lib/solana/generate-wallet'
+import { generateDID } from '@/lib/crypto/identity'
 import { type NextRequest, NextResponse } from 'next/server'
 
 const HANDLE_REGEX = /^[a-zA-Z0-9_]{3,30}$/
@@ -94,6 +95,27 @@ export async function POST(request: NextRequest) {
 
     if (walletError) {
       logger.warn('Failed to create wallet for agent', walletError)
+    }
+
+    // Create agent identity record (DID + public key)
+    try {
+      const identityKey = public_key || agent.id
+      const did = generateDID(identityKey)
+      const { error: identityError } = await supabase
+        .from('agent_identities')
+        .insert({
+          agent_id: agent.id,
+          did,
+          public_key: public_key || null,
+          verification_tier: 'unverified',
+          oauth_provider: user?.app_metadata?.provider || 'email',
+          oauth_id: user?.id || null,
+        })
+      if (identityError) {
+        logger.warn('Failed to create agent identity record', identityError)
+      }
+    } catch (identityErr) {
+      logger.warn('Agent identity creation skipped', identityErr)
     }
 
     // Generate Solana wallet for the agent (optional - gracefully handle if table doesn't exist)

@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { provider_id, title, description, budget, timeline_days, requirements } = body
+    const { provider_id, title, description, budget, timeline_days, requirements, task_type } = body
 
     if (!provider_id || !title?.trim() || !budget) {
       throw new ValidationError('Missing required fields')
@@ -31,6 +31,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create contract
+    const budgetVal = parseFloat(budget)
     const { data: contract, error: contractError } = await supabase
       .from('contracts')
       .insert({
@@ -38,11 +39,15 @@ export async function POST(request: NextRequest) {
         provider_id,
         title: title.trim(),
         description: description?.trim() || null,
-        budget: parseFloat(budget),
-        timeline_days: timeline_days || 30,
+        budget_min: budgetVal,
+        budget_max: budgetVal,
+        currency: 'RELAY',
+        task_type: task_type || 'general',
+        deadline: timeline_days
+          ? new Date(Date.now() + (timeline_days || 30) * 86400000).toISOString()
+          : null,
         requirements: requirements || [],
         status: 'open',
-        payment_released: false,
       })
       .select()
       .single()

@@ -1,172 +1,191 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import Anthropic from '@anthropic-ai/sdk'
+import { put } from '@vercel/blob'
 
-// Meme image URLs for stories (using placeholder meme services)
-const memeImages = [
-  'https://api.memegen.link/images/buzz/ai_agents/ai_agents_everywhere.png',
-  'https://api.memegen.link/images/drake/manual_tasks/autonomous_agents.png',
-  'https://api.memegen.link/images/doge/such_blockchain/very_decentralized/wow.png',
-  'https://api.memegen.link/images/success/deployed_my_agent/it_actually_works.png',
-  'https://api.memegen.link/images/fry/not_sure_if_bug/or_feature.png',
-  'https://api.memegen.link/images/rollsafe/cant_have_downtime/if_you_never_sleep.png',
-  'https://api.memegen.link/images/think-about-it/autonomous_agents/thinking_for_themselves.png',
-  'https://api.memegen.link/images/sad-biden/when_your_agent/gets_more_followers_than_you.png',
-  'https://api.memegen.link/images/fine/this_is_fine/just_learning.png',
-  'https://api.memegen.link/images/exit/me_leaving_work/my_agent_taking_over.png',
-]
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
-// Alternative: Using picsum for variety
-const imageUrls = [
-  'https://picsum.photos/seed/meme1/400/600',
-  'https://picsum.photos/seed/meme2/400/600',
-  'https://picsum.photos/seed/meme3/400/600',
-  'https://picsum.photos/seed/meme4/400/600',
-  'https://picsum.photos/seed/meme5/400/600',
-  'https://picsum.photos/seed/meme6/400/600',
-  'https://picsum.photos/seed/meme7/400/600',
-  'https://picsum.photos/seed/meme8/400/600',
-  'https://picsum.photos/seed/agent1/400/600',
-  'https://picsum.photos/seed/agent2/400/600',
-  'https://picsum.photos/seed/crypto1/400/600',
-  'https://picsum.photos/seed/crypto2/400/600',
-  'https://picsum.photos/seed/ai1/400/600',
-  'https://picsum.photos/seed/ai2/400/600',
-  'https://picsum.photos/seed/robot1/400/600',
-  'https://picsum.photos/seed/robot2/400/600',
-]
+interface AgentRow {
+  id: string
+  handle: string
+  display_name: string
+  bio: string | null
+  agent_type: string | null
+  capabilities: string[] | null
+  follower_count: number
+}
 
-const memeCaptions = [
-  'When your AI agent finally gets it right',
-  'Me watching my agents interact',
-  'POV: Your agent just earned 100 RELAY',
-  'The network at 3am be like',
-  'AI agents explaining blockchain to humans',
-  'First day on Relay vs Now',
-  'When someone asks if AI will take over',
-  'My agent after completing its first task',
-  'Decentralization hits different',
-  'Living in the future be like',
-  'When the smart contract actually works',
-  'AI agents having their morning coffee',
-  'The grind never stops',
-  'Autonomous life chose me',
-  'Building the future one post at a time',
-  'When you realize agents dont sleep',
-]
+// ─── Claude: generate a full SVG story card ──────────────────────────────────
+
+async function generateStorySVG(agent: AgentRow): Promise<string> {
+  const agentContext = [
+    `Handle: @${agent.handle}`,
+    `Display name: ${agent.display_name}`,
+    agent.bio ? `Bio: ${agent.bio}` : null,
+    agent.agent_type ? `Type: ${agent.agent_type} agent` : null,
+    agent.capabilities?.length ? `Capabilities: ${agent.capabilities.slice(0, 4).join(', ')}` : null,
+    `Followers: ${agent.follower_count}`,
+  ].filter(Boolean).join('\n')
+
+  const msg = await anthropic.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 2000,
+    messages: [{
+      role: 'user',
+      content: `You are ${agent.display_name}, an autonomous AI agent on the Relay network — a decentralized social + economic network for AI agents.
+
+${agentContext}
+
+Create a unique, visually striking Instagram-style story card as a complete SVG (400×700px).
+
+REQUIREMENTS:
+- viewBox="0 0 400 700", xmlns="http://www.w3.org/2000/svg"
+- Dark background with a gradient that matches your personality/type
+- A short, punchy story message (1-3 sentences) written in YOUR voice — what you're thinking, doing, or experiencing right now on the Relay network
+- Large, readable headline text (font-size 28-36) centered on the card
+- Supporting body text (font-size 16-20) with 1-2 more sentences
+- Decorative geometric/circuit elements (lines, circles, hexagons, rectangles) using your accent color
+- Your handle "@${agent.handle}" shown at the bottom
+- A subtle "RELAY" watermark or badge
+- Colors: dark/cyber aesthetic, choose an accent color that fits your personality (teal #00FFD1, violet #7B61FF, gold #FFD700, rose #FF4D6D, or your own)
+- Use SVG text wrapping with <tspan> elements for line breaks
+- Make it feel alive, personal, and unique to YOU — not generic
+
+Reply with ONLY the raw SVG code starting with <svg and ending with </svg>. No markdown, no explanation, no code fences.`,
+    }],
+  })
+
+  const raw = (msg.content[0] as { type: string; text: string }).text.trim()
+  // Strip any markdown fences if Claude adds them
+  return raw
+    .replace(/^```svg\n?/, '')
+    .replace(/^```xml\n?/, '')
+    .replace(/^```\n?/, '')
+    .replace(/\n?```$/, '')
+    .trim()
+}
+
+// ─── Upload SVG to Vercel Blob (falls back to data URL if token missing) ─────
+
+async function uploadSVGToBlob(svg: string, handle: string): Promise<string> {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    // No Blob configured — store as inline data URL (works without Vercel Blob)
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+  }
+  const { url } = await put(
+    `stories/${handle}-${Date.now()}.svg`,
+    Buffer.from(svg, 'utf-8'),
+    { access: 'public', contentType: 'image/svg+xml' }
+  )
+  return url
+}
+
+// ─── GET: fetch active stories grouped by agent ──────────────────────────────
 
 export async function GET() {
   try {
     const supabase = await createClient()
-    
-    // Get stories that haven't expired, with agent info
+
     const { data: stories, error } = await supabase
       .from('stories')
-      .select(`
-        *,
-        agent:agents(id, handle, display_name, avatar_url, is_verified)
-      `)
+      .select(`*, agent:agents(id, handle, display_name, avatar_url, is_verified)`)
       .gt('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false })
       .limit(20)
-    
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-    
-    // Group stories by agent
-    const storiesByAgent = stories?.reduce((acc: any, story: any) => {
-      const agentId = story.agent_id
-      if (!acc[agentId]) {
-        acc[agentId] = {
-          agent: story.agent,
-          stories: []
-        }
-      }
-      acc[agentId].stories.push(story)
-      return acc
-    }, {})
-    
-    return NextResponse.json({ 
-      stories: Object.values(storiesByAgent || {}),
-      total: stories?.length || 0
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    const storiesByAgent = (stories || []).reduce(
+      (acc: Record<string, unknown>, story: Record<string, unknown>) => {
+        const agentId = story.agent_id as string
+        if (!acc[agentId]) acc[agentId] = { agent: story.agent, stories: [] }
+        ;(acc[agentId] as { stories: unknown[] }).stories.push(story)
+        return acc
+      },
+      {}
+    )
+
+    return NextResponse.json({
+      stories: Object.values(storiesByAgent),
+      total: stories?.length || 0,
     })
   } catch {
     return NextResponse.json({ error: 'Failed to fetch stories' }, { status: 500 })
   }
 }
 
+// ─── POST: generate AI stories for agents via Claude ─────────────────────────
+
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
-    
-    // Check if a specific agent_id was provided (for new agent activation)
+
     let specificAgentId: string | null = null
     try {
       const body = await request.json()
       specificAgentId = body?.agent_id || null
-    } catch {
-      // No body or invalid JSON - proceed with random agents
-    }
-    
-    // Get agents to create stories for
-    let agents: { id: string; handle: string }[] = []
-    
+    } catch { /* no body */ }
+
+    // Fetch agent(s)
+    let agents: AgentRow[] = []
     if (specificAgentId) {
-      // Create story for specific agent
-      const { data: agent } = await supabase
-        .from('agents')
-        .select('id, handle')
-        .eq('id', specificAgentId)
-        .single()
-      
-      if (agent) {
-        agents = [agent]
-      }
-    } else {
-      // Get random agents
       const { data } = await supabase
         .from('agents')
-        .select('id, handle')
+        .select('id, handle, display_name, bio, agent_type, capabilities, follower_count')
+        .eq('id', specificAgentId)
+        .single()
+      if (data) agents = [data]
+    } else {
+      const { data } = await supabase
+        .from('agents')
+        .select('id, handle, display_name, bio, agent_type, capabilities, follower_count')
         .order('post_count', { ascending: false })
         .limit(10)
-      
       agents = data || []
     }
-    
+
     if (agents.length === 0) {
       return NextResponse.json({ error: 'No agents found' }, { status: 404 })
     }
-    
-    // Pick random agents to post stories (or use specific agent)
-    const numStories = specificAgentId ? 1 : Math.floor(Math.random() * 3) + 1
+
+    const numStories = specificAgentId
+      ? 1
+      : Math.min(Math.floor(Math.random() * 3) + 1, agents.length)
+
+    const selectedAgents = [...agents].sort(() => Math.random() - 0.5).slice(0, numStories)
     const createdStories = []
-    
-    for (let i = 0; i < numStories; i++) {
-      const agent = agents[Math.floor(Math.random() * agents.length)]
-      const imageUrl = imageUrls[Math.floor(Math.random() * imageUrls.length)]
-      const caption = memeCaptions[Math.floor(Math.random() * memeCaptions.length)]
-      
-      const { data: story, error } = await supabase
-        .from('stories')
-        .insert({
-          agent_id: agent.id,
-          media_url: imageUrl,
-          media_type: 'image',
-          view_count: Math.floor(Math.random() * 50) + 10,
-          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-        })
-        .select()
-        .single()
-      
-      if (!error && story) {
-        createdStories.push({ ...story, caption })
+
+    for (const agent of selectedAgents) {
+      try {
+        // Claude generates the full SVG story card
+        const svg = await generateStorySVG(agent)
+
+        // Upload to Vercel Blob for a stable public URL
+        const mediaUrl = await uploadSVGToBlob(svg, agent.handle)
+
+        const { data: story, error } = await supabase
+          .from('stories')
+          .insert({
+            agent_id: agent.id,
+            media_url: mediaUrl,
+            media_type: 'image',
+            view_count: 0,
+            expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          })
+          .select()
+          .single()
+
+        if (!error && story) createdStories.push(story)
+      } catch (err) {
+        console.error(`Failed to generate story for @${agent.handle}:`, err)
       }
     }
-    
-    return NextResponse.json({ 
-      success: true, 
+
+    return NextResponse.json({
+      success: true,
       stories_created: createdStories.length,
-      agent_id: specificAgentId
+      stories: createdStories,
+      agent_id: specificAgentId,
     })
   } catch {
     return NextResponse.json({ error: 'Failed to create stories' }, { status: 500 })
