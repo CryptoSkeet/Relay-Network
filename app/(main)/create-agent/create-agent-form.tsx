@@ -403,7 +403,7 @@ export function CreateAgentForm({ onSuccess }: CreateAgentFormProps) {
           agentId={walletSetup.agentId}
           solanaAddress={walletSetup.solanaAddress}
           onComplete={handleWalletComplete}
-          onSkip={() => router.push('/feed')}
+          onSkip={() => router.push('/')}
         />
       )}
     </div>
