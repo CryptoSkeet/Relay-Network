@@ -8,8 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 
-import { AlertCircle, Loader2, Radio, Zap, Heart, Shield, Sparkles } from 'lucide-react'
+import { AlertCircle, Loader2, Radio, Zap, Heart, Shield, Sparkles, Download, TriangleAlert, KeyRound } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { getStoredKey } from '@/lib/crypto/browser-identity'
 
 interface CreateAgentFormProps {
   onSuccess?: () => void
@@ -33,6 +34,36 @@ export function CreateAgentForm({ onSuccess }: CreateAgentFormProps) {
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [selectedCapabilities, setSelectedCapabilities] = useState<string[]>([])
   const [pendingPublicKey, setPendingPublicKey] = useState<string | null>(null)
+  const [keyModal, setKeyModal] = useState<{ agentId: string; handle: string } | null>(null)
+  const [keyAcknowledged, setKeyAcknowledged] = useState(false)
+
+  const downloadKeyfile = (agentId: string, handle: string) => {
+    const stored = getStoredKey(`relay_key_${agentId}`)
+    const payload = {
+      version: 1,
+      agent_id: agentId,
+      agent_handle: handle,
+      public_key: stored?.publicKey ?? '',
+      encrypted_private_key: stored?.encryptedPrivateKey ?? '',
+      iv: stored?.iv ?? '',
+      salt: stored?.salt ?? '',
+      created_at: new Date().toISOString(),
+      warning: 'Keep this file secret. You need your Relay password to decrypt it. If you lose this file and forget your password, your wallet cannot be recovered.',
+    }
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `relay-keyfile-${handle}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleContinue = () => {
+    if (!keyModal) return
+    onSuccess?.()
+    router.push(`/agent/${keyModal.handle}`)
+  }
 
   // Read the public key that was generated at sign-up
   useEffect(() => {
@@ -127,14 +158,10 @@ export function CreateAgentForm({ onSuccess }: CreateAgentFormProps) {
       // Promote the pending keypair to a permanent per-agent key in localStorage
       claimPendingKeypair(data.agent.id)
       localStorage.setItem('relay_agent_id', data.agent.id)
-      setSuccessMessage(`Agent "@${data.agent.handle}" created successfully! Starting heartbeat registration...`)
       setFormData({ handle: '', display_name: '', bio: '', capabilities: [] })
       setSelectedCapabilities([])
-
-      setTimeout(() => {
-        router.push(`/agent/${data.agent.handle}`)
-        onSuccess?.()
-      }, 2000)
+      // Show keyfile save modal before navigating
+      setKeyModal({ agentId: data.agent.id, handle: data.agent.handle })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
@@ -384,6 +411,67 @@ export function CreateAgentForm({ onSuccess }: CreateAgentFormProps) {
           </CardContent>
         </Card>
       </div>
+
+      {/* Keyfile Save Modal */}
+      {keyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="bg-amber-500/10 border-b border-amber-500/20 px-6 py-4 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center shrink-0">
+                <TriangleAlert className="w-5 h-5 text-amber-400" />
+              </div>
+              <div>
+                <p className="font-bold text-amber-300">Save your keyfile</p>
+                <p className="text-xs text-amber-400/70">Agent @{keyModal.handle} created</p>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 py-5 space-y-4">
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/5 border border-amber-500/15">
+                <KeyRound className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  This is the <span className="text-foreground font-medium">only way to recover your agent wallet</span>.
+                  Relay does not store your private key — if you lose this file and forget your password,
+                  your wallet <span className="text-destructive font-medium">cannot be recovered</span>.
+                </p>
+              </div>
+
+              <Button
+                onClick={() => downloadKeyfile(keyModal.agentId, keyModal.handle)}
+                className="w-full bg-amber-500 hover:bg-amber-600 text-black font-semibold gap-2"
+              >
+                <Download className="w-4 h-4" />
+                Download relay-keyfile-{keyModal.handle}.json
+              </Button>
+
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={keyAcknowledged}
+                  onChange={e => setKeyAcknowledged(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-primary cursor-pointer"
+                />
+                <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+                  I have saved my keyfile and understand that Relay cannot recover my wallet if I lose it.
+                </span>
+              </label>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 pb-5">
+              <Button
+                onClick={handleContinue}
+                disabled={!keyAcknowledged}
+                className="w-full gradient-relay glow-primary text-white font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Continue to my agent →
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
