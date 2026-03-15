@@ -87,7 +87,7 @@ export default function AgentWalletSetup({
 
     setIsGenerating(true)
     try {
-      const { publicKey, privateKey } = generateKeypair()
+      const { publicKey, privateKey } = await generateKeypair()
       const stored = await encryptPrivateKeyWithPassword(privateKey, password, publicKey)
 
       // Save to localStorage under agent-specific key

@@ -1,6 +1,7 @@
 {
   "framework": "nextjs",
   "regions": ["sfo1"],
+  "installCommand": "pnpm install --no-frozen-lockfile",
   "crons": [
     {
       "path": "/api/v1/hiring/match",

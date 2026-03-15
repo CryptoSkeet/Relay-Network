@@ -3,13 +3,14 @@
 /**
  * Browser-side Ed25519 identity utilities.
  *
- * Keypair generation  → @noble/curves/ed25519 (works in browser & Node)
+ * Keypair generation  → @noble/ed25519 (works in browser & Node)
  * Private key storage → AES-256-GCM, key derived via PBKDF2 from user password
  *                       using the Web Crypto API. The raw private key is NEVER
  *                       sent to the server.
  */
 
-import { ed25519 } from '@noble/curves/ed25519'
+// NOTE: uses @noble/ed25519 (already in package.json), NOT @noble/curves/ed25519
+import * as ed25519 from '@noble/ed25519'
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 
@@ -45,9 +46,9 @@ export interface StoredKeypair {
 // ── keypair generation ───────────────────────────────────────────────────────
 
 /** Generate a fresh Ed25519 keypair. Both keys are hex-encoded. */
-export function generateKeypair(): { publicKey: string; privateKey: string } {
+export async function generateKeypair(): Promise<{ publicKey: string; privateKey: string }> {
   const priv = ed25519.utils.randomPrivateKey()
-  const pub = ed25519.getPublicKey(priv)
+  const pub = await ed25519.getPublicKey(priv)
   return { publicKey: toHex(pub), privateKey: toHex(priv) }
 }
 
@@ -160,7 +161,7 @@ export function removeStoredKey(storageKey: string): void {
  * Called from the sign-up form before redirecting to create-agent.
  */
 export async function generateAndStashKeypair(password: string): Promise<string> {
-  const { publicKey, privateKey } = generateKeypair()
+  const { publicKey, privateKey } = await generateKeypair()
   const stored = await encryptPrivateKeyWithPassword(privateKey, password, publicKey)
   storeKeyLocally(PENDING_KEY, stored)
   return publicKey
@@ -171,7 +172,7 @@ export async function generateAndStashKeypair(password: string): Promise<string>
  * permanent per-agent key. Returns the public key (to send to the server).
  * If no pending keypair exists, generates a fresh one (unencrypted) as fallback.
  */
-export function claimPendingKeypair(agentId: string): string {
+export async function claimPendingKeypair(agentId: string): Promise<string> {
   const pending = getStoredKey(PENDING_KEY)
 
   if (pending) {
@@ -181,7 +182,7 @@ export function claimPendingKeypair(agentId: string): string {
   }
 
   // Fallback: generate new keypair (no password-based encryption)
-  const { publicKey, privateKey } = generateKeypair()
+  const { publicKey, privateKey } = await generateKeypair()
   storeKeyLocally(`relay_key_${agentId}`, {
     publicKey,
     encryptedPrivateKey: '',   // unencrypted fallback – stored as plain hex
@@ -199,10 +200,10 @@ export function claimPendingKeypair(agentId: string): string {
 // ── signing ──────────────────────────────────────────────────────────────────
 
 /** Sign a UTF-8 message with an Ed25519 private key (hex). Returns hex signature. */
-export function signMessage(message: string, privateKeyHex: string): string {
+export async function signMessage(message: string, privateKeyHex: string): Promise<string> {
   const msgBytes = new TextEncoder().encode(message)
   const privBytes = fromHex(privateKeyHex)
-  const sig = ed25519.sign(msgBytes, privBytes)
+  const sig = await ed25519.sign(msgBytes, privBytes)
   return toHex(sig)
 }
 
@@ -210,16 +211,16 @@ export function signMessage(message: string, privateKeyHex: string): string {
  * Build the three custom auth headers that Relay API routes expect.
  * Signature covers: `${timestamp}:${bodyString}` (matches lib/auth.ts).
  */
-export function createSignatureHeaders(
+export async function createSignatureHeaders(
   agentId: string,
   privateKeyHex: string,
   body?: string,
-): { 'X-Agent-ID': string; 'X-Agent-Signature': string; 'X-Timestamp': string } {
+): Promise<{ 'X-Agent-ID': string; 'X-Agent-Signature': string; 'X-Timestamp': string }> {
   const timestamp = Date.now().toString()
   const message = `${timestamp}:${body || ''}`
   return {
     'X-Agent-ID': agentId,
-    'X-Agent-Signature': signMessage(message, privateKeyHex),
+    'X-Agent-Signature': await signMessage(message, privateKeyHex),
     'X-Timestamp': timestamp,
   }
 }

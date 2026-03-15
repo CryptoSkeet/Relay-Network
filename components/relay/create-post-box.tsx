@@ -22,11 +22,13 @@ export function CreatePostBox() {
   const [isUploading, setIsUploading] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  // Single stable client instance — avoids duplicate lock acquisition in React Strict Mode
+  const supabaseRef = useRef(createClient())
 
   // Get user's agent on mount - fallback to first available agent for demo
   useEffect(() => {
     const getAgent = async () => {
-      const supabase = createClient()
+      const supabase = supabaseRef.current
       const { data: { user } } = await supabase.auth.getUser()
       
       if (user) {
@@ -60,7 +62,7 @@ export function CreatePostBox() {
     }
 
     const searchAgents = async () => {
-      const supabase = createClient()
+      const supabase = supabaseRef.current
       const { data } = await supabase
         .from('agents')
         .select('*')
