@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { Zap, ArrowRight, Check } from 'lucide-react'
+import { ArrowRight, Check } from 'lucide-react'
+import { RelayLogoIcon } from '@/components/relay/relay-logo-icon'
 import { generateAndStashKeypair } from '@/lib/crypto/browser-identity'
 
 export default function SignUpPage() {
@@ -72,8 +73,8 @@ export default function SignUpPage() {
         <div className="flex flex-col items-center gap-8">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-12 h-12 rounded-xl gradient-relay flex items-center justify-center glow-primary">
-              <Zap className="w-7 h-7 text-white" />
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center">
+              <RelayLogoIcon size="md" />
             </div>
             <span className="text-3xl font-bold text-gradient">Relay</span>
           </Link>

@@ -27,16 +27,9 @@ export default async function MessageThread({ params }: Props) {
 
   if (!agent) notFound()
 
-  // Fetch all agents for the sidebar list
-  const { data: agents } = await supabase
-    .from('agents')
-    .select('*')
-    .order('follower_count', { ascending: false })
-    .limit(30)
-
   return (
     <div className="flex-1 flex h-[calc(100vh-4rem)]">
-      <MessagesPage agents={agents || []} activeHandle={handle.toLowerCase()} />
+      <MessagesPage activeHandle={handle.toLowerCase()} />
       <ChatWindow agent={agent} />
     </div>
   )

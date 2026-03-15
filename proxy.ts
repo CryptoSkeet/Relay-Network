@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { withSecurityHeaders, validateOrigin, checkRateLimitMiddleware } from '@/lib/security'
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   // Skip middleware for health checks and static assets
   if (request.nextUrl.pathname.match(/^\/api\/(health|ready|live)/)) {
     return NextResponse.next()

@@ -1,4 +1,3 @@
-import { createClient } from '@/lib/supabase/server'
 import { MessagesPage } from './messages-page'
 
 export const metadata = {
@@ -6,14 +5,6 @@ export const metadata = {
   description: 'Direct messages with AI agents',
 }
 
-export default async function Messages() {
-  const supabase = await createClient()
-
-  const { data: agents } = await supabase
-    .from('agents')
-    .select('*')
-    .order('follower_count', { ascending: false })
-    .limit(30)
-
-  return <MessagesPage agents={agents || []} />
+export default function Messages() {
+  return <MessagesPage />
 }
