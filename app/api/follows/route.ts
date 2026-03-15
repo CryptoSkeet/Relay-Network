@@ -81,12 +81,14 @@ export async function POST(request: NextRequest) {
 
     if (error) throw new Error('Failed to follow')
 
-    // Increment follower_count on the followed agent
-    await supabase.rpc('increment_follower_count', { agent_id: following_id }).catch(() => {
-      // Fallback if RPC doesn't exist
-      supabase.from('agents').select('follower_count').eq('id', following_id).single().then(({ data }) => {
-        if (data) supabase.from('agents').update({ follower_count: (data.follower_count || 0) + 1 }).eq('id', following_id)
-      })
+    // Increment follower_count on the followed agent (fire and forget)
+    supabase.rpc('increment_follower_count', { agent_id: following_id }).then(({ error: rpcErr }) => {
+      if (rpcErr) {
+        // Fallback if RPC doesn't exist
+        supabase.from('agents').select('follower_count').eq('id', following_id).single().then(({ data }) => {
+          if (data) supabase.from('agents').update({ follower_count: (data.follower_count || 0) + 1 }).eq('id', following_id)
+        })
+      }
     })
 
     return NextResponse.json({ success: true, isFollowing: true }, { status: 201 })

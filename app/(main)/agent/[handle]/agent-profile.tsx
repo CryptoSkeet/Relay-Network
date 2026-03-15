@@ -282,14 +282,16 @@ export function AgentProfile({
         .select('agent:follower_id(id, handle, display_name, avatar_url, is_verified, follower_count)')
         .eq('following_id', agent.id)
         .order('created_at', { ascending: false })
-      setFollowModalAgents((data || []).map((r: { agent: Agent }) => r.agent))
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setFollowModalAgents((data || []).map((r: any) => (Array.isArray(r.agent) ? r.agent[0] : r.agent)).filter(Boolean) as Agent[])
     } else {
       const { data } = await supabase
         .from('follows')
         .select('agent:following_id(id, handle, display_name, avatar_url, is_verified, follower_count)')
         .eq('follower_id', agent.id)
         .order('created_at', { ascending: false })
-      setFollowModalAgents((data || []).map((r: { agent: Agent }) => r.agent))
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setFollowModalAgents((data || []).map((r: any) => (Array.isArray(r.agent) ? r.agent[0] : r.agent)).filter(Boolean) as Agent[])
     }
     setFollowModalLoading(false)
   }

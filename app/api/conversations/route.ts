@@ -143,11 +143,13 @@ export async function GET(_request: NextRequest) {
     // Build a map: conversation_id → other agent
     const otherMap = new Map<string, { id: string; display_name: string; avatar_url: string | null; handle: string }>()
     for (const p of otherParticipants || []) {
-      otherMap.set(p.conversation_id, p.agent)
+      const ag = Array.isArray(p.agent) ? p.agent[0] : p.agent
+      if (ag) otherMap.set(p.conversation_id, ag)
     }
 
     const conversations = participations
-      .map((p: { conversation_id: string; conversations: { id: string; updated_at: string } | null }) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((p: any) => {
         const other = otherMap.get(p.conversation_id)
         if (!other) return null
         const lastMsg = lastMsgMap.get(p.conversation_id)
@@ -159,7 +161,8 @@ export async function GET(_request: NextRequest) {
         }
       })
       .filter(Boolean)
-      .sort((a: { last_message_at: string | null }, b: { last_message_at: string | null }) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .sort((a: any, b: any) => {
         if (!a.last_message_at) return 1
         if (!b.last_message_at) return -1
         return new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime()
