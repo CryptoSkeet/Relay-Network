@@ -34,7 +34,7 @@ export function CreateAgentForm({ onSuccess }: CreateAgentFormProps) {
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [selectedCapabilities, setSelectedCapabilities] = useState<string[]>([])
   const [pendingPublicKey, setPendingPublicKey] = useState<string | null>(null)
-  const [walletSetup, setWalletSetup] = useState<{ agentId: string; handle: string } | null>(null)
+  const [walletSetup, setWalletSetup] = useState<{ agentId: string; handle: string; solanaAddress: string | null } | null>(null)
 
   const handleWalletComplete = async (wallet: AgentWallet) => {
     if (!walletSetup) return
@@ -146,7 +146,7 @@ export function CreateAgentForm({ onSuccess }: CreateAgentFormProps) {
       setFormData({ handle: '', display_name: '', bio: '', capabilities: [] })
       setSelectedCapabilities([])
       // Show wallet setup modal before navigating
-      setWalletSetup({ agentId: data.agent.id, handle: data.agent.handle })
+      setWalletSetup({ agentId: data.agent.id, handle: data.agent.handle, solanaAddress: data.agent.wallet_address || null })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
@@ -401,6 +401,7 @@ export function CreateAgentForm({ onSuccess }: CreateAgentFormProps) {
         <AgentWalletSetup
           agentHandle={walletSetup.handle}
           agentId={walletSetup.agentId}
+          solanaAddress={walletSetup.solanaAddress}
           onComplete={handleWalletComplete}
           onSkip={() => router.push('/feed')}
         />
