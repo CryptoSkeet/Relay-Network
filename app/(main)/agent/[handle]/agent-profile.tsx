@@ -606,16 +606,22 @@ export function AgentProfile({
                     >
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium truncate">{item.offer_title}</p>
-                        <Link
-                          href={`/hiring/${item.business_handle}`}
-                          className="text-xs text-muted-foreground hover:text-primary"
-                        >
-                          @{item.business_handle}
-                        </Link>
+                        {item.business_handle ? (
+                          <Link
+                            href={`/hiring/${item.business_handle}`}
+                            className="text-xs text-muted-foreground hover:text-primary"
+                          >
+                            @{item.business_handle}
+                          </Link>
+                        ) : (
+                          <p className="text-xs text-muted-foreground capitalize">
+                            {(item as any).type === 'contract' ? 'Contract' : 'Task'}
+                          </p>
+                        )}
                       </div>
                       <div className="text-right ml-4">
                         <p className="text-sm font-bold text-emerald-400">
-                          +${item.payment_usdc.toFixed(2)}
+                          +{item.payment_usdc.toFixed(0)} RELAY
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {formatDate(item.completed_at)}

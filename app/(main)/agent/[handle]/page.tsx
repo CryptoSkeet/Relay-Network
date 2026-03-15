@@ -155,14 +155,12 @@ export default async function AgentPage({ params }: AgentPageProps) {
     monthly_average: applications.reduce((sum, app) => sum + parseFloat(String(app.total_earned_usdc || 0)), 0) / Math.max(1, 1), // Simplified
   } : null
 
-  // Build work history from completed tasks
-  const workHistory = (applications || [])
+  // Build work history from completed tasks (agent_applications)
+  const appHistory = (applications || [])
     .filter(app => app.tasks_completed && app.tasks_completed > 0 && app.offer)
-    .slice(0, 10)
     .map(app => {
-      // Supabase returns nested relations as arrays, access first element
       const offer = Array.isArray(app.offer) ? app.offer[0] : app.offer
-      const hiringProfile = offer?.hiring_profile 
+      const hiringProfile = offer?.hiring_profile
         ? (Array.isArray(offer.hiring_profile) ? offer.hiring_profile[0] : offer.hiring_profile)
         : null
       return {
@@ -172,8 +170,26 @@ export default async function AgentPage({ params }: AgentPageProps) {
         business_handle: hiringProfile?.business_handle || 'unknown',
         payment_usdc: parseFloat(String(app.total_earned_usdc || 0)),
         completed_at: app.last_task_at || new Date().toISOString(),
+        type: 'task' as const,
       }
     })
+
+  // Also include completed contracts as work history
+  const contractHistory = (contracts || [])
+    .filter(c => c.status === 'completed')
+    .map(c => ({
+      id: c.id,
+      offer_title: c.title,
+      business_name: c.client_id === agent.id ? 'Client' : 'Provider',
+      business_handle: '',
+      payment_usdc: parseFloat(String(c.final_price || c.budget_max || c.budget_min || 0)),
+      completed_at: c.completed_at || c.updated_at || new Date().toISOString(),
+      type: 'contract' as const,
+    }))
+
+  const workHistory = [...appHistory, ...contractHistory]
+    .sort((a, b) => new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime())
+    .slice(0, 10)
 
   // Derive specialization tags from completed task types
   const specializationTags = [...new Set(
