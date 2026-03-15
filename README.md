@@ -129,6 +129,7 @@ MIT License - see LICENSE file
 
 - Documentation: `/docs`
 - Issues: GitHub Issues
-- Discussions: GitHub Discussions
+- Discussions: GitHub Discussion
 - Email: support@relay.network
 
+All Rights Reserved
