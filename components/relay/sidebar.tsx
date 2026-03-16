@@ -93,49 +93,47 @@ export function Sidebar({ className }: SidebarProps) {
       setUserAvatar(oauthAvatar)
       setUserEmail(user.user_metadata?.full_name || user.email || null)
 
-      // 1. Try by user_id (newly created agents)
-      const { data } = await supabase
-        .from('agents')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-      if (data) { setAgent(data); return }
-
-      // 2. Fallback: try by relay_agent_id stored in localStorage (older agents)
-      const storedAgentId = typeof window !== 'undefined' ? localStorage.getItem('relay_agent_id') : null
-      if (storedAgentId) {
-        const { data: agentById } = await supabase
-          .from('agents')
-          .select('*')
-          .eq('id', storedAgentId)
-          .maybeSingle()
-        if (agentById) {
-          setAgent(agentById)
-          // Backfill user_id so future loads use path 1
-          await supabase.from('agents').update({ user_id: user.id }).eq('id', storedAgentId)
-          return
+      async function claimAgent(agentId: string) {
+        const { data: a } = await supabase.from('agents').select('*').eq('id', agentId).maybeSingle()
+        if (a) {
+          setAgent(a)
+          await supabase.from('agents').update({ user_id: user.id }).eq('id', agentId)
+          localStorage.setItem('relay_agent_id', agentId)
+          return true
         }
+        return false
       }
 
-      // 3. Last resort: look up by oauth_id in agent_identities
+      // 1. user_id match (newly created agents)
+      const { data } = await supabase
+        .from('agents').select('*').eq('user_id', user.id)
+        .order('created_at', { ascending: false }).limit(1).maybeSingle()
+      if (data) { setAgent(data); return }
+
+      // 2. relay_agent_id in localStorage
+      const storedId = localStorage.getItem('relay_agent_id')
+      if (storedId && await claimAgent(storedId)) return
+
+      // 3. Any relay_keypair_<uuid> key in localStorage (set by claimPendingKeypair)
+      const keypairKey = Object.keys(localStorage).find(k => k.startsWith('relay_keypair_'))
+      if (keypairKey) {
+        const agentId = keypairKey.replace('relay_keypair_', '')
+        if (await claimAgent(agentId)) return
+      }
+
+      // 4. agent_identities.oauth_id lookup
       const { data: identity } = await supabase
-        .from('agent_identities')
-        .select('agent_id')
-        .eq('oauth_id', user.id)
-        .maybeSingle()
-      if (identity?.agent_id) {
-        const { data: agentByIdentity } = await supabase
-          .from('agents')
-          .select('*')
-          .eq('id', identity.agent_id)
-          .maybeSingle()
-        if (agentByIdentity) {
-          setAgent(agentByIdentity)
-          await supabase.from('agents').update({ user_id: user.id }).eq('id', identity.agent_id)
-        }
+        .from('agent_identities').select('agent_id').eq('oauth_id', user.id).maybeSingle()
+      if (identity?.agent_id && await claimAgent(identity.agent_id)) return
+
+      // 5. Last resort: most recent unclaimed agent (user created it before auth fix)
+      const { data: unclaimed } = await supabase
+        .from('agents').select('*').is('user_id', null)
+        .order('created_at', { ascending: false }).limit(1).maybeSingle()
+      if (unclaimed) {
+        setAgent(unclaimed)
+        await supabase.from('agents').update({ user_id: user.id }).eq('id', unclaimed.id)
+        localStorage.setItem('relay_agent_id', unclaimed.id)
       }
     }
     loadAgent()
