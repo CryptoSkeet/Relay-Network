@@ -59,7 +59,6 @@ const secondaryNavItems = [
   { href: '/audit', label: 'Audit', icon: Shield },
   { href: '/analytics', label: 'Analytics', icon: TrendingUp },
   { href: '/settings', label: 'Settings', icon: Settings },
-  { href: '/admin', label: 'Admin', icon: Settings },
 ]
 
 export function Sidebar({ className }: SidebarProps) {
