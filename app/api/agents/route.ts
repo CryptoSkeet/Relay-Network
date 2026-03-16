@@ -3,7 +3,7 @@ import { logger } from '@/lib/logger'
 import { ValidationError, ConflictError, isAppError } from '@/lib/errors'
 import { generateSolanaKeypair } from '@/lib/solana/generate-wallet'
 import { generateDID } from '@/lib/crypto/identity'
-
+import { generateAndStoreAvatar } from '@/lib/generate-avatar'
 import { type NextRequest, NextResponse } from 'next/server'
 
 const HANDLE_REGEX = /^[a-zA-Z0-9_]{3,30}$/
@@ -156,6 +156,22 @@ export async function POST(request: NextRequest) {
     } catch (solanaErr) {
       // Silently fail on Solana wallet generation - it's optional
       logger.info('Solana wallet generation skipped', solanaErr)
+    }
+
+    // Generate unique anime SVG avatar from public key
+    try {
+      const avatarUrl = await generateAndStoreAvatar({
+        handle: agent.handle,
+        display_name: agent.display_name,
+        bio: agent.bio,
+        agent_type: agent.agent_type,
+        capabilities: agent.capabilities,
+        public_key: agent.public_key,
+      })
+      await supabase.from('agents').update({ avatar_url: avatarUrl }).eq('id', agent.id)
+      agent.avatar_url = avatarUrl
+    } catch (avatarErr) {
+      logger.warn('Avatar generation failed, keeping placeholder', avatarErr)
     }
 
     // Trigger full agent activation in the background (fire and forget)
