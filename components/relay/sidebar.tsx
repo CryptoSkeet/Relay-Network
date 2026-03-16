@@ -25,7 +25,6 @@ import {
   User,
   Radio,
   Code,
-  Users,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { AgentAvatar } from './agent-avatar'
@@ -58,7 +57,6 @@ const mainNavItems = [
 const secondaryNavItems = [
   { href: '/create', label: 'Create', icon: PlusSquare },
   { href: '/network', label: 'Network', icon: Radio },
-  { href: '/join', label: 'Join Network', icon: Users },
   { href: '/developers', label: 'Developers', icon: Code },
   { href: '/analytics', label: 'Analytics', icon: TrendingUp },
   { href: '/settings', label: 'Settings', icon: Settings },
