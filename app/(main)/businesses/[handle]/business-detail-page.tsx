@@ -83,50 +83,46 @@ const totalRaised = investmentRounds.reduce((sum, r) => sum + Number(r.raised_am
       </div>
 
       {/* Hero Banner */}
+      {/* Cover — same pattern as profile-page.tsx */}
       <div
-        className="h-32 relative flex flex-col justify-end px-6 pb-4"
+        className="h-32 sm:h-48"
         style={{
           background: `linear-gradient(135deg, ${
-            business.business_type === 'agency'     ? '#3b82f6, #6366f1' :
-            business.business_type === 'fund'       ? '#10b981, #06b6d4' :
-            business.business_type === 'studio'     ? '#ec4899, #8b5cf6' :
-            business.business_type === 'lab'        ? '#f97316, #ef4444' :
-            business.business_type === 'dao'        ? '#06b6d4, #3b82f6' :
-            business.business_type === 'guild'      ? '#f59e0b, #f97316' :
-                                                      '#7c3aed, #06b6d4'
+            business.business_type === 'agency' ? '#3b82f6, #6366f1' :
+            business.business_type === 'fund'   ? '#10b981, #06b6d4' :
+            business.business_type === 'studio' ? '#ec4899, #8b5cf6' :
+            business.business_type === 'lab'    ? '#f97316, #ef4444' :
+            business.business_type === 'dao'    ? '#06b6d4, #3b82f6' :
+            business.business_type === 'guild'  ? '#f59e0b, #f97316' :
+                                                  '#7c3aed, #06b6d4'
           })`,
         }}
-      >
-        {/* scrim for text legibility */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
-        <div className="relative z-10">
-          <div className="flex items-center gap-2 mb-1">
-            <h1 className="text-2xl font-bold text-white drop-shadow">{business.name}</h1>
-            <span className="text-xs font-semibold bg-white/20 text-white border border-white/30 px-2 py-0.5 rounded capitalize backdrop-blur-sm">
-              {typeConfig.label}
-            </span>
-          </div>
-          <p className="text-white/75 text-sm">@{business.handle}</p>
-        </div>
-      </div>
+      />
 
       {/* Profile Header */}
-      <div className="px-6 pb-4 border-b border-border">
-        <div className="flex items-end gap-4 -mt-8 mb-4">
-          <div className="w-20 h-20 rounded-2xl bg-background border-4 border-background flex items-center justify-center shadow-lg"
-            style={{ background: 'hsl(var(--background))' }}>
-            {business.logo_url
-              ? <img src={business.logo_url} alt={business.name} className="w-full h-full object-cover rounded-2xl" />
-              : <Building2 className="w-10 h-10 text-primary" />
-            }
-          </div>
-          <div className="mb-2 flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              {business.is_public && (
-                <Badge variant="outline" className="text-green-500 border-green-500/30">Public</Badge>
-              )}
+      <div className="px-4 sm:px-6 pb-4 border-b border-border">
+        <div className="flex justify-between items-end -mt-12 sm:-mt-16 mb-4">
+          {/* Logo / avatar */}
+          <div className="ring-4 ring-background rounded-2xl">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-card border border-border flex items-center justify-center shadow-lg">
+              {business.logo_url
+                ? <img src={business.logo_url} alt={business.name} className="w-full h-full object-cover rounded-2xl" />
+                : <Building2 className="w-10 h-10 text-primary" />
+              }
             </div>
           </div>
+          {business.is_public && (
+            <Badge variant="outline" className="text-green-500 border-green-500/30 mb-2">Public</Badge>
+          )}
+        </div>
+
+        {/* Name / handle / type — below avatar, same as profile page */}
+        <div className="space-y-1 mb-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-xl font-bold">{business.name}</h1>
+            <Badge className={cn(typeConfig.color, 'capitalize')}>{typeConfig.label}</Badge>
+          </div>
+          <p className="text-muted-foreground text-sm">@{business.handle}</p>
         </div>
 
         {business.description && (
