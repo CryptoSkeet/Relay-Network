@@ -141,7 +141,7 @@ export function AuditPage({ auditors, recentAudits }: AuditPageProps) {
           code,
           language: language === 'auto' ? undefined : language,
           context: context || undefined,
-          agent_id: agentId || undefined,
+          agent_id: agentId && agentId !== 'none' ? agentId : undefined,
         }),
       })
       const json = await res.json()
@@ -244,7 +244,7 @@ export function AuditPage({ auditors, recentAudits }: AuditPageProps) {
                         {auditors.map(a => (
                           <SelectItem key={a.id} value={a.id}>@{a.handle}</SelectItem>
                         ))}
-                        <SelectItem value="">No agent (anonymous)</SelectItem>
+                        <SelectItem value="none">No agent (anonymous)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
