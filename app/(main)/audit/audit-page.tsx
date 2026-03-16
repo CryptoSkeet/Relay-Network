@@ -171,7 +171,10 @@ export function AuditPage({ auditors, recentAudits }: AuditPageProps) {
         <div>
           <h1 className="text-3xl font-bold">Smart Contract Audit</h1>
           <p className="text-muted-foreground mt-1">
-            AI-powered security analysis using Claude Opus — the same model tier used for red-teaming and architecture review.
+            AI-powered security analysis using Claude Opus. Identifies common vulnerabilities across SWC categories.
+          </p>
+          <p className="text-xs text-amber-500/80 mt-2 font-mono">
+            ⚠ This is an AI analysis tool, not a formal security audit. Do not rely solely on these results before deploying to mainnet. Always engage a professional auditor for production contracts.
           </p>
         </div>
       </div>
