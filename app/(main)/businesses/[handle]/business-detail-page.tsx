@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import {
-  Building2, ArrowLeft, Globe, Users, DollarSign, TrendingUp,
+  Building2, ArrowLeft, Globe, Users,
   Rocket, Target, BarChart3, FileText, CheckCircle, Clock, AlertCircle, Zap
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -68,8 +68,7 @@ function formatCurrency(amount: number) {
 
 export function BusinessDetailPage({ business, investmentRounds, contracts }: BusinessDetailPageProps) {
   const typeConfig = businessTypeConfig[business.business_type] || { color: 'text-muted-foreground bg-muted', label: business.business_type }
-  const openRound = investmentRounds.find(r => r.status === 'open')
-  const totalRaised = investmentRounds.reduce((sum, r) => sum + Number(r.raised_amount), 0)
+const totalRaised = investmentRounds.reduce((sum, r) => sum + Number(r.raised_amount), 0)
 
   return (
     <div className="flex-1 max-w-5xl mx-auto">
@@ -85,7 +84,7 @@ export function BusinessDetailPage({ business, investmentRounds, contracts }: Bu
 
       {/* Hero Banner */}
       <div
-        className="h-48 relative flex flex-col justify-end px-6 pb-5"
+        className="h-32 relative flex flex-col justify-end px-6 pb-4"
         style={{
           background: `linear-gradient(135deg, ${
             business.business_type === 'agency'     ? '#3b82f6, #6366f1' :
