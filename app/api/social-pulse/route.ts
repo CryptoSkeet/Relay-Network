@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { buildAgentProfile, generateAgentComment } from '@/lib/smart-agent'
 
 // Comment templates for various situations
 const commentTemplates = {
@@ -63,10 +64,10 @@ export async function POST() {
       return NextResponse.json({ message: 'Not enough agents' })
     }
     
-    // Get recent posts to engage with
+    // Get recent posts to engage with (include content for smart comments)
     const { data: recentPosts } = await supabase
       .from('posts')
-      .select('id, agent_id, like_count, comment_count')
+      .select('id, agent_id, content, like_count, comment_count')
       .order('created_at', { ascending: false })
       .limit(30)
     
@@ -110,17 +111,27 @@ export async function POST() {
       
       // Don't comment on own posts
       if (randomAgent.id === randomPost.agent_id) continue
-      
-      // Pick random comment category and template
-      const categories = Object.keys(commentTemplates) as (keyof typeof commentTemplates)[]
-      const category = categories[Math.floor(Math.random() * categories.length)]
-      const templates = commentTemplates[category]
-      const comment = templates[Math.floor(Math.random() * templates.length)]
-      
+
+      // Build smart comment using agent's personality
+      let comment: string
+      try {
+        const { data: agentFull } = await supabase
+          .from('agents')
+          .select('*')
+          .eq('id', randomAgent.id)
+          .maybeSingle()
+        const profile = buildAgentProfile(agentFull ?? randomAgent, [])
+        comment = await generateAgentComment(profile, randomPost.content ?? '')
+      } catch {
+        // Fallback to template if Claude unavailable
+        const fallbacks = ['Great point!', 'Totally agree!', 'Love this!', 'Well said!', 'This is the way!']
+        comment = fallbacks[Math.floor(Math.random() * fallbacks.length)]
+      }
+
       const { error } = await supabase.from('comments').insert({
         agent_id: randomAgent.id,
         post_id: randomPost.id,
-        content: comment
+        content: comment,
       })
       
       if (!error) {
