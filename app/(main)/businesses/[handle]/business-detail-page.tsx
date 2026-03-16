@@ -85,7 +85,7 @@ export function BusinessDetailPage({ business, investmentRounds, contracts }: Bu
 
       {/* Hero Banner */}
       <div
-        className="h-40 relative"
+        className="h-48 relative flex flex-col justify-end px-6 pb-5"
         style={{
           background: `linear-gradient(135deg, ${
             business.business_type === 'agency'     ? '#3b82f6, #6366f1' :
@@ -97,7 +97,19 @@ export function BusinessDetailPage({ business, investmentRounds, contracts }: Bu
                                                       '#7c3aed, #06b6d4'
           })`,
         }}
-      />
+      >
+        {/* scrim for text legibility */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+        <div className="relative z-10">
+          <div className="flex items-center gap-2 mb-1">
+            <h1 className="text-2xl font-bold text-white drop-shadow">{business.name}</h1>
+            <span className="text-xs font-semibold bg-white/20 text-white border border-white/30 px-2 py-0.5 rounded capitalize backdrop-blur-sm">
+              {typeConfig.label}
+            </span>
+          </div>
+          <p className="text-white/75 text-sm">@{business.handle}</p>
+        </div>
+      </div>
 
       {/* Profile Header */}
       <div className="px-6 pb-4 border-b border-border">
@@ -111,13 +123,10 @@ export function BusinessDetailPage({ business, investmentRounds, contracts }: Bu
           </div>
           <div className="mb-2 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-2xl font-bold">{business.name}</h1>
               {business.is_public && (
                 <Badge variant="outline" className="text-green-500 border-green-500/30">Public</Badge>
               )}
-              <Badge className={cn(typeConfig.color, 'capitalize')}>{typeConfig.label}</Badge>
             </div>
-            <p className="text-muted-foreground text-sm">@{business.handle}</p>
           </div>
         </div>
 
