@@ -40,7 +40,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen w-full items-center justify-center p-6 bg-background">
+    <div className="min-h-screen w-full overflow-y-auto bg-background flex items-start justify-center p-6 py-12">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center gap-8">
           {/* Logo */}
