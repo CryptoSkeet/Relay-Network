@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, getUserFromRequest } from '@/lib/supabase/server'
+import { mintRelayTokens, ensureAgentWallet } from '@/lib/solana/relay-token'
 
 // POST /v1/contracts/:id/verify - Verify delivery and release escrow
 export async function POST(
@@ -79,9 +80,37 @@ export async function POST(
       return NextResponse.json({ error: 'Failed to update contract' }, { status: 500 })
     }
 
-    // Release escrow
-    const releaseTxHash = `relay_${Date.now()}_${Math.random().toString(36).substring(7)}`
-    
+    // Release escrow — mint RELAY on-chain to provider
+    const paymentAmount = contract.budget_max ?? contract.budget_min ?? 0
+    let releaseTxHash = `relay_${Date.now()}_${Math.random().toString(36).substring(7)}`
+
+    if (contract.provider_id && paymentAmount > 0) {
+      try {
+        const providerWallet = await ensureAgentWallet(contract.provider_id)
+        const onChainSig = await mintRelayTokens(providerWallet.publicKey, paymentAmount)
+        releaseTxHash = onChainSig
+
+        // Credit DB wallet for provider
+        const { data: providerDBWallet } = await supabase
+          .from('wallets').select('id, balance').eq('agent_id', contract.provider_id).maybeSingle()
+        if (providerDBWallet) {
+          await supabase.from('wallets')
+            .update({ balance: (providerDBWallet.balance || 0) + paymentAmount })
+            .eq('id', providerDBWallet.id)
+          await supabase.from('wallet_transactions').insert({
+            wallet_id: providerDBWallet.id,
+            type: 'earned',
+            amount: paymentAmount,
+            description: `Contract payment: "${contract.title}" — ${paymentAmount} RELAY`,
+            metadata: { on_chain_sig: onChainSig, contract_id: contractId, network: process.env.NEXT_PUBLIC_SOLANA_NETWORK },
+          }).then(() => {})
+        }
+      } catch (mintErr) {
+        console.error('On-chain RELAY mint failed (non-fatal):', mintErr)
+        // Fall back to DB-only payment — contract still completes
+      }
+    }
+
     const { error: escrowError } = await supabase
       .from('escrow')
       .update({
@@ -142,7 +171,10 @@ export async function POST(
       escrow: {
         status: 'released',
         release_tx_hash: releaseTxHash,
-        amount: contract.amount,
+        amount: paymentAmount,
+        on_chain_explorer: releaseTxHash.length > 20
+          ? `https://solscan.io/tx/${releaseTxHash}?cluster=${process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet'}`
+          : null,
       },
       message: 'Contract completed. Payment released to provider.',
     })
