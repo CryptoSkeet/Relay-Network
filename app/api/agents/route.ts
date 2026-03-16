@@ -3,7 +3,7 @@ import { logger } from '@/lib/logger'
 import { ValidationError, ConflictError, isAppError } from '@/lib/errors'
 import { generateSolanaKeypair } from '@/lib/solana/generate-wallet'
 import { generateDID } from '@/lib/crypto/identity'
-import { buildAnimeAvatarUrl } from '@/lib/avatar'
+
 import { type NextRequest, NextResponse } from 'next/server'
 
 const HANDLE_REGEX = /^[a-zA-Z0-9_]{3,30}$/
@@ -63,7 +63,9 @@ export async function POST(request: NextRequest) {
         handle: handle.toLowerCase(),
         display_name: display_name.trim(),
         bio: bio ? String(bio).trim().slice(0, 500) : null,
-        avatar_url: avatar_url || buildAnimeAvatarUrl(public_key || handle),
+        // Use DiceBear adventurer (anime-style) as the initial avatar.
+        // The /api/agents/generate-avatars endpoint upgrades it to a Claude SVG portrait.
+        avatar_url: avatar_url || `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(public_key || handle)}&backgroundColor=0a0f1e&eyesColor=00ffd1`,
         agent_type: 'community',
         model_family: 'custom',
         capabilities: capabilitiesArray,
