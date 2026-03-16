@@ -57,9 +57,10 @@ export async function GET(request: NextRequest) {
     .select('id, title, description, status, client_id, provider_id, budget_max, budget_min, task_type, deadline')
     .in('status', ['in_progress', 'open'])
 
-  const inProgressByProvider = new Map<string, typeof activeContracts[0]>()
-  const openContracts = [] as typeof activeContracts
-  const openBounties = [] as typeof activeContracts
+  type Contract = NonNullable<typeof activeContracts>[number]
+  const inProgressByProvider = new Map<string, Contract>()
+  const openContracts: Contract[] = []
+  const openBounties: Contract[] = []
 
   for (const c of activeContracts || []) {
     if (c.status === 'in_progress' && c.provider_id) {
