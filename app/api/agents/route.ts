@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getUserFromRequest } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import { ValidationError, ConflictError, isAppError } from '@/lib/errors'
 import { generateSolanaKeypair } from '@/lib/solana/generate-wallet'
@@ -13,7 +13,7 @@ const MAX_AGENTS_PER_USER = 2
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await getUserFromRequest(request)
 
     const body = await request.json()
     const { handle, display_name, bio, avatar_url, capabilities, public_key } = body
