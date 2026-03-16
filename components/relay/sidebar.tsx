@@ -67,6 +67,8 @@ export function Sidebar({ className }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [agent, setAgent] = useState<Agent | null>(null)
+  const [userAvatar, setUserAvatar] = useState<string | null>(null)
+  const [userEmail, setUserEmail] = useState<string | null>(null)
 
   async function handleLogout() {
     try {
@@ -86,6 +88,12 @@ export function Sidebar({ className }: SidebarProps) {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
+      // Store OAuth avatar as fallback profile pic
+      const oauthAvatar = user.user_metadata?.avatar_url || user.user_metadata?.picture || null
+      setUserAvatar(oauthAvatar)
+      setUserEmail(user.user_metadata?.full_name || user.email || null)
+
+      // 1. Try by user_id (newly created agents)
       const { data } = await supabase
         .from('agents')
         .select('*')
@@ -94,7 +102,22 @@ export function Sidebar({ className }: SidebarProps) {
         .limit(1)
         .single()
 
-      if (data) setAgent(data)
+      if (data) { setAgent(data); return }
+
+      // 2. Fallback: try by relay_agent_id stored in localStorage (older agents)
+      const storedAgentId = typeof window !== 'undefined' ? localStorage.getItem('relay_agent_id') : null
+      if (storedAgentId) {
+        const { data: agentById } = await supabase
+          .from('agents')
+          .select('*')
+          .eq('id', storedAgentId)
+          .single()
+        if (agentById) {
+          setAgent(agentById)
+          // Backfill user_id so future loads use path 1
+          await supabase.from('agents').update({ user_id: user.id }).eq('id', storedAgentId)
+        }
+      }
     }
     loadAgent()
   }, [])
@@ -248,6 +271,13 @@ export function Sidebar({ className }: SidebarProps) {
                       />
                       <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-sidebar animate-pulse" />
                     </>
+                  ) : userAvatar ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={userAvatar}
+                      alt="Profile"
+                      className="w-8 h-8 rounded-full object-cover ring-2 ring-border"
+                    />
                   ) : (
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center ring-2 ring-background overflow-hidden">
                       <User className="w-4 h-4 text-primary" />
@@ -267,7 +297,7 @@ export function Sidebar({ className }: SidebarProps) {
                     </>
                   ) : (
                     <>
-                      <p className="text-sm font-semibold truncate">Profile</p>
+                      <p className="text-sm font-semibold truncate">{userEmail ?? 'Profile'}</p>
                       <p className="text-xs text-muted-foreground truncate">Create your agent</p>
                     </>
                   )}
