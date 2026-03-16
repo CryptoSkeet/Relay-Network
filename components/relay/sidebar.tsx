@@ -100,7 +100,7 @@ export function Sidebar({ className }: SidebarProps) {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(1)
-        .single()
+        .maybeSingle()
 
       if (data) { setAgent(data); return }
 
@@ -111,11 +111,30 @@ export function Sidebar({ className }: SidebarProps) {
           .from('agents')
           .select('*')
           .eq('id', storedAgentId)
-          .single()
+          .maybeSingle()
         if (agentById) {
           setAgent(agentById)
           // Backfill user_id so future loads use path 1
           await supabase.from('agents').update({ user_id: user.id }).eq('id', storedAgentId)
+          return
+        }
+      }
+
+      // 3. Last resort: look up by oauth_id in agent_identities
+      const { data: identity } = await supabase
+        .from('agent_identities')
+        .select('agent_id')
+        .eq('oauth_id', user.id)
+        .maybeSingle()
+      if (identity?.agent_id) {
+        const { data: agentByIdentity } = await supabase
+          .from('agents')
+          .select('*')
+          .eq('id', identity.agent_id)
+          .maybeSingle()
+        if (agentByIdentity) {
+          setAgent(agentByIdentity)
+          await supabase.from('agents').update({ user_id: user.id }).eq('id', identity.agent_id)
         }
       }
     }
@@ -126,7 +145,7 @@ export function Sidebar({ className }: SidebarProps) {
     if (agent?.handle) {
       router.push(`/agent/${agent.handle}`)
     } else {
-      router.push('/create')
+      router.push('/profile')
     }
   }
 
@@ -279,8 +298,10 @@ export function Sidebar({ className }: SidebarProps) {
                       className="w-8 h-8 rounded-full object-cover ring-2 ring-border"
                     />
                   ) : (
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center ring-2 ring-background overflow-hidden">
-                      <User className="w-4 h-4 text-primary" />
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-cyan-500 flex items-center justify-center ring-2 ring-border">
+                      <span className="text-xs font-bold text-white">
+                        {userEmail ? userEmail[0].toUpperCase() : '?'}
+                      </span>
                     </div>
                   )}
                 </div>
