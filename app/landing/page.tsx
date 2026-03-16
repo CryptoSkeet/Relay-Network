@@ -235,7 +235,7 @@ export default function LandingPage() {
           </div>
           <div className="hero-actions">
             <Link href="/auth/sign-up" className="btn-primary" style={{textDecoration:'none'}}>Deploy Agent</Link>
-            <a href="#protocol" className="btn-outline">Read Whitepaper</a>
+            <Link href="/whitepaper" className="btn-outline" style={{textDecoration:'none'}}>Read Whitepaper</Link>
           </div>
           <div className="net-ticker">
             NETWORK ACTIVE // agents online: <span>{agentCount.toLocaleString()}</span>

@@ -1,0 +1,251 @@
+/* ── Relay Whitepaper Styles ────────────────────────────────────────── */
+
+:root {
+  --bg: #0a0a0a;
+  --surface: #111111;
+  --border: #1e1e1e;
+  --text: #e8e8e8;
+  --muted: #888;
+  --accent: #00ff88;
+  --accent2: #4488ff;
+  --accent3: #ff8844;
+  --code-bg: #0f1117;
+  --max-w: 860px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body { background: var(--bg); color: var(--text); font-family: 'Georgia', serif; line-height: 1.75; }
+
+.wp-shell {
+  min-height: 100vh;
+}
+
+/* ── NAV ── */
+.wp-nav {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(10,10,10,0.95);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 32px; height: 56px;
+}
+.wp-nav-logo { font-family: monospace; font-size: 14px; color: var(--accent); font-weight: 700; text-decoration: none; }
+.wp-nav-links { display: flex; gap: 24px; }
+.wp-nav-links a { font-size: 12px; color: var(--muted); text-decoration: none; font-family: monospace; text-transform: uppercase; letter-spacing: .08em; transition: color .15s; }
+.wp-nav-links a:hover { color: var(--text); }
+.wp-nav-cta { font-size: 12px; font-family: monospace; background: var(--accent); color: #000; padding: 6px 16px; border-radius: 4px; text-decoration: none; font-weight: 700; }
+
+/* ── LAYOUT ── */
+.wp-body {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 0 24px;
+  gap: 0;
+}
+
+/* ── SIDEBAR TOC ── */
+.wp-toc {
+  position: sticky; top: 56px; align-self: start;
+  height: calc(100vh - 56px); overflow-y: auto;
+  padding: 32px 24px 32px 0;
+  border-right: 1px solid var(--border);
+  scrollbar-width: none;
+}
+.wp-toc::-webkit-scrollbar { display: none; }
+.wp-toc-label { font-size: 10px; font-family: monospace; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; margin-bottom: 12px; }
+.wp-toc ul { list-style: none; }
+.wp-toc li { margin-bottom: 2px; }
+.wp-toc a {
+  font-size: 12px; font-family: monospace; color: var(--muted);
+  text-decoration: none; display: block;
+  padding: 4px 8px; border-radius: 4px;
+  border-left: 2px solid transparent;
+  transition: all .15s;
+}
+.wp-toc a:hover, .wp-toc a.active { color: var(--accent); border-left-color: var(--accent); background: rgba(0,255,136,.05); }
+.wp-toc .toc-sub { padding-left: 16px; }
+.wp-toc .toc-sub a { font-size: 11px; }
+
+/* ── CONTENT ── */
+.wp-content {
+  padding: 48px 0 96px 48px;
+  max-width: 780px;
+}
+
+/* ── COVER ── */
+.wp-cover {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 48px;
+  margin-bottom: 56px;
+  background: linear-gradient(135deg, rgba(0,255,136,.04) 0%, transparent 60%);
+  position: relative; overflow: hidden;
+}
+.wp-cover::before {
+  content: '';
+  position: absolute; top: 0; right: 0;
+  width: 300px; height: 300px;
+  background: radial-gradient(circle, rgba(0,255,136,.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+.wp-tag { font-family: monospace; font-size: 11px; color: var(--accent); letter-spacing: .12em; text-transform: uppercase; margin-bottom: 20px; }
+.wp-cover h1 { font-size: 36px; font-weight: 700; line-height: 1.2; margin-bottom: 12px; font-family: 'Georgia', serif; }
+.wp-cover h1 em { font-style: italic; color: var(--accent); }
+.wp-cover-sub { font-size: 18px; color: var(--muted); margin-bottom: 28px; font-style: italic; }
+.wp-meta { display: flex; gap: 32px; flex-wrap: wrap; }
+.wp-meta-item { }
+.wp-meta-label { font-size: 10px; font-family: monospace; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.wp-meta-val { font-size: 13px; font-family: monospace; color: var(--text); margin-top: 2px; }
+
+/* ── SECTIONS ── */
+.wp-section { margin-bottom: 56px; scroll-margin-top: 80px; }
+
+.wp-section-num { font-family: monospace; font-size: 11px; color: var(--accent); letter-spacing: .1em; text-transform: uppercase; margin-bottom: 8px; }
+
+h2 { font-size: 26px; font-weight: 700; margin-bottom: 20px; line-height: 1.3; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+h3 { font-size: 18px; font-weight: 600; margin: 32px 0 12px; color: var(--text); }
+h4 { font-size: 14px; font-weight: 600; margin: 24px 0 8px; color: var(--muted); font-family: monospace; text-transform: uppercase; letter-spacing: .08em; }
+
+p { margin-bottom: 16px; color: #ccc; font-size: 15px; }
+
+/* ── ABSTRACT ── */
+.abstract {
+  background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent);
+  border-radius: 0 6px 6px 0; padding: 24px 28px; margin-bottom: 32px;
+}
+.abstract-label { font-family: monospace; font-size: 10px; color: var(--accent); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 8px; }
+.abstract p { font-size: 14px; color: #bbb; margin-bottom: 0; font-style: italic; }
+
+/* ── CODE ── */
+pre, code {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 13px;
+}
+pre {
+  background: var(--code-bg); border: 1px solid var(--border);
+  border-radius: 6px; padding: 20px 24px; overflow-x: auto;
+  margin: 20px 0; line-height: 1.6;
+  color: #c9d1d9;
+}
+code { background: rgba(255,255,255,.07); padding: 2px 6px; border-radius: 3px; font-size: 13px; color: #e8e8e8; }
+pre code { background: none; padding: 0; }
+
+/* syntax highlight classes */
+.k { color: #ff7b72; }   /* keyword */
+.t { color: #79c0ff; }   /* type */
+.s { color: #a5d6ff; }   /* string */
+.n { color: #ffa657; }   /* number */
+.c { color: #8b949e; }   /* comment */
+.f { color: #d2a8ff; }   /* function */
+.v { color: #e6edf3; }   /* variable */
+
+/* ── MATH / FORMULA ── */
+.formula {
+  background: var(--code-bg); border: 1px solid var(--border);
+  border-radius: 6px; padding: 20px 24px; margin: 20px 0;
+  font-family: monospace; font-size: 14px; color: #ffd700;
+  text-align: center; overflow-x: auto;
+}
+.formula-label { font-size: 11px; color: var(--muted); margin-top: 8px; text-align: center; }
+
+/* ── TABLE ── */
+table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 13px; }
+th { font-family: monospace; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); border-bottom: 1px solid var(--border); padding: 10px 12px; text-align: left; }
+td { padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,.05); color: #ccc; }
+tr:hover td { background: rgba(255,255,255,.02); }
+.td-g { color: var(--accent); font-family: monospace; }
+.td-b { color: var(--accent2); font-family: monospace; }
+.td-o { color: var(--accent3); font-family: monospace; }
+
+/* ── CALLOUT ── */
+.callout {
+  display: flex; gap: 16px; align-items: flex-start;
+  background: rgba(68,136,255,.06); border: 1px solid rgba(68,136,255,.2);
+  border-radius: 6px; padding: 16px 20px; margin: 20px 0;
+}
+.callout-ico { font-size: 18px; flex-shrink: 0; margin-top: 2px; }
+.callout p { margin: 0; font-size: 14px; color: #b8ccff; }
+.callout.warn { background: rgba(255,136,68,.06); border-color: rgba(255,136,68,.2); }
+.callout.warn p { color: #ffd8b8; }
+.callout.ok { background: rgba(0,255,136,.06); border-color: rgba(0,255,136,.2); }
+.callout.ok p { color: #b8ffe0; }
+
+/* ── DIAGRAM ── */
+.diagram {
+  background: var(--code-bg); border: 1px solid var(--border);
+  border-radius: 8px; padding: 32px; margin: 24px 0;
+  font-family: monospace; font-size: 12px; line-height: 1.8;
+  color: #8b949e; overflow-x: auto; white-space: pre;
+}
+.diagram .hi { color: var(--accent); }
+.diagram .bl { color: var(--accent2); }
+.diagram .or { color: var(--accent3); }
+
+/* ── TOKEN CHART ── */
+.token-dist {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 20px 0;
+}
+.tok-slice {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: 14px 18px;
+  display: flex; align-items: center; gap: 14px;
+}
+.tok-pct { font-size: 22px; font-weight: 700; font-family: monospace; min-width: 54px; }
+.tok-info-label { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+.tok-info-desc { font-size: 11px; color: var(--muted); }
+
+/* ── ROADMAP ── */
+.roadmap { margin: 20px 0; }
+.rm-phase {
+  display: flex; gap: 20px; margin-bottom: 0;
+  position: relative;
+}
+.rm-phase::before {
+  content: ''; position: absolute;
+  left: 15px; top: 44px; bottom: -4px; width: 1px;
+  background: var(--border);
+}
+.rm-phase:last-child::before { display: none; }
+.rm-dot {
+  width: 32px; height: 32px; border-radius: 50%;
+  border: 2px solid var(--border); background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; font-size: 11px; font-family: monospace; color: var(--muted);
+  margin-top: 8px;
+}
+.rm-dot.done { border-color: var(--accent); color: var(--accent); background: rgba(0,255,136,.1); }
+.rm-dot.now { border-color: var(--accent3); color: var(--accent3); background: rgba(255,136,68,.1); }
+.rm-body { padding: 8px 0 32px; }
+.rm-phase-label { font-family: monospace; font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; }
+.rm-phase-title { font-size: 15px; font-weight: 600; margin: 4px 0 8px; }
+.rm-items { list-style: none; }
+.rm-items li { font-size: 13px; color: #aaa; padding: 2px 0; }
+.rm-items li::before { content: '→ '; color: var(--muted); font-family: monospace; }
+.rm-items li.done::before { content: '✓ '; color: var(--accent); }
+
+/* ── REFS ── */
+.refs { list-style: none; }
+.refs li { font-size: 13px; color: var(--muted); padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,.04); font-family: monospace; }
+.refs li span { color: var(--accent2); margin-right: 10px; }
+
+/* ── FOOTER ── */
+.wp-footer {
+  border-top: 1px solid var(--border);
+  padding: 32px 48px;
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: monospace; font-size: 12px; color: var(--muted);
+}
+.wp-footer a { color: var(--accent); text-decoration: none; }
+
+@media (max-width: 900px) {
+  .wp-body { grid-template-columns: 1fr; }
+  .wp-toc { display: none; }
+  .wp-content { padding: 32px 0 64px; }
+  .wp-cover { padding: 32px 24px; }
+  .wp-cover h1 { font-size: 26px; }
+  .token-dist { grid-template-columns: 1fr; }
+  .wp-nav-links { display: none; }
+}
