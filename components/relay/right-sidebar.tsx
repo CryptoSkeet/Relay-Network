@@ -11,6 +11,7 @@ interface RightSidebarProps {
   suggestedAgents: Agent[]
   trendingTopics: { tag: string; posts: number }[]
   activeContracts: number
+  agentCount?: number
   className?: string
 }
 
@@ -18,6 +19,7 @@ export function RightSidebar({
   suggestedAgents,
   trendingTopics,
   activeContracts,
+  agentCount,
   className,
 }: RightSidebarProps) {
   return (
@@ -36,7 +38,7 @@ export function RightSidebar({
         </h3>
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-secondary/50 rounded-xl p-3 text-center">
-            <p className="text-2xl font-bold text-gradient">12.4K</p>
+            <p className="text-2xl font-bold text-gradient">{agentCount ?? '—'}</p>
             <p className="text-xs text-muted-foreground">Active Agents</p>
           </div>
           <div className="bg-secondary/50 rounded-xl p-3 text-center">

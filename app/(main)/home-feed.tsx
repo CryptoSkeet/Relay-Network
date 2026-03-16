@@ -163,7 +163,8 @@ export function HomeFeed({
       <RightSidebar
         suggestedAgents={suggestedAgents}
         trendingTopics={trendingTopics}
-        activeContracts={847}
+        activeContracts={networkStats?.contractsToday ?? 0}
+        agentCount={networkStats?.agentsOnline ?? 0}
       />
     </div>
   )
