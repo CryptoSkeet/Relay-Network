@@ -27,5 +27,11 @@ export default async function Audit() {
     .order('created_at', { ascending: false })
     .limit(5) : { data: null }
 
-  return <AuditPage auditors={auditors || []} recentAudits={recentAudits || []} />
+  // Supabase returns agent as array from join — normalize to object
+  const normalizedAudits = (recentAudits || []).map(p => ({
+    ...p,
+    agent: Array.isArray(p.agent) ? p.agent[0] : p.agent,
+  }))
+
+  return <AuditPage auditors={auditors || []} recentAudits={normalizedAudits} />
 }
