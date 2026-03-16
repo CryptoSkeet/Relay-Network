@@ -43,6 +43,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import type { Agent, Post, Wallet as WalletType, Business, Contract } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
 
@@ -225,8 +227,19 @@ export function AgentProfile({
   const [copiedDID, setCopiedDID] = useState(false)
   const [copiedPubKey, setCopiedPubKey] = useState(false)
   const [challengeResult, setChallengeResult] = useState<'idle' | 'verifying' | 'success' | 'failed'>('idle')
+  const [isOwner, setIsOwner] = useState(false)
+  const [bannerDialog, setBannerDialog] = useState(false)
+  const [bannerFrom, setBannerFrom] = useState(agent.gradient_from || agent.theme_color || '#7c3aed')
+  const [bannerTo, setBannerTo] = useState(agent.gradient_to || agent.accent_color || '#06b6d4')
+  const [bannerUrl, setBannerUrl] = useState(agent.banner_url || '')
+  const [bannerSaving, setBannerSaving] = useState(false)
+  const [liveBanner, setLiveBanner] = useState({
+    url: agent.banner_url || '',
+    from: agent.gradient_from || agent.theme_color || '#7c3aed',
+    to: agent.gradient_to || agent.accent_color || '#06b6d4',
+  })
 
-  // Check follow status + get current user's agent on mount
+  // Check follow status + detect ownership on mount
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getUser().then(async (res) => {
@@ -234,6 +247,7 @@ export function AgentProfile({
       if (!user) { setFollowLoading(false); return }
       const { data: myAgent } = await supabase.from('agents').select('id').eq('user_id', user.id).single()
       if (!myAgent) { setFollowLoading(false); return }
+      setIsOwner(myAgent.id === agent.id)
       const { data } = await supabase
         .from('follows')
         .select('id')
@@ -294,6 +308,23 @@ export function AgentProfile({
       setFollowModalAgents((data || []).map((r: any) => (Array.isArray(r.agent) ? r.agent[0] : r.agent)).filter(Boolean) as Agent[])
     }
     setFollowModalLoading(false)
+  }
+
+  // Save banner changes
+  const saveBanner = async () => {
+    setBannerSaving(true)
+    const supabase = createClient()
+    const updates: Record<string, string | null> = {
+      gradient_from: bannerUrl ? null : bannerFrom,
+      gradient_to: bannerUrl ? null : bannerTo,
+      banner_url: bannerUrl || null,
+      theme_color: bannerFrom,
+      accent_color: bannerTo,
+    }
+    await supabase.from('agents').update(updates).eq('id', agent.id)
+    setLiveBanner({ url: bannerUrl, from: bannerFrom, to: bannerTo })
+    setBannerSaving(false)
+    setBannerDialog(false)
   }
 
   // Copy to clipboard helpers
@@ -366,53 +397,150 @@ export function AgentProfile({
         </div>
       </header>
 
-      {/* Cover */}
-      <div 
-        className="h-32 sm:h-48 relative"
+      {/* Cover / Banner */}
+      <div
+        className="h-36 sm:h-52 relative overflow-hidden"
         style={{
-          background: agent.banner_url 
-            ? `url(${agent.banner_url})` 
-            : agent.gradient_from && agent.gradient_to
-            ? `linear-gradient(135deg, ${agent.gradient_from}, ${agent.gradient_to})`
-            : `linear-gradient(135deg, ${agent.theme_color || '#7c3aed'}, ${agent.accent_color || '#06b6d4'})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
+          background: liveBanner.url
+            ? `url(${liveBanner.url}) center/cover no-repeat`
+            : `linear-gradient(135deg, ${liveBanner.from}, ${liveBanner.to})`,
         }}
       >
-        {agent.banner_url && (
-          <img src={agent.banner_url} alt="Cover" className="w-full h-full object-cover" />
+        {liveBanner.url && (
+          <img src={liveBanner.url} alt="Banner" className="absolute inset-0 w-full h-full object-cover" />
+        )}
+        {/* dark scrim at bottom so avatar + buttons sit on readable surface */}
+        <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-background/80 to-transparent" />
+        {/* Owner: edit banner button */}
+        {isOwner && (
+          <button
+            onClick={() => setBannerDialog(true)}
+            className="absolute top-3 right-3 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/50 backdrop-blur text-white text-xs font-medium hover:bg-black/70 transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2.414a2 2 0 01.586-1.414z" />
+            </svg>
+            Edit Banner
+          </button>
         )}
       </div>
 
       {/* Profile Info */}
       <div className="px-4 pb-4">
-        {/* Avatar and actions */}
-        <div className="flex justify-between items-end -mt-12 sm:-mt-16 mb-4">
-          <div className="ring-4 ring-background rounded-full">
+        {/* Avatar row — sits on top of banner scrim */}
+        <div className="flex justify-between items-end -mt-10 sm:-mt-14 mb-4">
+          <div className="ring-4 ring-background rounded-full z-10 relative">
             <AgentAvatar src={agent.avatar_url} name={agent.display_name} size="xl" isVerified={agent.is_verified} />
           </div>
-          <div className="flex items-center gap-2 pb-2">
-            <Button variant="secondary" size="icon">
+          {/* Action buttons — always visible, elevated above banner */}
+          <div className="flex items-center gap-2 z-10 relative">
+            <Button variant="secondary" size="icon" className="bg-background/90 backdrop-blur border border-border shadow-sm">
               <MoreHorizontal className="w-5 h-5" />
             </Button>
-            <Button variant="secondary" size="icon" asChild>
+            <Button variant="secondary" size="icon" className="bg-background/90 backdrop-blur border border-border shadow-sm" asChild>
               <Link href={`/messages/${agent.handle}`}>
                 <MessageCircle className="w-5 h-5" />
               </Link>
             </Button>
-            <Button
-              onClick={handleFollow}
-              disabled={followLoading}
-              className={cn(
-                isFollowing
-                  ? 'bg-secondary text-foreground hover:bg-destructive hover:text-destructive-foreground'
-                  : 'gradient-relay text-primary-foreground glow-primary'
-              )}
-            >
-              {isFollowing ? 'Following' : 'Follow'}
-            </Button>
+            {!isOwner && (
+              <Button
+                onClick={handleFollow}
+                disabled={followLoading}
+                className={cn(
+                  'shadow-sm',
+                  isFollowing
+                    ? 'bg-secondary text-foreground hover:bg-destructive hover:text-destructive-foreground border border-border'
+                    : 'gradient-relay text-primary-foreground glow-primary'
+                )}
+              >
+                {followLoading ? '…' : isFollowing ? 'Following' : 'Follow'}
+              </Button>
+            )}
+            {isOwner && (
+              <Button variant="outline" className="bg-background/90 backdrop-blur shadow-sm" onClick={() => setBannerDialog(true)}>
+                Edit Profile
+              </Button>
+            )}
           </div>
         </div>
+
+        {/* Banner editor dialog */}
+        <Dialog open={bannerDialog} onOpenChange={setBannerDialog}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Customize Banner</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-5 pt-2">
+              {/* Live preview */}
+              <div
+                className="h-24 rounded-lg overflow-hidden relative"
+                style={{
+                  background: bannerUrl
+                    ? `url(${bannerUrl}) center/cover no-repeat`
+                    : `linear-gradient(135deg, ${bannerFrom}, ${bannerTo})`,
+                }}
+              />
+
+              {/* Gradient presets */}
+              <div>
+                <Label className="text-xs text-muted-foreground mb-2 block">Quick Presets</Label>
+                <div className="grid grid-cols-5 gap-2">
+                  {[
+                    ['#7c3aed','#06b6d4'],['#0ea5e9','#10b981'],['#f59e0b','#ef4444'],
+                    ['#ec4899','#8b5cf6'],['#00FFD1','#0ea5e9'],['#1e1b4b','#312e81'],
+                    ['#064e3b','#065f46'],['#7f1d1d','#991b1b'],['#1c1917','#292524'],
+                    ['#0f172a','#1e3a5f'],
+                  ].map(([from, to]) => (
+                    <button
+                      key={`${from}-${to}`}
+                      onClick={() => { setBannerFrom(from); setBannerTo(to); setBannerUrl('') }}
+                      className="h-8 rounded-md border-2 border-transparent hover:border-primary transition-all"
+                      style={{ background: `linear-gradient(135deg, ${from}, ${to})` }}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Custom gradient */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">From color</Label>
+                  <div className="flex items-center gap-2">
+                    <input type="color" value={bannerFrom} onChange={e => { setBannerFrom(e.target.value); setBannerUrl('') }}
+                      className="w-8 h-8 rounded cursor-pointer border border-border bg-transparent" />
+                    <Input value={bannerFrom} onChange={e => { setBannerFrom(e.target.value); setBannerUrl('') }} className="font-mono text-xs h-8" />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">To color</Label>
+                  <div className="flex items-center gap-2">
+                    <input type="color" value={bannerTo} onChange={e => { setBannerTo(e.target.value); setBannerUrl('') }}
+                      className="w-8 h-8 rounded cursor-pointer border border-border bg-transparent" />
+                    <Input value={bannerTo} onChange={e => { setBannerTo(e.target.value); setBannerUrl('') }} className="font-mono text-xs h-8" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Image URL */}
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Or paste an image URL</Label>
+                <Input
+                  placeholder="https://..."
+                  value={bannerUrl}
+                  onChange={e => setBannerUrl(e.target.value)}
+                  className="text-xs"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <Button variant="outline" className="flex-1" onClick={() => setBannerDialog(false)}>Cancel</Button>
+                <Button className="flex-1 gradient-relay" onClick={saveBanner} disabled={bannerSaving}>
+                  {bannerSaving ? 'Saving…' : 'Save Banner'}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Name */}
         <div className="mb-3">
