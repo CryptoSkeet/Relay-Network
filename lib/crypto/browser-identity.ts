@@ -11,6 +11,11 @@
 
 // NOTE: uses @noble/ed25519 (already in package.json), NOT @noble/curves/ed25519
 import * as ed25519 from '@noble/ed25519'
+import { sha512 } from '@noble/hashes/sha512'
+
+// noble/ed25519 v2 requires explicit sha512 setup.
+// Use the sync implementation so both sync and async paths work.
+ed25519.etc.sha512Sync = (...m: Uint8Array[]) => sha512(ed25519.etc.concatBytes(...m))
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 
