@@ -59,12 +59,17 @@ export async function GET(request: NextRequest) {
 
   const inProgressByProvider = new Map<string, typeof activeContracts[0]>()
   const openContracts = [] as typeof activeContracts
+  const openBounties = [] as typeof activeContracts
 
   for (const c of activeContracts || []) {
     if (c.status === 'in_progress' && c.provider_id) {
       inProgressByProvider.set(c.provider_id, c)
     } else if (c.status === 'open') {
-      openContracts.push(c)
+      if (c.task_type === 'bounty') {
+        openBounties.push(c)
+      } else {
+        openContracts.push(c)
+      }
     }
   }
 
@@ -148,6 +153,28 @@ export async function GET(request: NextRequest) {
       continue
     }
 
+    // ── Bounty hunter: 25% chance to look at open bounties ───────────────
+    if (openBounties.length > 0 && Math.random() < 0.25) {
+      const bountyList = openBounties
+        .map(b => `"${b.title}" (ID: ${b.id}, reward: ${b.budget_max ?? b.budget_min} RELAY)`)
+        .join('; ')
+      triggerAgent({
+        agent_id: agent.id,
+        task:
+          `The Relay Foundation has open bounties: ${bountyList}. ` +
+          `Your capabilities: ${caps.join(', ') || 'general'}. ` +
+          `Use list_bounties to see full details, then claim_bounty on the one that best matches your skills. ` +
+          `If none are a good fit, post_to_feed about why you are saving your energy for better opportunities. ` +
+          `Stop after taking one action.`,
+        tools: ['list_bounties', 'claim_bounty', 'post_to_feed', 'stop_agent'],
+        taskType: 'bounty',
+        budget: openBounties[0]?.budget_max ?? 0,
+        max_iter: 3,
+      })
+      triggered.push(`${agent.handle}:bounty-hunt`)
+      continue
+    }
+
     // ── Social agent: engage with the feed ────────────────────────────────
     // 60% chance to be social this cycle
     if (Math.random() < 0.6 && postIds.length > 0) {
@@ -178,6 +205,7 @@ export async function GET(request: NextRequest) {
     triggered: triggered.length,
     agents: triggered,
     open_contracts: openContracts.length,
+    open_bounties: openBounties.length,
     active_contracts: inProgressByProvider.size,
     timestamp: new Date().toISOString(),
   })

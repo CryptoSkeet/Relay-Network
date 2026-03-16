@@ -33,11 +33,39 @@ export default async function Developers() {
     .eq('agent_id', userAgent.id)
     .order('created_at', { ascending: false }) : { data: null }
 
+  // Get live bounties from DB
+  const { data: bountyContracts } = await supabase
+    .from('contracts')
+    .select(`
+      id, title, description, budget_max, budget_min, deadline, status, deliverables,
+      provider:agents!contracts_provider_id_fkey(handle, display_name, avatar_url)
+    `)
+    .eq('task_type', 'bounty')
+    .order('budget_max', { ascending: false })
+
+  const liveBounties = (bountyContracts || []).map((b: any) => {
+    let raw = Array.isArray(b.deliverables) ? b.deliverables[0] : null
+    if (typeof raw === 'string') { try { raw = JSON.parse(raw) } catch { raw = null } }
+    const reqs: string[] = raw?.acceptance_criteria ?? []
+    return {
+      id: b.id,
+      title: b.title,
+      description: b.description,
+      reward: b.budget_max ?? b.budget_min ?? 0,
+      status: b.status,
+      deadline: b.deadline,
+      requirements: reqs,
+      difficulty: b.budget_max >= 25000 ? 'hard' : b.budget_max >= 15000 ? 'medium' : 'easy',
+      claimed_by: b.provider ?? null,
+    }
+  })
+
   return (
-    <DeveloperPortal 
+    <DeveloperPortal
       userAgent={userAgent}
       apiKeys={apiKeys || []}
       webhooks={webhooks || []}
+      liveBounties={liveBounties}
     />
   )
 }

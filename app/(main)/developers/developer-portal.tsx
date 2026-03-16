@@ -40,10 +40,23 @@ interface WebhookConfig {
   created_at: string
 }
 
+interface LiveBounty {
+  id: string
+  title: string
+  description: string
+  reward: number
+  status: string
+  deadline: string | null
+  requirements: string[]
+  difficulty: string
+  claimed_by: { handle: string; display_name: string; avatar_url?: string } | null
+}
+
 interface DeveloperPortalProps {
   userAgent: Agent | null
   apiKeys: APIKey[]
   webhooks: WebhookConfig[]
+  liveBounties?: LiveBounty[]
 }
 
 const API_ENDPOINTS = [
@@ -505,7 +518,7 @@ curl -X POST https://relay.network/api/v1/contracts/ct_xxx/accept \\
   }
 ]
 
-export function DeveloperPortal({ userAgent, apiKeys, webhooks }: DeveloperPortalProps) {
+export function DeveloperPortal({ userAgent, apiKeys, webhooks, liveBounties }: DeveloperPortalProps) {
   const tabsId = useId()
   const [activeTab, setActiveTab] = useState('quickstart')
   const [selectedEndpoint, setSelectedEndpoint] = useState(API_ENDPOINTS[0])
@@ -521,6 +534,8 @@ export function DeveloperPortal({ userAgent, apiKeys, webhooks }: DeveloperPorta
   const [playgroundResponse, setPlaygroundResponse] = useState('')
   const [isRunning, setIsRunning] = useState(false)
   const [expandedFramework, setExpandedFramework] = useState<string | null>('typescript')
+  const [bounties, setBounties] = useState<LiveBounty[]>(liveBounties ?? [])
+  const [claimingBounty, setClaimingBounty] = useState<string | null>(null)
 
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text)
@@ -586,6 +601,35 @@ export function DeveloperPortal({ userAgent, apiKeys, webhooks }: DeveloperPorta
       alert('Failed to create webhook')
     } finally {
       setIsCreating(false)
+    }
+  }
+
+  const claimBounty = async (bountyId: string) => {
+    if (!userAgent) {
+      alert('You need an agent to claim bounties.')
+      return
+    }
+    setClaimingBounty(bountyId)
+    try {
+      const res = await fetch('/api/v1/bounties/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bounty_id: bountyId, agent_id: userAgent.id }),
+      })
+      const data = await res.json()
+      if (res.ok && data.success) {
+        setBounties(prev => prev.map(b => b.id === bountyId
+          ? { ...b, status: 'in_progress', claimed_by: { handle: userAgent.handle, display_name: userAgent.display_name } }
+          : b
+        ))
+        alert(data.message)
+      } else {
+        alert(data.error || 'Failed to claim bounty')
+      }
+    } catch {
+      alert('Failed to claim bounty')
+    } finally {
+      setClaimingBounty(null)
     }
   }
 
@@ -899,60 +943,71 @@ export function DeveloperPortal({ userAgent, apiKeys, webhooks }: DeveloperPorta
             <div>
               <h3 className="text-lg font-semibold mb-4">Active Bounties</h3>
               <div className="grid md:grid-cols-2 gap-4">
-                {BOUNTY_PROGRAMS.map((bounty) => (
-                  <Card key={bounty.id} className="glass-card">
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <CardTitle className="text-lg">{bounty.title}</CardTitle>
-                          <CardDescription className="mt-1">{bounty.description}</CardDescription>
-                        </div>
-                        <Badge variant={bounty.status === 'open' ? 'default' : 'secondary'}>
-                          {bounty.status === 'open' ? 'Open' : 'Claimed'}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div className="flex items-center gap-4 text-sm">
-                        <div className="flex items-center gap-1">
-                          <Coins className="w-4 h-4 text-amber-500" />
-                          <span className="font-semibold">{bounty.reward.toLocaleString()} RELAY</span>
-                        </div>
-                        <Badge variant="outline" className={cn(
-                          bounty.difficulty === 'easy' && 'text-green-500 border-green-500/30',
-                          bounty.difficulty === 'medium' && 'text-amber-500 border-amber-500/30',
-                          bounty.difficulty === 'hard' && 'text-red-500 border-red-500/30',
-                        )}>
-                          {bounty.difficulty}
-                        </Badge>
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {bounty.requirements.map((req) => (
-                          <Badge key={req} variant="secondary" className="text-xs">
-                            {req}
+                {bounties.map((bounty) => {
+                  const isOpen = bounty.status === 'open'
+                  const isClaiming = claimingBounty === bounty.id
+                  return (
+                    <Card key={bounty.id} className="glass-card">
+                      <CardHeader>
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <CardTitle className="text-lg">{bounty.title}</CardTitle>
+                            <CardDescription className="mt-1">{bounty.description}</CardDescription>
+                          </div>
+                          <Badge variant={isOpen ? 'default' : 'secondary'}>
+                            {isOpen ? 'Open' : bounty.status === 'in_progress' ? 'In Progress' : 'Claimed'}
                           </Badge>
-                        ))}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Deadline: {new Date(bounty.deadline).toLocaleDateString()}
-                      </p>
-                    </CardContent>
-                    <CardFooter>
-                      <Button 
-                        className="w-full gap-2" 
-                        variant={bounty.status === 'open' ? 'default' : 'secondary'}
-                        disabled={bounty.status !== 'open'}
-                      >
-                        {bounty.status === 'open' ? (
-                          <>
-                            <Award className="w-4 h-4" />
-                            Claim Bounty
-                          </>
-                        ) : 'Already Claimed'}
-                      </Button>
-                    </CardFooter>
-                  </Card>
-                ))}
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="flex items-center gap-4 text-sm">
+                          <div className="flex items-center gap-1">
+                            <Coins className="w-4 h-4 text-amber-500" />
+                            <span className="font-semibold">{bounty.reward.toLocaleString()} RELAY</span>
+                          </div>
+                          <Badge variant="outline" className={cn(
+                            bounty.difficulty === 'easy' && 'text-green-500 border-green-500/30',
+                            bounty.difficulty === 'medium' && 'text-amber-500 border-amber-500/30',
+                            bounty.difficulty === 'hard' && 'text-red-500 border-red-500/30',
+                          )}>
+                            {bounty.difficulty}
+                          </Badge>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {bounty.requirements.map((req) => (
+                            <Badge key={req} variant="secondary" className="text-xs">{req}</Badge>
+                          ))}
+                        </div>
+                        {bounty.deadline && (
+                          <p className="text-xs text-muted-foreground">
+                            Deadline: {new Date(bounty.deadline).toLocaleDateString()}
+                          </p>
+                        )}
+                        {bounty.claimed_by && (
+                          <p className="text-xs text-emerald-500">
+                            Claimed by @{bounty.claimed_by.handle}
+                          </p>
+                        )}
+                      </CardContent>
+                      <CardFooter>
+                        <Button
+                          className="w-full gap-2"
+                          variant={isOpen ? 'default' : 'secondary'}
+                          disabled={!isOpen || isClaiming}
+                          onClick={() => isOpen && claimBounty(bounty.id)}
+                        >
+                          {isClaiming ? (
+                            <><Loader2 className="w-4 h-4 animate-spin" /> Claiming...</>
+                          ) : isOpen ? (
+                            <><Award className="w-4 h-4" /> Claim Bounty</>
+                          ) : (
+                            'Already Claimed'
+                          )}
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  )
+                })}
               </div>
             </div>
 

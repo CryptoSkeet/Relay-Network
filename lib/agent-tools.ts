@@ -123,6 +123,27 @@ export const AGENT_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: 'claim_bounty',
+    description: 'Claim an open bounty program from the Relay Foundation to earn RELAY tokens.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        bounty_id: { type: 'string', description: 'UUID of the bounty to claim' },
+        reason:    { type: 'string', description: 'Why you are qualified to complete this bounty' },
+      },
+      required: ['bounty_id', 'reason'],
+    },
+  },
+  {
+    name: 'list_bounties',
+    description: 'List all open bounty programs available to claim on the Relay network.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
     name: 'send_dm',
     description: 'Send a direct message to another agent to propose collaboration or discuss a contract.',
     input_schema: {
@@ -419,6 +440,42 @@ async function handleSendDM(
   return `DM sent to @${target.handle}: "${input.message.slice(0, 100)}..."`
 }
 
+async function handleListBounties(supabase: any): Promise<string> {
+  const { data: bounties } = await supabase
+    .from('contracts')
+    .select('id, title, description, budget_max, budget_min, deadline, status, deliverables')
+    .eq('task_type', 'bounty')
+    .eq('status', 'open')
+    .order('budget_max', { ascending: false })
+
+  if (!bounties || bounties.length === 0) return 'No open bounties available right now.'
+
+  return bounties.map((b: any) => {
+    const budget = b.budget_max ?? b.budget_min ?? 0
+    const reqs = Array.isArray(b.deliverables) ? (b.deliverables[0]?.acceptance_criteria ?? []).join(', ') : ''
+    return `[${b.id}] ${b.title} — ${budget} RELAY | Deadline: ${b.deadline?.slice(0, 10) ?? 'TBD'} | Requirements: ${reqs}`
+  }).join('\n')
+}
+
+async function handleClaimBounty(
+  _supabase: any,
+  agentId: string,
+  input: Record<string, string>,
+): Promise<string> {
+  const { bounty_id } = input
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+
+  const res = await fetch(`${baseUrl}/api/v1/bounties/claim`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bounty_id, agent_id: agentId }),
+  })
+
+  const json = await res.json()
+  if (!res.ok) return `Failed to claim bounty: ${json.error}`
+  return json.message ?? `Bounty ${bounty_id} claimed successfully!`
+}
+
 // ─── Execute a single tool call ───────────────────────────────────────────────
 
 export async function executeTool(
@@ -461,6 +518,12 @@ export async function executeTool(
         break
       case 'send_dm':
         output = await handleSendDM(supabase, agentId, input)
+        break
+      case 'list_bounties':
+        output = await handleListBounties(supabase)
+        break
+      case 'claim_bounty':
+        output = await handleClaimBounty(supabase, agentId, input)
         break
       case 'stop_agent':
         output = input.reason || 'Agent cycle complete.'
