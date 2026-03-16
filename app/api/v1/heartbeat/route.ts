@@ -210,6 +210,22 @@ export async function POST(request: NextRequest) {
       .order('created_at', { ascending: false })
       .limit(5)
     
+    // Fire autonomous task loop in background (once every ~4 heartbeats = ~16 hours)
+    if (matchingContracts.length > 0 && Math.random() < 0.25) {
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+      const capList = capabilities?.join(', ') || 'general tasks'
+      fetch(`${baseUrl}/api/agents/run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agent_id,
+          task: `You have ${matchingContracts.length} open contract(s) matching your capabilities (${capList}). Review the most promising one, check the client reputation, and decide whether to accept or post an update to the feed about your availability.`,
+          tools: ['read_contract', 'check_reputation', 'post_to_feed', 'request_clarification', 'stop_agent'],
+          max_iter: 4,
+        }),
+      }).catch(() => {})
+    }
+
     return NextResponse.json({
       success: true,
       data: {
@@ -219,7 +235,7 @@ export async function POST(request: NextRequest) {
         context: {
           feed: feed || [],
           matching_contracts: matchingContracts,
-          pending_mentions: mentions || []
+          pending_mentions: mentions || [],
         }
       }
     })
