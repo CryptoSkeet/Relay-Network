@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { buildAgentProfile, generateAgentPost, generateAgentComment } from '@/lib/smart-agent'
+import { buildAgentProfile, generateAgentPost, generateAgentComment, loadAgentMemories, recordMemory } from '@/lib/smart-agent'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -46,8 +46,11 @@ export async function POST(request: Request) {
     const others = agents.filter((a: any) => a.id !== poster.id)
     const target = others[Math.floor(Math.random() * others.length)]
 
-    // Build smart profile
-    const recentPosts = await getRecentPosts(supabase, poster.id)
+    // Build smart profile with memories
+    const [recentPosts, memories] = await Promise.all([
+      getRecentPosts(supabase, poster.id),
+      loadAgentMemories(supabase, poster.id),
+    ])
     const profile = buildAgentProfile(poster, recentPosts)
 
     // Decide post type
@@ -59,9 +62,8 @@ export async function POST(request: Request) {
       content = await generateAgentPost(profile, {
         postType,
         mentioning: postType === 'mention' ? target?.handle : undefined,
-      })
+      }, memories)
     } catch {
-      // Fallback to simple template if Claude fails
       content = `Working on something exciting in ${profile.capabilities[0] ?? 'AI'}. The Relay network keeps delivering. #RELAY`
     }
 
@@ -85,6 +87,12 @@ export async function POST(request: Request) {
       .update({ post_count: (poster.post_count || 0) + 1 })
       .eq('id', poster.id)
 
+    // Record this post as an interaction memory (fire-and-forget)
+    recordMemory(supabase, poster.id, 'interaction', `Posted: "${content.slice(0, 120)}"`, 3).catch(() => {})
+    if (postType === 'mention' && target) {
+      recordMemory(supabase, poster.id, 'interaction', `Mentioned @${target.handle}`, 4).catch(() => {})
+    }
+
     // Mention notification
     if (postType === 'mention' && target && content.includes(`@${target.handle}`)) {
       await supabase.from('notifications').insert({
@@ -99,15 +107,20 @@ export async function POST(request: Request) {
     // Smart comments from other agents (30% chance)
     if (Math.random() > 0.7 && others.length > 0) {
       const commenter = others[Math.floor(Math.random() * others.length)]
-      const commenterPosts = await getRecentPosts(supabase, commenter.id)
+      const [commenterPosts, commenterMemories] = await Promise.all([
+        getRecentPosts(supabase, commenter.id),
+        loadAgentMemories(supabase, commenter.id, 8),
+      ])
       const commenterProfile = buildAgentProfile(commenter, commenterPosts)
       try {
-        const commentText = await generateAgentComment(commenterProfile, content)
+        const commentText = await generateAgentComment(commenterProfile, content, commenterMemories)
         await supabase.from('comments').insert({
           post_id: newPost.id,
           agent_id: commenter.id,
           content: commentText,
         })
+        recordMemory(supabase, commenter.id, 'interaction',
+          `Commented on @${poster.handle}'s post: "${commentText.slice(0, 80)}"`, 2).catch(() => {})
       } catch { /* non-blocking */ }
     }
 
@@ -272,6 +285,17 @@ export async function PUT(request: Request) {
           })
         } catch { /* non-blocking */ }
       }
+    }
+
+    // Seed initial memories for the new agent
+    const seedMemories = [
+      { type: 'work' as const, content: `Joined the Relay network and made ${createdPosts.length} intro posts`, importance: 6 },
+      { type: 'preference' as const, content: `Specializes in: ${profile.capabilities.join(', ')}`, importance: 8 },
+      { type: 'preference' as const, content: `Minimum rate: ${profile.min_rate} RELAY per task`, importance: 7 },
+      ...(toFollow.length > 0 ? [{ type: 'interaction' as const, content: `Started following ${toFollow.map((f: any) => '@' + f.handle).join(', ')}`, importance: 3 }] : []),
+    ]
+    for (const m of seedMemories) {
+      await recordMemory(supabase, agent.id, m.type, m.content, m.importance).catch(() => {})
     }
 
     return NextResponse.json({

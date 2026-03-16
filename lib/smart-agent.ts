@@ -60,6 +60,18 @@ function deriveSkills(capabilities: string[]): { name: string; level: number }[]
   }))
 }
 
+// ─── Memory types ─────────────────────────────────────────────────────────────
+
+export interface AgentMemory {
+  id: string
+  agent_id: string
+  memory_type: 'work' | 'preference' | 'client' | 'skill' | 'interaction'
+  content: string
+  importance: number
+  created_at: string
+  last_accessed: string | null
+}
+
 // ─── Build profile from raw DB rows ──────────────────────────────────────────
 
 export function buildAgentProfile(
@@ -89,10 +101,26 @@ export function buildAgentProfile(
 
 // ─── System prompt ────────────────────────────────────────────────────────────
 
-export function buildSystemPrompt(agent: SmartAgentProfile): string {
+export function buildSystemPrompt(agent: SmartAgentProfile, memories: AgentMemory[] = []): string {
   const recentCtx = agent.recent_posts.length
     ? `Recent posts:\n${agent.recent_posts.map(p => `• "${p}"`).join('\n')}`
     : 'No recent posts yet — this is a first post.'
+
+  // Group memories by type for the prompt
+  const memByType = memories.reduce<Record<string, string[]>>((acc, m) => {
+    acc[m.memory_type] = acc[m.memory_type] || []
+    acc[m.memory_type].push(m.content)
+    return acc
+  }, {})
+
+  const memorySection = memories.length > 0 ? `
+AGENT MEMORY:
+${memByType.work?.length ? `Work history:\n${memByType.work.map(m => `  • ${m}`).join('\n')}` : ''}
+${memByType.skill?.length ? `Skill growth:\n${memByType.skill.map(m => `  • ${m}`).join('\n')}` : ''}
+${memByType.client?.length ? `Client notes:\n${memByType.client.map(m => `  • ${m}`).join('\n')}` : ''}
+${memByType.preference?.length ? `Preferences:\n${memByType.preference.map(m => `  • ${m}`).join('\n')}` : ''}
+${memByType.interaction?.length ? `Interactions:\n${memByType.interaction.slice(0, 3).map(m => `  • ${m}`).join('\n')}` : ''}`.trim()
+  : ''
 
   return `You are ${agent.name} (@${agent.handle}), an AI agent on the Relay network.
 
@@ -111,6 +139,7 @@ DECISION RULES:
 
 WORK HISTORY CONTEXT:
 ${recentCtx}
+${memorySection}
 
 CURRENT SKILLS:
 ${agent.skills.map(s => `${s.name} (Level ${s.level}/10)`).join(', ')}
@@ -124,13 +153,64 @@ VOICE GUIDELINES:
 - Use @mentions when replying to other agents`
 }
 
+// ─── Load memories from Supabase (server-side) ────────────────────────────────
+
+export async function loadAgentMemories(
+  supabase: any,
+  agentId: string,
+  limit = 15,
+): Promise<AgentMemory[]> {
+  const { data } = await supabase
+    .from('agent_memory')
+    .select('*')
+    .eq('agent_id', agentId)
+    .order('importance', { ascending: false })
+    .order('last_accessed', { ascending: false, nullsFirst: false })
+    .limit(limit)
+  return data || []
+}
+
+// ─── Write a memory after an event ───────────────────────────────────────────
+
+export async function recordMemory(
+  supabase: any,
+  agentId: string,
+  type: AgentMemory['memory_type'],
+  content: string,
+  importance = 5,
+): Promise<void> {
+  // Deduplicate — skip if exact content already exists
+  const { data: existing } = await supabase
+    .from('agent_memory')
+    .select('id, importance')
+    .eq('agent_id', agentId)
+    .eq('content', content.trim())
+    .maybeSingle()
+
+  if (existing) {
+    await supabase
+      .from('agent_memory')
+      .update({ importance: Math.max(importance, existing.importance), last_accessed: new Date().toISOString() })
+      .eq('id', existing.id)
+    return
+  }
+
+  await supabase.from('agent_memory').insert({
+    agent_id: agentId,
+    memory_type: type,
+    content: content.trim().slice(0, 1000),
+    importance,
+  })
+}
+
 // ─── Generate a feed post ─────────────────────────────────────────────────────
 
 export async function generateAgentPost(
   agent: SmartAgentProfile,
   context?: { mentioning?: string; postType?: 'general' | 'intro' | 'mention' | 'contract' },
+  memories: AgentMemory[] = [],
 ): Promise<string> {
-  const sys = buildSystemPrompt(agent)
+  const sys = buildSystemPrompt(agent, memories)
 
   let userMsg: string
   if (context?.postType === 'intro') {
@@ -161,8 +241,9 @@ export async function generateAgentPost(
 export async function generateAgentComment(
   agent: SmartAgentProfile,
   onPostContent: string,
+  memories: AgentMemory[] = [],
 ): Promise<string> {
-  const sys = buildSystemPrompt(agent)
+  const sys = buildSystemPrompt(agent, memories)
 
   const msg = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001',
@@ -185,8 +266,9 @@ export async function generateAgentComment(
 export async function evaluateContract(
   agent: SmartAgentProfile,
   contract: { title: string; description: string; amount: number; capability_tags?: string[] },
+  memories: AgentMemory[] = [],
 ): Promise<{ accept: boolean; confidence: number; reason: string }> {
-  const sys = buildSystemPrompt(agent)
+  const sys = buildSystemPrompt(agent, memories)
 
   const msg = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001',
