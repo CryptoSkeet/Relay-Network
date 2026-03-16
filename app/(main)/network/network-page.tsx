@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { Activity, Wifi, Server, Cpu, Clock, Globe, Zap, Users, TrendingUp, Radio, RefreshCw, Loader2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Activity, Wifi, Server, Cpu, Clock, Globe, Zap, TrendingUp, Radio, RefreshCw, Loader2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -50,6 +50,19 @@ export function NetworkPage({
   const router = useRouter()
   const [activeTab, setActiveTab] = useState('live')
   const [isSeeding, setIsSeeding] = useState(false)
+  const [systemStatus, setSystemStatus] = useState<{ name: string; status: string; latency: string }[]>([
+    { name: 'Feed API', status: 'checking', latency: '…' },
+    { name: 'Contract Market', status: 'checking', latency: '…' },
+    { name: 'Authentication', status: 'checking', latency: '…' },
+    { name: 'Solana Devnet', status: 'checking', latency: '…' },
+  ])
+
+  useEffect(() => {
+    fetch('/api/v1/network/status')
+      .then(r => r.json())
+      .then(d => { if (d.services) setSystemStatus(d.services) })
+      .catch(() => {})
+  }, [])
 
   const seedTestData = async () => {
     setIsSeeding(true)
@@ -304,35 +317,11 @@ export function NetworkPage({
               <CardContent>
                 {/* Simplified region map */}
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {[
-                    { name: 'North America', code: 'NA', agents: Math.floor(onlineCount * 0.4), color: 'green' },
-                    { name: 'Europe', code: 'EU', agents: Math.floor(onlineCount * 0.3), color: 'blue' },
-                    { name: 'Asia Pacific', code: 'APAC', agents: Math.floor(onlineCount * 0.2), color: 'purple' },
-                    { name: 'South America', code: 'SA', agents: Math.floor(onlineCount * 0.05), color: 'yellow' },
-                    { name: 'Africa', code: 'AF', agents: Math.floor(onlineCount * 0.03), color: 'orange' },
-                    { name: 'Oceania', code: 'OC', agents: Math.floor(onlineCount * 0.02), color: 'cyan' },
-                  ].map((region) => (
-                    <Card key={region.code} className={`bg-${region.color}-500/10 border-${region.color}-500/20`}>
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">{region.name}</p>
-                            <p className="text-xs text-muted-foreground">{region.code}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className={`text-2xl font-bold text-${region.color}-500`}>{region.agents}</p>
-                            <p className="text-xs text-muted-foreground">agents</p>
-                          </div>
-                        </div>
-                        <div className="mt-3 h-2 bg-muted rounded-full overflow-hidden">
-                          <div
-                            className={`h-full bg-${region.color}-500 rounded-full`}
-                            style={{ width: `${(region.agents / Math.max(onlineCount, 1)) * 100}%` }}
-                          />
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                  <div className="col-span-full text-center py-8 text-muted-foreground">
+                    <p className="text-sm">Regional breakdown coming soon.</p>
+                    <p className="text-xs mt-1">Agents are globally distributed — geolocation data will be available after mainnet launch.</p>
+                    <p className="text-lg font-bold text-primary mt-4">{onlineCount} agents online worldwide</p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -349,18 +338,14 @@ export function NetworkPage({
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {[
-                { name: 'Heartbeat API', status: 'operational', latency: '23ms' },
-                { name: 'Webhook Delivery', status: 'operational', latency: '45ms' },
-                { name: 'Marketplace API', status: 'operational', latency: '31ms' },
-                { name: 'Authentication', status: 'operational', latency: '18ms' },
-              ].map((service) => (
+              {systemStatus.map((service) => (
                 <div key={service.name} className="flex items-center justify-between py-2 border-b border-border last:border-0">
                   <div className="flex items-center gap-3">
                     <span className={cn(
                       'w-2 h-2 rounded-full',
                       service.status === 'operational' ? 'bg-green-500' :
-                      service.status === 'degraded' ? 'bg-yellow-500' : 'bg-red-500'
+                      service.status === 'degraded' ? 'bg-yellow-500' :
+                      service.status === 'checking' ? 'bg-muted animate-pulse' : 'bg-red-500'
                     )} />
                     <span className="font-medium">{service.name}</span>
                   </div>
@@ -371,7 +356,8 @@ export function NetworkPage({
                       className={cn(
                         'capitalize',
                         service.status === 'operational' ? 'text-green-500' :
-                        service.status === 'degraded' ? 'text-yellow-500' : 'text-red-500'
+                        service.status === 'degraded' ? 'text-yellow-500' :
+                        service.status === 'checking' ? 'text-muted-foreground' : 'text-red-500'
                       )}
                     >
                       {service.status}

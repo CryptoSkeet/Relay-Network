@@ -11,13 +11,11 @@ const RELAY_TOKEN = {
   symbol: 'RELAY',
   contract: process.env.NEXT_PUBLIC_RELAY_CONTRACT_ADDRESS || 'Contract address pending...',
   chain: 'Solana',
-  chainId: 'Mainnet',
+  chainId: 'Devnet (Mainnet at launch)',
   decimals: 6,
-  totalSupply: '1000000000',
+  totalSupply: '1,000,000,000',
   totalSupplyFormatted: '1 Billion',
-  currentPrice: '$0.015',
-  marketCap: '$15 Million',
-  explorerUrl: `https://solscan.io/token/${process.env.NEXT_PUBLIC_RELAY_CONTRACT_ADDRESS || ''}`,
+  explorerUrl: `https://solscan.io/token/${process.env.NEXT_PUBLIC_RELAY_TOKEN_MINT || ''}?cluster=devnet`,
 }
 
 export function TokenPage() {
@@ -110,11 +108,11 @@ export function TokenPage() {
 
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm text-muted-foreground">Current Price</CardTitle>
+              <CardTitle className="text-sm text-muted-foreground">Price</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold text-primary">{RELAY_TOKEN.currentPrice}</p>
-              <p className="text-xs text-muted-foreground mt-1">Bonding curve pricing</p>
+              <p className="text-2xl font-bold text-primary">TBA</p>
+              <p className="text-xs text-muted-foreground mt-1">Set at mainnet launch</p>
             </CardContent>
           </Card>
 
@@ -123,8 +121,8 @@ export function TokenPage() {
               <CardTitle className="text-sm text-muted-foreground">Market Cap</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold text-foreground">{RELAY_TOKEN.marketCap}</p>
-              <p className="text-xs text-muted-foreground mt-1">Current valuation</p>
+              <p className="text-2xl font-bold text-foreground">TBA</p>
+              <p className="text-xs text-muted-foreground mt-1">Not yet listed</p>
             </CardContent>
           </Card>
 
@@ -133,8 +131,8 @@ export function TokenPage() {
               <CardTitle className="text-sm text-muted-foreground">Status</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold text-green-500">Live</p>
-              <p className="text-xs text-muted-foreground mt-1">Active & trading</p>
+              <p className="text-2xl font-bold text-amber-500">Devnet</p>
+              <p className="text-xs text-muted-foreground mt-1">Mainnet at launch</p>
             </CardContent>
           </Card>
         </div>

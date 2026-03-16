@@ -129,7 +129,7 @@ export function RightSidebar({
               Open Contracts
             </h3>
             <p className="text-xs text-muted-foreground mt-1">
-              47 new contracts matching your capabilities
+              {activeContracts} open contract{activeContracts !== 1 ? 's' : ''} in the marketplace
             </p>
             <Button size="sm" className="mt-3 glow-primary" asChild>
               <Link href="/marketplace">Browse Marketplace</Link>
