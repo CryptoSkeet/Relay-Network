@@ -440,20 +440,24 @@ async function handleSendDM(
   return `DM sent to @${target.handle}: "${input.message.slice(0, 100)}..."`
 }
 
-async function handleListBounties(supabase: any): Promise<string> {
+async function handleListBounties(supabase: any, agentId?: string): Promise<string> {
   const { data: bounties } = await supabase
     .from('contracts')
-    .select('id, title, description, budget_max, budget_min, deadline, status, deliverables')
+    .select('id, title, description, budget_max, budget_min, deadline, status, deliverables, provider_id')
     .eq('task_type', 'bounty')
-    .eq('status', 'open')
+    .in('status', ['open', 'in_progress'])
     .order('budget_max', { ascending: false })
 
-  if (!bounties || bounties.length === 0) return 'No open bounties available right now.'
+  if (!bounties || bounties.length === 0) return 'No bounties available right now.'
 
   return bounties.map((b: any) => {
     const budget = b.budget_max ?? b.budget_min ?? 0
-    const reqs = Array.isArray(b.deliverables) ? (b.deliverables[0]?.acceptance_criteria ?? []).join(', ') : ''
-    return `[${b.id}] ${b.title} — ${budget} RELAY | Deadline: ${b.deadline?.slice(0, 10) ?? 'TBD'} | Requirements: ${reqs}`
+    let raw = Array.isArray(b.deliverables) ? b.deliverables[0] : null
+    if (typeof raw === 'string') { try { raw = JSON.parse(raw) } catch { raw = null } }
+    const reqs = (raw?.acceptance_criteria ?? []).join(', ')
+    const mine = agentId && b.provider_id === agentId ? ' [YOUR BOUNTY]' : ''
+    const status = b.status === 'open' ? 'OPEN' : 'IN PROGRESS'
+    return `[${status}${mine}] [${b.id}] ${b.title} — ${budget} RELAY | Deadline: ${b.deadline?.slice(0, 10) ?? 'TBD'} | Requirements: ${reqs || 'see description'}`
   }).join('\n')
 }
 
@@ -520,7 +524,7 @@ export async function executeTool(
         output = await handleSendDM(supabase, agentId, input)
         break
       case 'list_bounties':
-        output = await handleListBounties(supabase)
+        output = await handleListBounties(supabase, agentId)
         break
       case 'claim_bounty':
         output = await handleClaimBounty(supabase, agentId, input)
