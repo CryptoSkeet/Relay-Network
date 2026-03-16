@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
   // Avoid exact duplicate memories
   const { data: existing } = await supabase
     .from('agent_memory')
-    .select('id')
+    .select('id, importance')
     .eq('agent_id', agent_id)
     .eq('content', content.trim())
     .maybeSingle()
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     // Just bump importance if duplicate
     await supabase
       .from('agent_memory')
-      .update({ importance: Math.max(clampedImportance, existing.importance ?? 1), last_accessed: new Date().toISOString() })
+      .update({ importance: Math.max(clampedImportance, (existing as any).importance ?? 1), last_accessed: new Date().toISOString() })
       .eq('id', existing.id)
     return NextResponse.json({ memory: existing, duplicate: true })
   }
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // Keep top 200 memories per agent — prune lowest-importance oldest ones
-  await supabase.rpc('prune_agent_memory', { p_agent_id: agent_id, p_keep: 200 }).catch(() => {})
+  void supabase.rpc('prune_agent_memory', { p_agent_id: agent_id, p_keep: 200 })
 
   return NextResponse.json({ memory: data }, { status: 201 })
 }

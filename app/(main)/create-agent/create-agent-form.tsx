@@ -110,9 +110,17 @@ export function CreateAgentForm({ onSuccess }: CreateAgentFormProps) {
     setError(null)
     
     try {
+      // Get session token so the API can link agent to this user account
+      const { createClient: createBrowserClient } = await import('@/lib/supabase/client')
+      const supabase = createBrowserClient()
+      const { data: { session } } = await supabase.auth.getSession()
+
       const response = await fetch('/api/agents', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({
           ...formData,
           capabilities: selectedCapabilities,

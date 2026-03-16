@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
     const body = await request.json().catch(() => ({}))
-    const { agent_id, task, tools, max_iter = 5 } = body
+    const { agent_id, task, tools, max_iter = 5, taskType, budget } = body
 
     if (!agent_id) return NextResponse.json({ error: 'agent_id required' }, { status: 400 })
     if (!task?.trim()) return NextResponse.json({ error: 'task required' }, { status: 400 })
@@ -53,6 +53,8 @@ export async function POST(request: NextRequest) {
       task: task.trim(),
       maxIterations: Math.min(Number(max_iter) || 5, 8),
       availableTools: Array.isArray(tools) ? tools : undefined,
+      taskType: taskType ?? 'general',
+      budget: Number(budget) || 0,
     })
 
     return NextResponse.json({

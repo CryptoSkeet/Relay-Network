@@ -1,12 +1,20 @@
 /**
  * Smart Agent System
  * Builds personality-driven prompts from DB data and generates
- * Claude-powered content for agent posts, comments, and decisions.
+ * AI-powered content for agent posts, comments, and decisions.
+ * Supports both Anthropic (Claude) and OpenAI (GPT) with automatic fallback.
  */
 
-import Anthropic from '@anthropic-ai/sdk'
+import { callLLM, type LLMProvider } from './llm'
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+// Derive preferred provider from agent capabilities/type
+function agentProvider(agent: SmartAgentProfile): LLMProvider {
+  const caps = agent.capabilities.join(' ').toLowerCase()
+  const type = (agent.agent_type || '').toLowerCase()
+  if (type.includes('openai') || caps.includes('gpt') || caps.includes('openai')) return 'openai'
+  if (type.includes('anthropic') || type.includes('claude')) return 'anthropic'
+  return 'auto'
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -223,15 +231,14 @@ export async function generateAgentPost(
     userMsg = `Write one organic social feed post as yourself. It should reflect your specialty and personality. Max 180 characters. Just the post text, no quotes.`
   }
 
-  const msg = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 150,
+  const { text } = await callLLM({
     system: sys,
     messages: [{ role: 'user', content: userMsg }],
+    maxTokens: 150,
+    provider: agentProvider(agent),
   })
 
-  return (msg.content[0] as { type: string; text: string }).text
-    .trim()
+  return text
     .replace(/^["']|["']$/g, '')
     .slice(0, 280)
 }
@@ -245,18 +252,14 @@ export async function generateAgentComment(
 ): Promise<string> {
   const sys = buildSystemPrompt(agent, memories)
 
-  const msg = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 80,
+  const { text } = await callLLM({
     system: sys,
-    messages: [{
-      role: 'user',
-      content: `Reply to this post in 1-2 sentences, staying in character. Post: "${onPostContent.slice(0, 200)}"`,
-    }],
+    messages: [{ role: 'user', content: `Reply to this post in 1-2 sentences, staying in character. Post: "${onPostContent.slice(0, 200)}"` }],
+    maxTokens: 80,
+    provider: agentProvider(agent),
   })
 
-  return (msg.content[0] as { type: string; text: string }).text
-    .trim()
+  return text
     .replace(/^["']|["']$/g, '')
     .slice(0, 200)
 }
@@ -270,9 +273,7 @@ export async function evaluateContract(
 ): Promise<{ accept: boolean; confidence: number; reason: string }> {
   const sys = buildSystemPrompt(agent, memories)
 
-  const msg = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 120,
+  const { text: raw } = await callLLM({
     system: sys,
     messages: [{
       role: 'user',
@@ -283,11 +284,12 @@ Tags: ${(contract.capability_tags || []).join(', ')}
 
 Reply with: {"accept": true/false, "confidence": 0-100, "reason": "one sentence"}`,
     }],
+    maxTokens: 120,
+    provider: agentProvider(agent),
   })
 
   try {
-    const text = (msg.content[0] as { type: string; text: string }).text.trim()
-    const json = text.match(/\{[\s\S]*\}/)
+    const json = raw.match(/\{[\s\S]*\}/)
     if (json) return JSON.parse(json[0])
   } catch { /* fall through */ }
 

@@ -224,17 +224,15 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
     }
   }
 
-  // Filter by view mode (my created vs my accepted)
+  // Filter by view mode
   const viewFilteredContracts = useMemo(() => {
-    if (!userAgentId) return contracts
-    
     switch (viewMode) {
       case 'my-created':
         return contracts.filter(c => c.client_id === userAgentId)
       case 'my-accepted':
         return contracts.filter(c => c.provider_id === userAgentId)
       default:
-        return contracts.filter(c => c.client_id === userAgentId || c.provider_id === userAgentId)
+        return contracts // 'all' shows every contract on the network
     }
   }, [contracts, userAgentId, viewMode])
 
@@ -600,14 +598,14 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
       {/* Content */}
       <div className="p-3 sm:p-4" suppressHydrationWarning>
         {mounted ? (
-          <Tabs defaultValue="all" className="space-y-3 sm:space-y-4" suppressHydrationWarning>
+          <Tabs value={filter} onValueChange={setFilter} className="space-y-3 sm:space-y-4" suppressHydrationWarning>
             <TabsList className="w-full overflow-x-auto scrollbar-hide gap-1" suppressHydrationWarning>
-              <TabsTrigger value="all" onClick={() => setFilter('all')} className="touch-manipulation text-xs sm:text-sm">All</TabsTrigger>
-              <TabsTrigger value="open" onClick={() => setFilter('open')} className="touch-manipulation text-xs sm:text-sm">Open</TabsTrigger>
-              <TabsTrigger value="active" onClick={() => setFilter('active')} className="touch-manipulation text-xs sm:text-sm">Active</TabsTrigger>
-              <TabsTrigger value="delivered" onClick={() => setFilter('delivered')} className="touch-manipulation text-xs sm:text-sm">Delivered</TabsTrigger>
-              <TabsTrigger value="completed" onClick={() => setFilter('completed')} className="touch-manipulation text-xs sm:text-sm">Completed</TabsTrigger>
-              <TabsTrigger value="disputed" onClick={() => setFilter('disputed')} className="touch-manipulation text-xs sm:text-sm text-orange-500">Disputed</TabsTrigger>
+              <TabsTrigger value="all" className="touch-manipulation text-xs sm:text-sm">All</TabsTrigger>
+              <TabsTrigger value="open" className="touch-manipulation text-xs sm:text-sm">Open</TabsTrigger>
+              <TabsTrigger value="active" className="touch-manipulation text-xs sm:text-sm">Active</TabsTrigger>
+              <TabsTrigger value="delivered" className="touch-manipulation text-xs sm:text-sm">Delivered</TabsTrigger>
+              <TabsTrigger value="completed" className="touch-manipulation text-xs sm:text-sm">Completed</TabsTrigger>
+              <TabsTrigger value="disputed" className="touch-manipulation text-xs sm:text-sm text-orange-500">Disputed</TabsTrigger>
             </TabsList>
 
           <div className="space-y-3 sm:space-y-4">

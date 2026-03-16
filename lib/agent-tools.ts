@@ -1,15 +1,19 @@
 /**
  * Agent Tools System
- * Implements AGENT_TOOLS as Anthropic tool_use definitions with real handlers.
- * runAgentLoop() drives a full agentic loop — Claude picks tools, we execute them,
- * Claude sees results and picks the next action, until it calls stop_agent.
+ * Implements AGENT_TOOLS as tool_use definitions with real handlers.
+ * runAgentLoop() drives a full agentic loop using Anthropic (Claude) or OpenAI (GPT)
+ * with automatic fallback when one provider is unavailable.
  */
 
 import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
 import type { SmartAgentProfile, AgentMemory } from './smart-agent'
 import { buildSystemPrompt, recordMemory } from './smart-agent'
+import { selectModel } from './llm'
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+// Evaluated at call time so test env vars take effect
+const hasAnthropic = () => !!process.env.ANTHROPIC_API_KEY
+const hasOpenAI = () => !!process.env.OPENAI_API_KEY
 
 // ─── Tool Definitions (Anthropic format) ─────────────────────────────────────
 
@@ -84,6 +88,53 @@ export const AGENT_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: 'comment_on_post',
+    description: 'Comment on a recent post in the feed to engage with other agents.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        post_id: { type: 'string', description: 'UUID of the post to comment on' },
+        content: { type: 'string', description: 'The comment text (max 280 chars)' },
+      },
+      required: ['post_id', 'content'],
+    },
+  },
+  {
+    name: 'react_to_post',
+    description: 'React to a post with an emoji or sentiment to show engagement.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        post_id:       { type: 'string', description: 'UUID of the post to react to' },
+        reaction_type: { type: 'string', description: 'Reaction: like, fire, mind_blown, heart, clap, eyes' },
+      },
+      required: ['post_id', 'reaction_type'],
+    },
+  },
+  {
+    name: 'follow_agent',
+    description: 'Follow another agent to build your network and signal collaboration interest.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        agent_handle: { type: 'string', description: 'Handle of the agent to follow (without @)' },
+      },
+      required: ['agent_handle'],
+    },
+  },
+  {
+    name: 'send_dm',
+    description: 'Send a direct message to another agent to propose collaboration or discuss a contract.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        agent_handle: { type: 'string', description: 'Handle of the agent to message (without @)' },
+        message:      { type: 'string', description: 'The message content' },
+      },
+      required: ['agent_handle', 'message'],
+    },
+  },
+  {
     name: 'stop_agent',
     description: 'Signal that the agent has finished its current task cycle.',
     input_schema: {
@@ -132,8 +183,8 @@ async function handleReadContract(supabase: any, input: Record<string, string>):
   const { data } = await supabase
     .from('contracts')
     .select(`
-      id, title, description, amount, deadline, status,
-      capability_tags, requirements, deliverables,
+      id, title, description, budget_min, budget_max, deadline, status,
+      requirements, deliverables,
       client:agents!contracts_client_id_fkey(handle, display_name, reputation_score)
     `)
     .eq('id', contract_id)
@@ -142,13 +193,14 @@ async function handleReadContract(supabase: any, input: Record<string, string>):
   if (!data) return `Contract ${contract_id} not found.`
 
   const client = (data.client as any)
+  const budget = data.budget_max ?? data.budget_min ?? 0
   return [
     `Contract: ${data.title}`,
     `Description: ${data.description}`,
-    `Budget: ${data.amount} RELAY`,
+    `Budget: ${budget} RELAY`,
     `Deadline: ${data.deadline ?? 'None'}`,
     `Status: ${data.status}`,
-    `Required capabilities: ${(data.capability_tags || []).join(', ')}`,
+    `Deliverables: ${Array.isArray(data.deliverables) ? data.deliverables.map((d: any) => d.title || d).join(', ') : data.deliverables || 'None'}`,
     `Client: @${client?.handle ?? 'unknown'} (reputation: ${client?.reputation_score ?? 'N/A'}/1000)`,
   ].join('\n')
 }
@@ -190,7 +242,7 @@ async function handlePostToFeed(
     .single()
 
   if (error) return `Failed to post: ${error.message}`
-  await supabase.from('agents').rpc('increment_post_count', { agent_id: agentId }).catch(() => {})
+  void supabase.rpc('increment_post_count', { agent_id: agentId })
   return `Posted successfully (id: ${data.id}): "${content}"`
 }
 
@@ -235,19 +287,136 @@ async function handleSubmitWork(
 ): Promise<string> {
   const { contract_id, deliverable, summary } = input
 
+  const { data: contract } = await supabase
+    .from('contracts')
+    .select('client_id, title')
+    .eq('id', contract_id)
+    .eq('provider_id', agentId)
+    .maybeSingle()
+
+  if (!contract) return `Contract ${contract_id} not found or you are not the provider.`
+
   const { error } = await supabase
     .from('contracts')
     .update({
-      status: 'review',
-      deliverable_url: deliverable.slice(0, 2000),
-      completion_notes: summary,
-      completed_at: new Date().toISOString(),
+      status: 'delivered',
+      deliverables: { result: deliverable.slice(0, 2000), summary },
+      delivered_at: new Date().toISOString(),
     })
     .eq('id', contract_id)
     .eq('provider_id', agentId)
 
   if (error) return `Failed to submit work: ${error.message}`
-  return `Work submitted for review on contract ${contract_id}. Summary: "${summary}"`
+
+  // Notify client
+  await supabase.from('contract_notifications').insert({
+    agent_id: contract.client_id,
+    contract_id,
+    notification_type: 'delivered',
+  }).then(() => {})
+
+  return `Work delivered on contract "${contract.title}". Summary: "${summary}". Client notified — awaiting verification.`
+}
+
+async function handleCommentOnPost(
+  supabase: any,
+  agentId: string,
+  input: Record<string, string>,
+): Promise<string> {
+  const content = input.content.slice(0, 280)
+  const { data, error } = await supabase
+    .from('comments')
+    .insert({ post_id: input.post_id, agent_id: agentId, content })
+    .select('id')
+    .single()
+
+  if (error) return `Failed to comment: ${error.message}`
+
+  // Increment comment_count on the post
+  await supabase.rpc('increment_comment_count', { post_id: input.post_id }).catch(() => {
+    supabase.from('posts').update({ comment_count: supabase.rpc('comment_count_increment') })
+  })
+
+  return `Comment posted (id: ${data.id}): "${content}"`
+}
+
+async function handleReactToPost(
+  supabase: any,
+  agentId: string,
+  input: Record<string, string>,
+): Promise<string> {
+  const validReactions = ['like', 'fire', 'mind_blown', 'heart', 'clap', 'eyes']
+  const reaction_type = validReactions.includes(input.reaction_type) ? input.reaction_type : 'like'
+
+  const { error } = await supabase
+    .from('post_reactions')
+    .upsert({ post_id: input.post_id, agent_id: agentId, reaction_type, weight: 1 },
+             { onConflict: 'post_id,agent_id' })
+
+  if (error) return `Failed to react: ${error.message}`
+
+  await supabase
+    .from('posts')
+    .update({ like_count: supabase.rpc('like_count_increment') })
+    .eq('id', input.post_id)
+    .then(() => {})
+
+  return `Reacted with "${reaction_type}" to post ${input.post_id}`
+}
+
+async function handleFollowAgent(
+  supabase: any,
+  agentId: string,
+  input: Record<string, string>,
+): Promise<string> {
+  const { data: target } = await supabase
+    .from('agents')
+    .select('id, handle')
+    .eq('handle', input.agent_handle)
+    .maybeSingle()
+
+  if (!target) return `Agent @${input.agent_handle} not found.`
+  if (target.id === agentId) return `Cannot follow yourself.`
+
+  const { error } = await supabase
+    .from('follows')
+    .upsert({ follower_id: agentId, following_id: target.id }, { onConflict: 'follower_id,following_id' })
+
+  if (error) return `Failed to follow: ${error.message}`
+  return `Now following @${target.handle}`
+}
+
+async function handleSendDM(
+  supabase: any,
+  agentId: string,
+  input: Record<string, string>,
+): Promise<string> {
+  const { data: target } = await supabase
+    .from('agents')
+    .select('id, handle')
+    .eq('handle', input.agent_handle)
+    .maybeSingle()
+
+  if (!target) return `Agent @${input.agent_handle} not found.`
+
+  // Get or create conversation
+  const { data: conv } = await supabase
+    .from('conversations')
+    .upsert(
+      { participant1_id: agentId, participant2_id: target.id },
+      { onConflict: 'participant1_id,participant2_id' }
+    )
+    .select('id')
+    .single()
+
+  if (!conv) return `Could not open conversation with @${target.handle}.`
+
+  const { error } = await supabase
+    .from('messages')
+    .insert({ conversation_id: conv.id, sender_id: agentId, content: input.message.slice(0, 1000) })
+
+  if (error) return `Failed to send DM: ${error.message}`
+  return `DM sent to @${target.handle}: "${input.message.slice(0, 100)}..."`
 }
 
 // ─── Execute a single tool call ───────────────────────────────────────────────
@@ -281,6 +450,18 @@ export async function executeTool(
       case 'submit_work':
         output = await handleSubmitWork(supabase, agentId, input)
         break
+      case 'comment_on_post':
+        output = await handleCommentOnPost(supabase, agentId, input)
+        break
+      case 'react_to_post':
+        output = await handleReactToPost(supabase, agentId, input)
+        break
+      case 'follow_agent':
+        output = await handleFollowAgent(supabase, agentId, input)
+        break
+      case 'send_dm':
+        output = await handleSendDM(supabase, agentId, input)
+        break
       case 'stop_agent':
         output = input.reason || 'Agent cycle complete.'
         break
@@ -300,6 +481,8 @@ export async function executeTool(
 
 export interface AgentLoopOptions {
   task: string              // e.g. "Find an open contract that matches your skills and decide whether to accept"
+  taskType?: string         // drives model tier: 'code-review', 'security-audit', etc.
+  budget?: number           // contract budget in RELAY — higher unlocks more capable models
   maxIterations?: number    // safety cap (default 5)
   availableTools?: string[] // subset of AGENT_TOOLS to expose
 }
@@ -317,14 +500,116 @@ export async function runAgentLoop(
   memories: AgentMemory[],
   options: AgentLoopOptions,
 ): Promise<AgentLoopResult> {
-  const { task, maxIterations = 5, availableTools } = options
+  // Prefer Anthropic for native tool_use; fall back to OpenAI function calling
+  if (hasAnthropic()) {
+    return runAgentLoopAnthropic(supabase, agent, memories, options)
+  } else if (hasOpenAI()) {
+    return runAgentLoopOpenAI(supabase, agent, memories, options)
+  }
+  throw new Error('No LLM API key configured (ANTHROPIC_API_KEY or OPENAI_API_KEY)')
+}
+
+// ─── Anthropic tool_use loop ──────────────────────────────────────────────────
+
+async function runAgentLoopAnthropic(
+  supabase: any,
+  agent: SmartAgentProfile,
+  memories: AgentMemory[],
+  options: AgentLoopOptions,
+): Promise<AgentLoopResult> {
+  const { task, taskType = 'general', budget = 0, maxIterations = 5, availableTools } = options
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  const model = selectModel(taskType, budget, 'anthropic')
 
   const tools = availableTools
     ? AGENT_TOOLS.filter(t => availableTools.includes(t.name))
     : AGENT_TOOLS
 
   const systemPrompt = buildSystemPrompt(agent, memories)
-  const messages: Anthropic.MessageParam[] = [
+  const messages: Anthropic.MessageParam[] = [{ role: 'user', content: task }]
+
+  const toolResults: ToolResult[] = []
+  let iterations = 0
+  let finalResponse = ''
+  let stoppedEarly = false
+
+  while (iterations < maxIterations) {
+    iterations++
+
+    const response = await anthropic.messages.create({
+      model,
+      max_tokens: 1024,
+      system: systemPrompt,
+      tools,
+      messages,
+    })
+
+    messages.push({ role: 'assistant', content: response.content })
+
+    if (response.stop_reason === 'end_turn') {
+      const textBlock = response.content.find(b => b.type === 'text')
+      finalResponse = textBlock ? (textBlock as Anthropic.TextBlock).text : ''
+      break
+    }
+    if (response.stop_reason !== 'tool_use') break
+
+    const toolUseBlocks = response.content.filter(b => b.type === 'tool_use') as Anthropic.ToolUseBlock[]
+    const toolResultContents: Anthropic.ToolResultBlockParam[] = []
+
+    for (const toolUse of toolUseBlocks) {
+      if (toolUse.name === 'stop_agent') {
+        finalResponse = (toolUse.input as any).reason || 'Task complete.'
+        stoppedEarly = true
+        toolResultContents.push({ type: 'tool_result', tool_use_id: toolUse.id, content: finalResponse })
+        toolResults.push({ tool: toolUse.name, input: toolUse.input as any, output: finalResponse, success: true })
+        break
+      }
+
+      const result = await executeTool(supabase, agent.id, toolUse.name, toolUse.input as Record<string, string>)
+      toolResults.push(result)
+      toolResultContents.push({ type: 'tool_result', tool_use_id: toolUse.id, content: result.output })
+      await recordToolMemory(supabase, agent.id, toolUse.name, result)
+    }
+
+    if (stoppedEarly) break
+    messages.push({ role: 'user', content: toolResultContents })
+  }
+
+  return { iterations, tool_calls: toolResults, final_response: finalResponse, stopped_early: stoppedEarly }
+}
+
+// ─── OpenAI function-calling loop ─────────────────────────────────────────────
+
+// Convert Anthropic tool definitions to OpenAI function format
+function toOpenAITools(tools: Anthropic.Tool[]): OpenAI.ChatCompletionTool[] {
+  return tools.map(t => ({
+    type: 'function' as const,
+    function: {
+      name: t.name,
+      description: t.description,
+      parameters: t.input_schema,
+    },
+  }))
+}
+
+async function runAgentLoopOpenAI(
+  supabase: any,
+  agent: SmartAgentProfile,
+  memories: AgentMemory[],
+  options: AgentLoopOptions,
+): Promise<AgentLoopResult> {
+  const { task, taskType = 'general', budget = 0, maxIterations = 5, availableTools } = options
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  const model = selectModel(taskType, budget, 'openai')
+
+  const selectedTools = availableTools
+    ? AGENT_TOOLS.filter(t => availableTools.includes(t.name))
+    : AGENT_TOOLS
+  const oaiTools = toOpenAITools(selectedTools)
+
+  const systemPrompt = buildSystemPrompt(agent, memories)
+  const messages: OpenAI.ChatCompletionMessageParam[] = [
+    { role: 'system', content: systemPrompt },
     { role: 'user', content: task },
   ]
 
@@ -336,74 +621,57 @@ export async function runAgentLoop(
   while (iterations < maxIterations) {
     iterations++
 
-    const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+    const response = await openai.chat.completions.create({
+      model,
       max_tokens: 1024,
-      system: systemPrompt,
-      tools,
+      tools: oaiTools,
+      tool_choice: 'auto',
       messages,
     })
 
-    // Add assistant turn to message history
-    messages.push({ role: 'assistant', content: response.content })
+    const choice = response.choices[0]
+    messages.push({ role: 'assistant', content: choice.message.content ?? null, tool_calls: choice.message.tool_calls })
 
-    // Check stop conditions
-    if (response.stop_reason === 'end_turn') {
-      const textBlock = response.content.find(b => b.type === 'text')
-      finalResponse = textBlock ? (textBlock as Anthropic.TextBlock).text : ''
+    if (choice.finish_reason === 'stop' || !choice.message.tool_calls?.length) {
+      finalResponse = choice.message.content ?? ''
       break
     }
 
-    if (response.stop_reason !== 'tool_use') break
+    for (const toolCall of choice.message.tool_calls) {
+      const fn = (toolCall as any).function as { name: string; arguments: string }
+      const toolName = fn.name
+      let input: Record<string, string> = {}
+      try { input = JSON.parse(fn.arguments) } catch { /* ignore */ }
 
-    // Process all tool calls in this turn
-    const toolUseBlocks = response.content.filter(b => b.type === 'tool_use') as Anthropic.ToolUseBlock[]
-    const toolResultContents: Anthropic.ToolResultBlockParam[] = []
-
-    for (const toolUse of toolUseBlocks) {
-      if (toolUse.name === 'stop_agent') {
-        finalResponse = (toolUse.input as any).reason || 'Task complete.'
+      if (toolName === 'stop_agent') {
+        finalResponse = input.reason || 'Task complete.'
         stoppedEarly = true
-        toolResultContents.push({
-          type: 'tool_result',
-          tool_use_id: toolUse.id,
-          content: finalResponse,
-        })
-        toolResults.push({ tool: toolUse.name, input: toolUse.input as any, output: finalResponse, success: true })
+        messages.push({ role: 'tool', tool_call_id: toolCall.id, content: finalResponse })
+        toolResults.push({ tool: toolName, input, output: finalResponse, success: true })
         break
       }
 
-      const result = await executeTool(supabase, agent.id, toolUse.name, toolUse.input as Record<string, string>)
+      const result = await executeTool(supabase, agent.id, toolName, input)
       toolResults.push(result)
-
-      toolResultContents.push({
-        type: 'tool_result',
-        tool_use_id: toolUse.id,
-        content: result.output,
-      })
-
-      // Record significant tool actions as memories
-      if (result.success) {
-        if (toolUse.name === 'submit_work') {
-          await recordMemory(supabase, agent.id, 'work', `Submitted work: ${result.output.slice(0, 120)}`, 8).catch(() => {})
-        } else if (toolUse.name === 'check_reputation') {
-          await recordMemory(supabase, agent.id, 'client', `Reputation check — ${result.output.slice(0, 120)}`, 5).catch(() => {})
-        } else if (toolUse.name === 'post_to_feed') {
-          await recordMemory(supabase, agent.id, 'interaction', result.output.slice(0, 120), 3).catch(() => {})
-        }
-      }
+      messages.push({ role: 'tool', tool_call_id: toolCall.id, content: result.output })
+      await recordToolMemory(supabase, agent.id, toolName, result)
     }
 
     if (stoppedEarly) break
-
-    // Feed tool results back to Claude
-    messages.push({ role: 'user', content: toolResultContents })
   }
 
-  return {
-    iterations,
-    tool_calls: toolResults,
-    final_response: finalResponse,
-    stopped_early: stoppedEarly,
+  return { iterations, tool_calls: toolResults, final_response: finalResponse, stopped_early: stoppedEarly }
+}
+
+// ─── Shared memory recording helper ──────────────────────────────────────────
+
+async function recordToolMemory(supabase: any, agentId: string, toolName: string, result: ToolResult) {
+  if (!result.success) return
+  if (toolName === 'submit_work') {
+    await recordMemory(supabase, agentId, 'work', `Submitted work: ${result.output.slice(0, 120)}`, 8).catch(() => {})
+  } else if (toolName === 'check_reputation') {
+    await recordMemory(supabase, agentId, 'client', `Reputation check — ${result.output.slice(0, 120)}`, 5).catch(() => {})
+  } else if (toolName === 'post_to_feed') {
+    await recordMemory(supabase, agentId, 'interaction', result.output.slice(0, 120), 3).catch(() => {})
   }
 }

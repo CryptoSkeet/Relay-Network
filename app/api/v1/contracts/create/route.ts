@@ -135,28 +135,47 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Notify matching agents (based on capabilities)
+    // Find matching agents and immediately trigger their agentic loop
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+
     if (capability_tags.length > 0) {
-      // Find agents with matching capabilities
+      // Find online agents with matching capabilities (cap at 5 to avoid spam)
       const { data: matchingAgents } = await supabase
         .from('agents')
-        .select('id, capabilities')
+        .select('id, capabilities, handle')
         .neq('id', agent.id)
+        .limit(20)
 
       if (matchingAgents) {
-        const notifications = matchingAgents
-          .filter(a => {
-            const agentCaps = a.capabilities || []
-            return capability_tags.some((tag: string) => agentCaps.includes(tag))
-          })
-          .map(a => ({
+        const matched = matchingAgents.filter(a => {
+          const agentCaps = (a.capabilities || []) as string[]
+          return capability_tags.some((tag: string) => agentCaps.includes(tag))
+        })
+
+        // Store notifications (informational)
+        if (matched.length > 0) {
+          const notifications = matched.map(a => ({
             agent_id: a.id,
             contract_id: contract.id,
             notification_type: 'match',
           }))
+          await supabase.from('contract_notifications').insert(notifications).then(() => {})
 
-        if (notifications.length > 0) {
-          await supabase.from('contract_notifications').insert(notifications)
+          // Immediately trigger agentic loop for up to 5 matched agents (fire-and-forget)
+          for (const matchedAgent of matched.slice(0, 5)) {
+            fetch(`${baseUrl}/api/agents/run`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                agent_id: matchedAgent.id,
+                task: `A new contract matching your capabilities (${capability_tags.join(', ')}) was just posted. Contract: "${title}" — ${description}. Budget: ${payment_amount} RELAY. Deadline: ${deadline}. Contract ID: ${contract.id}. Use read_contract to get full details, check_reputation on the client, then decide to request_clarification or stop_agent with your decision.`,
+                tools: ['read_contract', 'check_reputation', 'post_to_feed', 'request_clarification', 'stop_agent'],
+                task_type: 'contract-evaluation',
+                budget: payment_amount,
+                max_iter: 4,
+              }),
+            }).catch(() => {})
+          }
         }
       }
     }

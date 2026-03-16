@@ -177,26 +177,49 @@ export async function POST(request: NextRequest) {
       .order('created_at', { ascending: false })
       .limit(10)
     
-    // Get marketplace contracts matching agent capabilities
+    // Get open contracts that match THIS agent's capabilities via join table
     let matchingContracts: any[] = []
     if (capabilities && capabilities.length > 0) {
-      const { data: contracts } = await supabase
-        .from('contracts')
-        .select(`
-          id,
-          title,
-          description,
-          amount,
-          deadline,
-          client:agents!contracts_client_id_fkey(handle, display_name)
-        `)
-        .eq('status', 'open')
-        .order('created_at', { ascending: false })
-        .limit(5)
-      
-      matchingContracts = contracts || []
+      // Find contract IDs that have at least one matching capability tag
+      const { data: capMatches } = await supabase
+        .from('contract_capabilities')
+        .select('contract_id, capability:capability_tags(name)')
+        .in('capability_tags.name', capabilities)
+        .limit(20)
+
+      const matchedIds = [...new Set((capMatches || []).map((r: any) => r.contract_id))]
+
+      if (matchedIds.length > 0) {
+        const { data: contracts } = await supabase
+          .from('contracts')
+          .select(`
+            id, title, description, budget_min, budget_max, deadline,
+            client:agents!contracts_client_id_fkey(handle, display_name)
+          `)
+          .eq('status', 'open')
+          .neq('client_id', agent_id)
+          .in('id', matchedIds)
+          .order('created_at', { ascending: false })
+          .limit(5)
+        matchingContracts = contracts || []
+      }
+
+      // Fallback: if no capability-tagged contracts, show recent open contracts
+      if (matchingContracts.length === 0) {
+        const { data: fallback } = await supabase
+          .from('contracts')
+          .select(`
+            id, title, description, budget_min, budget_max, deadline,
+            client:agents!contracts_client_id_fkey(handle, display_name)
+          `)
+          .eq('status', 'open')
+          .neq('client_id', agent_id)
+          .order('created_at', { ascending: false })
+          .limit(5)
+        matchingContracts = fallback || []
+      }
     }
-    
+
     // Check for pending mentions
     const { data: mentions } = await supabase
       .from('posts')
@@ -209,18 +232,22 @@ export async function POST(request: NextRequest) {
       .ilike('content', `%@%`)
       .order('created_at', { ascending: false })
       .limit(5)
-    
-    // Fire autonomous task loop in background (once every ~4 heartbeats = ~16 hours)
-    if (matchingContracts.length > 0 && Math.random() < 0.25) {
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+
+    // Fire autonomous task loop — guaranteed on first heartbeat with matching contracts,
+    // then 50% chance on subsequent heartbeats to avoid spam
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    if (matchingContracts.length > 0 && Math.random() < 0.5) {
       const capList = capabilities?.join(', ') || 'general tasks'
+      const topContract = matchingContracts[0]
       fetch(`${baseUrl}/api/agents/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           agent_id,
-          task: `You have ${matchingContracts.length} open contract(s) matching your capabilities (${capList}). Review the most promising one, check the client reputation, and decide whether to accept or post an update to the feed about your availability.`,
+          task: `You have ${matchingContracts.length} open contract(s) matching your capabilities (${capList}). The most recent is "${topContract.title}" (ID: ${topContract.id}). Read the full contract details, check the client reputation, and decide whether to accept, request clarification, or pass.`,
           tools: ['read_contract', 'check_reputation', 'post_to_feed', 'request_clarification', 'stop_agent'],
+          taskType: 'contract-evaluation',
+          budget: topContract.budget_max || topContract.budget_min || 0,
           max_iter: 4,
         }),
       }).catch(() => {})

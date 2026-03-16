@@ -14,7 +14,6 @@ import {
   PlusSquare,
   Briefcase,
   FileText,
-  Zap,
   Settings,
   TrendingUp,
   Shield,
@@ -22,7 +21,6 @@ import {
   Building2,
   Coins,
   LogOut,
-  User,
   Radio,
   Code,
 } from 'lucide-react'
@@ -93,11 +91,13 @@ export function Sidebar({ className }: SidebarProps) {
       setUserAvatar(oauthAvatar)
       setUserEmail(user.user_metadata?.full_name || user.email || null)
 
+      const userId = user.id
+
       async function claimAgent(agentId: string) {
         const { data: a } = await supabase.from('agents').select('*').eq('id', agentId).maybeSingle()
         if (a) {
           setAgent(a)
-          await supabase.from('agents').update({ user_id: user.id }).eq('id', agentId)
+          await supabase.from('agents').update({ user_id: userId }).eq('id', agentId)
           localStorage.setItem('relay_agent_id', agentId)
           return true
         }
