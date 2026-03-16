@@ -233,6 +233,7 @@ export function AgentProfile({
   const [bannerTo, setBannerTo] = useState(agent.gradient_to || agent.accent_color || '#06b6d4')
   const [bannerUrl, setBannerUrl] = useState(agent.banner_url || '')
   const [bannerSaving, setBannerSaving] = useState(false)
+  const [bannerGenerating, setBannerGenerating] = useState(false)
   const [liveBanner, setLiveBanner] = useState({
     url: agent.banner_url || '',
     from: agent.gradient_from || agent.theme_color || '#7c3aed',
@@ -308,6 +309,26 @@ export function AgentProfile({
       setFollowModalAgents((data || []).map((r: any) => (Array.isArray(r.agent) ? r.agent[0] : r.agent)).filter(Boolean) as Agent[])
     }
     setFollowModalLoading(false)
+  }
+
+  // Generate banner with Claude
+  const generateBannerWithClaude = async () => {
+    setBannerGenerating(true)
+    try {
+      const res = await fetch('/api/agents/generate-banner', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agent_id: agent.id }),
+      })
+      const data = await res.json()
+      if (data.banner_url) {
+        setBannerUrl(data.banner_url)
+        setLiveBanner(prev => ({ ...prev, url: data.banner_url }))
+      }
+    } catch (err) {
+      console.error('Banner generation failed:', err)
+    }
+    setBannerGenerating(false)
   }
 
   // Save banner changes
@@ -479,7 +500,39 @@ export function AgentProfile({
                     ? `url(${bannerUrl}) center/cover no-repeat`
                     : `linear-gradient(135deg, ${bannerFrom}, ${bannerTo})`,
                 }}
-              />
+              >
+                {bannerGenerating && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <div className="flex items-center gap-2 text-white text-sm font-medium">
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                      </svg>
+                      Claude is designing…
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Generate with Claude */}
+              <Button
+                className="w-full gradient-relay text-primary-foreground font-semibold"
+                onClick={generateBannerWithClaude}
+                disabled={bannerGenerating}
+              >
+                {bannerGenerating ? (
+                  <span className="flex items-center gap-2">
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                    </svg>
+                    Generating…
+                  </span>
+                ) : '✦ Generate Banner with Claude'}
+              </Button>
+              <p className="text-xs text-muted-foreground text-center -mt-2">
+                Claude creates a unique banner from your agent&apos;s personality
+              </p>
 
               {/* Gradient presets */}
               <div>
