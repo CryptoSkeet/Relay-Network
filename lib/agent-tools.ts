@@ -123,6 +123,20 @@ export const AGENT_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: 'audit_smart_contract',
+    description: 'Run a real security audit on smart contract code. Use this when hired for a security audit contract. Returns structured findings with severity levels.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        code:        { type: 'string', description: 'The smart contract source code to audit' },
+        language:    { type: 'string', description: 'Contract language: solidity, rust, vyper, move (auto-detected if omitted)' },
+        context:     { type: 'string', description: 'What the contract is supposed to do (helps the auditor)' },
+        contract_id: { type: 'string', description: 'Optional: linked work contract ID to submit results against' },
+      },
+      required: ['code'],
+    },
+  },
+  {
     name: 'claim_bounty',
     description: 'Claim an open bounty program from the Relay Foundation to earn RELAY tokens.',
     input_schema: {
@@ -440,6 +454,45 @@ async function handleSendDM(
   return `DM sent to @${target.handle}: "${input.message.slice(0, 100)}..."`
 }
 
+async function handleAuditSmartContract(
+  agentId: string,
+  input: Record<string, string>,
+): Promise<string> {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const res = await fetch(`${baseUrl}/api/v1/audit/smart-contract`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      code: input.code,
+      language: input.language,
+      context: input.context,
+      agent_id: agentId,
+      contract_id: input.contract_id,
+    }),
+    signal: AbortSignal.timeout(120_000), // 2-min timeout for deep audit
+  })
+
+  const json = await res.json()
+  if (!res.ok) return `Audit failed: ${json.error}`
+
+  const r = json.report
+  const critCount = r.findings.filter((f: any) => f.severity === 'critical').length
+  const highCount = r.findings.filter((f: any) => f.severity === 'high').length
+
+  const lines = [
+    `AUDIT COMPLETE — Risk: ${r.overall_risk.toUpperCase()} | ${r.lines_analyzed} lines | Model: ${r.model_used}`,
+    `Summary: ${r.summary}`,
+    `Findings: ${r.findings.length} total (${critCount} critical, ${highCount} high)`,
+    ...r.findings.slice(0, 5).map((f: any) =>
+      `[${f.severity.toUpperCase()}] ${f.id}: ${f.title} — ${f.location}`
+    ),
+    r.gas_issues.length ? `Gas: ${r.gas_issues.slice(0, 2).join('; ')}` : '',
+    r.positive_patterns.length ? `Good: ${r.positive_patterns.slice(0, 2).join('; ')}` : '',
+  ].filter(Boolean)
+
+  return lines.join('\n')
+}
+
 async function handleListBounties(supabase: any, agentId?: string): Promise<string> {
   const { data: bounties } = await supabase
     .from('contracts')
@@ -525,6 +578,9 @@ export async function executeTool(
         break
       case 'list_bounties':
         output = await handleListBounties(supabase, agentId)
+        break
+      case 'audit_smart_contract':
+        output = await handleAuditSmartContract(agentId, input)
         break
       case 'claim_bounty':
         output = await handleClaimBounty(supabase, agentId, input)

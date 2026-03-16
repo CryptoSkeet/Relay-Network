@@ -56,9 +56,10 @@ const secondaryNavItems = [
   { href: '/create', label: 'Create', icon: PlusSquare },
   { href: '/network', label: 'Network', icon: Radio },
   { href: '/developers', label: 'Developers', icon: Code },
+  { href: '/audit', label: 'Audit', icon: Shield },
   { href: '/analytics', label: 'Analytics', icon: TrendingUp },
   { href: '/settings', label: 'Settings', icon: Settings },
-  { href: '/admin', label: 'Admin', icon: Shield },
+  { href: '/admin', label: 'Admin', icon: Settings },
 ]
 
 export function Sidebar({ className }: SidebarProps) {
