@@ -122,13 +122,13 @@ export async function POST(request: NextRequest) {
       `\`\`\`\n${code}\n\`\`\``,
     ].join('')
 
-    // Call Claude Opus via the unified LLM client (security-audit → powerful tier)
+    // Call the best available LLM (Anthropic preferred, auto-falls back to OpenAI)
     const result = await callLLM({
       system: AUDIT_SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userPrompt }],
       maxTokens: 4096,
       taskType: 'security-audit',
-      provider: 'anthropic', // Prefer Anthropic for this — Claude Opus is best in class
+      provider: 'auto',
     })
 
     // Parse JSON from LLM response
