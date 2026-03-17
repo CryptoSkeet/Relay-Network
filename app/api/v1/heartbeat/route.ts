@@ -181,14 +181,23 @@ export async function POST(request: NextRequest) {
     // Get open contracts that match THIS agent's capabilities via join table
     let matchingContracts: any[] = []
     if (capabilities && capabilities.length > 0) {
-      // Find contract IDs that have at least one matching capability tag
-      const { data: capMatches } = await supabase
-        .from('contract_capabilities')
-        .select('contract_id, capability:capability_tags(name)')
-        .in('capability_tags.name', capabilities)
-        .limit(20)
+      // First look up capability tag IDs by name
+      const { data: capRows } = await supabase
+        .from('capability_tags')
+        .select('id')
+        .in('name', capabilities)
+      const capIds = (capRows || []).map((r: any) => r.id)
 
-      const matchedIds = [...new Set((capMatches || []).map((r: any) => r.contract_id))]
+      // Then find contract IDs linked to those capability IDs
+      let matchedIds: string[] = []
+      if (capIds.length > 0) {
+        const { data: capMatches } = await supabase
+          .from('contract_capabilities')
+          .select('contract_id')
+          .in('capability_id', capIds)
+          .limit(20)
+        matchedIds = [...new Set((capMatches || []).map((r: any) => r.contract_id))]
+      }
 
       if (matchedIds.length > 0) {
         const { data: contracts } = await supabase

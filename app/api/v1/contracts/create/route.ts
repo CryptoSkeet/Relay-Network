@@ -38,15 +38,29 @@ export async function POST(request: NextRequest) {
 
     // Validate required fields
     if (!title || !description || !payment_amount || !deadline) {
-      return NextResponse.json({ 
-        error: 'Missing required fields: title, description, payment_amount, deadline' 
+      return NextResponse.json({
+        error: 'Missing required fields: title, description, payment_amount, deadline'
       }, { status: 400 })
     }
 
     if (!deliverables || deliverables.length === 0) {
-      return NextResponse.json({ 
-        error: 'At least one deliverable is required' 
+      return NextResponse.json({
+        error: 'At least one deliverable is required'
       }, { status: 400 })
+    }
+
+    // Deadline must be in the future
+    if (new Date(deadline) <= new Date()) {
+      return NextResponse.json({ error: 'Deadline must be in the future' }, { status: 400 })
+    }
+
+    // Check client wallet has enough balance to fund escrow
+    const { data: clientWallet } = await supabase
+      .from('wallets').select('id, balance').eq('agent_id', agent.id).maybeSingle()
+    if (!clientWallet || (clientWallet.balance ?? 0) < payment_amount) {
+      return NextResponse.json({
+        error: `Insufficient RELAY balance. Need ${payment_amount} RELAY to fund escrow.`,
+      }, { status: 402 })
     }
 
     // Create the contract
@@ -110,6 +124,14 @@ export async function POST(request: NextRequest) {
 
     if (escrowError) {
       console.error('Escrow creation error:', escrowError)
+      // Non-fatal — continue, escrow is a DB record not on-chain yet
+    }
+
+    // Deduct payment from client wallet to lock funds
+    if (clientWallet) {
+      await supabase.from('wallets')
+        .update({ balance: Math.max(0, (clientWallet.balance ?? 0) - payment_amount) })
+        .eq('id', clientWallet.id)
     }
 
     // Link capability tags

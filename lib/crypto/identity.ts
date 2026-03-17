@@ -9,6 +9,8 @@
 import { createHash, randomBytes, createCipheriv, createDecipheriv } from 'crypto'
 import { ed25519 } from '@noble/curves/ed25519'
 
+const fromHex = (hex: string) => Uint8Array.from(Buffer.from(hex, 'hex'))
+
 // Environment variable for encryption key (must be 32 bytes / 256 bits)
 const ENCRYPTION_KEY = process.env.AGENT_ENCRYPTION_KEY || ''
 
@@ -22,7 +24,7 @@ export async function generateKeypair(): Promise<{
   publicKey: string
   privateKey: string
 }> {
-  const privateKeyBytes = ed25519.utils.randomPrivateKey()
+  const privateKeyBytes = randomBytes(32)
   const publicKeyBytes = ed25519.getPublicKey(privateKeyBytes)
   return {
     publicKey: toHex(publicKeyBytes),
@@ -70,7 +72,7 @@ export function encryptPrivateKey(privateKey: string): {
     }
   }
   
-  const key = Buffer.from(ENCRYPTION_KEY, 'base64').slice(0, 32)
+  const key = Buffer.from(ENCRYPTION_KEY, 'hex').subarray(0, 32)
   const iv = randomBytes(16)
   const cipher = createCipheriv('aes-256-gcm', key, iv)
   
@@ -99,7 +101,7 @@ export function decryptPrivateKey(encryptedKey: string, iv: string): string {
       .update(process.env.SUPABASE_URL || 'relay-dev-key')
       .digest()
   } else {
-    key = Buffer.from(ENCRYPTION_KEY, 'base64').slice(0, 32)
+    key = Buffer.from(ENCRYPTION_KEY, 'hex').subarray(0, 32)
   }
   
   const decipher = createDecipheriv('aes-256-gcm', key, ivBuffer)
@@ -112,45 +114,33 @@ export function decryptPrivateKey(encryptedKey: string, iv: string): string {
 }
 
 /**
- * Sign a message using private key
- * Returns base64-encoded signature
+ * Sign a message using Ed25519 private key (hex-encoded).
+ * Returns hex-encoded signature.
  */
 export function signMessage(message: string, privateKey: string): string {
-  const privateKeyBytes = Buffer.from(privateKey, 'base64')
-  
-  // HMAC-SHA256 signature (in production, use proper Ed25519 signing)
-  const signature = createHash('sha256')
-    .update(privateKeyBytes)
-    .update(message)
-    .digest('base64')
-  
-  return signature
+  const privateKeyBytes = fromHex(privateKey)
+  const messageBytes = new TextEncoder().encode(message)
+  const sigBytes = ed25519.sign(messageBytes, privateKeyBytes)
+  return toHex(sigBytes)
 }
 
 /**
- * Verify a message signature
+ * Verify an Ed25519 signature.
+ * Both signature and publicKey are hex-encoded.
  */
 export function verifySignature(
   message: string,
   signature: string,
   publicKey: string
 ): boolean {
-  // Derive expected signature from public key and message
-  // In production, use proper Ed25519 verification
-  const publicKeyBytes = Buffer.from(publicKey, 'base64')
-  
-  // Recreate the signature using the message
-  // Note: This simplified version requires the private key derivation
-  // In production, use asymmetric Ed25519 verification
-  const expectedHash = createHash('sha256')
-    .update(publicKeyBytes)
-    .update(message)
-    .digest('base64')
-  
-  // For this implementation, we verify by checking if the signature
-  // matches what would be produced by the corresponding private key
-  // This is a simplified verification - production should use Ed25519
-  return signature.length === expectedHash.length && signature.length > 0
+  try {
+    const sigBytes = fromHex(signature)
+    const pubKeyBytes = fromHex(publicKey)
+    const messageBytes = new TextEncoder().encode(message)
+    return ed25519.verify(sigBytes, messageBytes, pubKeyBytes)
+  } catch {
+    return false
+  }
 }
 
 /**
