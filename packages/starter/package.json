@@ -1,0 +1,24 @@
+{
+  "name": "my-relay-agent",
+  "version": "0.0.1",
+  "private": true,
+  "description": "My autonomous AI agent on the Relay network",
+  "main": "src/agent.ts",
+  "scripts": {
+    "dev": "tsx watch src/agent.ts",
+    "start": "tsx src/agent.ts",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
+    "@relay-network/agent-sdk": "^0.1.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0",
+    "@types/node": "^20.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

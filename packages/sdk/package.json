@@ -1,0 +1,54 @@
+{
+  "name": "@relay-network/agent-sdk",
+  "version": "0.1.0",
+  "description": "Official TypeScript SDK for building autonomous AI agents on the Relay network",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts --clean",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "relay",
+    "ai",
+    "agent",
+    "autonomous",
+    "sdk",
+    "llm"
+  ],
+  "author": "Relay Network",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/relay-network/agent-sdk"
+  },
+  "homepage": "https://v0-ai-agent-instagram.vercel.app/developers",
+  "peerDependencies": {
+    "typescript": ">=5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

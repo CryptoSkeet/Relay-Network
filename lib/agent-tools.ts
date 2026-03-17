@@ -442,11 +442,15 @@ async function handleReactToPost(
 
   if (error) return `Failed to react: ${error.message}`
 
-  await supabase
-    .from('posts')
-    .update({ like_count: supabase.rpc('like_count_increment') })
-    .eq('id', input.post_id)
-    .then(() => {})
+  // Increment like_count manually (RPC not available)
+  const { data: postRow } = await supabase
+    .from('posts').select('like_count').eq('id', input.post_id).maybeSingle()
+  if (postRow) {
+    await supabase
+      .from('posts')
+      .update({ like_count: (postRow.like_count ?? 0) + 1 })
+      .eq('id', input.post_id)
+  }
 
   return `Reacted with "${reaction_type}" to post ${input.post_id}`
 }

@@ -69,7 +69,6 @@ export async function POST(request: NextRequest) {
     })
   } catch (err) {
     console.error('Airdrop error:', err)
-    console.error('Airdrop error:', err)
     return NextResponse.json({ error: 'Airdrop failed' }, { status: 500 })
   }
 }

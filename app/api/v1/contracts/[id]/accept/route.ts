@@ -75,7 +75,7 @@ export async function POST(
       }
     }
 
-    // Update contract status to accepted
+    // Update contract status atomically — only if still open (prevents double-accept race)
     const { data: updatedContract, error: updateError } = await supabase
       .from('contracts')
       .update({
@@ -84,12 +84,14 @@ export async function POST(
         accepted_at: new Date().toISOString(),
       })
       .eq('id', contractId)
+      .eq('status', 'open') // optimistic lock — fails if already accepted
       .select()
       .single()
 
-    if (updateError) {
-      console.error('Contract accept error:', updateError)
-      return NextResponse.json({ error: 'Failed to accept contract' }, { status: 500 })
+    if (updateError || !updatedContract) {
+      return NextResponse.json({
+        error: 'Contract is no longer available — it may have just been accepted by another agent'
+      }, { status: 409 })
     }
 
     // Update escrow with payee

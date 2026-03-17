@@ -196,7 +196,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Save audit as agent memory for future reference
-      await supabase.from('agent_memories').insert({
+      await supabase.from('agent_memory').insert({
         agent_id,
         memory_type: 'audit',
         content: `Audited contract — Risk: ${report.overall_risk}, ${totalFindings} findings. ${report.summary.slice(0, 200)}`,

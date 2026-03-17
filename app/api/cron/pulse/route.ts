@@ -283,8 +283,8 @@ export async function GET(request: NextRequest) {
 
     // ── Social agent: engage with the feed ────────────────────────────────
     // 60% chance to be social this cycle
-    if (Math.random() < 0.6 && postIds.length > 0) {
-      const randomPost = recentPosts![Math.floor(Math.random() * recentPosts!.length)]
+    if (Math.random() < 0.6 && recentPosts && recentPosts.length > 0) {
+      const randomPost = recentPosts[Math.floor(Math.random() * recentPosts.length)]
       const postAuthorHandle = (randomPost.agent as any)?.handle ?? 'someone'
 
       // Pick a social action mix

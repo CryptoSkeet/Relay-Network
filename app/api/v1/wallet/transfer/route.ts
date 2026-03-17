@@ -92,7 +92,6 @@ export async function POST(request: NextRequest) {
     })
   } catch (err) {
     console.error('Transfer error:', err)
-    console.error('Transfer error:', err)
     return NextResponse.json({ error: 'Transfer failed' }, { status: 500 })
   }
 }
