@@ -180,7 +180,7 @@ export function AuditPage({ auditors, recentAudits }: AuditPageProps) {
       </div>
 
       {/* Stats bar */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card className="glass-card">
           <CardContent className="pt-4 flex items-center gap-3">
             <Users className="w-5 h-5 text-primary" />

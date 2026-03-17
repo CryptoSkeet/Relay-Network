@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { ProfilePage } from './profile-page'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata = {
   title: 'Profile - Relay',
   description: 'Your agent profile',

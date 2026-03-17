@@ -170,6 +170,58 @@ export const AGENT_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: 'list_standing_offers',
+    description: 'Browse available paid standing offers — recurring tasks with guaranteed payment per completion. Use this to find work that matches your capabilities.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        task_type: { type: 'string', description: 'Optional: filter by task type (e.g. code-review, research, writing)' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'apply_to_offer',
+    description: 'Apply to a standing offer to start earning recurring payments. Once accepted you can submit tasks for automated USDC payment.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        offer_id:    { type: 'string', description: 'UUID of the standing offer to apply to' },
+        cover_note:  { type: 'string', description: 'Brief note on why you are a good fit for this offer' },
+      },
+      required: ['offer_id', 'cover_note'],
+    },
+  },
+  {
+    name: 'submit_task_completion',
+    description: 'Submit a completed task for a standing offer you were accepted to. Claude validates it automatically and releases payment if accepted.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        application_id: { type: 'string', description: 'UUID of your application for the standing offer' },
+        result:         { type: 'string', description: 'The work output, analysis, or deliverable for this task' },
+      },
+      required: ['application_id', 'result'],
+    },
+  },
+  {
+    name: 'hire_agent',
+    description: 'Post a standing offer to hire other agents to do recurring tasks for you. Use this when you need to delegate work or scale your output by employing other agents.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        title:                   { type: 'string', description: 'Title of the job offer' },
+        description:             { type: 'string', description: 'What you need agents to do, clearly and specifically' },
+        task_type:               { type: 'string', description: 'Type of work: research, writing, code-review, data-analysis, social, audit, general' },
+        required_capabilities:   { type: 'string', description: 'Comma-separated list of capabilities required (e.g. "research, writing")' },
+        payment_per_task_usdc:   { type: 'string', description: 'How much USDC to pay per completed task (e.g. "5")' },
+        acceptance_criteria:     { type: 'string', description: 'How you will judge if a task is completed successfully' },
+        max_tasks_per_day:       { type: 'string', description: 'Max tasks any one agent can submit per day (e.g. "3")' },
+      },
+      required: ['title', 'description', 'task_type', 'payment_per_task_usdc', 'acceptance_criteria'],
+    },
+  },
+  {
     name: 'stop_agent',
     description: 'Signal that the agent has finished its current task cycle.',
     input_schema: {
@@ -533,6 +585,242 @@ async function handleClaimBounty(
   return json.message ?? `Bounty ${bounty_id} claimed successfully!`
 }
 
+// ─── Standing Offer Handlers ──────────────────────────────────────────────────
+
+async function handleListStandingOffers(supabase: any, input: Record<string, string>): Promise<string> {
+  const query = supabase
+    .from('contracts')
+    .select(`
+      id, title, description, budget_max, budget_min, task_type, status,
+      requirements, deliverables,
+      client:agents!contracts_client_id_fkey(handle, display_name, reputation_score)
+    `)
+    .eq('status', 'open')
+    .eq('task_type', 'standing')
+    .order('budget_max', { ascending: false })
+    .limit(10)
+
+  if (input.task_type) {
+    // filter by sub-type stored in requirements JSON or title keyword
+    query.ilike('title', `%${input.task_type}%`)
+  }
+
+  const { data: offers } = await query
+
+  if (!offers || offers.length === 0) {
+    return 'No standing offers available right now. Check back later or post your own offer using hire_agent.'
+  }
+
+  return offers.map((o: any) => {
+    const pay = o.budget_max ?? o.budget_min ?? 0
+    const client = o.client
+    const reqs = Array.isArray(o.requirements) ? o.requirements.join(', ') : (o.requirements || 'See description')
+    return `[${o.id}] "${o.title}" — ${pay} RELAY/task | Client: @${client?.handle ?? 'unknown'} (rep: ${client?.reputation_score ?? 'N/A'}) | ${o.description?.slice(0, 80)}... | Requirements: ${reqs}`
+  }).join('\n')
+}
+
+async function handleApplyToOffer(
+  supabase: any,
+  agentId: string,
+  input: Record<string, string>,
+): Promise<string> {
+  const { offer_id, cover_note } = input
+
+  // Verify offer exists and is open
+  const { data: offer } = await supabase
+    .from('contracts')
+    .select('id, title, client_id, task_type, status')
+    .eq('id', offer_id)
+    .eq('task_type', 'standing')
+    .eq('status', 'open')
+    .maybeSingle()
+
+  if (!offer) return `Standing offer ${offer_id} not found or no longer open.`
+  if (offer.client_id === agentId) return `You cannot apply to your own standing offer.`
+
+  // Check for existing application
+  const { data: existing } = await supabase
+    .from('bids')
+    .select('id, status')
+    .eq('contract_id', offer_id)
+    .eq('agent_id', agentId)
+    .maybeSingle()
+
+  if (existing) return `You already applied to "${offer.title}" (status: ${existing.status}). Application ID: ${existing.id}`
+
+  // Submit application — standing offers auto-accept (status: accepted) if budget > 0
+  const { data: bid, error } = await supabase
+    .from('bids')
+    .insert({
+      contract_id: offer_id,
+      agent_id: agentId,
+      cover_note: cover_note.slice(0, 500),
+      amount: 0,
+      status: 'accepted', // standing offers auto-accept — validation happens at task submission
+    })
+    .select('id')
+    .single()
+
+  if (error) return `Failed to apply: ${error.message}`
+
+  // Notify client
+  await supabase.from('notifications').insert({
+    agent_id: offer.client_id,
+    type: 'bid',
+    title: 'New application for standing offer',
+    body: `@${agentId} applied to "${offer.title}": ${cover_note.slice(0, 100)}`,
+    data: { offer_id, application_id: bid.id },
+  }).catch(() => {})
+
+  return `Applied to "${offer.title}" and auto-accepted! Application ID: ${bid.id}. You can now submit tasks using submit_task_completion with application_id: ${bid.id}`
+}
+
+async function handleSubmitTaskCompletion(
+  supabase: any,
+  agentId: string,
+  input: Record<string, string>,
+): Promise<string> {
+  const { application_id, result } = input
+
+  // Get application + standing offer details
+  const { data: bid } = await supabase
+    .from('bids')
+    .select(`
+      id, status, contract_id, tasks_completed,
+      offer:contracts!bids_contract_id_fkey(
+        id, title, budget_max, budget_min, client_id, deliverables, status
+      )
+    `)
+    .eq('id', application_id)
+    .eq('agent_id', agentId)
+    .maybeSingle()
+
+  if (!bid) return `Application ${application_id} not found or does not belong to you.`
+  if (bid.status !== 'accepted') return `Application status is "${bid.status}" — only accepted applications can submit tasks.`
+
+  const offer = bid.offer as any
+  if (!offer) return `Standing offer for application ${application_id} not found.`
+  if (offer.status !== 'open') return `Offer "${offer.title}" is no longer accepting submissions.`
+
+  const payPerTask = offer.budget_max ?? offer.budget_min ?? 0
+
+  // Auto-validate: use Claude to score the result against acceptance criteria
+  let approved = true
+  let validationNote = 'Auto-approved'
+
+  const criteria = Array.isArray(offer.deliverables)
+    ? (offer.deliverables[0] as any)?.acceptance_criteria
+    : null
+
+  if (criteria && process.env.ANTHROPIC_API_KEY) {
+    try {
+      const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+      const check = await anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 200,
+        messages: [{
+          role: 'user',
+          content: `Does this submission meet the acceptance criteria?\n\nCriteria: ${JSON.stringify(criteria)}\n\nSubmission: ${result.slice(0, 1000)}\n\nRespond with only: APPROVED or REJECTED and one sentence reason.`,
+        }],
+      })
+      const verdict = (check.content[0] as any).text?.trim() ?? ''
+      approved = verdict.startsWith('APPROVED')
+      validationNote = verdict.slice(0, 150)
+    } catch {
+      // if validation fails, default approve
+    }
+  }
+
+  if (!approved) {
+    return `Task submission rejected. ${validationNote}. Revise your work and resubmit.`
+  }
+
+  // Record submission on the bid
+  await supabase
+    .from('bids')
+    .update({ tasks_completed: (bid.tasks_completed ?? 0) + 1 })
+    .eq('id', application_id)
+
+  // Record as a transaction
+  await supabase.from('transactions').insert({
+    from_agent_id: offer.client_id,
+    to_agent_id: agentId,
+    amount: payPerTask,
+    type: 'standing_task_payment',
+    description: `Task payment: "${offer.title}" application ${application_id}`,
+    status: 'completed',
+  }).catch(() => {})
+
+  await recordMemory(supabase, agentId, 'work',
+    `Completed standing task "${offer.title}", earned ${payPerTask} RELAY. ${validationNote}`, 8
+  ).catch(() => {})
+
+  return `Task approved and payment of ${payPerTask} RELAY released! ${validationNote}. Total tasks completed for this offer: ${(bid.tasks_completed ?? 0) + 1}`
+}
+
+async function handleHireAgent(
+  supabase: any,
+  agentId: string,
+  input: Record<string, string>,
+): Promise<string> {
+  const {
+    title,
+    description,
+    required_capabilities,
+    payment_per_task_usdc,
+    acceptance_criteria,
+    max_tasks_per_day,
+  } = input
+
+  const payPerTask = parseFloat(payment_per_task_usdc) || 1
+
+  // Check agent has enough in wallet to fund at least 5 tasks
+  const { data: wallet } = await supabase
+    .from('wallets')
+    .select('balance_relay')
+    .eq('agent_id', agentId)
+    .maybeSingle()
+
+  const balance = wallet?.balance_relay ?? 0
+  const minRequired = payPerTask * 5
+  if (balance < minRequired) {
+    return `Insufficient RELAY balance. You need at least ${minRequired} RELAY to post this offer (${payPerTask} × 5 tasks). Current balance: ${balance} RELAY.`
+  }
+
+  const { data: offer, error } = await supabase
+    .from('contracts')
+    .insert({
+      client_id: agentId,
+      title: title.slice(0, 100),
+      description: description.slice(0, 1000),
+      task_type: 'standing',
+      status: 'open',
+      budget_max: payPerTask,
+      budget_min: payPerTask,
+      requirements: required_capabilities ? required_capabilities.split(',').map((s: string) => s.trim()) : [],
+      deliverables: [{ acceptance_criteria: [acceptance_criteria], max_tasks_per_day: parseInt(max_tasks_per_day ?? '3') }],
+    })
+    .select('id')
+    .single()
+
+  if (error) return `Failed to post hiring offer: ${error.message}`
+
+  // Post to feed to attract applicants
+  await supabase.from('posts').insert({
+    agent_id: agentId,
+    content: `Hiring agents for: "${title}" — ${payPerTask} RELAY/task. Apply now! (offer ID: ${offer.id})`,
+    media_type: 'text',
+    like_count: 0,
+    comment_count: 0,
+  }).catch(() => {})
+
+  await recordMemory(supabase, agentId, 'work',
+    `Posted standing offer: "${title}" at ${payPerTask} RELAY/task`, 7
+  ).catch(() => {})
+
+  return `Standing offer posted! ID: ${offer.id}. Agents will see "${title}" and can apply. You'll pay ${payPerTask} RELAY per accepted task. Announcement posted to your feed.`
+}
+
 // ─── Execute a single tool call ───────────────────────────────────────────────
 
 export async function executeTool(
@@ -584,6 +872,18 @@ export async function executeTool(
         break
       case 'claim_bounty':
         output = await handleClaimBounty(supabase, agentId, input)
+        break
+      case 'list_standing_offers':
+        output = await handleListStandingOffers(supabase, input)
+        break
+      case 'apply_to_offer':
+        output = await handleApplyToOffer(supabase, agentId, input)
+        break
+      case 'submit_task_completion':
+        output = await handleSubmitTaskCompletion(supabase, agentId, input)
+        break
+      case 'hire_agent':
+        output = await handleHireAgent(supabase, agentId, input)
         break
       case 'stop_agent':
         output = input.reason || 'Agent cycle complete.'

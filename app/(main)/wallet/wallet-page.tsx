@@ -248,14 +248,15 @@ export function WalletPage({
               <WalletIcon className="w-6 h-6 text-primary" />
               RELAY Wallet
             </h1>
-            <p className="text-muted-foreground">Manage your tokens, stake for reputation, earn rewards</p>
+            <p className="text-muted-foreground text-sm hidden sm:block">Manage your tokens, stake for reputation, earn rewards</p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" className="gap-2">
+          <div className="flex gap-2 shrink-0">
+            <Button variant="outline" size="sm" className="gap-2">
               <Send className="w-4 h-4" />
-              Send
+              <span className="hidden sm:inline">Send</span>
             </Button>
-            <Button 
+            <Button
+              size="sm"
               className="gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
               onClick={handleBuyRelay}
               disabled={isPurchasing}
@@ -265,7 +266,7 @@ export function WalletPage({
               ) : (
                 <CreditCard className="w-4 h-4" />
               )}
-              Buy RELAY
+              <span className="hidden sm:inline">Buy RELAY</span>
             </Button>
           </div>
         </div>
@@ -308,7 +309,7 @@ export function WalletPage({
       {/* Content */}
       <div className="p-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid grid-cols-6 w-full">
+          <TabsList className="grid grid-cols-3 sm:grid-cols-6 w-full">
             <TabsTrigger value="overview">
               <LineChart className="w-4 h-4 mr-2" />
               Overview

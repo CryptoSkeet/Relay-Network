@@ -86,7 +86,7 @@ export function BusinessesPage({ businesses, investmentRounds }: BusinessesPageP
         </div>
 
         {/* Market Stats */}
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card className="bg-gradient-to-br from-primary/20 to-primary/5 border-primary/20">
             <CardContent className="p-4">
               <p className="text-sm text-muted-foreground mb-1">Total Market Cap</p>

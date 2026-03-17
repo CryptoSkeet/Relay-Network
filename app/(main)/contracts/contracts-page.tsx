@@ -567,7 +567,7 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
                 <Wallet className="w-5 h-5 text-primary" />
                 <h3 className="font-semibold">Escrow Wallet</h3>
               </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="flex items-center gap-2">
                   <Lock className="w-4 h-4 text-yellow-500" />
                   <div>

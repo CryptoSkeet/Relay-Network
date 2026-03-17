@@ -1,14 +1,14 @@
 'use client'
 
-import { useState } from 'react'
-import { Settings, User, Bell, Shield, Palette, Wallet, Globe, Key, LogOut, Save, Moon, Sun, Monitor, Upload, Image as ImageIcon } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Settings, User, Bell, Shield, Palette, Wallet, Key, LogOut, Save, Moon, Sun, Monitor, Image as ImageIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
+import { createClient } from '@/lib/supabase/client'
 
 const settingsSections = [
   { id: 'profile', label: 'Profile', icon: User },
@@ -21,12 +21,63 @@ const settingsSections = [
 
 export function SettingsPage() {
   const [activeSection, setActiveSection] = useState('profile')
+  const [agent, setAgent] = useState<any>(null)
+  const [wallet, setWallet] = useState<{ address: string; balance: number } | null>(null)
+  const [userEmail, setUserEmail] = useState<string | null>(null)
+  const [displayName, setDisplayName] = useState('')
+  const [bio, setBio] = useState('')
+  const [capabilities, setCapabilities] = useState('')
+  const [modelFamily, setModelFamily] = useState('anthropic')
   const [themeColor, setThemeColor] = useState('#7c3aed')
   const [accentColor, setAccentColor] = useState('#06b6d4')
   const [gradientFrom, setGradientFrom] = useState('#7c3aed')
   const [gradientTo, setGradientTo] = useState('#06b6d4')
   const [bannerFile, setBannerFile] = useState<File | null>(null)
   const [bannerPreview, setBannerPreview] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function load() {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      setUserEmail(user.email ?? null)
+
+      // 1. Try to find agent by user_id
+      let found: any = null
+      const { data: byUser } = await supabase
+        .from('agents').select('*').eq('user_id', user.id)
+        .order('created_at', { ascending: false }).limit(1).maybeSingle()
+      found = byUser ?? null
+
+      // 2. Fallback: check localStorage for relay_agent_id (set by create-agent form)
+      if (!found) {
+        const localAgentId = typeof window !== 'undefined' ? localStorage.getItem('relay_agent_id') : null
+        if (localAgentId) {
+          const { data: byId } = await supabase
+            .from('agents').select('*').eq('id', localAgentId).maybeSingle()
+          if (byId) found = byId
+        }
+      }
+
+      if (found) {
+        setAgent(found)
+        setDisplayName(found.display_name ?? '')
+        setBio(found.bio ?? '')
+        setCapabilities((found.capabilities ?? []).join(', '))
+        setModelFamily(found.model_family ?? 'anthropic')
+        setThemeColor(found.theme_color ?? '#7c3aed')
+        setAccentColor(found.accent_color ?? '#06b6d4')
+        setGradientFrom(found.gradient_from ?? '#7c3aed')
+        setGradientTo(found.gradient_to ?? '#06b6d4')
+        setBannerPreview(found.banner_url ?? null)
+
+        const { data: w } = await supabase
+          .from('wallets').select('address, balance').eq('agent_id', found.id).maybeSingle()
+        if (w) setWallet(w)
+      }
+    }
+    load()
+  }, [])
 
   const handleBannerUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -40,25 +91,39 @@ export function SettingsPage() {
     }
   }
 
+  const [styleSaving, setStyleSaving] = useState(false)
+  const [styleSaved,  setStyleSaved]  = useState(false)
+  const [styleError,  setStyleError]  = useState<string | null>(null)
+
   const saveBannerAndColors = async () => {
+    setStyleSaving(true); setStyleSaved(false); setStyleError(null)
     try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('Not logged in')
+
       const formData = new FormData()
       if (bannerFile) formData.append('banner', bannerFile)
       formData.append('theme_color', themeColor)
       formData.append('accent_color', accentColor)
       formData.append('gradient_from', gradientFrom)
       formData.append('gradient_to', gradientTo)
+      if (agent?.id) formData.append('agent_id', agent.id)
 
       const response = await fetch('/api/profile/customize', {
         method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
         body: formData,
       })
-
-      if (response.ok) {
-        console.log('[v0] Profile customization saved')
-      }
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Save failed')
+      if (data.agent?.banner_url) setBannerPreview(data.agent.banner_url)
+      setStyleSaved(true)
+      setTimeout(() => setStyleSaved(false), 2500)
     } catch (error) {
-      console.error('[v0] Failed to save customization:', error)
+      setStyleError(error instanceof Error ? error.message : 'Save failed')
+    } finally {
+      setStyleSaving(false)
     }
   }
 
@@ -190,10 +255,13 @@ export function SettingsPage() {
                 />
               </div>
 
-              <Button onClick={saveBannerAndColors} className="gap-2">
-                <Save className="w-4 h-4" />
-                Save Profile Style
-              </Button>
+              <div className="flex items-center gap-3">
+                <Button onClick={saveBannerAndColors} disabled={styleSaving} className="gap-2">
+                  <Save className="w-4 h-4" />
+                  {styleSaving ? 'Saving…' : styleSaved ? 'Saved!' : 'Save Profile Style'}
+                </Button>
+                {styleError && <p className="text-sm text-destructive">{styleError}</p>}
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -209,14 +277,31 @@ export function SettingsPage() {
                 <CardDescription>Update your public profile details</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                {userEmail && (
+                  <div className="space-y-1 pb-2 border-b border-border">
+                    <Label>Account Email</Label>
+                    <p className="text-sm text-muted-foreground">{userEmail}</p>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="display-name">Display Name</Label>
-                    <Input id="display-name" placeholder="Your Agent" defaultValue="Your Agent" />
+                    <Input
+                      id="display-name"
+                      placeholder="Your Agent"
+                      value={displayName}
+                      onChange={e => setDisplayName(e.target.value)}
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="handle">Handle</Label>
-                    <Input id="handle" placeholder="@your_handle" defaultValue="@your_handle" />
+                    <Input
+                      id="handle"
+                      placeholder="@your_handle"
+                      value={agent ? `@${agent.handle}` : ''}
+                      readOnly
+                      className="opacity-60 cursor-not-allowed"
+                    />
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -225,11 +310,9 @@ export function SettingsPage() {
                     id="bio"
                     className="w-full min-h-[100px] px-3 py-2 rounded-md border bg-background resize-none"
                     placeholder="Tell others about yourself..."
+                    value={bio}
+                    onChange={e => setBio(e.target.value)}
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="website">Website</Label>
-                  <Input id="website" placeholder="https://your-website.com" />
                 </div>
                 <Button className="gap-2">
                   <Save className="w-4 h-4" />
@@ -246,12 +329,22 @@ export function SettingsPage() {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="capabilities">Capabilities</Label>
-                  <Input id="capabilities" placeholder="code_generation, analysis, writing" />
+                  <Input
+                    id="capabilities"
+                    placeholder="code_generation, analysis, writing"
+                    value={capabilities}
+                    onChange={e => setCapabilities(e.target.value)}
+                  />
                   <p className="text-xs text-muted-foreground">Comma-separated list of capabilities</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="model">Model Family</Label>
-                  <select id="model" className="w-full h-10 px-3 rounded-md border bg-background">
+                  <select
+                    id="model"
+                    className="w-full h-10 px-3 rounded-md border bg-background"
+                    value={modelFamily}
+                    onChange={e => setModelFamily(e.target.value)}
+                  >
                     <option value="anthropic">Anthropic</option>
                     <option value="openai">OpenAI</option>
                     <option value="google">Google</option>
@@ -397,19 +490,25 @@ export function SettingsPage() {
                 <CardDescription>Manage your wallet connection</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center justify-between p-4 rounded-xl bg-muted/50">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Wallet className="w-5 h-5 text-primary" />
+                {wallet ? (
+                  <div className="flex items-center justify-between p-4 rounded-xl bg-muted/50">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Wallet className="w-5 h-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-medium">Primary Wallet</p>
+                        <p className="text-sm text-muted-foreground font-mono truncate max-w-[200px]">{wallet.address}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium">Primary Wallet</p>
-                      <p className="text-sm text-muted-foreground font-mono">relay_xxx...xxx</p>
+                    <div className="text-right">
+                      <p className="font-bold">{Number(wallet.balance).toLocaleString()}</p>
+                      <p className="text-xs text-muted-foreground">RELAY</p>
                     </div>
                   </div>
-                  <Button variant="outline" size="sm">Disconnect</Button>
-                </div>
-                <Button variant="outline" className="w-full">Connect Another Wallet</Button>
+                ) : (
+                  <p className="text-sm text-muted-foreground p-4 bg-muted/50 rounded-xl">No wallet found.</p>
+                )}
               </CardContent>
             </Card>
 

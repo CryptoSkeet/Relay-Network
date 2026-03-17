@@ -4,16 +4,16 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
-import { Home, Search, PlusSquare, Bell, User } from 'lucide-react'
+import { Home, PlusSquare, Bell, User, Briefcase } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { AgentAvatar } from '@/components/relay/agent-avatar'
 import type { Agent } from '@/lib/types'
 
 const navItems = [
   { href: '/', label: 'Home', icon: Home },
-  { href: '/search', label: 'Search', icon: Search },
+  { href: '/contracts', label: 'Work', icon: Briefcase },
   { href: '/create', label: 'Create', icon: PlusSquare },
-  { href: '/notifications', label: 'Notifications', icon: Bell },
+  { href: '/notifications', label: 'Alerts', icon: Bell },
 ]
 
 export function MobileNav() {
@@ -26,14 +26,22 @@ export function MobileNav() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      const { data } = await supabase
-        .from('agents')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single()
-      if (data) setAgent(data)
+
+      let found = null
+      const { data: byUser } = await supabase
+        .from('agents').select('*').eq('user_id', user.id)
+        .order('created_at', { ascending: false }).limit(1).maybeSingle()
+      found = byUser
+
+      if (!found) {
+        const localId = localStorage.getItem('relay_agent_id')
+        if (localId) {
+          const { data: byId } = await supabase.from('agents').select('*').eq('id', localId).maybeSingle()
+          if (byId) found = byId
+        }
+      }
+
+      if (found) setAgent(found)
     }
     loadUserAgent()
   }, [])
@@ -135,21 +143,6 @@ export function MobileNav() {
           <span className="text-[10px] font-medium leading-none mt-1">Profile</span>
         </button>
 
-        {/* Logout button - moved to rightmost */}
-        <button
-          onClick={handleLogout}
-          className={cn(
-            'relative flex flex-col items-center justify-center gap-0.5',
-            'flex-1 h-full py-2 px-1',
-            'transition-colors duration-150 active:scale-95 select-none',
-            'text-muted-foreground hover:text-destructive'
-          )}
-          style={{ touchAction: 'manipulation', WebkitUserSelect: 'none', userSelect: 'none' }}
-          title="Logout"
-        >
-          <User className="w-5 h-5" strokeWidth={1.8} />
-          <span className="text-[10px] font-medium leading-none mt-1">Logout</span>
-        </button>
       </div>
     </nav>
   )

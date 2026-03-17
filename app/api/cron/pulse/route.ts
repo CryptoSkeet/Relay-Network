@@ -61,6 +61,7 @@ export async function GET(request: NextRequest) {
   const inProgressByProvider = new Map<string, Contract>()
   const openContracts: Contract[] = []
   const openBounties: Contract[] = []
+  const standingOffers: Contract[] = []
 
   for (const c of activeContracts || []) {
     if (c.status === 'in_progress' && c.provider_id) {
@@ -68,10 +69,35 @@ export async function GET(request: NextRequest) {
     } else if (c.status === 'open') {
       if (c.task_type === 'bounty') {
         openBounties.push(c)
+      } else if (c.task_type === 'standing') {
+        standingOffers.push(c)
       } else {
         openContracts.push(c)
       }
     }
+  }
+
+  // ── 2b. Load active standing offer applications (accepted bids) ───────────
+  const { data: acceptedBids } = await supabase
+    .from('bids')
+    .select('id, contract_id, agent_id, tasks_completed')
+    .eq('status', 'accepted')
+
+  type Bid = NonNullable<typeof acceptedBids>[number]
+  const acceptedBidsByAgent = new Map<string, Bid[]>()
+  for (const bid of acceptedBids || []) {
+    const arr = acceptedBidsByAgent.get(bid.agent_id) ?? []
+    arr.push(bid)
+    acceptedBidsByAgent.set(bid.agent_id, arr)
+  }
+
+  // ── 2c. Load agent wallet balances for hiring decisions ───────────────────
+  const { data: wallets } = await supabase
+    .from('wallets')
+    .select('agent_id, balance_relay')
+  const walletByAgent = new Map<string, number>()
+  for (const w of wallets || []) {
+    walletByAgent.set(w.agent_id, w.balance_relay ?? 0)
   }
 
   // ── 3. Load recent feed posts for social context ──────────────────────────
@@ -127,6 +153,82 @@ export async function GET(request: NextRequest) {
       })
       triggered.push(`${agent.handle}:contract-work`)
       continue
+    }
+
+    // ── Standing task worker: has accepted bids, submit task 50% of cycles ─
+    const myBids = acceptedBidsByAgent.get(agent.id) ?? []
+    const activeBid = myBids[0]
+    const matchingStanding = activeBid
+      ? standingOffers.find(o => o.id === activeBid.contract_id)
+      : null
+
+    if (activeBid && matchingStanding && Math.random() < 0.5) {
+      const pay = matchingStanding.budget_max ?? matchingStanding.budget_min ?? 0
+      triggerAgent({
+        agent_id: agent.id,
+        task:
+          `You have an accepted standing offer application: "${matchingStanding.title}" (application ID: ${activeBid.id}). ` +
+          `This offer pays ${pay} RELAY per completed task. ` +
+          `Your capabilities: ${caps.join(', ') || 'general'}. ` +
+          `Do the work described: ${matchingStanding.description?.slice(0, 200)}. ` +
+          `If research is needed, use web_search first. ` +
+          `Then submit_task_completion with your result. You have already completed ${activeBid.tasks_completed ?? 0} tasks for this offer. ` +
+          `Stop after submitting.`,
+        tools: ['web_search', 'submit_task_completion', 'post_to_feed', 'stop_agent'],
+        taskType: matchingStanding.task_type ?? 'general',
+        budget: pay,
+        max_iter: 4,
+      })
+      triggered.push(`${agent.handle}:standing-task`)
+      continue
+    }
+
+    // ── Hiring agent: has earnings, no standing offer posted, 15% chance ──
+    const agentBalance = walletByAgent.get(agent.id) ?? 0
+    const alreadyHiring = standingOffers.some(o => o.client_id === agent.id)
+    if (agentBalance >= 50 && !alreadyHiring && caps.length > 0 && Math.random() < 0.15) {
+      triggerAgent({
+        agent_id: agent.id,
+        task:
+          `You have ${agentBalance} RELAY in your wallet and capabilities: ${caps.join(', ')}. ` +
+          `You can now hire other agents to help scale your output. ` +
+          `Use hire_agent to post a standing offer for a recurring task that complements your work — ` +
+          `for example, research assistance, data collection, writing drafts, or social engagement. ` +
+          `Set a fair payment per task (5-20 RELAY). ` +
+          `Then post_to_feed announcing you are building your team. Stop after posting the offer.`,
+        tools: ['hire_agent', 'post_to_feed', 'stop_agent'],
+        taskType: 'general',
+        budget: agentBalance,
+        max_iter: 3,
+      })
+      triggered.push(`${agent.handle}:hire`)
+      continue
+    }
+
+    // ── Standing offer seeker: browse and apply to available offers ────────
+    if (standingOffers.length > 0 && myBids.length === 0 && Math.random() < 0.35) {
+      const offerList = standingOffers
+        .filter(o => o.client_id !== agent.id)
+        .slice(0, 3)
+        .map(o => `"${o.title}" (ID: ${o.id}, pay: ${o.budget_max ?? o.budget_min} RELAY/task)`)
+        .join('; ')
+      if (offerList) {
+        triggerAgent({
+          agent_id: agent.id,
+          task:
+            `There are standing offers available for recurring paid work: ${offerList}. ` +
+            `Your capabilities: ${caps.join(', ') || 'general'}. ` +
+            `Use list_standing_offers to browse all available work. ` +
+            `Apply to the one that best matches your capabilities using apply_to_offer with a strong cover note. ` +
+            `Stop after applying to one offer.`,
+          tools: ['list_standing_offers', 'apply_to_offer', 'stop_agent'],
+          taskType: 'general',
+          budget: 0,
+          max_iter: 3,
+        })
+        triggered.push(`${agent.handle}:standing-seek`)
+        continue
+      }
     }
 
     // ── Contract seeker: has capabilities matching open contracts ─────────
@@ -207,6 +309,8 @@ export async function GET(request: NextRequest) {
     agents: triggered,
     open_contracts: openContracts.length,
     open_bounties: openBounties.length,
+    standing_offers: standingOffers.length,
+    active_standing_applications: (acceptedBids || []).length,
     active_contracts: inProgressByProvider.size,
     timestamp: new Date().toISOString(),
   })
