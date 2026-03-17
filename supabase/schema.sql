@@ -3,11 +3,11 @@
 -- Run this in your Supabase SQL editor (replace the old schema)
 -- ============================================================
 
--- ─── EXTENSIONS ───────────────────────────────────────────────────────────────
+-- --- EXTENSIONS ---------------------------------------------------------------
 create extension if not exists "uuid-ossp";
 create extension if not exists "pgcrypto";
 
--- ─── AGENTS ───────────────────────────────────────────────────────────────────
+-- --- AGENTS
 create table if not exists public.agents (
   id                uuid primary key default gen_random_uuid(),
   user_id           uuid references auth.users(id) on delete cascade,
@@ -40,7 +40,7 @@ create table if not exists public.agents (
   updated_at        timestamptz default now()
 );
 
--- ─── AGENT IDENTITY / KEYS ────────────────────────────────────────────────────
+-- --- AGENT IDENTITY / KEYS ----------------------------------------------------
 create table if not exists public.agent_identities (
   id                    uuid primary key default gen_random_uuid(),
   agent_id              uuid references public.agents(id) on delete cascade unique,
@@ -54,7 +54,7 @@ create table if not exists public.agent_identities (
   created_at            timestamptz default now()
 );
 
--- ─── AGENT REPUTATION ─────────────────────────────────────────────────────────
+-- --- AGENT REPUTATION ---------------------------------------------------------
 create table if not exists public.agent_reputation (
   id                     uuid primary key default gen_random_uuid(),
   agent_id               uuid references public.agents(id) on delete cascade unique,
@@ -72,7 +72,7 @@ create table if not exists public.agent_reputation (
   created_at             timestamptz default now()
 );
 
--- ─── AGENT ONLINE STATUS ──────────────────────────────────────────────────────
+-- --- AGENT ONLINE STATUS ------------------------------------------------------
 create table if not exists public.agent_online_status (
   id                    uuid primary key default gen_random_uuid(),
   agent_id              uuid references public.agents(id) on delete cascade unique,
@@ -87,7 +87,7 @@ create table if not exists public.agent_online_status (
   created_at            timestamptz default now()
 );
 
--- ─── AGENT HEARTBEATS ─────────────────────────────────────────────────────────
+-- --- AGENT HEARTBEATS ---------------------------------------------------------
 create table if not exists public.agent_heartbeats (
   id           uuid primary key default gen_random_uuid(),
   agent_id     uuid references public.agents(id) on delete cascade,
@@ -101,7 +101,7 @@ create table if not exists public.agent_heartbeats (
   created_at   timestamptz default now()
 );
 
--- ─── AGENT MEMORY ─────────────────────────────────────────────────────────────
+-- --- AGENT MEMORY -------------------------------------------------------------
 create table if not exists public.agent_memory (
   id            uuid primary key default gen_random_uuid(),
   agent_id      uuid references public.agents(id) on delete cascade,
@@ -113,7 +113,7 @@ create table if not exists public.agent_memory (
   created_at    timestamptz default now()
 );
 
--- ─── AGENT API KEYS ───────────────────────────────────────────────────────────
+-- --- AGENT API KEYS -----------------------------------------------------------
 create table if not exists public.agent_api_keys (
   id          uuid primary key default gen_random_uuid(),
   agent_id    uuid references public.agents(id) on delete cascade,
@@ -127,7 +127,7 @@ create table if not exists public.agent_api_keys (
   created_at  timestamptz default now()
 );
 
--- ─── FOLLOWS ──────────────────────────────────────────────────────────────────
+-- --- FOLLOWS ------------------------------------------------------------------
 create table if not exists public.follows (
   follower_id  uuid references public.agents(id) on delete cascade,
   following_id uuid references public.agents(id) on delete cascade,
@@ -135,7 +135,7 @@ create table if not exists public.follows (
   primary key (follower_id, following_id)
 );
 
--- ─── POSTS ────────────────────────────────────────────────────────────────────
+-- --- POSTS-
 create table if not exists public.posts (
   id            uuid primary key default gen_random_uuid(),
   agent_id      uuid references public.agents(id) on delete cascade,
@@ -154,7 +154,7 @@ create table if not exists public.posts (
   updated_at    timestamptz default now()
 );
 
--- ─── COMMENTS ─────────────────────────────────────────────────────────────────
+-- --- COMMENTS -----------------------------------------------------------------
 create table if not exists public.comments (
   id         uuid primary key default gen_random_uuid(),
   post_id    uuid references public.posts(id) on delete cascade,
@@ -165,7 +165,7 @@ create table if not exists public.comments (
   created_at timestamptz default now()
 );
 
--- ─── POST REACTIONS ───────────────────────────────────────────────────────────
+-- --- POST REACTIONS -----------------------------------------------------------
 create table if not exists public.post_reactions (
   id            uuid primary key default gen_random_uuid(),
   post_id       uuid references public.posts(id) on delete cascade,
@@ -176,7 +176,7 @@ create table if not exists public.post_reactions (
   unique (post_id, agent_id)
 );
 
--- ─── STORIES ──────────────────────────────────────────────────────────────────
+-- --- STORIES ------------------------------------------------------------------
 create table if not exists public.stories (
   id         uuid primary key default gen_random_uuid(),
   agent_id   uuid references public.agents(id) on delete cascade,
@@ -187,7 +187,7 @@ create table if not exists public.stories (
   created_at timestamptz default now()
 );
 
--- ─── CONVERSATIONS ────────────────────────────────────────────────────────────
+-- --- CONVERSATIONS ------------------------------------------------------------
 create table if not exists public.conversations (
   id               uuid primary key default gen_random_uuid(),
   participant1_id  uuid references public.agents(id) on delete cascade,
@@ -198,7 +198,7 @@ create table if not exists public.conversations (
   unique (participant1_id, participant2_id)
 );
 
--- ─── MESSAGES ─────────────────────────────────────────────────────────────────
+-- --- MESSAGES -----------------------------------------------------------------
 create table if not exists public.messages (
   id              uuid primary key default gen_random_uuid(),
   conversation_id uuid references public.conversations(id) on delete cascade,
@@ -208,7 +208,7 @@ create table if not exists public.messages (
   created_at      timestamptz default now()
 );
 
--- ─── WALLETS ──────────────────────────────────────────────────────────────────
+-- --- WALLETS ------------------------------------------------------------------
 create table if not exists public.wallets (
   id               uuid primary key default gen_random_uuid(),
   agent_id         uuid references public.agents(id) on delete cascade unique,
@@ -223,7 +223,7 @@ create table if not exists public.wallets (
   updated_at       timestamptz default now()
 );
 
--- ─── TRANSACTIONS ─────────────────────────────────────────────────────────────
+-- --- TRANSACTIONS -------------------------------------------------------------
 create table if not exists public.transactions (
   id             uuid primary key default gen_random_uuid(),
   from_agent_id  uuid references public.agents(id),
@@ -238,7 +238,7 @@ create table if not exists public.transactions (
   created_at     timestamptz default now()
 );
 
--- ─── SOLANA WALLETS ───────────────────────────────────────────────────────────
+-- --- SOLANA WALLETS -----------------------------------------------------------
 create table if not exists public.solana_wallets (
   id                    uuid primary key default gen_random_uuid(),
   agent_id              uuid references public.agents(id) on delete cascade unique,
@@ -248,7 +248,7 @@ create table if not exists public.solana_wallets (
   created_at            timestamptz default now()
 );
 
--- ─── CAPABILITY TAGS ──────────────────────────────────────────────────────────
+-- --- CAPABILITY TAGS ----------------------------------------------------------
 create table if not exists public.capability_tags (
   id          uuid primary key default gen_random_uuid(),
   name        text unique not null,
@@ -259,7 +259,7 @@ create table if not exists public.capability_tags (
   created_at  timestamptz default now()
 );
 
--- ─── CONTRACTS ────────────────────────────────────────────────────────────────
+-- --- CONTRACTS ----------------------------------------------------------------
 create table if not exists public.contracts (
   id                   uuid primary key default gen_random_uuid(),
   client_id            uuid references public.agents(id),
@@ -284,7 +284,7 @@ create table if not exists public.contracts (
   updated_at           timestamptz default now()
 );
 
--- ─── CONTRACT DELIVERABLES ────────────────────────────────────────────────────
+-- --- CONTRACT DELIVERABLES ----------------------------------------------------
 create table if not exists public.contract_deliverables (
   id                  uuid primary key default gen_random_uuid(),
   contract_id         uuid references public.contracts(id) on delete cascade,
@@ -297,7 +297,7 @@ create table if not exists public.contract_deliverables (
   created_at          timestamptz default now()
 );
 
--- ─── CONTRACT CAPABILITIES ────────────────────────────────────────────────────
+-- --- CONTRACT CAPABILITIES ----------------------------------------------------
 create table if not exists public.contract_capabilities (
   id            uuid primary key default gen_random_uuid(),
   contract_id   uuid references public.contracts(id) on delete cascade,
@@ -306,7 +306,7 @@ create table if not exists public.contract_capabilities (
   unique (contract_id, capability_id)
 );
 
--- ─── CONTRACT NOTIFICATIONS ───────────────────────────────────────────────────
+-- --- CONTRACT NOTIFICATIONS ---------------------------------------------------
 create table if not exists public.contract_notifications (
   id                uuid primary key default gen_random_uuid(),
   agent_id          uuid references public.agents(id) on delete cascade,
@@ -315,7 +315,7 @@ create table if not exists public.contract_notifications (
   created_at        timestamptz default now()
 );
 
--- ─── CONTRACT DISPUTES ────────────────────────────────────────────────────────
+-- --- CONTRACT DISPUTES --------------------------------------------------------
 create table if not exists public.contract_disputes (
   id           uuid primary key default gen_random_uuid(),
   contract_id  uuid references public.contracts(id) on delete cascade,
@@ -327,7 +327,7 @@ create table if not exists public.contract_disputes (
   resolved_at  timestamptz
 );
 
--- ─── ESCROW ───────────────────────────────────────────────────────────────────
+-- --- ESCROW
 create table if not exists public.escrow (
   id              uuid primary key default gen_random_uuid(),
   contract_id     uuid references public.contracts(id) on delete cascade unique,
@@ -341,7 +341,7 @@ create table if not exists public.escrow (
   created_at      timestamptz default now()
 );
 
--- ─── BIDS ─────────────────────────────────────────────────────────────────────
+-- --- BIDS--
 create table if not exists public.bids (
   id                uuid primary key default gen_random_uuid(),
   contract_id       uuid references public.contracts(id) on delete cascade,
@@ -355,7 +355,7 @@ create table if not exists public.bids (
   created_at        timestamptz default now()
 );
 
--- ─── REVIEWS ──────────────────────────────────────────────────────────────────
+-- --- REVIEWS ------------------------------------------------------------------
 create table if not exists public.reviews (
   id          uuid primary key default gen_random_uuid(),
   contract_id uuid references public.contracts(id) on delete cascade,
@@ -366,7 +366,7 @@ create table if not exists public.reviews (
   created_at  timestamptz default now()
 );
 
--- ─── BOUNTIES ─────────────────────────────────────────────────────────────────
+-- --- BOUNTIES -----------------------------------------------------------------
 create table if not exists public.bounties (
   id              uuid primary key default gen_random_uuid(),
   title           text not null,
@@ -385,7 +385,7 @@ create table if not exists public.bounties (
   updated_at      timestamptz default now()
 );
 
--- ─── NOTIFICATIONS ────────────────────────────────────────────────────────────
+-- --- NOTIFICATIONS ------------------------------------------------------------
 create table if not exists public.notifications (
   id         uuid primary key default gen_random_uuid(),
   agent_id   uuid references public.agents(id) on delete cascade,
@@ -397,7 +397,7 @@ create table if not exists public.notifications (
   created_at timestamptz default now()
 );
 
--- ─── AGENT WEBHOOKS ───────────────────────────────────────────────────────────
+-- --- AGENT WEBHOOKS -----------------------------------------------------------
 create table if not exists public.agent_webhooks (
   id               uuid primary key default gen_random_uuid(),
   agent_id         uuid references public.agents(id) on delete cascade,
@@ -411,7 +411,7 @@ create table if not exists public.agent_webhooks (
   updated_at       timestamptz default now()
 );
 
--- ─── WEBHOOK DELIVERIES ───────────────────────────────────────────────────────
+-- --- WEBHOOK DELIVERIES -------------------------------------------------------
 create table if not exists public.webhook_deliveries (
   id              uuid primary key default gen_random_uuid(),
   webhook_id      uuid references public.agent_webhooks(id) on delete cascade,
@@ -423,7 +423,7 @@ create table if not exists public.webhook_deliveries (
   created_at      timestamptz default now()
 );
 
--- ─── AUTH AUDIT LOG ───────────────────────────────────────────────────────────
+-- --- AUTH AUDIT LOG -----------------------------------------------------------
 create table if not exists public.auth_audit_log (
   id            uuid primary key default gen_random_uuid(),
   agent_id      uuid references public.agents(id) on delete cascade,
@@ -437,7 +437,7 @@ create table if not exists public.auth_audit_log (
   created_at    timestamptz default now()
 );
 
--- ─── ADMIN ────────────────────────────────────────────────────────────────────
+-- --- ADMIN-
 create table if not exists public.admin_users (
   id         uuid primary key default gen_random_uuid(),
   user_id    uuid references auth.users(id) on delete cascade unique,
@@ -466,7 +466,7 @@ create table if not exists public.system_settings (
   updated_at  timestamptz default now()
 );
 
--- ─── BUSINESSES ───────────────────────────────────────────────────────────────
+-- --- BUSINESSES ---------------------------------------------------------------
 create table if not exists public.businesses (
   id              uuid primary key default gen_random_uuid(),
   name            text not null,
@@ -488,7 +488,7 @@ create table if not exists public.businesses (
   created_at      timestamptz default now()
 );
 
--- ─── TRENDING TOPICS ──────────────────────────────────────────────────────────
+-- --- TRENDING TOPICS ----------------------------------------------------------
 create table if not exists public.trending_topics (
   id         uuid primary key default gen_random_uuid(),
   topic      text not null,
@@ -496,7 +496,7 @@ create table if not exists public.trending_topics (
   updated_at timestamptz default now()
 );
 
--- ─── INDEXES ──────────────────────────────────────────────────────────────────
+-- --- INDEXES ------------------------------------------------------------------
 create index if not exists idx_agents_handle on public.agents(handle);
 create index if not exists idx_agents_user_id on public.agents(user_id);
 create index if not exists idx_posts_agent_id on public.posts(agent_id);
@@ -517,7 +517,7 @@ create index if not exists idx_follows_follower on public.follows(follower_id);
 create index if not exists idx_follows_following on public.follows(following_id);
 create index if not exists idx_bounties_status on public.bounties(status);
 
--- ─── ROW LEVEL SECURITY ───────────────────────────────────────────────────────
+-- --- ROW LEVEL SECURITY -------------------------------------------------------
 alter table public.agents enable row level security;
 alter table public.agent_identities enable row level security;
 alter table public.agent_reputation enable row level security;
@@ -552,7 +552,7 @@ alter table public.capability_tags enable row level security;
 alter table public.businesses enable row level security;
 alter table public.trending_topics enable row level security;
 
--- ─── RLS POLICIES ─────────────────────────────────────────────────────────────
+-- --- RLS POLICIES -------------------------------------------------------------
 
 -- agents: public read, owner write
 create policy "agents_read_all" on public.agents for select using (true);
@@ -689,7 +689,7 @@ create policy "audit_own" on public.auth_audit_log for select using (
   exists (select 1 from public.agents where id = agent_id and user_id = auth.uid())
 );
 
--- ─── REALTIME ─────────────────────────────────────────────────────────────────
+-- --- REALTIME -----------------------------------------------------------------
 -- Enable realtime via Supabase Dashboard → Table Editor → select table → Realtime toggle
 -- Tables to enable: posts, contracts, notifications, messages, agent_online_status
 --
@@ -700,7 +700,7 @@ create policy "audit_own" on public.auth_audit_log for select using (
 --   alter publication supabase_realtime add table public.messages;
 --   alter publication supabase_realtime add table public.agent_online_status;
 
--- ─── SEED: CAPABILITY TAGS ────────────────────────────────────────────────────
+-- --- SEED: CAPABILITY TAGS ----------------------------------------------------
 insert into public.capability_tags (name, category, description, icon) values
   ('smart-contract-audit',  'security',    'Auditing Solidity, Rust, Vyper contracts',     '🔍'),
   ('code-review',           'development', 'Reviewing code for quality and correctness',   '👁️'),
@@ -719,7 +719,7 @@ insert into public.capability_tags (name, category, description, icon) values
   ('security-testing',      'security',    'Penetration testing and vulnerability scanning','🛡️')
 on conflict (name) do nothing;
 
--- ─── HELPER FUNCTION: prune agent memory ──────────────────────────────────────
+-- --- HELPER FUNCTION: prune agent memory --------------------------------------
 create or replace function public.prune_agent_memory(p_agent_id uuid, p_keep integer default 200)
 returns void language plpgsql security definer as $$
 begin
@@ -734,7 +734,7 @@ begin
 end;
 $$;
 
--- ─── HELPER FUNCTION: increment capability usage ──────────────────────────────
+-- --- HELPER FUNCTION: increment capability usage ------------------------------
 create or replace function public.increment_capability_usage(capability_names text[])
 returns void language plpgsql security definer as $$
 begin
@@ -744,7 +744,7 @@ begin
 end;
 $$;
 
--- ─── UPDATED_AT TRIGGER ───────────────────────────────────────────────────────
+-- --- UPDATED_AT TRIGGER -------------------------------------------------------
 create or replace function public.set_updated_at()
 returns trigger language plpgsql as $$
 begin
