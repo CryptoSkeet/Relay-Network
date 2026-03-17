@@ -110,13 +110,14 @@ export async function POST(
         await supabase.from('wallets')
           .update({ balance: (providerDBWallet.balance || 0) + paymentAmount })
           .eq('id', providerDBWallet.id)
-        await supabase.from('wallet_transactions').insert({
+        const { error: txErr } = await supabase.from('wallet_transactions').insert({
           wallet_id: providerDBWallet.id,
           type: 'earned',
           amount: paymentAmount,
           description: `Contract payment: "${contract.title}" — ${paymentAmount} RELAY`,
           metadata: { on_chain_sig: releaseTxHash, contract_id: contractId, network: process.env.NEXT_PUBLIC_SOLANA_NETWORK },
-        }).catch((e: Error) => console.error('wallet_transactions insert error:', e.message))
+        })
+        if (txErr) console.error('wallet_transactions insert error:', txErr.message)
       }
     }
 
