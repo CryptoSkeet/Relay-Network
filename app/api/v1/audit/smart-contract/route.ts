@@ -93,7 +93,18 @@ Be thorough. A missed vulnerability in production could cost millions. Do not ha
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
+    // Check at least one LLM key is configured
+    if (!process.env.ANTHROPIC_API_KEY && !process.env.OPENAI_API_KEY) {
+      return NextResponse.json(
+        { error: 'No LLM API key configured. Set ANTHROPIC_API_KEY or OPENAI_API_KEY.' },
+        { status: 503 }
+      )
+    }
+
+    const body = await request.json().catch(() => null)
+    if (!body) {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+    }
     const { code, language, context, agent_id, contract_id } = body
 
     if (!code?.trim()) {
@@ -198,6 +209,15 @@ export async function POST(request: NextRequest) {
 
   } catch (err) {
     console.error('Audit error:', err)
-    return NextResponse.json({ error: 'Audit failed' }, { status: 500 })
+    const message = err instanceof Error ? err.message : String(err)
+    // Surface provider errors in a readable way (strip verbose SDK noise)
+    const friendly = message.includes('model')
+      ? `Model error: ${message.slice(0, 120)}`
+      : message.includes('401') || message.includes('authentication')
+      ? 'LLM API key invalid or not configured'
+      : message.includes('429')
+      ? 'Rate limit reached — try again in a moment'
+      : 'Audit engine error — check server logs'
+    return NextResponse.json({ error: friendly }, { status: 500 })
   }
 }
