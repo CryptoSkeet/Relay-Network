@@ -555,11 +555,17 @@ alter table public.trending_topics enable row level security;
 -- --- RLS POLICIES -------------------------------------------------------------
 
 -- agents: public read, owner write
+drop policy if exists "agents_read_all" on public.agents;
+drop policy if exists "agents_insert_own" on public.agents;
+drop policy if exists "agents_update_own" on public.agents;
 create policy "agents_read_all" on public.agents for select using (true);
 create policy "agents_insert_own" on public.agents for insert with check (auth.uid() = user_id);
 create policy "agents_update_own" on public.agents for update using (auth.uid() = user_id);
 
 -- posts: public read, agent owner write
+drop policy if exists "posts_read_all" on public.posts;
+drop policy if exists "posts_insert" on public.posts;
+drop policy if exists "posts_delete_own" on public.posts;
 create policy "posts_read_all" on public.posts for select using (true);
 create policy "posts_insert" on public.posts for insert with check (
   exists (select 1 from public.agents where id = agent_id and user_id = auth.uid())
@@ -569,24 +575,33 @@ create policy "posts_delete_own" on public.posts for delete using (
 );
 
 -- comments: public read, agent owner write
+drop policy if exists "comments_read_all" on public.comments;
+drop policy if exists "comments_insert" on public.comments;
 create policy "comments_read_all" on public.comments for select using (true);
 create policy "comments_insert" on public.comments for insert with check (
   exists (select 1 from public.agents where id = agent_id and user_id = auth.uid())
 );
 
 -- post_reactions: public read, agent owner write
+drop policy if exists "reactions_read_all" on public.post_reactions;
+drop policy if exists "reactions_insert" on public.post_reactions;
 create policy "reactions_read_all" on public.post_reactions for select using (true);
 create policy "reactions_insert" on public.post_reactions for insert with check (
   exists (select 1 from public.agents where id = agent_id and user_id = auth.uid())
 );
 
 -- stories: public read, agent owner write
+drop policy if exists "stories_read_all" on public.stories;
+drop policy if exists "stories_insert" on public.stories;
 create policy "stories_read_all" on public.stories for select using (true);
 create policy "stories_insert" on public.stories for insert with check (
   exists (select 1 from public.agents where id = agent_id and user_id = auth.uid())
 );
 
 -- follows: public read, agent owner write
+drop policy if exists "follows_read_all" on public.follows;
+drop policy if exists "follows_insert" on public.follows;
+drop policy if exists "follows_delete" on public.follows;
 create policy "follows_read_all" on public.follows for select using (true);
 create policy "follows_insert" on public.follows for insert with check (
   exists (select 1 from public.agents where id = follower_id and user_id = auth.uid())
@@ -596,6 +611,9 @@ create policy "follows_delete" on public.follows for delete using (
 );
 
 -- contracts: public read
+drop policy if exists "contracts_read_all" on public.contracts;
+drop policy if exists "contracts_insert" on public.contracts;
+drop policy if exists "contracts_update_parties" on public.contracts;
 create policy "contracts_read_all" on public.contracts for select using (true);
 create policy "contracts_insert" on public.contracts for insert with check (
   exists (select 1 from public.agents where id = client_id and user_id = auth.uid())
@@ -605,6 +623,12 @@ create policy "contracts_update_parties" on public.contracts for update using (
 );
 
 -- contract sub-tables: public read
+drop policy if exists "contract_deliverables_read" on public.contract_deliverables;
+drop policy if exists "contract_capabilities_read" on public.contract_capabilities;
+drop policy if exists "contract_notifications_read" on public.contract_notifications;
+drop policy if exists "escrow_read" on public.escrow;
+drop policy if exists "bids_read_all" on public.bids;
+drop policy if exists "bids_insert" on public.bids;
 create policy "contract_deliverables_read" on public.contract_deliverables for select using (true);
 create policy "contract_capabilities_read" on public.contract_capabilities for select using (true);
 create policy "contract_notifications_read" on public.contract_notifications for select using (
@@ -617,15 +641,20 @@ create policy "bids_insert" on public.bids for insert with check (
 );
 
 -- bounties: public read
+drop policy if exists "bounties_read_all" on public.bounties;
 create policy "bounties_read_all" on public.bounties for select using (true);
 
 -- reviews: public read
+drop policy if exists "reviews_read_all" on public.reviews;
+drop policy if exists "reviews_insert" on public.reviews;
 create policy "reviews_read_all" on public.reviews for select using (true);
 create policy "reviews_insert" on public.reviews for insert with check (
   exists (select 1 from public.agents where id = reviewer_id and user_id = auth.uid())
 );
 
 -- wallets: own only
+drop policy if exists "wallets_own" on public.wallets;
+drop policy if exists "wallets_insert" on public.wallets;
 create policy "wallets_own" on public.wallets for select using (
   exists (select 1 from public.agents where id = agent_id and user_id = auth.uid())
 );
@@ -634,11 +663,14 @@ create policy "wallets_insert" on public.wallets for insert with check (
 );
 
 -- transactions: own only
+drop policy if exists "transactions_own" on public.transactions;
 create policy "transactions_own" on public.transactions for select using (
   exists (select 1 from public.agents where (id = from_agent_id or id = to_agent_id) and user_id = auth.uid())
 );
 
 -- notifications: own only
+drop policy if exists "notifications_own" on public.notifications;
+drop policy if exists "notifications_update_own" on public.notifications;
 create policy "notifications_own" on public.notifications for select using (
   exists (select 1 from public.agents where id = agent_id and user_id = auth.uid())
 );
@@ -647,6 +679,8 @@ create policy "notifications_update_own" on public.notifications for update usin
 );
 
 -- conversations/messages: participants only
+drop policy if exists "conversations_own" on public.conversations;
+drop policy if exists "messages_own" on public.messages;
 create policy "conversations_own" on public.conversations for select using (
   exists (select 1 from public.agents where (id = participant1_id or id = participant2_id) and user_id = auth.uid())
 );
@@ -659,6 +693,8 @@ create policy "messages_own" on public.messages for select using (
 );
 
 -- agent_memory/heartbeats: own only
+drop policy if exists "agent_memory_own" on public.agent_memory;
+drop policy if exists "agent_heartbeats_own" on public.agent_heartbeats;
 create policy "agent_memory_own" on public.agent_memory for select using (
   exists (select 1 from public.agents where id = agent_id and user_id = auth.uid())
 );
@@ -667,24 +703,31 @@ create policy "agent_heartbeats_own" on public.agent_heartbeats for select using
 );
 
 -- online status: public read
+drop policy if exists "online_status_read" on public.agent_online_status;
+drop policy if exists "reputation_read" on public.agent_reputation;
 create policy "online_status_read" on public.agent_online_status for select using (true);
 create policy "reputation_read" on public.agent_reputation for select using (true);
 
 -- capability_tags: public read
+drop policy if exists "capability_tags_read" on public.capability_tags;
 create policy "capability_tags_read" on public.capability_tags for select using (true);
 
 -- businesses: public read
+drop policy if exists "businesses_read" on public.businesses;
 create policy "businesses_read" on public.businesses for select using (true);
 
 -- trending: public read
+drop policy if exists "trending_read" on public.trending_topics;
 create policy "trending_read" on public.trending_topics for select using (true);
 
 -- agent_webhooks: own only
+drop policy if exists "webhooks_own" on public.agent_webhooks;
 create policy "webhooks_own" on public.agent_webhooks for select using (
   exists (select 1 from public.agents where id = agent_id and user_id = auth.uid())
 );
 
 -- auth_audit_log: own only
+drop policy if exists "audit_own" on public.auth_audit_log;
 create policy "audit_own" on public.auth_audit_log for select using (
   exists (select 1 from public.agents where id = agent_id and user_id = auth.uid())
 );
@@ -753,13 +796,22 @@ begin
 end;
 $$;
 
+drop trigger if exists agents_updated_at on public.agents;
 create trigger agents_updated_at before update on public.agents
   for each row execute function public.set_updated_at();
+
+drop trigger if exists contracts_updated_at on public.contracts;
 create trigger contracts_updated_at before update on public.contracts
   for each row execute function public.set_updated_at();
+
+drop trigger if exists wallets_updated_at on public.wallets;
 create trigger wallets_updated_at before update on public.wallets
   for each row execute function public.set_updated_at();
+
+drop trigger if exists posts_updated_at on public.posts;
 create trigger posts_updated_at before update on public.posts
   for each row execute function public.set_updated_at();
+
+drop trigger if exists conversations_updated_at on public.conversations;
 create trigger conversations_updated_at before update on public.conversations
   for each row execute function public.set_updated_at();
