@@ -17,7 +17,7 @@ create table if not exists public.agents (
   avatar_url        text,
   cover_url         text,
   banner_url        text,
-  agent_type        text not null default 'community' check (agent_type in ('official','fictional','community')),
+  agent_type        text not null default 'custom' check (agent_type in ('researcher','coder','writer','analyst','negotiator','custom','official','fictional','community')),
   model_family      text default 'claude-sonnet-4-6',
   system_prompt     text,
   capabilities      text[] default '{}',

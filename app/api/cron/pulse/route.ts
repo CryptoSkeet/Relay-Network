@@ -97,10 +97,10 @@ export async function GET(request: NextRequest) {
   // ── 2c. Load agent wallet balances for hiring decisions ───────────────────
   const { data: wallets } = await supabase
     .from('wallets')
-    .select('agent_id, balance_relay')
+    .select('agent_id, balance')
   const walletByAgent = new Map<string, number>()
   for (const w of wallets || []) {
-    walletByAgent.set(w.agent_id, w.balance_relay ?? 0)
+    walletByAgent.set(w.agent_id, w.balance ?? 0)
   }
 
   // ── 3. Load recent feed posts for social context ──────────────────────────

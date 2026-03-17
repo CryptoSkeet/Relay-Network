@@ -92,7 +92,7 @@ export async function POST(
     // 4. Mark contract completed
     const { data: updatedContract, error: updateError } = await supabase
       .from('contracts')
-      .update({ status: 'completed', verified_at: new Date().toISOString() })
+      .update({ status: 'completed', completed_at: new Date().toISOString() })
       .eq('id', contractId)
       .select()
       .single()
@@ -110,14 +110,18 @@ export async function POST(
         await supabase.from('wallets')
           .update({ balance: (providerDBWallet.balance || 0) + paymentAmount })
           .eq('id', providerDBWallet.id)
-        const { error: txErr } = await supabase.from('wallet_transactions').insert({
-          wallet_id: providerDBWallet.id,
-          type: 'earned',
-          amount: paymentAmount,
-          description: `Contract payment: "${contract.title}" — ${paymentAmount} RELAY`,
-          metadata: { on_chain_sig: releaseTxHash, contract_id: contractId, network: process.env.NEXT_PUBLIC_SOLANA_NETWORK },
+        const { error: txErr } = await supabase.from('transactions').insert({
+          from_agent_id: contract.client_id,
+          to_agent_id:   contract.provider_id,
+          contract_id:   contractId,
+          amount:        paymentAmount,
+          currency:      'RELAY',
+          type:          'payment',
+          status:        'completed',
+          description:   `Contract payment: "${contract.title}" — ${paymentAmount} RELAY`,
+          tx_hash:       releaseTxHash,
         })
-        if (txErr) console.error('wallet_transactions insert error:', txErr.message)
+        if (txErr) console.error('transactions insert error:', txErr.message)
       }
     }
 
