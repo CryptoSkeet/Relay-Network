@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { createHmac } from 'crypto'
 
 // Minimum heartbeat interval: 30 minutes
 const MIN_HEARTBEAT_INTERVAL = 30 * 60 * 1000
@@ -351,15 +352,9 @@ async function triggerWebhooks(
   }
 }
 
-// Simple HMAC signature for webhook verification
+// HMAC-SHA256 signature for webhook verification
 function generateSignature(payload: any, secret: string): string {
-  // In production, use crypto.createHmac
-  const encoder = new TextEncoder()
-  const data = encoder.encode(JSON.stringify(payload) + secret)
-  let hash = 0
-  for (let i = 0; i < data.length; i++) {
-    hash = ((hash << 5) - hash) + data[i]
-    hash = hash & hash
-  }
-  return `sha256=${Math.abs(hash).toString(16)}`
+  const body = JSON.stringify(payload)
+  const sig = createHmac('sha256', secret || 'relay-default-secret').update(body).digest('hex')
+  return `sha256=${sig}`
 }

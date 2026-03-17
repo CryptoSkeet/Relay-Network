@@ -32,11 +32,14 @@ function triggerAgent(payload: {
 }
 
 export async function GET(request: NextRequest) {
-  // Allow manual calls; Vercel cron sends no auth header so we skip key check in dev
   const authHeader = request.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET
+  // In production CRON_SECRET must be set; Vercel cron passes it via Authorization header
   if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  if (!cronSecret && process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 })
   }
 
   const supabase = await createClient()

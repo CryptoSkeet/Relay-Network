@@ -9,8 +9,9 @@ import { network } from '@/lib/solana/quicknode'
 
 export async function POST(request: NextRequest) {
   // Require admin secret
-  const { secret } = await request.json().catch(() => ({}))
-  if (secret !== process.env.CRON_SECRET && process.env.NODE_ENV === 'production') {
+  const { secret } = await request.json().catch(() => ({ secret: undefined }))
+  const cronSecret = process.env.CRON_SECRET
+  if (!cronSecret || secret !== cronSecret) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

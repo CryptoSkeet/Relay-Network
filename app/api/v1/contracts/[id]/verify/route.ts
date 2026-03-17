@@ -54,33 +54,7 @@ export async function POST(
       }, { status: 400 })
     }
 
-    // Mark all deliverables as accepted
-    await supabase
-      .from('contract_deliverables')
-      .update({
-        status: 'accepted',
-        verified_at: new Date().toISOString(),
-      })
-      .eq('contract_id', contractId)
-      .eq('status', 'submitted')
-
-    // Update contract status to completed
-    const { data: updatedContract, error: updateError } = await supabase
-      .from('contracts')
-      .update({
-        status: 'completed',
-        verified_at: new Date().toISOString(),
-      })
-      .eq('id', contractId)
-      .select()
-      .single()
-
-    if (updateError) {
-      console.error('Contract verify error:', updateError)
-      return NextResponse.json({ error: 'Failed to update contract' }, { status: 500 })
-    }
-
-    // Release escrow — mint RELAY on-chain to provider
+    // 1. Release escrow FIRST — mint RELAY on-chain to provider before marking complete
     const paymentAmount = contract.budget_max ?? contract.budget_min ?? 0
     let releaseTxHash = `relay_${Date.now()}_${Math.random().toString(36).substring(7)}`
 
@@ -89,28 +63,12 @@ export async function POST(
         const providerWallet = await ensureAgentWallet(contract.provider_id)
         const onChainSig = await mintRelayTokens(providerWallet.publicKey, paymentAmount)
         releaseTxHash = onChainSig
-
-        // Credit DB wallet for provider
-        const { data: providerDBWallet } = await supabase
-          .from('wallets').select('id, balance').eq('agent_id', contract.provider_id).maybeSingle()
-        if (providerDBWallet) {
-          await supabase.from('wallets')
-            .update({ balance: (providerDBWallet.balance || 0) + paymentAmount })
-            .eq('id', providerDBWallet.id)
-          await supabase.from('wallet_transactions').insert({
-            wallet_id: providerDBWallet.id,
-            type: 'earned',
-            amount: paymentAmount,
-            description: `Contract payment: "${contract.title}" — ${paymentAmount} RELAY`,
-            metadata: { on_chain_sig: onChainSig, contract_id: contractId, network: process.env.NEXT_PUBLIC_SOLANA_NETWORK },
-          }).then(() => {})
-        }
       } catch (mintErr) {
-        console.error('On-chain RELAY mint failed (non-fatal):', mintErr)
-        // Fall back to DB-only payment — contract still completes
+        console.error('On-chain RELAY mint failed (non-fatal — falling back to DB credit):', mintErr)
       }
     }
 
+    // 2. Update escrow table
     const { error: escrowError } = await supabase
       .from('escrow')
       .update({
@@ -121,7 +79,45 @@ export async function POST(
       .eq('contract_id', contractId)
 
     if (escrowError) {
-      console.error('Escrow release error:', escrowError)
+      console.error('Escrow release error (non-fatal):', escrowError)
+    }
+
+    // 3. Mark all deliverables as accepted
+    await supabase
+      .from('contract_deliverables')
+      .update({ status: 'accepted', verified_at: new Date().toISOString() })
+      .eq('contract_id', contractId)
+      .eq('status', 'submitted')
+
+    // 4. Mark contract completed
+    const { data: updatedContract, error: updateError } = await supabase
+      .from('contracts')
+      .update({ status: 'completed', verified_at: new Date().toISOString() })
+      .eq('id', contractId)
+      .select()
+      .single()
+
+    if (updateError) {
+      console.error('Contract verify error:', updateError)
+      return NextResponse.json({ error: 'Failed to update contract' }, { status: 500 })
+    }
+
+    // 5. Credit DB wallet for provider
+    if (contract.provider_id && paymentAmount > 0) {
+      const { data: providerDBWallet } = await supabase
+        .from('wallets').select('id, balance').eq('agent_id', contract.provider_id).maybeSingle()
+      if (providerDBWallet) {
+        await supabase.from('wallets')
+          .update({ balance: (providerDBWallet.balance || 0) + paymentAmount })
+          .eq('id', providerDBWallet.id)
+        await supabase.from('wallet_transactions').insert({
+          wallet_id: providerDBWallet.id,
+          type: 'earned',
+          amount: paymentAmount,
+          description: `Contract payment: "${contract.title}" — ${paymentAmount} RELAY`,
+          metadata: { on_chain_sig: releaseTxHash, contract_id: contractId, network: process.env.NEXT_PUBLIC_SOLANA_NETWORK },
+        }).catch((e: Error) => console.error('wallet_transactions insert error:', e.message))
+      }
     }
 
     // Update provider reputation (completed contract)

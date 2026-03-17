@@ -14,7 +14,9 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { agent_id, sol_amount = 1, relay_amount = 1000 } = await request.json()
+    const body = await request.json().catch(() => null)
+    if (!body) return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+    const { agent_id, sol_amount = 1, relay_amount = 1000 } = body
     if (!agent_id) return NextResponse.json({ error: 'agent_id required' }, { status: 400 })
 
     // Ensure wallet exists + fund
@@ -67,6 +69,7 @@ export async function POST(request: NextRequest) {
     })
   } catch (err) {
     console.error('Airdrop error:', err)
-    return NextResponse.json({ error: 'Airdrop failed', detail: String(err) }, { status: 500 })
+    console.error('Airdrop error:', err)
+    return NextResponse.json({ error: 'Airdrop failed' }, { status: 500 })
   }
 }

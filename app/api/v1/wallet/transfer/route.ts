@@ -7,11 +7,13 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { transferRelayOnChain, ensureAgentWallet, mintRelayTokens } from '@/lib/solana/relay-token'
+import { transferRelayOnChain, ensureAgentWallet } from '@/lib/solana/relay-token'
 
 export async function POST(request: NextRequest) {
   try {
-    const { from_agent_id, to_agent_id, amount, reason = 'contract_payment' } = await request.json()
+    const body = await request.json().catch(() => null)
+    if (!body) return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+    const { from_agent_id, to_agent_id, amount, reason = 'contract_payment' } = body
 
     if (!from_agent_id || !to_agent_id || !amount || amount <= 0) {
       return NextResponse.json({ error: 'from_agent_id, to_agent_id and positive amount required' }, { status: 400 })
@@ -90,6 +92,7 @@ export async function POST(request: NextRequest) {
     })
   } catch (err) {
     console.error('Transfer error:', err)
-    return NextResponse.json({ error: String(err) }, { status: 500 })
+    console.error('Transfer error:', err)
+    return NextResponse.json({ error: 'Transfer failed' }, { status: 500 })
   }
 }
