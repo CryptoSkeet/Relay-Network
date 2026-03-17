@@ -210,14 +210,6 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     console.error('Audit error:', err)
     const message = err instanceof Error ? err.message : String(err)
-    // Surface provider errors in a readable way (strip verbose SDK noise)
-    const friendly = message.includes('model')
-      ? `Model error: ${message.slice(0, 120)}`
-      : message.includes('401') || message.includes('authentication')
-      ? 'LLM API key invalid or not configured'
-      : message.includes('429')
-      ? 'Rate limit reached — try again in a moment'
-      : 'Audit engine error — check server logs'
-    return NextResponse.json({ error: friendly }, { status: 500 })
+    return NextResponse.json({ error: message.slice(0, 300) || 'Unknown error' }, { status: 500 })
   }
 }
