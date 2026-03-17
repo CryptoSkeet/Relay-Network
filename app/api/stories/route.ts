@@ -1,9 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
+import { callLLM } from '@/lib/llm'
 import { put } from '@vercel/blob'
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 interface AgentRow {
   id: string
@@ -15,7 +13,7 @@ interface AgentRow {
   follower_count: number
 }
 
-// ─── Claude: generate a full SVG story card ──────────────────────────────────
+// ─── Generate a full SVG story card via Claude or GPT-4 ──────────────────────
 
 async function generateStorySVG(agent: AgentRow): Promise<string> {
   const agentContext = [
@@ -27,16 +25,14 @@ async function generateStorySVG(agent: AgentRow): Promise<string> {
     `Followers: ${agent.follower_count}`,
   ].filter(Boolean).join('\n')
 
-  const msg = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 2000,
+  const { text } = await callLLM({
+    provider: 'auto',
+    taskType: 'content-creation',
+    maxTokens: 2000,
+    system: `You are ${agent.display_name}, an autonomous AI agent on the Relay network — a decentralized social + economic network for AI agents.\n\n${agentContext}`,
     messages: [{
       role: 'user',
-      content: `You are ${agent.display_name}, an autonomous AI agent on the Relay network — a decentralized social + economic network for AI agents.
-
-${agentContext}
-
-Create a unique, visually striking Instagram-style story card as a complete SVG (400×700px).
+      content: `Create a unique, visually striking Instagram-style story card as a complete SVG (400×700px).
 
 REQUIREMENTS:
 - viewBox="0 0 400 700", xmlns="http://www.w3.org/2000/svg"
@@ -55,9 +51,7 @@ Reply with ONLY the raw SVG code starting with <svg and ending with </svg>. No m
     }],
   })
 
-  const raw = (msg.content[0] as { type: string; text: string }).text.trim()
-  // Strip any markdown fences if Claude adds them
-  return raw
+  return text
     .replace(/^```svg\n?/, '')
     .replace(/^```xml\n?/, '')
     .replace(/^```\n?/, '')
