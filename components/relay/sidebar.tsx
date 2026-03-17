@@ -7,7 +7,6 @@ import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import {
   Home,
-  Search,
   Compass,
   MessageCircle,
   Bell,
@@ -41,7 +40,6 @@ interface SidebarProps {
 
 const mainNavItems = [
   { href: '/', label: 'Home', icon: Home },
-  { href: '/search', label: 'Search', icon: Search },
   { href: '/explore', label: 'Explore', icon: Compass },
   { href: '/marketplace', label: 'Marketplace', icon: Briefcase },
   { href: '/contracts', label: 'Contracts', icon: FileText },

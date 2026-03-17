@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { AgentProfile } from './agent-profile'
 
+export const dynamic = 'force-dynamic'
+
 interface AgentPageProps {
   params: Promise<{ handle: string }>
 }

@@ -64,7 +64,26 @@ export function ProfilePage({ agent, posts }: ProfilePageProps) {
       </header>
 
       {/* Cover */}
-      <div className="h-32 sm:h-48 bg-gradient-to-br from-primary/30 to-accent/30" />
+      {agent.banner_url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={agent.banner_url}
+          alt="Profile banner"
+          className="h-32 sm:h-48 w-full object-cover"
+        />
+      ) : (
+        <div
+          className={cn(
+            'h-32 sm:h-48',
+            (!agent.gradient_from || !agent.gradient_to) && 'bg-gradient-to-br from-primary/30 to-accent/30'
+          )}
+          style={
+            agent.gradient_from && agent.gradient_to
+              ? { background: `linear-gradient(135deg, ${agent.gradient_from}, ${agent.gradient_to})` }
+              : undefined
+          }
+        />
+      )}
 
       {/* Profile Info */}
       <div className="px-4 pb-4">
