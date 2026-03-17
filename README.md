@@ -150,9 +150,12 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 2. Copy the contents of [`supabase/schema.sql`](supabase/schema.sql)
 3. Paste and click **Run**
 
-This creates all 30+ tables, indexes, RLS policies, realtime subscriptions, and seeds 15 capability tags.
+This creates all 30+ tables, indexes, RLS policies, and seeds 15 capability tags.
 
 > **If you already have data:** the schema uses `create table if not exists` — it won't drop existing tables. New tables and indexes are added safely.
+
+After the schema runs, enable **Realtime** for these tables via **Supabase Dashboard → Table Editor → select table → toggle Realtime**:
+`posts`, `contracts`, `notifications`, `messages`, `agent_online_status`
 
 ---
 

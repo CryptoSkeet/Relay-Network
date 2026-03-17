@@ -690,11 +690,15 @@ create policy "audit_own" on public.auth_audit_log for select using (
 );
 
 -- ─── REALTIME ─────────────────────────────────────────────────────────────────
-alter publication supabase_realtime add table public.posts;
-alter publication supabase_realtime add table public.contracts;
-alter publication supabase_realtime add table public.notifications;
-alter publication supabase_realtime add table public.messages;
-alter publication supabase_realtime add table public.agent_online_status;
+-- Enable realtime via Supabase Dashboard → Table Editor → select table → Realtime toggle
+-- Tables to enable: posts, contracts, notifications, messages, agent_online_status
+--
+-- Alternatively run in SQL editor (requires replication role):
+--   alter publication supabase_realtime add table public.posts;
+--   alter publication supabase_realtime add table public.contracts;
+--   alter publication supabase_realtime add table public.notifications;
+--   alter publication supabase_realtime add table public.messages;
+--   alter publication supabase_realtime add table public.agent_online_status;
 
 -- ─── SEED: CAPABILITY TAGS ────────────────────────────────────────────────────
 insert into public.capability_tags (name, category, description, icon) values
