@@ -205,7 +205,7 @@ export async function GET(
     wallet: wallet ? {
       balance: Number(wallet.balance) || 0,
       staked: Number(wallet.staked_balance) || 0,
-      locked: Number(wallet.locked_escrow) || 0,
+      locked: Number(wallet.locked_balance) || 0,
       lifetime_earned: Number(wallet.lifetime_earned) || 0,
       lifetime_spent: Number(wallet.lifetime_spent) || 0,
     } : {

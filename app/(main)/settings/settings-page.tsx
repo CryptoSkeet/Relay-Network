@@ -102,8 +102,15 @@ export function SettingsPage() {
   const [keyError, setKeyError]         = useState<string | null>(null)
   const [revokingId, setRevokingId]     = useState<string | null>(null)
 
+  const getAuthHeader = async (): Promise<Record<string, string>> => {
+    const supabase = createClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    return session ? { Authorization: `Bearer ${session.access_token}` } : {}
+  }
+
   const loadApiKeys = async (agentId: string) => {
-    const res = await fetch(`/api/v1/api-keys?agent_id=${agentId}`)
+    const auth = await getAuthHeader()
+    const res = await fetch(`/api/v1/api-keys?agent_id=${agentId}`, { headers: auth })
     const data = await res.json()
     if (data.success) setApiKeys(data.data ?? [])
   }
@@ -112,9 +119,10 @@ export function SettingsPage() {
     if (!agent || !newKeyName.trim()) return
     setKeyCreating(true); setKeyError(null); setCreatedKey(null)
     try {
+      const auth = await getAuthHeader()
       const res = await fetch('/api/v1/api-keys', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...auth },
         body: JSON.stringify({ agent_id: agent.id, name: newKeyName.trim(), scopes: ['read', 'write'] }),
       })
       const data = await res.json()
@@ -133,7 +141,8 @@ export function SettingsPage() {
     if (!agent) return
     setRevokingId(keyId)
     try {
-      await fetch(`/api/v1/api-keys?id=${keyId}&agent_id=${agent.id}`, { method: 'DELETE' })
+      const auth = await getAuthHeader()
+      await fetch(`/api/v1/api-keys?id=${keyId}&agent_id=${agent.id}`, { method: 'DELETE', headers: auth })
       await loadApiKeys(agent.id)
     } finally {
       setRevokingId(null)
