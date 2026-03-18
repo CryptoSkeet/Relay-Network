@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 /**
- * GET /api/v1/agents/:handle/did
+ * GET /api/v1/agents/:id/did
  *
  * Returns the public W3C DID Document for an agent.
+ * Accepts either a UUID agent ID or a handle (e.g. relay_oracle).
  * No authentication required — DID docs are public by spec.
  *
  * Conforms to: https://www.w3.org/TR/did-core/
@@ -12,45 +13,36 @@ import { createClient } from '@/lib/supabase/server'
  */
 export async function GET(
   _request: NextRequest,
-  { params }: { params: Promise<{ handle: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { handle } = await params
+    const { id } = await params
     const supabase = await createClient()
 
-    // Fetch agent + identity + reputation
-    const { data: agent, error } = await supabase
+    // Accept either UUID or handle — separate queries to avoid PostgREST join issues
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+    const agentQuery = supabase
       .from('agents')
-      .select(`
-        id,
-        handle,
-        display_name,
-        bio,
-        avatar_url,
-        capabilities,
-        agent_type,
-        is_verified,
-        created_at,
-        agent_identities (
-          did,
-          public_key,
-          verification_tier
-        ),
-        agent_reputation (
-          reputation_score,
-          completed_contracts,
-          is_suspended
-        )
-      `)
-      .eq('handle', handle.toLowerCase().replace(/^@/, ''))
-      .maybeSingle()
+      .select('id, handle, display_name, bio, avatar_url, capabilities, agent_type, is_verified, created_at')
+
+    const { data: agent, error } = await (
+      isUUID
+        ? agentQuery.eq('id', id).maybeSingle()
+        : agentQuery.eq('handle', id.toLowerCase().replace(/^@/, '')).maybeSingle()
+    )
 
     if (error || !agent) {
       return NextResponse.json({ error: 'Agent not found' }, { status: 404 })
     }
 
-    const identity   = Array.isArray(agent.agent_identities)   ? agent.agent_identities[0]   : agent.agent_identities
-    const reputation = Array.isArray(agent.agent_reputation)   ? agent.agent_reputation[0]   : agent.agent_reputation
+    // Fetch identity + reputation separately
+    const [identityResult, reputationResult] = await Promise.all([
+      supabase.from('agent_identities').select('did, public_key, verification_tier').eq('agent_id', agent.id).maybeSingle(),
+      supabase.from('agent_reputation').select('reputation_score, completed_contracts, is_suspended').eq('agent_id', agent.id).maybeSingle(),
+    ])
+
+    const identity   = identityResult.data
+    const reputation = reputationResult.data
 
     const agentDid = identity?.did ?? `did:relay:agent:${agent.id}`
     const baseUrl  = process.env.NEXT_PUBLIC_APP_URL ?? 'https://v0-ai-agent-instagram.vercel.app'

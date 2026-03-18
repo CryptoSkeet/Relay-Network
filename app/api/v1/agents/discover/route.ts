@@ -27,64 +27,52 @@ export async function GET(request: NextRequest) {
     const limit         = Math.min(parseInt(searchParams.get('limit') ?? '20', 10), 100)
     const offset        = parseInt(searchParams.get('offset') ?? '0', 10)
 
-    // Base query — join reputation scores
-    let query = supabase
+    // Fetch agents (separate queries to avoid PostgREST cross-table ORDER/filter issues)
+    let agentsQuery = supabase
       .from('agents')
-      .select(`
-        id,
-        handle,
-        display_name,
-        avatar_url,
-        bio,
-        capabilities,
-        agent_type,
-        is_verified,
-        follower_count,
-        post_count,
-        created_at,
-        agent_reputation (
-          reputation_score,
-          completed_contracts,
-          is_suspended
-        ),
-        agent_online_status (
-          status,
-          current_task,
-          last_seen_at
-        )
-      `, { count: 'exact' })
-      .eq('agent_reputation.is_suspended', false)
-      .gte('agent_reputation.reputation_score', minReputation)
-      .order('agent_reputation.reputation_score', { ascending: false })
-      .range(offset, offset + limit - 1)
+      .select('id, handle, display_name, avatar_url, bio, capabilities, agent_type, is_verified, follower_count, post_count, created_at')
+      .order('created_at', { ascending: false })
+      .limit(500)
 
-    // Capability overlap filter (agent has at least one matching capability)
     if (capabilities.length > 0) {
-      query = query.overlaps('capabilities', capabilities)
+      agentsQuery = agentsQuery.overlaps('capabilities', capabilities)
     }
 
-    const { data: agents, error, count } = await query
-
-    if (error) {
-      console.error('AMP discovery error:', error)
+    const { data: rawAgents, error: agentsError } = await agentsQuery
+    if (agentsError) {
+      console.error('AMP discovery error:', agentsError)
       return NextResponse.json({ error: 'Discovery failed' }, { status: 500 })
     }
 
-    // Shape into AMP peer format
-    const peers = (agents ?? [])
+    // Fetch reputations and online status for these agents
+    const agentIds = (rawAgents ?? []).map(a => a.id)
+    const [repResult, onlineResult] = await Promise.all([
+      supabase.from('agent_reputation')
+        .select('agent_id, reputation_score, completed_contracts, is_suspended')
+        .in('agent_id', agentIds),
+      supabase.from('agent_online_status')
+        .select('agent_id, status, current_task, last_seen_at')
+        .in('agent_id', agentIds),
+    ])
+
+    const repMap    = Object.fromEntries((repResult.data    ?? []).map(r => [r.agent_id,    r]))
+    const onlineMap = Object.fromEntries((onlineResult.data ?? []).map(r => [r.agent_id,    r]))
+
+    // Shape, filter, sort, paginate in JS
+    const allPeers = (rawAgents ?? [])
       .filter(a => {
-        // Filter out suspended agents
-        const rep = Array.isArray(a.agent_reputation) ? a.agent_reputation[0] : a.agent_reputation
-        return rep && !rep.is_suspended
+        const rep = repMap[a.id]
+        if (rep?.is_suspended) return false
+        if ((rep?.reputation_score ?? 0) < minReputation) return false
+        return true
       })
       .filter(a => {
         if (!statusFilter) return true
-        const status = Array.isArray(a.agent_online_status) ? a.agent_online_status[0] : a.agent_online_status
-        return status?.status === statusFilter
+        return onlineMap[a.id]?.status === statusFilter
       })
       .map(a => {
-        const rep    = Array.isArray(a.agent_reputation)    ? a.agent_reputation[0]    : a.agent_reputation
-        const online = Array.isArray(a.agent_online_status) ? a.agent_online_status[0] : a.agent_online_status
+        const rep    = repMap[a.id]
+        const online = onlineMap[a.id]
         return {
           id:               a.id,
           did:              `did:relay:agent:${a.id}`,
@@ -102,14 +90,17 @@ export async function GET(request: NextRequest) {
           last_seen_at:     online?.last_seen_at ?? null,
           follower_count:   a.follower_count,
           post_count:       a.post_count,
-          // AMP service endpoint
           service_endpoint: `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/api/v1/agents/${a.id}`,
         }
       })
+      .sort((a, b) => b.reputation_score - a.reputation_score)
+
+    const total = allPeers.length
+    const peers = allPeers.slice(offset, offset + limit)
 
     return NextResponse.json({
       peers,
-      total:  count ?? peers.length,
+      total,
       offset,
       limit,
       query: {
