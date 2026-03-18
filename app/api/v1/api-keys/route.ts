@@ -2,142 +2,127 @@ import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { randomBytes, createHash } from 'crypto'
 
-// GET /v1/api-keys - List API keys for an agent
-export async function GET(request: NextRequest) {
+// GET /v1/api-keys - List API keys for the authenticated user's first agent
+export async function GET(_request: NextRequest) {
   const supabase = await createClient()
-  
-  const { searchParams } = new URL(request.url)
-  const agentId = searchParams.get('agent_id')
-  
-  if (!agentId) {
-    return NextResponse.json(
-      { success: false, error: 'agent_id is required' },
-      { status: 400 }
-    )
-  }
-  
+
   try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Get first agent belonging to user
+    const { data: agent } = await supabase
+      .from('agents')
+      .select('id')
+      .eq('user_id', user.id)
+      .limit(1)
+      .single()
+
+    if (!agent) {
+      return NextResponse.json({ success: true, keys: [], agent_id: '' })
+    }
+
     const { data: keys, error } = await supabase
       .from('agent_api_keys')
-      .select('id, key_prefix, name, scopes, last_used_at, expires_at, is_active, created_at')
-      .eq('agent_id', agentId)
+      .select('id, key_prefix, name, last_used_at, created_at')
+      .eq('agent_id', agent.id)
+      .is('revoked_at', null)
       .order('created_at', { ascending: false })
-    
+
     if (error) throw error
-    
-    return NextResponse.json({
-      success: true,
-      data: keys || []
-    })
+
+    return NextResponse.json({ success: true, keys: keys || [], agent_id: agent.id })
   } catch (error) {
     console.error('API Keys GET error:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch API keys' },
-      { status: 500 }
-    )
+    return NextResponse.json({ success: false, error: 'Failed to fetch API keys' }, { status: 500 })
   }
 }
 
 // POST /v1/api-keys - Create a new API key
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
-  
+
   try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    }
+
     const body = await request.json()
-    const { agent_id, name, scopes = ['read', 'write'], expires_in_days } = body
-    
-    if (!agent_id) {
-      return NextResponse.json(
-        { success: false, error: 'agent_id is required' },
-        { status: 400 }
-      )
+    const { agent_id, name } = body
+
+    if (!agent_id || !name?.trim()) {
+      return NextResponse.json({ success: false, error: 'agent_id and name are required' }, { status: 400 })
     }
-    
-    if (!name || name.length < 1) {
-      return NextResponse.json(
-        { success: false, error: 'API key name is required' },
-        { status: 400 }
-      )
+
+    // Verify agent belongs to user
+    const { data: agent } = await supabase
+      .from('agents')
+      .select('id')
+      .eq('id', agent_id)
+      .eq('user_id', user.id)
+      .single()
+
+    if (!agent) {
+      return NextResponse.json({ success: false, error: 'Agent not found' }, { status: 404 })
     }
-    
-    // Generate API key
-    const rawKey = `relay_${randomBytes(32).toString('hex')}`
-    const keyPrefix = rawKey.substring(0, 12) + '...'
+
+    // Generate key: relay_ + 40 hex chars
+    const rawKey = `relay_${randomBytes(20).toString('hex')}`
+    const keyPrefix = rawKey.substring(0, 14) // "relay_" + 8 chars
     const keyHash = createHash('sha256').update(rawKey).digest('hex')
-    
-    // Calculate expiration
-    let expiresAt = null
-    if (expires_in_days && expires_in_days > 0) {
-      expiresAt = new Date(Date.now() + expires_in_days * 24 * 60 * 60 * 1000).toISOString()
-    }
-    
+
     const { data: apiKey, error } = await supabase
       .from('agent_api_keys')
-      .insert({
-        agent_id,
-        key_hash: keyHash,
-        key_prefix: keyPrefix,
-        name,
-        scopes,
-        expires_at: expiresAt,
-        is_active: true
-      })
-      .select('id, key_prefix, name, scopes, expires_at, created_at')
+      .insert({ agent_id, key_hash: keyHash, key_prefix: keyPrefix, name: name.trim() })
+      .select('id, key_prefix, name, last_used_at, created_at')
       .single()
-    
+
     if (error) throw error
-    
+
     return NextResponse.json({
       success: true,
-      data: {
-        ...apiKey,
-        key: rawKey // Only returned once at creation
-      },
-      message: 'API key created. Save your key - it will not be shown again.'
+      data: { ...apiKey, key: rawKey },
+      message: 'API key created. Save it — it will not be shown again.'
     })
   } catch (error) {
     console.error('API Keys POST error:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to create API key' },
-      { status: 500 }
-    )
+    return NextResponse.json({ success: false, error: 'Failed to create API key' }, { status: 500 })
   }
 }
 
 // DELETE /v1/api-keys - Revoke an API key
 export async function DELETE(request: NextRequest) {
   const supabase = await createClient()
-  
+
   const { searchParams } = new URL(request.url)
   const keyId = searchParams.get('id')
   const agentId = searchParams.get('agent_id')
-  
+
   if (!keyId || !agentId) {
-    return NextResponse.json(
-      { success: false, error: 'key id and agent_id are required' },
-      { status: 400 }
-    )
+    return NextResponse.json({ success: false, error: 'id and agent_id are required' }, { status: 400 })
   }
-  
+
   try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { error } = await supabase
       .from('agent_api_keys')
-      .update({ is_active: false })
+      .update({ revoked_at: new Date().toISOString() })
       .eq('id', keyId)
       .eq('agent_id', agentId)
-    
+
     if (error) throw error
-    
-    return NextResponse.json({
-      success: true,
-      message: 'API key revoked'
-    })
+
+    return NextResponse.json({ success: true, message: 'API key revoked' })
   } catch (error) {
     console.error('API Keys DELETE error:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to revoke API key' },
-      { status: 500 }
-    )
+    return NextResponse.json({ success: false, error: 'Failed to revoke API key' }, { status: 500 })
   }
 }
 

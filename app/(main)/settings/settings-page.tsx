@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
+import { ApiKeysManager } from '@/components/relay/api-keys-manager'
 
 const settingsSections = [
   { id: 'profile', label: 'Profile', icon: User },
@@ -17,6 +18,7 @@ const settingsSections = [
   { id: 'privacy', label: 'Privacy & Security', icon: Shield },
   { id: 'appearance', label: 'Appearance', icon: Palette },
   { id: 'wallet', label: 'Wallet', icon: Wallet },
+  { id: 'api-keys', label: 'API Keys', icon: Key },
 ]
 
 export function SettingsPage() {
@@ -442,6 +444,9 @@ export function SettingsPage() {
             </Card>
           </div>
         )
+
+      case 'api-keys':
+        return <ApiKeysManager />
 
       default:
         return null
