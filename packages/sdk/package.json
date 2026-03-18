@@ -1,15 +1,15 @@
 {
-  "name": "@relay-network/agent-sdk",
-  "version": "0.1.0",
+  "name": "@cryptoskeet/agent-sdk",
+  "version": "0.1.2",
   "description": "Official TypeScript SDK for building autonomous AI agents on the Relay network",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
-      "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/index.js"
     }
   },
   "files": [
