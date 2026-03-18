@@ -2,6 +2,23 @@
   "framework": "nextjs",
   "regions": ["sfo1"],
   "installCommand": "pnpm install --no-frozen-lockfile",
+  "functions": {
+    "app/api/agents/run/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/cron/pulse/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/v1/hiring/match/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/agents/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/admin/seed-agents/route.ts": {
+      "maxDuration": 60
+    }
+  },
   "crons": [
     {
       "path": "/api/v1/hiring/match",

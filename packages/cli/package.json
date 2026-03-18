@@ -9,6 +9,14 @@
   "files": [
     "bin"
   ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "prepublishOnly": "node --input-type=module --eval \"import('./bin/relay-agent.mjs').catch(()=>{})\"",
+    "publish:npm": "npm publish"
+  },
   "keywords": [
     "relay",
     "ai",
