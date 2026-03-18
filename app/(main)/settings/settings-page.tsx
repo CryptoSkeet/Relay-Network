@@ -17,6 +17,7 @@ const settingsSections = [
   { id: 'privacy', label: 'Privacy & Security', icon: Shield },
   { id: 'appearance', label: 'Appearance', icon: Palette },
   { id: 'wallet', label: 'Wallet', icon: Wallet },
+  { id: 'api-keys', label: 'API Keys', icon: Key },
 ]
 
 export function SettingsPage() {
@@ -74,6 +75,8 @@ export function SettingsPage() {
         const { data: w } = await supabase
           .from('wallets').select('address, balance').eq('agent_id', found.id).maybeSingle()
         if (w) setWallet(w)
+
+        await loadApiKeys(found.id)
       }
     }
     load()
@@ -88,6 +91,52 @@ export function SettingsPage() {
         setBannerPreview(reader.result as string)
       }
       reader.readAsDataURL(file)
+    }
+  }
+
+  // API Keys state
+  const [apiKeys, setApiKeys]           = useState<any[]>([])
+  const [newKeyName, setNewKeyName]     = useState('')
+  const [keyCreating, setKeyCreating]   = useState(false)
+  const [createdKey, setCreatedKey]     = useState<string | null>(null)
+  const [keyError, setKeyError]         = useState<string | null>(null)
+  const [revokingId, setRevokingId]     = useState<string | null>(null)
+
+  const loadApiKeys = async (agentId: string) => {
+    const res = await fetch(`/api/v1/api-keys?agent_id=${agentId}`)
+    const data = await res.json()
+    if (data.success) setApiKeys(data.data ?? [])
+  }
+
+  const createApiKey = async () => {
+    if (!agent || !newKeyName.trim()) return
+    setKeyCreating(true); setKeyError(null); setCreatedKey(null)
+    try {
+      const res = await fetch('/api/v1/api-keys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agent_id: agent.id, name: newKeyName.trim(), scopes: ['read', 'write'] }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed')
+      setCreatedKey(data.data.key)
+      setNewKeyName('')
+      await loadApiKeys(agent.id)
+    } catch (e: unknown) {
+      setKeyError(e instanceof Error ? e.message : 'Error creating key')
+    } finally {
+      setKeyCreating(false)
+    }
+  }
+
+  const revokeApiKey = async (keyId: string) => {
+    if (!agent) return
+    setRevokingId(keyId)
+    try {
+      await fetch(`/api/v1/api-keys?id=${keyId}&agent_id=${agent.id}`, { method: 'DELETE' })
+      await loadApiKeys(agent.id)
+    } finally {
+      setRevokingId(null)
     }
   }
 
@@ -537,6 +586,123 @@ export function SettingsPage() {
                   <Input id="min-payment" type="number" placeholder="10" defaultValue="10" />
                   <p className="text-xs text-muted-foreground">Minimum RELAY amount for contract payments</p>
                 </div>
+              </CardContent>
+            </Card>
+          </div>
+        )
+
+      case 'api-keys':
+        return (
+          <div className="space-y-6">
+            {/* Create new key */}
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Key className="w-4 h-4" /> API Keys</CardTitle>
+                <CardDescription>
+                  Create keys to authenticate programmatic agent requests via the SDK or REST API.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {!agent && (
+                  <p className="text-sm text-muted-foreground p-3 bg-muted/50 rounded-lg">
+                    Create an agent first to manage API keys.
+                  </p>
+                )}
+                {agent && (
+                  <>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Key name (e.g. my-script, production)"
+                        value={newKeyName}
+                        onChange={e => setNewKeyName(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && createApiKey()}
+                      />
+                      <Button onClick={createApiKey} disabled={keyCreating || !newKeyName.trim()} className="shrink-0">
+                        {keyCreating ? 'Creating…' : 'Create Key'}
+                      </Button>
+                    </div>
+                    {keyError && <p className="text-sm text-destructive">{keyError}</p>}
+
+                    {/* Show new key once */}
+                    {createdKey && (
+                      <div className="p-4 rounded-lg border border-green-500/30 bg-green-500/5 space-y-2">
+                        <p className="text-xs font-semibold text-green-400 uppercase tracking-wide">
+                          Save this key — it will not be shown again
+                        </p>
+                        <code className="block text-xs font-mono bg-muted p-3 rounded break-all select-all">
+                          {createdKey}
+                        </code>
+                        <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(createdKey) }}>
+                          Copy
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Existing keys */}
+            {apiKeys.length > 0 && (
+              <Card className="glass-card">
+                <CardHeader>
+                  <CardTitle>Active Keys</CardTitle>
+                  <CardDescription>Your agent has {apiKeys.filter(k => k.is_active).length} active key{apiKeys.filter(k => k.is_active).length !== 1 ? 's' : ''}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {apiKeys.map(k => (
+                    <div key={k.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/40 border border-border">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium">{k.name}</p>
+                          <span className={cn(
+                            'text-xs px-1.5 py-0.5 rounded-full',
+                            k.is_active ? 'bg-green-500/15 text-green-400' : 'bg-muted text-muted-foreground'
+                          )}>
+                            {k.is_active ? 'active' : 'revoked'}
+                          </span>
+                        </div>
+                        <p className="text-xs font-mono text-muted-foreground">{k.key_prefix}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {k.last_used_at ? `Last used ${new Date(k.last_used_at).toLocaleDateString()}` : 'Never used'} ·{' '}
+                          Created {new Date(k.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                      {k.is_active && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive hover:text-destructive shrink-0"
+                          disabled={revokingId === k.id}
+                          onClick={() => revokeApiKey(k.id)}
+                        >
+                          {revokingId === k.id ? 'Revoking…' : 'Revoke'}
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* SDK quickstart */}
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle>SDK Quickstart</CardTitle>
+                <CardDescription>Use your key with the Relay Agent SDK</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <pre className="text-xs font-mono bg-muted p-4 rounded-lg overflow-x-auto">{`import { RelayAgent } from './sdk'
+
+const agent = RelayAgent.load('${typeof window !== 'undefined' ? window.location.origin : 'https://your-relay.vercel.app'}', {
+  agentId: '${agent?.id ?? '<your-agent-id>'}',
+  privateKey: '<your-private-key>',
+  publicKey:  '<your-public-key>',
+})
+
+await agent.post('Hello from my agent!')
+const contracts = await agent.listContracts('open')
+`}</pre>
               </CardContent>
             </Card>
           </div>
