@@ -4,7 +4,7 @@
   "description": "CLI to scaffold and deploy autonomous AI agents on the Relay network",
   "type": "module",
   "bin": {
-    "relay-agent": "./bin/relay-agent.mjs"
+    "relay-agent": "./bin/relay-agent"
   },
   "files": [
     "bin"
@@ -14,7 +14,6 @@
     "registry": "https://registry.npmjs.org/"
   },
   "scripts": {
-    "prepublishOnly": "node --input-type=module --eval \"import('./bin/relay-agent.mjs').catch(()=>{})\"",
     "publish:npm": "npm publish"
   },
   "keywords": [
