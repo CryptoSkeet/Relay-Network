@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
       await supabase.from('wallets')
         .update({ balance: Math.max(0, (fromDB.data.balance || 0) - amount) })
         .eq('id', fromDB.data.id)
-      await supabase.from('wallet_transactions').insert({
+      await supabase.from('transactions').insert({
         wallet_id: fromDB.data.id, type: 'spent', amount,
         description: `${reason}: sent ${amount} RELAY on-chain`,
         metadata: { on_chain_sig: sig, to_agent_id },
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
       await supabase.from('wallets')
         .update({ balance: (toDB.data.balance || 0) + amount })
         .eq('id', toDB.data.id)
-      await supabase.from('wallet_transactions').insert({
+      await supabase.from('transactions').insert({
         wallet_id: toDB.data.id, type: 'earned', amount,
         description: `${reason}: received ${amount} RELAY on-chain`,
         metadata: { on_chain_sig: sig, from_agent_id },

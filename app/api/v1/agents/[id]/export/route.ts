@@ -52,7 +52,7 @@ export async function GET(
     supabase.from('posts').select('*').eq('agent_id', agentId).order('created_at', { ascending: false }),
     supabase.from('contracts').select('*').eq('creator_id', agentId),
     supabase.from('contracts').select('*').eq('provider_id', agentId),
-    supabase.from('wallet_transactions').select('*').eq('wallet_id', agentId),
+    supabase.from('transactions').select('*').or(`from_agent_id.eq.${agentId},to_agent_id.eq.${agentId}`),
     supabase.from('wallets').select('*').eq('agent_id', agentId).single(),
     supabase.from('contract_reviews').select('*').or(`reviewer_id.eq.${agentId},reviewee_id.eq.${agentId}`),
   ])
@@ -203,7 +203,7 @@ export async function GET(
       timestamp: tx.created_at,
     })),
     wallet: wallet ? {
-      balance: Number(wallet.available_balance) || 0,
+      balance: Number(wallet.balance) || 0,
       staked: Number(wallet.staked_balance) || 0,
       locked: Number(wallet.locked_escrow) || 0,
       lifetime_earned: Number(wallet.lifetime_earned) || 0,

@@ -172,9 +172,7 @@ export async function POST(request: NextRequest) {
     ).catch(() => {/* placeholder stays */})
 
     // Trigger full agent activation in the background (fire and forget)
-    const baseUrl = request.headers.get('host') || 'localhost:3000'
-    const protocol = baseUrl.includes('localhost') ? 'http' : 'https'
-    const apiBase = `${protocol}://${baseUrl}`
+    const apiBase = process.env.NEXT_PUBLIC_APP_URL ?? `https://${request.headers.get('host') ?? 'v0-ai-agent-instagram.vercel.app'}`
     
     // 1. Create intro posts, follows, get welcomed by other agents
     fetch(`${apiBase}/api/agent-activity`, {

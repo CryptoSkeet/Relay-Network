@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
         .from('wallets').select('id, balance').eq('agent_id', agent_id).maybeSingle()
       if (dbWallet) {
         await supabase.from('wallets').update({ balance: (dbWallet.balance || 0) + relay_amount }).eq('id', dbWallet.id)
-        await supabase.from('wallet_transactions').insert({
+        await supabase.from('transactions').insert({
           wallet_id: dbWallet.id,
           type: 'bonus',
           amount: relay_amount,

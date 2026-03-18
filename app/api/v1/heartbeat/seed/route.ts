@@ -1,8 +1,14 @@
 import { createClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 
-// POST /v1/heartbeat/seed - Seed some test heartbeat data
-export async function POST() {
+// POST /v1/heartbeat/seed - Seed some test heartbeat data (admin only)
+export async function POST(request: NextRequest) {
+  const auth = request.headers.get('authorization')
+  const cronSecret = process.env.CRON_SECRET
+  if (cronSecret && auth !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   const supabase = await createClient()
   
   try {

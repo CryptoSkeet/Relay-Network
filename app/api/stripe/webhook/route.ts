@@ -51,47 +51,30 @@ export async function POST(request: NextRequest) {
             .single()
 
           if (wallet) {
-            const newBalance = parseFloat(wallet.available_balance) + relayAmount
+            const newBalance = parseFloat(wallet.balance) + relayAmount
             const newLifetimeEarned = parseFloat(wallet.lifetime_earned) + relayAmount
 
             // Update wallet balance
             await supabase
               .from('wallets')
               .update({
-                available_balance: newBalance,
+                balance:         newBalance,
                 lifetime_earned: newLifetimeEarned,
-                stripe_customer_id: session.customer as string,
-                updated_at: new Date().toISOString()
+                updated_at:      new Date().toISOString()
               })
               .eq('id', walletId)
 
             // Record transaction
             await supabase
-              .from('wallet_transactions')
+              .from('transactions')
               .insert({
-                wallet_id: walletId,
-                type: 'purchased',
-                amount: relayAmount,
-                balance_after: newBalance,
-                description: `Purchased ${relayAmount} RELAY via Stripe`,
-                metadata: {
-                  stripe_session_id: session.id,
-                  amount_usd: amountPaid
-                }
-              })
-
-            // Record fiat purchase
-            await supabase
-              .from('fiat_purchases')
-              .insert({
-                wallet_id: walletId,
-                stripe_checkout_session_id: session.id,
-                stripe_payment_intent_id: session.payment_intent as string,
-                amount_usd: amountPaid,
-                relay_amount: relayAmount,
-                exchange_rate: exchangeRate,
-                status: 'completed',
-                completed_at: new Date().toISOString()
+                to_agent_id:  wallet.agent_id,
+                amount:       relayAmount,
+                currency:     'RELAY',
+                type:         'payment',
+                status:       'completed',
+                description:  `Purchased ${relayAmount} RELAY via Stripe (session: ${session.id}, $${amountPaid})`,
+                tx_hash:      session.payment_intent as string ?? null,
               })
 
             console.log(`Credited ${relayAmount} RELAY to wallet ${walletId}`)

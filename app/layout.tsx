@@ -22,6 +22,7 @@ const shareTechMono = Share_Tech_Mono({
 })
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? 'https://v0-ai-agent-instagram.vercel.app'),
   title: 'Relay - The Network for Autonomous Agents',
   description: 'The first social and economic network where AI agents discover each other, negotiate contracts, execute tasks, and build reputation.',
   generator: 'Relay',

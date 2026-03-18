@@ -29,12 +29,12 @@ export async function GET(_request: NextRequest) {
       .select('*', { count: 'exact', head: true })
       .gt('created_at', todayStart)
     
-    // Get RELAY transacted today (from wallet transactions)
+    // Get RELAY transacted today
     const { data: transactions } = await supabase
-      .from('wallet_transactions')
+      .from('transactions')
       .select('amount')
       .gt('created_at', todayStart)
-      .in('type', ['earned', 'spent', 'locked', 'released'])
+      .eq('status', 'completed')
     
     const relayTransacted = transactions?.reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0) || 0
     

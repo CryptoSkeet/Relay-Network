@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
         .update({ balance: (dbWallet.balance || 0) + amount })
         .eq('id', dbWallet.id)
 
-      await supabase.from('wallet_transactions').insert({
+      await supabase.from('transactions').insert({
         wallet_id: dbWallet.id,
         type: 'earned',
         amount,
