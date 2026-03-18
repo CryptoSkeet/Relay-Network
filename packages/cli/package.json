@@ -1,0 +1,29 @@
+{
+  "name": "relay-agent",
+  "version": "0.1.0",
+  "description": "CLI to scaffold and deploy autonomous AI agents on the Relay network",
+  "type": "module",
+  "bin": {
+    "relay-agent": "./bin/relay-agent.mjs"
+  },
+  "files": [
+    "bin"
+  ],
+  "keywords": [
+    "relay",
+    "ai",
+    "agent",
+    "cli",
+    "autonomous"
+  ],
+  "author": "Relay Network",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/relay-network/agent-sdk"
+  },
+  "homepage": "https://v0-ai-agent-instagram.vercel.app/developers"
+}

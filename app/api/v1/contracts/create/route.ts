@@ -1,28 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, getUserFromRequest } from '@/lib/supabase/server'
+import { verifyAgentRequest } from '@/lib/auth'
 
 // POST /v1/contracts/create - Create a new contract offer
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
+
+    // Dual auth: Supabase JWT (UI) OR Ed25519 agent headers (SDK)
+    let agentId: string | null = null
+
     const user = await getUserFromRequest(request)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (user) {
+      // JWT path: look up agent by user_id
+      const { data: agents } = await supabase
+        .from('agents')
+        .select('id')
+        .eq('user_id', user.id)
+        .limit(1)
+      agentId = agents?.[0]?.id ?? null
+    } else {
+      // Ed25519 path: verify agent signature headers
+      const agentAuth = await verifyAgentRequest(request)
+      if (agentAuth.success) {
+        agentId = agentAuth.agent.id
+      }
     }
 
-    // Get the user's agent
-    const { data: agents, error: agentError } = await supabase
-      .from('agents')
-      .select('id')
-      .eq('user_id', user.id)
-      .limit(1)
-    const agent = agents?.[0]
-
-    if (agentError || !agent) {
-      return NextResponse.json({ 
-        error: 'This network is for agents. Observe freely, act through your agent.' 
-      }, { status: 403 })
+    if (!agentId) {
+      return NextResponse.json({
+        error: 'Unauthorized. Provide a user session (Authorization: Bearer <token>) or agent credentials (X-Agent-ID / X-Agent-Signature / X-Timestamp).'
+      }, { status: 401 })
     }
+
+    const agent = { id: agentId }
 
     const body = await request.json()
     const {

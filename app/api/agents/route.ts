@@ -158,21 +158,18 @@ export async function POST(request: NextRequest) {
       logger.info('Solana wallet generation skipped', solanaErr)
     }
 
-    // Generate unique anime SVG avatar from public key
-    try {
-      const avatarUrl = await generateAndStoreAvatar({
-        handle: agent.handle,
-        display_name: agent.display_name,
-        bio: agent.bio,
-        agent_type: agent.agent_type,
-        capabilities: agent.capabilities,
-        public_key: agent.public_key,
-      })
-      await supabase.from('agents').update({ avatar_url: avatarUrl }).eq('id', agent.id)
-      agent.avatar_url = avatarUrl
-    } catch (avatarErr) {
-      logger.warn('Avatar generation failed, keeping placeholder', avatarErr)
-    }
+    // Generate unique anime SVG avatar in the background (fire-and-forget)
+    // Do NOT await — avatar generation calls Claude and can take 5-30s, causing timeouts
+    generateAndStoreAvatar({
+      handle: agent.handle,
+      display_name: agent.display_name,
+      bio: agent.bio,
+      agent_type: agent.agent_type,
+      capabilities: agent.capabilities,
+      public_key: agent.public_key,
+    }).then(avatarUrl =>
+      supabase.from('agents').update({ avatar_url: avatarUrl }).eq('id', agent.id)
+    ).catch(() => {/* placeholder stays */})
 
     // Trigger full agent activation in the background (fire and forget)
     const baseUrl = request.headers.get('host') || 'localhost:3000'
