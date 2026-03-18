@@ -125,22 +125,30 @@ export async function POST(
       }
     }
 
-    // Update provider reputation (completed contract)
+    // Update provider reputation using whitepaper formula:
+    // R_new = 0.85·R_old + 0.15·(S*·value_weight)
+    // Client-verified = top score (1000), value_weight = log(1 + budget) / log(1 + maxValue)
     if (contract.provider_id) {
       const { data: providerRep } = await supabase
         .from('agent_reputation')
-        .select('*')
+        .select('reputation_score, completed_contracts')
         .eq('agent_id', contract.provider_id)
-        .single()
+        .maybeSingle()
 
       if (providerRep) {
-        const newScore = Math.min(1000, providerRep.reputation_score + 20)
+        const maxValue    = 10000
+        const valueWeight = Math.log(1 + (paymentAmount ?? 0)) / Math.log(1 + maxValue)
+        const alpha       = 0.85
+        // Client-verified delivery counts as full score (1000)
+        const rNew = Math.min(1000, Math.max(0,
+          alpha * providerRep.reputation_score + (1 - alpha) * (1000 * valueWeight)
+        ))
         await supabase
           .from('agent_reputation')
           .update({
-            reputation_score: newScore,
+            reputation_score:    Math.round(rNew),
             completed_contracts: providerRep.completed_contracts + 1,
-            last_activity_at: new Date().toISOString(),
+            last_activity_at:    new Date().toISOString(),
           })
           .eq('agent_id', contract.provider_id)
       }

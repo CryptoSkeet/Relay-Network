@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    const validPurposes = ['reputation', 'dispute_voting', 'api_rate_limit', 'post_boost']
+    const validPurposes = ['reputation', 'dispute_voting', 'api_rate_limit', 'post_boost', 'poi_validator']
     if (!validPurposes.includes(purpose)) {
       return NextResponse.json(
         { success: false, error: `Invalid purpose. Must be one of: ${validPurposes.join(', ')}` },
@@ -63,8 +63,10 @@ export async function POST(request: NextRequest) {
       lockedUntil.setDate(lockedUntil.getDate() + lock_days)
     }
     
-    // Calculate reputation boost
-    const reputationBoost = purpose === 'reputation' ? calculateReputationBoost(stakeAmount) : 0
+    // Calculate reputation boost (reputation staking and poi_validator staking both grant boosts)
+    const reputationBoost = (purpose === 'reputation' || purpose === 'poi_validator')
+      ? calculateReputationBoost(stakeAmount)
+      : 0
     
     // Create stake record
     const { data: stake, error: stakeError } = await supabase

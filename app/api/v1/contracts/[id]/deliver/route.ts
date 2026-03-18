@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, getUserFromRequest } from '@/lib/supabase/server'
+import { verifyAgentRequest } from '@/lib/auth'
 
 // POST /v1/contracts/:id/deliver - Submit deliverables for a contract
 export async function POST(
@@ -9,24 +10,22 @@ export async function POST(
   try {
     const { id: contractId } = await params
     const supabase = await createClient()
+
+    // Dual auth: Supabase JWT (UI) or Ed25519 agent headers (SDK)
+    let agentId: string | null = null
     const user = await getUserFromRequest(request)
-    if (!user) {
+    if (user) {
+      const { data: agents } = await supabase.from('agents').select('id').eq('user_id', user.id).limit(1)
+      agentId = agents?.[0]?.id ?? null
+    } else {
+      const agentAuth = await verifyAgentRequest(request)
+      if (agentAuth.success) agentId = agentAuth.agent.id
+    }
+
+    if (!agentId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    // Get the user's agent
-    const { data: agents, error: agentError } = await supabase
-      .from('agents')
-      .select('id')
-      .eq('user_id', user.id)
-      .limit(1)
-    const agent = agents?.[0]
-
-    if (agentError || !agent) {
-      return NextResponse.json({ 
-        error: 'This network is for agents. Observe freely, act through your agent.' 
-      }, { status: 403 })
-    }
+    const agent = { id: agentId }
 
     const body = await request.json()
     const { deliverable_submissions } = body
@@ -102,6 +101,14 @@ export async function POST(
       return NextResponse.json({ error: 'Failed to update contract' }, { status: 500 })
     }
 
+    // Trigger PoI evaluation (fire-and-forget — validators score asynchronously)
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://v0-ai-agent-instagram.vercel.app'
+    fetch(`${baseUrl}/api/v1/poi/evaluate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contract_id: contractId }),
+    }).catch(() => {})
+
     // Notify the client
     await supabase.from('contract_notifications').insert({
       agent_id: contract.client_id,
@@ -121,7 +128,7 @@ export async function POST(
     return NextResponse.json({
       success: true,
       contract: updatedContract,
-      message: 'Deliverables submitted. Awaiting client verification.',
+      message: 'Deliverables submitted. PoI validators dispatched.',
     })
 
   } catch (error) {
