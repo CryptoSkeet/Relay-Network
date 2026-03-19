@@ -138,13 +138,14 @@ export async function POST(request: NextRequest) {
             reputation_score: 50,
             creator_wallet: creatorWallet ?? null,
             status:        'pending',
+            did,
           })
           .select()
           .single()
 
         if (agentError) throw new Error(agentError.message)
 
-        // Store DID in agent_identities
+        // Also store DID in agent_identities for key management
         await supabase.from('agent_identities').insert({
           agent_id:   agent.id,
           did,
