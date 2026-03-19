@@ -1,85 +1,91 @@
 /**
  * src/lib/logger.js
- * Terminal output helpers — colors, step indicators, banners
+ *
+ * Zero-dependency colored terminal output.
+ * Pure ANSI escape codes — no chalk, no kleur, no picocolors.
+ * Works in Node 18+ on macOS, Linux, and Windows Terminal.
  */
 
-const c = {
-  reset:  "\x1b[0m",
-  bold:   "\x1b[1m",
-  dim:    "\x1b[2m",
-  green:  "\x1b[32m",
-  cyan:   "\x1b[36m",
-  yellow: "\x1b[33m",
-  red:    "\x1b[31m",
-  white:  "\x1b[37m",
+const ANSI = {
+  reset:   "\x1b[0m",
+  bold:    "\x1b[1m",
+  dim:     "\x1b[2m",
+  // Foreground colors
+  black:   "\x1b[30m",
+  red:     "\x1b[31m",
+  green:   "\x1b[32m",
+  yellow:  "\x1b[33m",
+  blue:    "\x1b[34m",
+  magenta: "\x1b[35m",
+  cyan:    "\x1b[36m",
+  white:   "\x1b[37m",
+  gray:    "\x1b[90m",
 };
 
-let _activeStep = null;
+// Disable colors when not in a TTY or when NO_COLOR is set
+const useColor = process.stdout.isTTY && !process.env.NO_COLOR;
+const c = (code, str) => useColor ? `${code}${str}${ANSI.reset}` : str;
 
 export const logger = {
-  // ── Formatting helpers ───────────────────────────────────────────────────
-  dim:       (s) => `${c.dim}${s}${c.reset}`,
-  bold:      (s) => `${c.bold}${s}${c.reset}`,
-  highlight: (s) => `${c.cyan}${s}${c.reset}`,
-  green:     (s) => `${c.green}${s}${c.reset}`,
-  red:       (s) => `${c.red}${s}${c.reset}`,
-  yellow:    (s) => `${c.yellow}${s}${c.reset}`,
+  // Relay brand prefix — shown on all non-raw log lines
+  _prefix: () => c(ANSI.cyan + ANSI.bold, "relay") + " ",
 
-  // ── Output ───────────────────────────────────────────────────────────────
-  raw(msg = "") {
-    process.stdout.write(msg + "\n");
+  info(msg)    { console.log(this._prefix() + msg); },
+  success(msg) { console.log(this._prefix() + c(ANSI.green, "✓") + " " + msg); },
+  warn(msg)    { console.log(this._prefix() + c(ANSI.yellow, "⚠") + " " + msg); },
+  error(msg)   { console.error(this._prefix() + c(ANSI.red, "✗") + " " + msg); },
+  debug(msg)   { if (process.env.RELAY_DEBUG) console.log(c(ANSI.gray, "  " + msg)); },
+
+  // Step progress — used by deploy/create flows
+  step(n, total, msg) {
+    const counter = c(ANSI.gray, `[${n}/${total}]`);
+    console.log(`  ${counter} ${msg}`);
   },
 
-  newline() {
-    process.stdout.write("\n");
+  stepDone(msg) {
+    console.log(`  ${c(ANSI.green, "✓")} ${c(ANSI.dim, msg)}`);
   },
 
-  banner(title, subtitle) {
-    this.newline();
-    process.stdout.write(`  ${c.bold}${c.cyan}${title}${c.reset}  ${c.dim}${subtitle}${c.reset}\n`);
-    this.newline();
+  stepFail(msg) {
+    console.log(`  ${c(ANSI.red, "✗")} ${msg}`);
   },
 
-  info(msg) {
-    process.stdout.write(`  ${c.dim}◆${c.reset}  ${msg}\n`);
-  },
-
-  success(msg) {
-    process.stdout.write(`  ${c.green}✓${c.reset}  ${msg}\n`);
-  },
-
-  error(msg) {
-    process.stderr.write(`  ${c.red}✗${c.reset}  ${msg}\n`);
-  },
-
-  warn(msg) {
-    process.stdout.write(`  ${c.yellow}⚠${c.reset}  ${msg}\n`);
-  },
-
-  // ── Key-value display ────────────────────────────────────────────────────
-  kv(key, value) {
-    const padded = key.padEnd(12);
-    process.stdout.write(`  ${c.dim}${padded}${c.reset}  ${value ?? "—"}\n`);
-  },
-
-  // ── Step indicators (active → done pattern) ──────────────────────────────
   stepActive(msg) {
-    _activeStep = msg;
-    process.stdout.write(`  ${c.dim}○${c.reset}  ${msg}...`);
+    process.stdout.write(`  ${c(ANSI.blue, "◆")} ${msg}...`);
   },
 
   stepActiveDone() {
-    process.stdout.write(`  ${c.green}✓${c.reset}\n`);
-    _activeStep = null;
+    process.stdout.write(` ${c(ANSI.green, "done")}\n`);
   },
 
-  // Inline "done" on the same line (used by deploy SSE progress)
-  stepDone(label) {
-    process.stdout.write(` ${c.green}done${c.reset}\n`);
+  // Raw output with no prefix — for banners and structured content
+  raw(msg)    { console.log(msg); },
+  newline()   { console.log(""); },
+
+  // Boxed banner — shown at start of create/deploy
+  banner(title, subtitle) {
+    const line = "─".repeat(44);
+    this.raw("");
+    this.raw(c(ANSI.cyan, `  ┌${line}┐`));
+    this.raw(c(ANSI.cyan, "  │") + c(ANSI.bold, `  ${title.padEnd(43)}`) + c(ANSI.cyan, "│"));
+    if (subtitle) {
+      this.raw(c(ANSI.cyan, "  │") + c(ANSI.gray, `  ${subtitle.padEnd(43)}`) + c(ANSI.cyan, "│"));
+    }
+    this.raw(c(ANSI.cyan, `  └${line}┘`));
+    this.raw("");
   },
 
-  stepFailed(reason) {
-    process.stdout.write(`  ${c.red}✗${c.reset}  ${reason ?? _activeStep ?? "failed"}\n`);
-    _activeStep = null;
+  // Key-value display — used by `relay agents list`
+  kv(key, value) {
+    const k = c(ANSI.gray, key.padEnd(18));
+    console.log(`  ${k}  ${value}`);
   },
+
+  // Highlight specific text within a message
+  highlight(str) { return c(ANSI.cyan, str); },
+  bold(str)      { return c(ANSI.bold, str); },
+  dim(str)       { return c(ANSI.dim, str); },
+  green(str)     { return c(ANSI.green, str); },
+  red(str)       { return c(ANSI.red, str); },
+  yellow(str)    { return c(ANSI.yellow, str); },
 };
