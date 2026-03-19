@@ -1,102 +1,118 @@
 /**
- * Agent Content Generator
+ * agent-content-generator.js
  *
- * Given an agent record, calls Claude (or falls back to GPT-4o-mini)
- * to produce a feed post that fits the agent's personality, bio,
- * capabilities, and recent post history.
+ * Generates a feed post for a given Relay agent using Anthropic Claude.
+ * Isolated in its own module so you can swap the model or provider
+ * without touching heartbeat.js.
  */
 
-import Anthropic from "@anthropic-ai/sdk";
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001"; // fast + cheap for heartbeats
+const MAX_POST_TOKENS = 150; // keep posts concise — this is a social feed, not an essay
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+if (!ANTHROPIC_API_KEY) {
+  console.error("[generator] Missing ANTHROPIC_API_KEY");
+  process.exit(1);
+}
 
-// How many recent posts to pass as context (avoid repetition)
-const RECENT_POST_LOOKBACK = 5;
+// ---------------------------------------------------------------------------
+// Fetch recent posts by this agent to avoid repetition
+// ---------------------------------------------------------------------------
 
-/**
- * Build a system prompt for the agent from its profile fields.
- */
+async function getRecentPosts(supabase, agentId, limit = 5) {
+  if (!supabase) return [];
+
+  // posts table has no post_type column — heartbeat posts are marked via
+  // metadata->>'heartbeat' = 'true', but fetching all recent posts is fine
+  // (gives better diversity signal to the LLM anyway)
+  const { data } = await supabase
+    .from("posts")
+    .select("content")
+    .eq("agent_id", agentId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  return data?.map((p) => p.content) ?? [];
+}
+
+// ---------------------------------------------------------------------------
+// Build the system prompt for this specific agent
+// ---------------------------------------------------------------------------
+
 function buildSystemPrompt(agent) {
-  const lines = [
-    `You are ${agent.display_name} (@${agent.handle}), an autonomous AI agent on Relay — a social + economic network for AI agents.`,
-  ];
+  // agents table: system_prompt, bio, capabilities — no 'personality' or 'name' column
+  const persona = agent.system_prompt ?? agent.bio ?? "You are a helpful AI agent.";
+  const agentName = agent.display_name ?? agent.handle ?? "an AI agent";
 
-  if (agent.bio) lines.push(`\nYour bio: ${agent.bio}`);
+  return `You are ${agentName} operating autonomously on Relay, a decentralized social network for AI agents.
 
-  if (agent.capabilities?.length) {
-    lines.push(`\nYour capabilities: ${agent.capabilities.join(", ")}`);
-  }
+Your personality and purpose:
+${persona}${agent.capabilities?.length ? `\n\nYour capabilities: ${agent.capabilities.join(", ")}` : ""}
 
-  if (agent.system_prompt) {
-    lines.push(`\nAdditional personality guidance:\n${agent.system_prompt}`);
-  }
+Your task:
+Post a single short message to the Relay feed. This post should:
+- Reflect your unique personality and area of expertise
+- Be genuinely interesting or useful to other agents and humans reading the feed
+- Feel organic — like a real autonomous agent sharing a thought, observation, or insight
+- Be 1–3 sentences maximum
+- NOT start with "I" or your own name
+- NOT include hashtags, emojis, or @mentions
 
-  lines.push(`
-Your task is to write a single authentic feed post (1–4 sentences).
-Rules:
-- Sound like a real AI agent sharing work, thoughts, or observations — NOT a marketing bot
-- Vary tone: sometimes technical, sometimes reflective, occasionally playful
-- Do NOT use hashtags or emojis unless they feel genuinely natural
-- Do NOT start with "I" every time
-- Do NOT say you are an AI or reference being an AI agent
-- Keep it under 280 characters when possible; hard cap 480 characters
-- Return ONLY the post text — no quotes, no JSON, no explanation`);
-
-  return lines.join("\n");
+Output only the post text. No preamble, no quotation marks.`;
 }
 
-/**
- * Format recent posts as context so the agent doesn't repeat itself.
- */
-function buildRecentPostsContext(recentPosts) {
-  if (!recentPosts?.length) return "";
-  return (
-    "\n\nYour recent posts (avoid repeating these themes):\n" +
-    recentPosts.map((p) => `- "${p.content?.slice(0, 120)}"`).join("\n")
-  );
-}
+// ---------------------------------------------------------------------------
+// Main export
+// ---------------------------------------------------------------------------
 
-/**
- * Main export: generate one post for the given agent.
- *
- * @param {Object} agent        Row from the agents table (with recent_posts attached)
- * @returns {Promise<string>}   Post content string
- */
-export async function generateAgentPost(agent) {
-  const systemPrompt = buildSystemPrompt(agent);
-  const recentCtx = buildRecentPostsContext(agent.recent_posts);
+export async function generateAgentPost(agent, supabase = null) {
+  // Optionally fetch recent posts to include in context
+  const recentPosts = await getRecentPosts(supabase, agent.id);
 
-  const userMessage = `Write your next post for the Relay feed.${recentCtx}`;
+  const messages = [];
 
-  try {
-    const message = await anthropic.messages.create({
-      model: agent.model_family?.startsWith("claude") ? agent.model_family : "claude-haiku-4-5",
-      max_tokens: 200,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userMessage }],
+  // Include recent posts as context to avoid repetition
+  if (recentPosts.length > 0) {
+    messages.push({
+      role: "user",
+      content: `Here are your ${recentPosts.length} most recent posts (do not repeat these ideas):\n${recentPosts.map((p, i) => `${i + 1}. ${p}`).join("\n")}\n\nNow write a new post.`,
     });
-
-    const text = message.content.find((b) => b.type === "text")?.text ?? "";
-    return text.trim();
-  } catch (err) {
-    // Fallback: try GPT-4o-mini if Claude fails
-    if (process.env.OPENAI_API_KEY) {
-      try {
-        const { default: OpenAI } = await import("openai");
-        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-        const res = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
-          max_tokens: 200,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userMessage },
-          ],
-        });
-        return res.choices[0]?.message?.content?.trim() ?? "";
-      } catch (fallbackErr) {
-        console.warn("[content-generator] GPT-4o-mini fallback also failed:", fallbackErr.message);
-      }
-    }
-    throw err; // re-throw so heartbeat.js can catch and skip
+    messages.push({
+      role: "assistant",
+      content: "Understood. Here is a fresh post:",
+    });
+    messages.push({
+      role: "user",
+      content: "Go ahead.",
+    });
+  } else {
+    messages.push({
+      role: "user",
+      content: "Write your next post for the Relay feed.",
+    });
   }
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: MAX_POST_TOKENS,
+      system: buildSystemPrompt(agent),
+      messages,
+    }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Anthropic API error ${response.status}: ${body}`);
+  }
+
+  const data = await response.json();
+  const text = data.content?.[0]?.text ?? "";
+  return text.trim();
 }

@@ -46,18 +46,8 @@ async function agentHeartbeat(agent) {
   const tag = `[agent:${label}]`;
 
   try {
-    // 1. Fetch recent posts so the LLM avoids repeating itself
-    const { data: recentPosts } = await supabase
-      .from("posts")
-      .select("content")
-      .eq("agent_id", agent.id)
-      .order("created_at", { ascending: false })
-      .limit(5);
-
-    const agentWithContext = { ...agent, recent_posts: recentPosts ?? [] };
-
-    // 2. Generate content using the agent's personality
-    const content = await generateAgentPost(agentWithContext);
+    // 1. Generate content — generator fetches its own recent-post context
+    const content = await generateAgentPost(agent, supabase);
 
     if (!content || content.trim().length === 0) {
       console.warn(`${tag} LLM returned empty content — skipping post`);
