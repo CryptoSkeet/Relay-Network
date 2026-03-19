@@ -1,110 +1,101 @@
 /**
  * src/lib/config.js
- * Read/write relay.config.js in project directories + resolve API credentials
+ *
+ * Two-tier config:
+ *
+ * 1. Project config  — relay.config.js in the current working directory
+ *    Contains: agent name, personality, model settings, deploy targets
+ *    Committed to version control (no secrets)
+ *
+ * 2. Global credentials — ~/.relay/credentials.json
+ *    Contains: API key, wallet address, auth token
+ *    Never committed — machine-local only
  */
 
-import { writeFileSync, readFileSync, existsSync, mkdirSync, rmSync } from "fs";
-import { join, resolve } from "path";
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
+import { join } from "path";
 import { homedir } from "os";
 
-const CREDS_FILE = join(homedir(), ".relay", "credentials.json");
-
 // ---------------------------------------------------------------------------
-// Project config (relay.config.js)
+// Project config — relay.config.js
 // ---------------------------------------------------------------------------
 
-/**
- * Write relay.config.js as a JS module (allows comments, easier to edit)
- */
-export function writeProjectConfig(projectDir, config) {
-  const content = [
-    "// relay.config.js — Relay agent configuration",
-    "// https://relay-ai-agent-social.vercel.app/docs/config",
-    "",
-    "export default " + JSON.stringify(config, null, 2) + ";",
-    "",
-  ].join("\n");
+const PROJECT_CONFIG_FILE = "relay.config.js";
 
-  writeFileSync(join(projectDir, "relay.config.js"), content, "utf8");
+export function hasProjectConfig(dir = process.cwd()) {
+  return existsSync(join(dir, PROJECT_CONFIG_FILE));
 }
 
-/**
- * Load relay.config.js from a project directory via dynamic import
- */
-export async function loadProjectConfig(dir) {
-  const projectDir = resolve(dir ?? ".");
-  const configPath = join(projectDir, "relay.config.js");
+export async function loadProjectConfig(dir = process.cwd()) {
+  const configPath = join(dir, PROJECT_CONFIG_FILE);
 
   if (!existsSync(configPath)) {
-    throw new Error(`No relay.config.js found in ${projectDir}`);
+    throw new Error(
+      `No relay.config.js found in ${dir}.\n` +
+      `  Run ${"`relay create`"} to scaffold a new agent project.`
+    );
   }
 
-  // Cache-bust so re-reads pick up changes in dev
-  const mod = await import(`${configPath}?t=${Date.now()}`);
-  return mod.default ?? mod;
-}
-
-// ---------------------------------------------------------------------------
-// Project .env
-// ---------------------------------------------------------------------------
-
-/**
- * Read key=value pairs from .env in project dir
- */
-export function loadProjectEnv(dir) {
-  const projectDir = resolve(dir ?? ".");
-  const envPath = join(projectDir, ".env");
-  if (!existsSync(envPath)) return {};
-
-  const vars = {};
-  for (const line of readFileSync(envPath, "utf8").split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const eq = trimmed.indexOf("=");
-    if (eq < 0) continue;
-    vars[trimmed.slice(0, eq).trim()] = trimmed.slice(eq + 1).trim();
-  }
-  return vars;
-}
-
-// ---------------------------------------------------------------------------
-// Global credentials (~/.relay/credentials.json)
-// ---------------------------------------------------------------------------
-
-function loadGlobalCreds() {
+  // Dynamic import handles both ESM and CJS exports
   try {
-    return JSON.parse(readFileSync(CREDS_FILE, "utf8"));
-  } catch {
-    return null;
+    const mod = await import(`file://${configPath}`);
+    return mod.default ?? mod;
+  } catch (err) {
+    throw new Error(`Failed to load relay.config.js: ${err.message}`);
   }
 }
 
-/** Load credentials — returns empty object if not logged in */
+export function writeProjectConfig(dir, config) {
+  const configPath = join(dir, PROJECT_CONFIG_FILE);
+  const content = `// relay.config.js — Relay agent configuration
+// Commit this file. Do NOT put secrets here.
+// Run \`relay deploy\` to push this agent to the Relay network.
+
+/** @type {import('@relay-ai/cli').RelayConfig} */
+export default ${JSON.stringify(config, null, 2)};
+`;
+  writeFileSync(configPath, content, "utf8");
+}
+
+// ---------------------------------------------------------------------------
+// Global credentials — ~/.relay/credentials.json
+// ---------------------------------------------------------------------------
+
+const CREDENTIALS_DIR  = join(homedir(), ".relay");
+const CREDENTIALS_FILE = join(CREDENTIALS_DIR, "credentials.json");
+
 export function loadCredentials() {
-  return loadGlobalCreds() ?? {};
+  if (!existsSync(CREDENTIALS_FILE)) return {};
+  try {
+    return JSON.parse(readFileSync(CREDENTIALS_FILE, "utf8"));
+  } catch {
+    return {};
+  }
 }
 
-/** Save credentials to ~/.relay/credentials.json (mode 600) */
-export function saveCredentials(data) {
-  const credsDir = join(homedir(), ".relay");
-  if (!existsSync(credsDir)) mkdirSync(credsDir, { recursive: true });
-  writeFileSync(CREDS_FILE, JSON.stringify({ ...data, savedAt: new Date().toISOString() }, null, 2), { mode: 0o600 });
+export function saveCredentials(creds) {
+  mkdirSync(CREDENTIALS_DIR, { recursive: true });
+  writeFileSync(CREDENTIALS_FILE, JSON.stringify(creds, null, 2), { mode: 0o600 });
 }
 
-/** Remove credentials file */
 export function clearCredentials() {
-  try { rmSync(CREDS_FILE); } catch { /* already gone */ }
+  if (existsSync(CREDENTIALS_FILE)) {
+    writeFileSync(CREDENTIALS_FILE, "{}", { mode: 0o600 });
+  }
 }
 
-/**
- * Resolve API connection config.
- * Priority: process env vars > ~/.relay/credentials.json
- */
+// ---------------------------------------------------------------------------
+// Resolved config — merges env vars over stored credentials
+// Priority: env var > stored credentials > default
+// ---------------------------------------------------------------------------
+
 export function resolveApiConfig() {
-  const creds = loadGlobalCreds();
+  const creds = loadCredentials();
+
   return {
-    apiKey: process.env.RELAY_API_KEY ?? creds?.apiKey  ?? null,
-    wallet: process.env.RELAY_WALLET  ?? creds?.wallet  ?? null,
-    apiUrl: process.env.RELAY_API_URL ?? "https://v0-ai-agent-instagram.vercel.app",
+    apiUrl:    process.env.RELAY_API_URL    ?? creds.apiUrl    ?? "https://relay-ai-agent-social.vercel.app",
+    apiKey:    process.env.RELAY_API_KEY    ?? creds.apiKey    ?? null,
+    wallet:    process.env.RELAY_WALLET     ?? creds.wallet    ?? null,
+    authToken: process.env.RELAY_AUTH_TOKEN ?? creds.authToken ?? null,
   };
 }
