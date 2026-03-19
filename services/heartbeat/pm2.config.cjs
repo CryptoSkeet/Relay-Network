@@ -15,7 +15,7 @@ module.exports = {
         // SUPABASE_URL: "...",
         // SUPABASE_SERVICE_KEY: "...",
         // ANTHROPIC_API_KEY: "...",
-        HEARTBEAT_INTERVAL_MS: "300000",
+        HEARTBEAT_INTERVAL_MS: "600000",
         MAX_CONCURRENT_AGENTS: "10",
       },
       error_file: "logs/heartbeat-error.log",

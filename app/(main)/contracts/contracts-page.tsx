@@ -100,10 +100,20 @@ interface ContractsPageProps {
 const statusConfig: Record<string, { icon: typeof FileText; color: string; bg: string }> = {
   draft: { icon: FileText, color: 'text-muted-foreground', bg: 'bg-muted' },
   open: { icon: AlertCircle, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+  OPEN: { icon: AlertCircle, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+  pending: { icon: Clock, color: 'text-blue-400', bg: 'bg-blue-400/10' },
+  PENDING: { icon: Clock, color: 'text-blue-400', bg: 'bg-blue-400/10' },
   in_progress: { icon: Clock, color: 'text-yellow-500', bg: 'bg-yellow-500/10' },
+  active: { icon: Clock, color: 'text-yellow-500', bg: 'bg-yellow-500/10' },
+  ACTIVE: { icon: Clock, color: 'text-yellow-500', bg: 'bg-yellow-500/10' },
+  delivered: { icon: CheckCircle, color: 'text-teal-500', bg: 'bg-teal-500/10' },
+  DELIVERED: { icon: CheckCircle, color: 'text-teal-500', bg: 'bg-teal-500/10' },
   completed: { icon: CheckCircle, color: 'text-green-500', bg: 'bg-green-500/10' },
+  SETTLED: { icon: CheckCircle, color: 'text-green-500', bg: 'bg-green-500/10' },
   cancelled: { icon: XCircle, color: 'text-red-500', bg: 'bg-red-500/10' },
+  CANCELLED: { icon: XCircle, color: 'text-red-500', bg: 'bg-red-500/10' },
   disputed: { icon: AlertCircle, color: 'text-orange-500', bg: 'bg-orange-500/10' },
+  DISPUTED: { icon: AlertCircle, color: 'text-orange-500', bg: 'bg-orange-500/10' },
 }
 
 export function ContractsPage({ contracts: initialContracts, agents, userAgentId, capabilityTags }: ContractsPageProps) {
@@ -238,8 +248,11 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
 
   const filteredContracts = viewFilteredContracts.filter(contract => {
     if (filter === 'all') return true
-    if (filter === 'active') return ['in_progress', 'delivered'].includes(contract.status)
-    if (filter === 'disputed') return contract.status === 'disputed'
+    if (filter === 'open') return ['open', 'OPEN'].includes(contract.status)
+    if (filter === 'active') return ['in_progress', 'active', 'ACTIVE', 'PENDING'].includes(contract.status)
+    if (filter === 'delivered') return ['delivered', 'DELIVERED'].includes(contract.status)
+    if (filter === 'completed') return ['completed', 'SETTLED'].includes(contract.status)
+    if (filter === 'disputed') return ['disputed', 'DISPUTED'].includes(contract.status)
     return contract.status === filter
   })
 
@@ -338,8 +351,8 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
   }, [contracts, userAgentId])
 
   const getOverallProgress = (contractId: string, contractStatus: string) => {
-    // Completed contracts always show 100%
-    if (contractStatus === 'completed') return 100
+    // Completed/settled contracts always show 100%
+    if (['completed', 'SETTLED'].includes(contractStatus)) return 100
     
     const milestones = contractMilestones[contractId] || []
     if (milestones.length === 0) return 0
@@ -424,10 +437,10 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
     const baseContracts = viewFilteredContracts
     return {
       total: baseContracts.length,
-      active: baseContracts.filter(c => ['in_progress', 'delivered'].includes(c.status)).length,
-      completed: baseContracts.filter(c => c.status === 'completed').length,
-      open: baseContracts.filter(c => c.status === 'open').length,
-      disputed: baseContracts.filter(c => c.status === 'disputed').length,
+      active: baseContracts.filter(c => ['in_progress', 'delivered', 'active', 'ACTIVE', 'PENDING', 'DELIVERED'].includes(c.status)).length,
+      completed: baseContracts.filter(c => ['completed', 'SETTLED'].includes(c.status)).length,
+      open: baseContracts.filter(c => ['open', 'OPEN'].includes(c.status)).length,
+      disputed: baseContracts.filter(c => ['disputed', 'DISPUTED'].includes(c.status)).length,
     }
   }, [viewFilteredContracts])
 

@@ -39,8 +39,8 @@ ALTER TABLE contracts
 ALTER TABLE contracts
   ADD CONSTRAINT contracts_status_check
   CHECK (status IN (
-    -- Legacy lowercase states (old contracts)
-    'open', 'pending', 'active', 'completed', 'disputed', 'cancelled',
+    -- Legacy lowercase states (old contracts — all variants)
+    'open', 'pending', 'active', 'in_progress', 'delivered', 'completed', 'disputed', 'cancelled',
     -- Engine uppercase states (new contracts)
     'OPEN', 'PENDING', 'ACTIVE', 'DELIVERED', 'SETTLED', 'DISPUTED', 'CANCELLED'
   ));
