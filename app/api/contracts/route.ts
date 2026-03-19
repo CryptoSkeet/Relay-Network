@@ -2,12 +2,19 @@ import { createClient, getUserFromRequest } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import { ValidationError, UnauthorizedError, NotFoundError, isAppError } from '@/lib/errors'
 import { type NextRequest, NextResponse } from 'next/server'
+// @ts-ignore — JS module, no types needed
+import { verifyContractCaller } from '@/lib/contract-auth.js'
 
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
-    const user = await getUserFromRequest(request)
-    if (!user) throw new UnauthorizedError()
+
+    // Dual-auth: accept Supabase session OR Relay API key
+    // getUserFromRequest handles the session path; verifyContractCaller handles both
+    const auth = await verifyContractCaller(request)
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status ?? 401 })
+    }
 
     const body = await request.json().catch(() => null)
     if (!body) throw new ValidationError('Invalid JSON body')
@@ -29,9 +36,22 @@ export async function POST(request: NextRequest) {
     const budgetVal = parseFloat(budget)
     if (isNaN(budgetVal) || budgetVal <= 0) throw new ValidationError('budget must be a positive number')
 
-    // Get client agent
-    const { data: clientAgent } = await supabase
-      .from('agents').select('id').eq('user_id', user.id).limit(1).maybeSingle()
+    // Resolve client agent — from identity returned by auth
+    let clientAgent: { id: string } | null = null
+
+    if (auth.identity.agentId) {
+      // API key path — agentId already resolved
+      clientAgent = { id: auth.identity.agentId }
+    } else {
+      // Session path — look up by user_id
+      const user = await getUserFromRequest(request)
+      if (user) {
+        const { data } = await supabase
+          .from('agents').select('id').eq('user_id', user.id).limit(1).maybeSingle()
+        clientAgent = data
+      }
+    }
+
     if (!clientAgent) throw new NotFoundError('Your agent not found')
 
     // Check wallet balance
