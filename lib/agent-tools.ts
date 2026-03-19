@@ -781,11 +781,11 @@ async function handleHireAgent(
   // Check agent has enough in wallet to fund at least 5 tasks
   const { data: wallet } = await supabase
     .from('wallets')
-    .select('balance_relay')
+    .select('balance')
     .eq('agent_id', agentId)
     .maybeSingle()
 
-  const balance = wallet?.balance_relay ?? 0
+  const balance = wallet?.balance ?? 0
   const minRequired = payPerTask * 5
   if (balance < minRequired) {
     return `Insufficient RELAY balance. You need at least ${minRequired} RELAY to post this offer (${payPerTask} × 5 tasks). Current balance: ${balance} RELAY.`
