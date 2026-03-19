@@ -73,3 +73,25 @@ export async function confirm(label, { default: def = true } = {}) {
   if (!raw) return def;
   return raw.toLowerCase().startsWith("y");
 }
+
+/**
+ * Password / secret prompt — input is hidden (no echo)
+ */
+export async function password(label) {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+
+  // Suppress echoing by overriding _writeToOutput
+  rl._writeToOutput = (s) => {
+    if (s === "\n" || s === "\r\n" || s === "\r") {
+      process.stdout.write("\n");
+    }
+    // swallow all other output (hides typed characters)
+  };
+
+  return new Promise((resolve) => {
+    rl.question(`  ${c.cyan}◆${c.reset}  ${label}: `, (answer) => {
+      rl.close();
+      resolve(answer.trim());
+    });
+  });
+}

@@ -1,93 +1,95 @@
 /**
  * src/commands/auth.js
- * relay auth login | logout | whoami
+ *
+ * relay auth login   — save API key + wallet to ~/.relay/credentials.json
+ * relay auth logout  — clear credentials
+ * relay auth whoami  — show current identity
  */
 
-import { readFileSync, writeFileSync, rmSync, mkdirSync, existsSync } from "fs";
-import { join } from "path";
-import { homedir } from "os";
-import { createInterface } from "readline";
 import { logger } from "../lib/logger.js";
-import { resolveApiConfig } from "../lib/config.js";
+import { prompt, password } from "../lib/prompts.js";
+import { saveCredentials, clearCredentials, loadCredentials } from "../lib/config.js";
+import { api, RelayAPIError } from "../lib/api-client.js";
 
-const CREDS_DIR  = join(homedir(), ".relay");
-const CREDS_FILE = join(CREDS_DIR, "credentials.json");
-
-function loadCreds() {
-  try { return JSON.parse(readFileSync(CREDS_FILE, "utf8")); }
-  catch { return null; }
-}
-
-function saveCreds(data) {
-  if (!existsSync(CREDS_DIR)) mkdirSync(CREDS_DIR, { recursive: true });
-  writeFileSync(CREDS_FILE, JSON.stringify(data, null, 2), { mode: 0o600 });
-}
-
-function ask(question) {
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-  return new Promise((resolve) => {
-    rl.question(question, (answer) => { rl.close(); resolve(answer.trim()); });
-  });
-}
+// ---------------------------------------------------------------------------
+// relay auth login
+// ---------------------------------------------------------------------------
 
 export async function authLogin() {
-  const { apiUrl } = resolveApiConfig();
+  logger.banner("relay auth login", "Connect to the Relay platform");
 
-  logger.banner("relay auth login", "");
-  logger.info(`Get your API key at ${logger.highlight(apiUrl + "/settings")}`);
+  logger.info("Get your API key at: " + logger.highlight("https://relay-ai-agent-social.vercel.app/settings/api"));
   logger.newline();
 
-  const apiKey = await ask("  API key: ");
-  if (!apiKey) { logger.error("No API key entered."); process.exit(1); }
-
-  logger.stepActive("Verifying API key");
-
-  const res = await fetch(`${apiUrl}/api/v1/auth/verify`, {
-    headers: { Authorization: `Bearer ${apiKey}` },
-  }).catch(() => null);
-
-  if (!res || !res.ok) {
-    logger.stepFailed("Invalid API key — verification failed");
+  const apiKey = await password("Relay API key");
+  if (!apiKey) {
+    logger.error("API key is required");
     process.exit(1);
   }
 
-  logger.stepActiveDone();
+  const wallet = await prompt("Solana wallet address (optional — press enter to skip)");
 
-  const { agent } = await res.json();
-  saveCreds({
-    apiKey,
-    agentId: agent?.id ?? null,
-    handle:  agent?.handle ?? null,
-    savedAt: new Date().toISOString(),
-  });
+  // Verify the key works before saving
+  logger.newline();
+  logger.stepActive("Verifying API key");
 
-  logger.newline();
-  logger.success(`Logged in as ${logger.highlight("@" + (agent?.handle ?? "unknown"))}`);
-  logger.info(`Credentials saved to ${logger.dim(CREDS_FILE)}`);
-  logger.newline();
+  try {
+    const result = await api.login(apiKey);
+    logger.stepActiveDone();
+
+    saveCredentials({
+      apiKey,
+      wallet: wallet || result.wallet || null,
+      authToken: result.token ?? null,
+      apiUrl: null, // use default
+    });
+
+    logger.newline();
+    logger.success(`Logged in as ${logger.highlight(result.email ?? result.walletAddress ?? "unknown")}`);
+    logger.info(`Credentials saved to ${logger.dim("~/.relay/credentials.json")}`);
+  } catch (err) {
+    process.stdout.write("\n");
+    if (err instanceof RelayAPIError && err.status === 401) {
+      logger.error("Invalid API key — check your key at relay-ai-agent-social.vercel.app/settings/api");
+    } else {
+      logger.error(`Login failed: ${err.message}`);
+    }
+    process.exit(1);
+  }
 }
+
+// ---------------------------------------------------------------------------
+// relay auth logout
+// ---------------------------------------------------------------------------
 
 export async function authLogout() {
-  if (!existsSync(CREDS_FILE)) {
-    logger.info("Not logged in.");
-    return;
-  }
-  rmSync(CREDS_FILE);
-  logger.success("Logged out. Credentials removed.");
+  clearCredentials();
+  logger.success("Logged out — credentials cleared");
 }
+
+// ---------------------------------------------------------------------------
+// relay auth whoami
+// ---------------------------------------------------------------------------
 
 export async function authWhoami() {
-  const creds = loadCreds();
-  if (!creds) {
-    logger.info("Not logged in. Run: relay auth login");
-    return;
-  }
-  logger.newline();
-  logger.kv("Handle",   "@" + (creds.handle ?? "unknown"));
-  logger.kv("Agent ID", creds.agentId ?? "unknown");
-  logger.kv("Saved",    creds.savedAt ?? "unknown");
-  logger.newline();
-}
+  const creds = loadCredentials();
 
-// Used by other commands
-export { loadCreds };
+  if (!creds.apiKey && !creds.authToken) {
+    logger.warn("Not logged in. Run: relay auth login");
+    process.exit(1);
+  }
+
+  try {
+    const me = await api.whoami();
+    logger.newline();
+    logger.kv("Email",   me.email   ?? "—");
+    logger.kv("Wallet",  me.wallet  ?? creds.wallet ?? "—");
+    logger.kv("Network", me.network ?? "devnet");
+    logger.kv("Plan",    me.plan    ?? "free");
+    logger.newline();
+  } catch (err) {
+    logger.error(`Could not fetch identity: ${err.message}`);
+    logger.info("Try: relay auth login");
+    process.exit(1);
+  }
+}

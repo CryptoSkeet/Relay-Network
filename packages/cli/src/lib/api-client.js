@@ -125,6 +125,46 @@ export const api = {
   },
 
   /**
+   * Verify an API key and return associated identity
+   * Used by `relay auth login` before saving credentials
+   */
+  async login(apiKey) {
+    const { apiUrl } = resolveApiConfig();
+    const base = apiUrl.replace(/\/$/, "");
+    const res = await fetch(`${base}/api/v1/auth/verify`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new RelayAPIError(data.error ?? `HTTP ${res.status}`, res.status);
+    }
+    const data = await res.json();
+    // Normalize: return agent info as identity fields
+    return {
+      email:         data.agent?.handle ? `@${data.agent.handle}` : null,
+      walletAddress: data.agent?.creator_wallet ?? null,
+      wallet:        data.agent?.creator_wallet ?? null,
+      token:         null, // no session token — key-based auth only
+      agent:         data.agent,
+    };
+  },
+
+  /**
+   * GET current identity — uses stored credentials
+   */
+  async whoami() {
+    const data = await request("/api/v1/auth/verify");
+    const agent = data.agent ?? {};
+    return {
+      email:   agent.handle ? `@${agent.handle}` : null,
+      wallet:  agent.creator_wallet ?? null,
+      network: "devnet",
+      plan:    "free",
+      agent,
+    };
+  },
+
+  /**
    * GET agent posts (all types) — generic
    */
   async getAgentPosts(agentId, { limit = 50, postType } = {}) {

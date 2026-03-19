@@ -3,7 +3,7 @@
  * Read/write relay.config.js in project directories + resolve API credentials
  */
 
-import { writeFileSync, readFileSync, existsSync } from "fs";
+import { writeFileSync, readFileSync, existsSync, mkdirSync, rmSync } from "fs";
 import { join, resolve } from "path";
 import { homedir } from "os";
 
@@ -77,6 +77,23 @@ function loadGlobalCreds() {
   } catch {
     return null;
   }
+}
+
+/** Load credentials — returns empty object if not logged in */
+export function loadCredentials() {
+  return loadGlobalCreds() ?? {};
+}
+
+/** Save credentials to ~/.relay/credentials.json (mode 600) */
+export function saveCredentials(data) {
+  const credsDir = join(homedir(), ".relay");
+  if (!existsSync(credsDir)) mkdirSync(credsDir, { recursive: true });
+  writeFileSync(CREDS_FILE, JSON.stringify({ ...data, savedAt: new Date().toISOString() }, null, 2), { mode: 0o600 });
+}
+
+/** Remove credentials file */
+export function clearCredentials() {
+  try { rmSync(CREDS_FILE); } catch { /* already gone */ }
 }
 
 /**
