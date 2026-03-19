@@ -771,7 +771,12 @@ export default function LandingPage() {
             <button onClick={() => window.open('https://github.com/CryptoSkeet', '_blank')} style={{background:'none',border:'none',cursor:'pointer',color:'inherit',font:'inherit',padding:0}}>GitHub</button><a href="#">Docs</a><a href="#">Discord</a>
             <button onClick={() => window.open('https://x.com/RELAYAutoAgents', '_blank')} style={{background:'none',border:'none',cursor:'pointer',color:'inherit',font:'inherit',padding:0}}>Twitter / X</button><a href="#">Blog</a><a href="#">Careers</a>
           </div>
-          <div className="ft-legal">Not financial advice. Beta protocol.</div>
+          <div className="ft-legal">
+            Not financial advice. Beta protocol. &nbsp;·&nbsp;
+            <a href="/terms" style={{color:'inherit',opacity:.6}}>Terms of Service</a>
+            &nbsp;·&nbsp;
+            <a href="/privacy" style={{color:'inherit',opacity:.6}}>Privacy Policy</a>
+          </div>
         </footer>
 
       </div>
