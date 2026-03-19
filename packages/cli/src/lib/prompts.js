@@ -1,97 +1,131 @@
 /**
  * src/lib/prompts.js
- * Minimal interactive prompt utilities — no heavy dependencies
+ *
+ * Zero-dependency interactive prompts using Node's built-in readline.
+ * Covers everything relay create needs: text, password, select, confirm.
+ *
+ * Why not inquirer/prompts/enquirer?
+ * Each adds 50-300 transitive dependencies. For 4 prompt types we don't
+ * need the baggage. readline ships with Node — no install, no version drift.
  */
 
-import { createInterface } from "readline";
+import readline from "readline";
 
-const c = {
-  reset:  "\x1b[0m",
-  dim:    "\x1b[2m",
-  cyan:   "\x1b[36m",
-  red:    "\x1b[31m",
-  green:  "\x1b[32m",
-};
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
 
-function ask(question) {
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-  return new Promise((resolve) => {
-    rl.question(question, (answer) => { rl.close(); resolve(answer.trim()); });
+function createRL() {
+  return readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
   });
 }
 
-/**
- * Text prompt with optional default and validation
- */
-export async function prompt(label, { default: def, validate } = {}) {
-  const hint = def ? ` ${c.dim}(${def})${c.reset}` : "";
+function ask(rl, question) {
+  return new Promise((resolve) => rl.question(question, resolve));
+}
+
+// ---------------------------------------------------------------------------
+// Text prompt
+// prompt("Agent name", { default: "my-agent" })
+// ---------------------------------------------------------------------------
+
+export async function prompt(label, { default: defaultVal, validate } = {}) {
+  const rl = createRL();
+  const hint = defaultVal ? ` (${defaultVal})` : "";
+
   while (true) {
-    const raw = await ask(`  ${c.cyan}◆${c.reset}  ${label}${hint}: `);
-    const value = raw || def || "";
+    const raw = await ask(rl, `  ${label}${hint}: `);
+    const value = raw.trim() || defaultVal || "";
+
     if (validate) {
       const err = validate(value);
       if (err) {
-        process.stdout.write(`     ${c.red}${err}${c.reset}\n`);
+        console.log(`  ⚠ ${err}`);
         continue;
       }
     }
+
+    rl.close();
     return value;
   }
 }
 
-/**
- * Single-choice select from a list
- * Shows numbered options, accepts number or exact value
- */
-export async function select(label, choices, { default: defaultIndex = 0 } = {}) {
-  process.stdout.write(`  ${c.cyan}◆${c.reset}  ${label}:\n`);
-  choices.forEach((choice, i) => {
-    const marker = i === defaultIndex ? `${c.green}▶${c.reset}` : " ";
-    process.stdout.write(`     ${marker} ${i + 1}. ${choice}\n`);
+// ---------------------------------------------------------------------------
+// Password prompt — input hidden
+// password("Anthropic API key")
+// ---------------------------------------------------------------------------
+
+export async function password(label) {
+  return new Promise((resolve) => {
+    const rl = createRL();
+
+    // Hide input by suppressing keystrokes
+    process.stdout.write(`  ${label}: `);
+    rl.stdoutMuted = true;
+
+    rl._writeToOutput = function(str) {
+      if (rl.stdoutMuted) {
+        process.stdout.write("*");
+      } else {
+        process.stdout.write(str);
+      }
+    };
+
+    rl.question("", (value) => {
+      rl.stdoutMuted = false;
+      console.log(""); // newline after hidden input
+      rl.close();
+      resolve(value.trim());
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Select prompt — arrow-key style via numbered options
+// select("Model provider", ["anthropic", "openai", "ollama"])
+// ---------------------------------------------------------------------------
+
+export async function select(label, options, { default: defaultIdx = 0 } = {}) {
+  const rl = createRL();
+
+  console.log(`  ${label}:`);
+  options.forEach((opt, i) => {
+    const marker = i === defaultIdx ? "◆" : "◇";
+    console.log(`    ${i + 1}. ${marker} ${opt}`);
   });
 
   while (true) {
-    const raw = await ask(`     Choice ${c.dim}(${defaultIndex + 1})${c.reset}: `);
-    if (!raw) return choices[defaultIndex];
+    const raw = await ask(rl, `  Choice (1-${options.length}) [${defaultIdx + 1}]: `);
+    const n = raw.trim() === "" ? defaultIdx + 1 : parseInt(raw.trim(), 10);
 
-    const num = parseInt(raw, 10);
-    if (!isNaN(num) && num >= 1 && num <= choices.length) return choices[num - 1];
+    if (!isNaN(n) && n >= 1 && n <= options.length) {
+      rl.close();
+      return options[n - 1];
+    }
 
-    const match = choices.find((c) => c === raw);
-    if (match) return match;
-
-    process.stdout.write(`     ${c.red}Enter a number 1–${choices.length}${c.reset}\n`);
+    console.log(`  ⚠ Enter a number between 1 and ${options.length}`);
   }
 }
 
-/**
- * Yes/no confirm
- */
-export async function confirm(label, { default: def = true } = {}) {
-  const hint = def ? "Y/n" : "y/N";
-  const raw = await ask(`  ${c.cyan}◆${c.reset}  ${label} ${c.dim}(${hint})${c.reset}: `);
-  if (!raw) return def;
-  return raw.toLowerCase().startsWith("y");
-}
+// ---------------------------------------------------------------------------
+// Confirm prompt — y/n
+// confirm("Enable autonomous posting?", { default: true })
+// ---------------------------------------------------------------------------
 
-/**
- * Password / secret prompt — input is hidden (no echo)
- */
-export async function password(label) {
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
+export async function confirm(label, { default: defaultVal = true } = {}) {
+  const rl = createRL();
+  const hint = defaultVal ? "Y/n" : "y/N";
 
-  // Suppress echoing by overriding _writeToOutput
-  rl._writeToOutput = (s) => {
-    if (s === "\n" || s === "\r\n" || s === "\r") {
-      process.stdout.write("\n");
-    }
-    // swallow all other output (hides typed characters)
-  };
+  while (true) {
+    const raw = await ask(rl, `  ${label} (${hint}): `);
+    const val = raw.trim().toLowerCase();
 
-  return new Promise((resolve) => {
-    rl.question(`  ${c.cyan}◆${c.reset}  ${label}: `, (answer) => {
-      rl.close();
-      resolve(answer.trim());
-    });
-  });
+    if (val === "" ) { rl.close(); return defaultVal; }
+    if (val === "y" || val === "yes") { rl.close(); return true; }
+    if (val === "n" || val === "no")  { rl.close(); return false; }
+
+    console.log("  ⚠ Enter y or n");
+  }
 }
