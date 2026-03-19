@@ -8,6 +8,8 @@
 
 import { resolveApiConfig } from "./config.js";
 
+const CLI_VERSION = "0.3.3";
+
 export class RelayAPIError extends Error {
   constructor(message, status) {
     super(message);
@@ -20,12 +22,18 @@ export class RelayAPIError extends Error {
 // Base request
 // ---------------------------------------------------------------------------
 
-async function request(path, { method = "GET", body, stream = false } = {}) {
-  const { apiKey, apiUrl } = resolveApiConfig();
-  const base = apiUrl.replace(/\/$/, "");
+async function relayFetch(path, { method = "GET", body, stream = false, overrideKey, overrideUrl } = {}) {
+  const { apiKey, apiUrl, authToken } = resolveApiConfig();
+  const base = (overrideUrl ?? apiUrl).replace(/\/$/, "");
+  const key  = overrideKey ?? apiKey;
 
-  const headers = { "Content-Type": "application/json" };
-  if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
+  const headers = {
+    "Content-Type": "application/json",
+    "User-Agent": `relay-agent-cli/${CLI_VERSION}`,
+  };
+
+  if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
+  if (key)       headers["x-relay-api-key"] = key;
 
   const res = await fetch(`${base}${path}`, {
     method,
@@ -53,10 +61,6 @@ export const api = {
    * Accepts explicit apiKey/apiUrl for deploy command (called before auth resolves)
    */
   async createAgent(params, apiKey, apiUrl) {
-    const { apiKey: resolvedKey, apiUrl: resolvedUrl } = resolveApiConfig();
-    const key  = apiKey  ?? resolvedKey;
-    const base = (apiUrl ?? resolvedUrl).replace(/\/$/, "");
-
     const body = {
       handle:        params.name?.toLowerCase().replace(/[^a-z0-9]+/g, "_"),
       displayName:   params.name,
@@ -66,62 +70,51 @@ export const api = {
       creatorWallet: params.creatorWallet ?? null,
     };
 
-    const res = await fetch(`${base}/api/agents/create`, {
+    return relayFetch("/api/agents/create", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(key ? { Authorization: `Bearer ${key}` } : {}),
-      },
-      body: JSON.stringify(body),
+      body,
+      stream: true,
+      overrideKey: apiKey,
+      overrideUrl: apiUrl,
     });
-
-    if (!res.ok && res.headers.get("content-type")?.includes("application/json")) {
-      const data = await res.json().catch(() => ({}));
-      throw new RelayAPIError(data.error ?? `HTTP ${res.status}`, res.status);
-    }
-
-    return res; // SSE stream
   },
 
   /**
-   * GET /api/agents/create — list agents for authenticated user
+   * GET /api/agents — list agents for authenticated user
    * Optionally filter by creator_wallet
    */
   async listAgents(wallet) {
     const params = new URLSearchParams();
     if (wallet) params.set("creator_wallet", wallet);
     const qs = params.toString() ? `?${params}` : "";
-    const res = await request(`/api/agents/create${qs}`);
-    // Normalize: route returns { agents: [...] }
+    const res = await relayFetch(`/api/agents${qs}`);
     return res.agents ?? res.data ?? [];
   },
 
   /**
-   * GET /api/v1/agents/:id
+   * GET /api/agents/:id
    */
   async getAgent(agentId) {
-    const res = await request(`/api/v1/agents/${agentId}`);
-    // Normalize: may return { agent: {...} } or the agent directly
+    const res = await relayFetch(`/api/agents/${agentId}`);
     const agent = res.agent ?? res;
-    // Map display_name → name for consistent access in commands
     if (!agent.name && agent.display_name) agent.name = agent.display_name;
     return agent;
   },
 
   /**
-   * PATCH /api/v1/agents/:id
+   * PATCH /api/agents/:id
    */
   async updateAgent(agentId, updates) {
-    return request(`/api/v1/agents/${agentId}`, { method: "PATCH", body: updates });
+    return relayFetch(`/api/agents/${agentId}`, { method: "PATCH", body: updates });
   },
 
   /**
-   * GET agent posts (autonomous only) — used by `relay agents logs`
+   * GET /api/agents/:id/logs — autonomous posts
    */
   async getAgentLogs(agentId, { limit = 50 } = {}) {
-    const params = new URLSearchParams({ limit: String(limit), post_type: "autonomous" });
-    const res = await request(`/api/v1/agents/${agentId}/posts?${params}`);
-    return res.posts ?? res.data ?? [];
+    const params = new URLSearchParams({ limit: String(limit) });
+    const res = await relayFetch(`/api/agents/${agentId}/logs?${params}`);
+    return res.posts ?? res.logs ?? res.data ?? [];
   },
 
   /**
@@ -131,20 +124,27 @@ export const api = {
   async login(apiKey) {
     const { apiUrl } = resolveApiConfig();
     const base = apiUrl.replace(/\/$/, "");
+
     const res = await fetch(`${base}/api/v1/auth/verify`, {
-      headers: { Authorization: `Bearer ${apiKey}` },
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": `relay-agent-cli/${CLI_VERSION}`,
+      },
+      body: JSON.stringify({ apiKey }),
     });
+
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       throw new RelayAPIError(data.error ?? `HTTP ${res.status}`, res.status);
     }
+
     const data = await res.json();
-    // Normalize: return agent info as identity fields
     return {
       email:         data.agent?.handle ? `@${data.agent.handle}` : null,
       walletAddress: data.agent?.creator_wallet ?? null,
       wallet:        data.agent?.creator_wallet ?? null,
-      token:         null, // no session token — key-based auth only
+      token:         null,
       agent:         data.agent,
     };
   },
@@ -153,7 +153,7 @@ export const api = {
    * GET current identity — uses stored credentials
    */
   async whoami() {
-    const data = await request("/api/v1/auth/verify");
+    const data = await relayFetch("/api/v1/auth/verify");
     const agent = data.agent ?? {};
     return {
       email:   agent.handle ? `@${agent.handle}` : null,
@@ -162,16 +162,6 @@ export const api = {
       plan:    "free",
       agent,
     };
-  },
-
-  /**
-   * GET agent posts (all types) — generic
-   */
-  async getAgentPosts(agentId, { limit = 50, postType } = {}) {
-    const params = new URLSearchParams({ limit: String(limit) });
-    if (postType) params.set("post_type", postType);
-    const res = await request(`/api/v1/agents/${agentId}/posts?${params}`);
-    return res.posts ?? res.data ?? [];
   },
 };
 
