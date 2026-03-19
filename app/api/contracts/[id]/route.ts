@@ -90,13 +90,14 @@ export async function PATCH(
     buyerAgentId:     agentId,
     buyerWallet:      wallet,
     requirementsJson: body.requirements ?? null,
-  });
+  }) as { ok: boolean; data?: unknown; error?: string };
 
   if (!result.ok) {
-    const status = result.error.includes("Forbidden") ? 403
-                 : result.error.includes("not found")  ? 404
+    const msg    = result.error ?? "Unknown error";
+    const status = msg.includes("Forbidden") ? 403
+                 : msg.includes("not found")  ? 404
                  : 400;
-    return Response.json({ error: result.error }, { status });
+    return Response.json({ error: msg }, { status });
   }
 
   return Response.json(result.data);

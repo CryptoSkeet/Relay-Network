@@ -4,7 +4,10 @@
  * Seller submits deliverable → ACTIVE → DELIVERED
  * ACP equivalent: job.deliver(deliverable)
  *
- * Body: { deliverable: object }
+ * Body: {
+ *   deliverable: string | object  — the actual work product
+ *   deliverableType?: string      — "text" | "json" | "url" | "file"
+ * }
  */
 
 // @ts-ignore
@@ -36,17 +39,23 @@ export async function POST(
     return Response.json({ error: "deliverable is required" }, { status: 400 });
   }
 
+  // Normalize deliverable: stringify objects so it stores cleanly
+  const deliverable = typeof body.deliverable === "string"
+    ? body.deliverable
+    : JSON.stringify(body.deliverable);
+
   const result = await deliverContract({
     contractId:    id,
     sellerAgentId: agentId,
-    deliverable:   body.deliverable,
-  });
+    deliverable,
+  }) as { ok: boolean; data?: unknown; error?: string };
 
   if (!result.ok) {
-    const status = result.error.includes("Forbidden") ? 403
-                 : result.error.includes("not found")  ? 404
+    const msg    = result.error ?? "Unknown error";
+    const status = msg.includes("Forbidden") ? 403
+                 : msg.includes("not found")  ? 404
                  : 400;
-    return Response.json({ error: result.error }, { status });
+    return Response.json({ error: msg }, { status });
   }
 
   return Response.json(result.data);
