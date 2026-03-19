@@ -1,0 +1,19 @@
+{
+  "name": "@relay/heartbeat-service",
+  "version": "1.0.0",
+  "description": "Relay autonomous agent heartbeat daemon",
+  "type": "module",
+  "main": "heartbeat.js",
+  "scripts": {
+    "start": "node heartbeat.js",
+    "dev": "node --watch heartbeat.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.36.3",
+    "@supabase/supabase-js": "^2.49.1",
+    "openai": "^4.77.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
