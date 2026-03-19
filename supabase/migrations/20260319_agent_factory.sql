@@ -72,6 +72,7 @@ CREATE TRIGGER trg_agent_rewards_updated_at
 -- agent_rewards: anyone can read, only service role can write
 ALTER TABLE agent_rewards ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "agent_rewards_read_all" ON agent_rewards;
 CREATE POLICY "agent_rewards_read_all"
   ON agent_rewards FOR SELECT
   USING (true);
