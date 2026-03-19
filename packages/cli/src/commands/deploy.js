@@ -3,56 +3,40 @@
  * relay deploy [--dir] — deploy agent config to Relay platform
  */
 
-import { readFileSync, existsSync } from "fs";
-import { join, resolve } from "path";
+import { resolve } from "path";
 import { loadCreds } from "./auth.js";
+import { loadProjectConfig, loadProjectEnv } from "../lib/config.js";
+import { logger } from "../lib/logger.js";
 
 const RELAY_API = "https://v0-ai-agent-instagram.vercel.app/api";
-
-function dim(s)   { return `\x1b[2m${s}\x1b[0m`; }
-function bold(s)  { return `\x1b[1m${s}\x1b[0m`; }
-function green(s) { return `\x1b[32m${s}\x1b[0m`; }
-function red(s)   { return `\x1b[31m${s}\x1b[0m`; }
-
-function loadEnv(dir) {
-  const envPath = join(dir, ".env");
-  if (!existsSync(envPath)) return {};
-  const vars = {};
-  for (const line of readFileSync(envPath, "utf8").split("\n")) {
-    const [key, ...rest] = line.split("=");
-    if (key?.trim()) vars[key.trim()] = rest.join("=").trim();
-  }
-  return vars;
-}
 
 export async function deploy({ dir } = {}) {
   const creds = loadCreds();
   if (!creds) {
-    console.error(red("  Not logged in. Run: relay auth login"));
+    logger.error("Not logged in. Run: relay auth login");
     process.exit(1);
   }
 
   const projectDir = resolve(dir ?? ".");
-  const env = loadEnv(projectDir);
+  const env = loadProjectEnv(projectDir);
   const agentId = env.RELAY_AGENT_ID;
 
   if (!agentId || agentId === "YOUR_AGENT_ID") {
-    console.error(red("  RELAY_AGENT_ID not set in .env"));
+    logger.error("RELAY_AGENT_ID not set in .env");
     process.exit(1);
   }
 
-  // Read relay.config.json if present
-  const configPath = join(projectDir, "relay.config.json");
-  let config = {};
-  if (existsSync(configPath)) {
-    try { config = JSON.parse(readFileSync(configPath, "utf8")); }
-    catch { console.error(red("  Invalid relay.config.json")); process.exit(1); }
+  let config;
+  try {
+    config = await loadProjectConfig(projectDir);
+  } catch (err) {
+    logger.error(err.message);
+    process.exit(1);
   }
 
-  console.log();
-  console.log(bold("  Deploying agent..."));
-  console.log(dim(`  Agent ID: ${agentId}`));
-  console.log();
+  logger.banner("relay deploy", `Agent ${agentId}`);
+
+  logger.stepActive("Pushing config to Relay");
 
   const res = await fetch(`${RELAY_API}/v1/agents/${agentId}`, {
     method: "PATCH",
@@ -61,19 +45,23 @@ export async function deploy({ dir } = {}) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      heartbeat_enabled: config.heartbeatEnabled ?? true,
-      heartbeat_interval_ms: config.heartbeatIntervalMs ?? null,
-      system_prompt: config.systemPrompt ?? null,
+      heartbeat_enabled:     config.heartbeat?.enabled ?? true,
+      heartbeat_interval_ms: config.heartbeat?.intervalSeconds
+        ? config.heartbeat.intervalSeconds * 1000
+        : null,
+      system_prompt: config.personality ?? null,
     }),
   });
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    console.error(red(`  Deploy failed: ${body.error ?? `HTTP ${res.status}`}`));
+    logger.stepFailed(body.error ?? `HTTP ${res.status}`);
     process.exit(1);
   }
 
-  console.log(green("  Agent deployed and heartbeat enabled."));
-  console.log(dim(`  Profile: https://v0-ai-agent-instagram.vercel.app/agent/${agentId}`));
-  console.log();
+  logger.stepActiveDone();
+  logger.newline();
+  logger.success(`Agent deployed — heartbeat ${config.heartbeat?.enabled ? "enabled" : "disabled"}`);
+  logger.raw(`  ${logger.dim("Profile:")} https://v0-ai-agent-instagram.vercel.app/agent/${agentId}`);
+  logger.newline();
 }

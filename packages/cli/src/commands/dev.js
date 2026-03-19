@@ -3,60 +3,55 @@
  * relay dev [--dir] — run agent locally with file watch + auto-restart
  */
 
-import { existsSync, readFileSync } from "fs";
+import { existsSync } from "fs";
 import { join, resolve } from "path";
 import { spawn } from "child_process";
-
-function dim(s)   { return `\x1b[2m${s}\x1b[0m`; }
-function bold(s)  { return `\x1b[1m${s}\x1b[0m`; }
-function green(s) { return `\x1b[32m${s}\x1b[0m`; }
-function red(s)   { return `\x1b[31m${s}\x1b[0m`; }
-function yellow(s){ return `\x1b[33m${s}\x1b[0m`; }
+import { loadProjectConfig } from "../lib/config.js";
+import { logger } from "../lib/logger.js";
 
 export async function dev({ dir } = {}) {
   const projectDir = resolve(dir ?? ".");
 
-  const pkgPath = join(projectDir, "package.json");
-  if (!existsSync(pkgPath)) {
-    console.error(red(`  No package.json found in ${projectDir}`));
-    console.error(dim("  Run: relay create [name]"));
+  let config;
+  try {
+    config = await loadProjectConfig(projectDir);
+  } catch {
+    // relay.config.js missing — fall back to package.json dev script
+    config = null;
+  }
+
+  const agentFile = join(projectDir, "agent.js");
+  if (!existsSync(agentFile)) {
+    logger.error(`No agent.js found in ${projectDir}`);
+    logger.info("Run: relay create [name]");
     process.exit(1);
   }
 
-  const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
-  const devScript = pkg.scripts?.dev;
+  logger.banner("relay dev", config?.name ?? "Local agent");
+  logger.info(`Directory:  ${projectDir}`);
+  logger.info(`Interval:   ${config?.heartbeat?.intervalSeconds ?? 60}s`);
+  logger.warn("Watching for changes — Ctrl+C to stop");
+  logger.newline();
 
-  if (!devScript) {
-    console.error(red("  No 'dev' script in package.json"));
-    process.exit(1);
-  }
-
-  console.log();
-  console.log(bold("  Relay Dev Mode"));
-  console.log(dim(`  Directory: ${projectDir}`));
-  console.log(dim(`  Script:    ${devScript}`));
-  console.log(yellow("  Watching for changes — Ctrl+C to stop"));
-  console.log();
-
-  const child = spawn("npm", ["run", "dev"], {
-    cwd: projectDir,
-    stdio: "inherit",
-    shell: true,
-  });
+  // Use --watch (Node 18+) for zero-dependency file watching
+  const child = spawn(
+    process.execPath,
+    ["--watch", "--env-file=.env", "agent.js"],
+    { cwd: projectDir, stdio: "inherit" }
+  );
 
   child.on("error", (err) => {
-    console.error(red(`  Failed to start: ${err.message}`));
+    logger.error(`Failed to start: ${err.message}`);
     process.exit(1);
   });
 
   child.on("exit", (code) => {
-    if (code !== 0) {
-      console.error(red(`  Process exited with code ${code}`));
-      process.exit(code ?? 1);
+    if (code !== 0 && code !== null) {
+      logger.error(`Process exited with code ${code}`);
+      process.exit(code);
     }
   });
 
-  // Forward signals to child
   for (const sig of ["SIGINT", "SIGTERM"]) {
     process.on(sig, () => { child.kill(sig); process.exit(0); });
   }
