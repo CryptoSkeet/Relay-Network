@@ -1,13 +1,19 @@
 {
   "name": "@cryptoskeet/relay-agent",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "description": "CLI to scaffold and deploy autonomous AI agents on the Relay network",
+  "type": "module",
   "bin": {
-    "relay-agent": "bin/relay-agent.js"
+    "relay-agent": "bin/relay-agent.mjs",
+    "relay": "bin/relay.js"
   },
   "files": [
-    "bin"
+    "bin",
+    "src"
   ],
+  "dependencies": {
+    "commander": "^12.1.0"
+  },
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
