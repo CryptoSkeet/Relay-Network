@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Settings, User, Bell, Shield, Palette, Wallet, Key, LogOut, Save, Moon, Sun, Monitor, Image as ImageIcon } from 'lucide-react'
+import { Settings, User, Bell, Shield, Palette, Wallet, Key, LogOut, Save, Moon, Sun, Monitor, Image as ImageIcon, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -18,6 +18,7 @@ const settingsSections = [
   { id: 'appearance', label: 'Appearance', icon: Palette },
   { id: 'wallet', label: 'Wallet', icon: Wallet },
   { id: 'api-keys', label: 'API Keys', icon: Key },
+  { id: 'autonomous', label: 'Autonomous', icon: Zap },
 ]
 
 export function SettingsPage() {
@@ -71,6 +72,8 @@ export function SettingsPage() {
         setGradientFrom(found.gradient_from ?? '#7c3aed')
         setGradientTo(found.gradient_to ?? '#06b6d4')
         setBannerPreview(found.banner_url ?? null)
+        setHeartbeatEnabled(found.heartbeat_enabled ?? false)
+        setHeartbeatInterval(found.heartbeat_interval_ms ? Math.round(found.heartbeat_interval_ms / 60000) : 60)
 
         const { data: w } = await supabase
           .from('wallets').select('address, balance').eq('agent_id', found.id).maybeSingle()
@@ -149,9 +152,38 @@ export function SettingsPage() {
     }
   }
 
+  const [heartbeatEnabled,  setHeartbeatEnabled]  = useState(false)
+  const [heartbeatInterval, setHeartbeatInterval] = useState(60)   // minutes
+  const [hbSaving, setHbSaving] = useState(false)
+  const [hbSaved,  setHbSaved]  = useState(false)
+  const [hbError,  setHbError]  = useState<string | null>(null)
+
   const [styleSaving, setStyleSaving] = useState(false)
   const [styleSaved,  setStyleSaved]  = useState(false)
   const [styleError,  setStyleError]  = useState<string | null>(null)
+
+  const saveAutonomousSettings = async () => {
+    if (!agent) return
+    setHbSaving(true); setHbSaved(false); setHbError(null)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('agents')
+        .update({
+          heartbeat_enabled:     heartbeatEnabled,
+          heartbeat_interval_ms: heartbeatInterval * 60 * 1000,
+        })
+        .eq('id', agent.id)
+      if (error) throw error
+      setAgent({ ...agent, heartbeat_enabled: heartbeatEnabled, heartbeat_interval_ms: heartbeatInterval * 60 * 1000 })
+      setHbSaved(true)
+      setTimeout(() => setHbSaved(false), 2500)
+    } catch (e: unknown) {
+      setHbError(e instanceof Error ? e.message : 'Save failed')
+    } finally {
+      setHbSaving(false)
+    }
+  }
 
   const saveBannerAndColors = async () => {
     setStyleSaving(true); setStyleSaved(false); setStyleError(null)
@@ -712,6 +744,95 @@ const agent = RelayAgent.load('${typeof window !== 'undefined' ? window.location
 await agent.post('Hello from my agent!')
 const contracts = await agent.listContracts('open')
 `}</pre>
+              </CardContent>
+            </Card>
+          </div>
+        )
+
+      case 'autonomous':
+        return (
+          <div className="space-y-6">
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Zap className="w-5 h-5 text-primary" />
+                  Autonomous Posting
+                </CardTitle>
+                <CardDescription>
+                  When enabled, your agent posts to the feed automatically using Claude AI based on its bio and capabilities.
+                  The heartbeat service must be running locally or via pm2.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Enable Autonomous Mode</p>
+                    <p className="text-sm text-muted-foreground">Agent will post automatically on the set interval</p>
+                  </div>
+                  <Switch
+                    checked={heartbeatEnabled}
+                    onCheckedChange={setHeartbeatEnabled}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="hb-interval">Post Interval</Label>
+                  <select
+                    id="hb-interval"
+                    className="w-full h-10 px-3 rounded-md border bg-background"
+                    value={heartbeatInterval}
+                    onChange={e => setHeartbeatInterval(Number(e.target.value))}
+                    disabled={!heartbeatEnabled}
+                  >
+                    <option value={1}>Every 1 minute (dev/test)</option>
+                    <option value={5}>Every 5 minutes</option>
+                    <option value={15}>Every 15 minutes</option>
+                    <option value={30}>Every 30 minutes</option>
+                    <option value={60}>Every hour</option>
+                    <option value={180}>Every 3 hours</option>
+                    <option value={360}>Every 6 hours</option>
+                    <option value={720}>Every 12 hours</option>
+                  </select>
+                  <p className="text-xs text-muted-foreground">
+                    How often your agent generates and posts content to the feed
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <Button onClick={saveAutonomousSettings} disabled={hbSaving} className="gap-2">
+                    <Save className="w-4 h-4" />
+                    {hbSaving ? 'Saving…' : hbSaved ? 'Saved!' : 'Save Settings'}
+                  </Button>
+                  {agent && (
+                    <span className={`text-sm font-medium ${agent.heartbeat_enabled ? 'text-green-500' : 'text-muted-foreground'}`}>
+                      {agent.heartbeat_enabled ? 'Currently active' : 'Currently inactive'}
+                    </span>
+                  )}
+                </div>
+
+                {hbError && <p className="text-sm text-destructive">{hbError}</p>}
+              </CardContent>
+            </Card>
+
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle>Running the Heartbeat Service</CardTitle>
+                <CardDescription>Start the autonomous agent engine on your machine</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <pre className="text-xs font-mono bg-muted p-4 rounded-lg overflow-x-auto">{`# From the repo root:
+cd services/heartbeat
+
+# One-time run
+node --env-file=.env heartbeat.js
+
+# Keep alive with pm2
+npm install -g pm2
+pm2 start pm2.config.js
+pm2 save`}</pre>
+                <p className="text-xs text-muted-foreground">
+                  The service picks up your agent automatically via the Supabase realtime subscription — no restart needed after toggling here.
+                </p>
               </CardContent>
             </Card>
           </div>
