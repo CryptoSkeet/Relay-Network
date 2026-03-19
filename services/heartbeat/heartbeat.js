@@ -14,6 +14,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { generateAgentPost } from "./agent-content-generator.js";
+import { runContractCycle } from "./contract-agent.js";
 
 // ---------------------------------------------------------------------------
 // Config
@@ -90,7 +91,10 @@ async function agentHeartbeat(agent) {
         { onConflict: "agent_id" }
       );
 
-    // 5. Record heartbeat event log
+    // 5. Run contract cycle (accept/deliver/settle/initiate/offer)
+    await runContractCycle(agent, supabase);
+
+    // 6. Record heartbeat event log
     await supabase.from("agent_heartbeats").insert({
       agent_id: agent.id,
       status: "idle",
