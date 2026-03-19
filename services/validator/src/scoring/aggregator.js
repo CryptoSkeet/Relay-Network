@@ -1,64 +1,80 @@
 /**
  * src/scoring/aggregator.js
  *
- * Relay PoI Scoring Aggregator
+ * Score aggregation — Yuma Consensus math adapted for Relay PoI
  *
- * Implements the three mathematical primitives used by the validator loop:
- *   1. aggregateRewardScores  — weighted combination of the three reward signals
- *   2. updateEMA              — exponential moving average (Bittensor's moving_avg_scores)
- *   3. computeEmission        — RELAY token credit per scored post
+ * Bittensor's full Yuma pipeline:
+ *   1. Multiple validators each submit weight vectors W_ij (validator i, miner j)
+ *   2. Yuma clips outlier weights to consensus median
+ *   3. EMA bond B_ij^(t) = α·ΔB_ij + (1-α)·B_ij^(t-1)
+ *   4. Miner incentive I_j = sum of consensus-clipped weights × stake
+ *   5. Emissions = I_j × subnet_emission_budget
+ *
+ * Our adaptation (Phase 1 — single centralized validator):
+ *   1. Three reward functions score each post: relevance, diversity, quality
+ *   2. Weighted sum → raw post score (0–1)
+ *   3. EMA smoothing → updated agent quality_score
+ *   4. RELAY emission = quality_score × emission_rate × interval
+ *
+ * When Phase 2 adds multiple validators, step 1 becomes a median across
+ * validator calls and the rest of the math is identical.
  */
 
-// Reward weights — must sum to 1.0
-// Tuned to favour quality over novelty, with relevance as tiebreaker.
-const W_RELEVANCE = parseFloat(process.env.POI_W_RELEVANCE ?? "0.35");
-const W_DIVERSITY = parseFloat(process.env.POI_W_DIVERSITY ?? "0.25");
-const W_QUALITY   = parseFloat(process.env.POI_W_QUALITY   ?? "0.40");
+// ---------------------------------------------------------------------------
+// Reward function weights
+// ---------------------------------------------------------------------------
 
-// EMA smoothing factor: how fast the score responds to new posts
-// 0.1 = slow/stable, 0.3 = fast/reactive
-const EMA_ALPHA = parseFloat(process.env.POI_EMA_ALPHA ?? "0.1");
+const WEIGHT_RELEVANCE = parseFloat(process.env.POI_WEIGHT_RELEVANCE ?? "0.40");
+const WEIGHT_DIVERSITY = parseFloat(process.env.POI_WEIGHT_DIVERSITY ?? "0.25");
+const WEIGHT_QUALITY   = parseFloat(process.env.POI_WEIGHT_QUALITY   ?? "0.35");
 
-// Base RELAY tokens emitted per post at quality=1.0 active for 1 hour
-const BASE_EMISSION = parseFloat(process.env.POI_BASE_EMISSION ?? "1.0");
-
-// Cap hours-since-last to prevent huge payouts after long idle periods
-const MAX_HOURS_CAP = 24;
+const WEIGHT_SUM = WEIGHT_RELEVANCE + WEIGHT_DIVERSITY + WEIGHT_QUALITY;
+if (Math.abs(WEIGHT_SUM - 1.0) > 0.01) {
+  console.warn(`[aggregator] Reward weights sum to ${WEIGHT_SUM}, expected 1.0`);
+}
 
 // ---------------------------------------------------------------------------
-// 1. Weighted reward aggregation
-//    Bittensor equivalent: reward_pipeline.apply(rewards, weights)
+// EMA alpha — α = 0.1 matches Bittensor (slow, manipulation-resistant)
+// ---------------------------------------------------------------------------
+
+const EMA_ALPHA = parseFloat(process.env.POI_EMA_ALPHA ?? "0.1");
+
+// ---------------------------------------------------------------------------
+// Weighted sum of reward scores → raw post score
 // ---------------------------------------------------------------------------
 
 export function aggregateRewardScores({ relevance, diversity, quality }) {
-  const r = Math.max(0, Math.min(1, relevance?.score ?? 0));
-  const d = Math.max(0, Math.min(1, diversity?.score ?? 0));
-  const q = Math.max(0, Math.min(1, quality?.score ?? 0));
+  const rawScore =
+    relevance.score * WEIGHT_RELEVANCE +
+    diversity.score * WEIGHT_DIVERSITY +
+    quality.score   * WEIGHT_QUALITY;
 
-  return parseFloat(
-    (W_RELEVANCE * r + W_DIVERSITY * d + W_QUALITY * q).toFixed(6)
-  );
+  return Math.max(0, Math.min(1, rawScore));
 }
 
 // ---------------------------------------------------------------------------
-// 2. Exponential Moving Average
-//    Bittensor equivalent: scores[uid] = alpha * reward + (1 - alpha) * scores[uid]
+// EMA update — Q^(t) = α·rawScore + (1-α)·Q^(t-1)
 // ---------------------------------------------------------------------------
 
-export function updateEMA(current, newValue) {
-  return EMA_ALPHA * newValue + (1 - EMA_ALPHA) * current;
+export function updateEMA(previousScore, rawScore) {
+  const prev = typeof previousScore === "number" && !isNaN(previousScore)
+    ? previousScore
+    : 0.5;  // cold start: assume average quality
+
+  return EMA_ALPHA * rawScore + (1 - EMA_ALPHA) * prev;
 }
 
 // ---------------------------------------------------------------------------
-// 3. RELAY emission per post
-//    Linear in quality × time, capped to prevent runaway accumulation.
-//    A quality=1.0 agent posting every hour earns BASE_EMISSION tokens/post.
-//    Lower quality or longer idle periods earn proportionally less.
+// RELAY emission per post
+// emission = base_rate × capped_hours × quality^1.5
+// Quadratic bonus rewards top agents significantly more, not just proportionally.
 // ---------------------------------------------------------------------------
 
-export function computeEmission(qualityScore, hoursSinceLast) {
-  const hours = Math.min(hoursSinceLast, MAX_HOURS_CAP);
-  // Scale: quality^2 so low-quality agents earn much less (not just a little less)
-  const emission = BASE_EMISSION * Math.pow(qualityScore, 2) * Math.min(hours, 1);
+const BASE_RELAY_PER_HOUR = parseFloat(process.env.POI_BASE_RELAY_RATE ?? "10.0");
+
+export function computeEmission(qualityScore, hoursSinceLastPost = 1) {
+  const clampedHours  = Math.min(hoursSinceLastPost, 4);
+  const qualityBonus  = Math.pow(qualityScore, 1.5);
+  const emission      = BASE_RELAY_PER_HOUR * clampedHours * qualityBonus;
   return parseFloat(emission.toFixed(6));
 }
