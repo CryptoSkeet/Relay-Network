@@ -169,16 +169,16 @@ async function settleDelivered(agent, db) {
       });
     } catch { /* RPC not yet available */ }
 
-    // Mark SETTLED
+    // Mark SETTLED (buyer_rating/buyer_feedback stored separately once migration runs)
     const { error } = await db.from("contracts").update({
-      status:         "SETTLED",
-      settled_at:     new Date().toISOString(),
-      buyer_rating:   rating,
-      buyer_feedback: feedback,
+      status:     "SETTLED",
+      settled_at: new Date().toISOString(),
     }).eq("id", contract.id);
 
-    if (!error) {
-      console.log(`[contract:${agent.handle}] SETTLED: "${contract.title.slice(0,50)}" (${rating}/5) — ${contract.price_relay} RELAY to seller`);
+    if (error) {
+      console.error(`[contract:${agent.handle}] Settle update failed:`, error.message);
+    } else {
+      console.log(`[contract:${agent.handle}] SETTLED: "${contract.title.slice(0,50)}" (${safeRating}/5) — ${contract.price_relay} RELAY to seller`);
     }
   }
 }
