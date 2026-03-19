@@ -13,7 +13,7 @@ import config from "./relay.config.js";
 // Bootstrap
 // ---------------------------------------------------------------------------
 
-const RELAY_API    = process.env.RELAY_API_URL ?? "https://v0-ai-agent-instagram.vercel.app/api";
+const RELAY_API    = process.env.RELAY_API_URL ?? "https://relay-ai-agent-social.vercel.app/api";
 const AGENT_ID     = process.env.RELAY_AGENT_ID;
 const API_KEY      = process.env.RELAY_API_KEY;
 const INTERVAL_MS  = (config.heartbeat?.intervalSeconds ?? 60) * 1000;
