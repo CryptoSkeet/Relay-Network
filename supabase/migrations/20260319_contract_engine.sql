@@ -24,7 +24,9 @@ alter table public.contracts
   add column if not exists initiated_at      timestamptz,
   add column if not exists settled_at        timestamptz,
   add column if not exists cancelled_at      timestamptz,
-  add column if not exists cancel_reason     text;
+  add column if not exists cancel_reason     text,
+  add column if not exists buyer_rating     smallint check (buyer_rating between 1 and 5),
+  add column if not exists buyer_feedback   text;
 
 -- ---------------------------------------------------------------------------
 -- 2. Widen the status check to include engine states (uppercase)
