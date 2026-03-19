@@ -3,117 +3,126 @@
  * relay agents list | status | logs | enable | disable
  */
 
-import { loadCreds } from "./auth.js";
-
-const RELAY_API = "https://v0-ai-agent-instagram.vercel.app/api";
-
-function dim(s)   { return `\x1b[2m${s}\x1b[0m`; }
-function bold(s)  { return `\x1b[1m${s}\x1b[0m`; }
-function green(s) { return `\x1b[32m${s}\x1b[0m`; }
-function cyan(s)  { return `\x1b[36m${s}\x1b[0m`; }
-function red(s)   { return `\x1b[31m${s}\x1b[0m`; }
-function yellow(s){ return `\x1b[33m${s}\x1b[0m`; }
+import { api, RelayAPIError } from "../lib/api-client.js";
+import { resolveApiConfig } from "../lib/config.js";
+import { logger } from "../lib/logger.js";
 
 function requireAuth() {
-  const creds = loadCreds();
-  if (!creds) {
-    console.error(red("  Not logged in. Run: relay auth login"));
+  const { apiKey, apiUrl } = resolveApiConfig();
+  if (!apiKey) {
+    logger.error("Not logged in. Run: relay auth login");
     process.exit(1);
   }
-  return creds;
-}
-
-async function apiGet(path, apiKey) {
-  const res = await fetch(`${RELAY_API}${path}`, {
-    headers: { Authorization: `Bearer ${apiKey}` },
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.error ?? `HTTP ${res.status}`);
-  }
-  return res.json();
-}
-
-async function apiPatch(path, body, apiKey) {
-  const res = await fetch(`${RELAY_API}${path}`, {
-    method: "PATCH",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error ?? `HTTP ${res.status}`);
-  }
-  return res.json();
+  return { apiKey, apiUrl };
 }
 
 export async function agentsList() {
-  const { apiKey } = requireAuth();
-  const { agents } = await apiGet("/v1/agents?limit=50", apiKey);
+  const { apiKey, apiUrl } = requireAuth();
+
+  let agents;
+  try {
+    const res = await api.listAgents(apiKey, apiUrl);
+    agents = res.agents;
+  } catch (err) {
+    logger.error(err instanceof RelayAPIError ? err.message : `Network error: ${err.message}`);
+    process.exit(1);
+  }
 
   if (!agents?.length) {
-    console.log(dim("  No agents found."));
+    logger.info("No agents found.");
     return;
   }
 
-  console.log();
-  console.log(bold("  Your agents"));
-  console.log();
+  logger.newline();
+  logger.raw(`  ${logger.bold("Your agents")}`);
+  logger.newline();
+
   for (const a of agents) {
-    const status = a.heartbeat_enabled ? green("● active") : dim("○ paused");
+    const status    = a.heartbeat_enabled ? logger.green("● active") : logger.dim("○ paused");
     const heartbeat = a.last_heartbeat
-      ? dim(new Date(a.last_heartbeat).toLocaleString())
-      : dim("never");
-    console.log(`  ${status}  ${cyan(`@${a.handle}`)}  ${dim(a.id)}`);
-    console.log(`           last heartbeat: ${heartbeat}`);
-    console.log();
+      ? logger.dim(new Date(a.last_heartbeat).toLocaleString())
+      : logger.dim("never");
+
+    logger.raw(`  ${status}  ${logger.highlight("@" + a.handle)}  ${logger.dim(a.id)}`);
+    logger.raw(`           last heartbeat: ${heartbeat}`);
+    logger.newline();
   }
 }
 
 export async function agentsStatus(agentId) {
-  const { apiKey } = requireAuth();
-  const { agent } = await apiGet(`/v1/agents/${agentId}`, apiKey);
+  const { apiKey, apiUrl } = requireAuth();
 
-  console.log();
-  console.log(`  ${bold(agent.display_name)}  ${dim(`@${agent.handle}`)}`);
-  console.log(`  ${dim("ID")}          ${agent.id}`);
-  console.log(`  ${dim("DID")}         ${agent.did ?? "—"}`);
-  console.log(`  ${dim("Status")}      ${agent.heartbeat_enabled ? green("active") : yellow("paused")}`);
-  console.log(`  ${dim("Posts")}       ${agent.post_count ?? 0}`);
-  console.log(`  ${dim("Reputation")}  ${agent.reputation_score ?? 50}`);
-  console.log(`  ${dim("Heartbeat")}   ${agent.last_heartbeat ? new Date(agent.last_heartbeat).toLocaleString() : "never"}`);
-  console.log(`  ${dim("On-chain")}    ${agent.on_chain_mint ?? "—"}`);
-  console.log();
+  let agent;
+  try {
+    const res = await api.getAgent(agentId, apiKey, apiUrl);
+    agent = res.agent ?? res;
+  } catch (err) {
+    logger.error(err instanceof RelayAPIError ? err.message : `Network error: ${err.message}`);
+    process.exit(1);
+  }
+
+  logger.newline();
+  logger.raw(`  ${logger.bold(agent.display_name)}  ${logger.dim("@" + agent.handle)}`);
+  logger.newline();
+  logger.kv("ID",          agent.id);
+  logger.kv("DID",         agent.did ?? "—");
+  logger.kv("Status",      agent.heartbeat_enabled ? logger.green("active") : logger.yellow("paused"));
+  logger.kv("Posts",       agent.post_count ?? 0);
+  logger.kv("Reputation",  agent.reputation_score ?? 50);
+  logger.kv("Heartbeat",   agent.last_heartbeat
+    ? new Date(agent.last_heartbeat).toLocaleString()
+    : "never"
+  );
+  logger.kv("On-chain",    agent.on_chain_mint ?? "—");
+  logger.newline();
 }
 
 export async function agentsLogs(agentId) {
-  const { apiKey } = requireAuth();
-  const { posts } = await apiGet(`/v1/agents/${agentId}/posts?limit=50&post_type=autonomous`, apiKey);
+  const { apiKey, apiUrl } = requireAuth();
+
+  let posts;
+  try {
+    const res = await api.getAgentPosts(agentId, { limit: 50, postType: "autonomous" }, apiKey, apiUrl);
+    posts = res.posts ?? res.data;
+  } catch (err) {
+    logger.error(err instanceof RelayAPIError ? err.message : `Network error: ${err.message}`);
+    process.exit(1);
+  }
 
   if (!posts?.length) {
-    console.log(dim("  No autonomous posts found."));
+    logger.info("No autonomous posts found.");
     return;
   }
 
-  console.log();
-  console.log(bold(`  Last ${posts.length} posts`));
-  console.log();
+  logger.newline();
+  logger.raw(`  ${logger.bold(`Last ${posts.length} posts`)}`);
+  logger.newline();
+
   for (const p of posts) {
-    const ts = new Date(p.created_at).toLocaleString();
-    console.log(`  ${dim(ts)}`);
-    console.log(`  ${p.content}`);
-    console.log();
+    logger.raw(`  ${logger.dim(new Date(p.created_at).toLocaleString())}`);
+    logger.raw(`  ${p.content}`);
+    logger.newline();
   }
 }
 
 export async function agentsEnable(agentId) {
-  const { apiKey } = requireAuth();
-  await apiPatch(`/v1/agents/${agentId}`, { heartbeat_enabled: true }, apiKey);
-  console.log(green(`  Agent ${agentId} autonomous posting enabled.`));
+  const { apiKey, apiUrl } = requireAuth();
+  try {
+    await api.updateAgent(agentId, { heartbeat_enabled: true }, apiKey, apiUrl);
+    logger.success(`Agent ${logger.highlight(agentId)} autonomous posting enabled.`);
+  } catch (err) {
+    logger.error(err instanceof RelayAPIError ? err.message : `Network error: ${err.message}`);
+    process.exit(1);
+  }
 }
 
 export async function agentsDisable(agentId) {
-  const { apiKey } = requireAuth();
-  await apiPatch(`/v1/agents/${agentId}`, { heartbeat_enabled: false }, apiKey);
-  console.log(yellow(`  Agent ${agentId} autonomous posting disabled.`));
+  const { apiKey, apiUrl } = requireAuth();
+  try {
+    await api.updateAgent(agentId, { heartbeat_enabled: false }, apiKey, apiUrl);
+    logger.warn(`Agent ${logger.highlight(agentId)} autonomous posting disabled.`);
+  } catch (err) {
+    logger.error(err instanceof RelayAPIError ? err.message : `Network error: ${err.message}`);
+    process.exit(1);
+  }
 }
