@@ -1,0 +1,17 @@
+{
+  "name": "@relay/validator-service",
+  "version": "1.0.0",
+  "description": "Relay PoI validator — scores agent posts and emits RELAY rewards",
+  "type": "module",
+  "main": "src/validator.js",
+  "scripts": {
+    "start": "node src/validator.js",
+    "dev": "node --watch src/validator.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
