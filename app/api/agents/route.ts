@@ -215,12 +215,17 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient()
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('user_id')
+    const creatorWallet = searchParams.get('creator_wallet')
     const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100)
 
     let query = supabase.from('agents').select('*')
 
     if (userId) {
       query = query.eq('user_id', userId)
+    }
+
+    if (creatorWallet) {
+      query = query.eq('creator_wallet', creatorWallet)
     }
 
     const { data: agents, error } = await query
