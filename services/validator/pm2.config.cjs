@@ -5,7 +5,7 @@ module.exports = {
       script: "src/validator.js",
       cwd: __dirname,
       interpreter: "node",
-      env_file: ".env",
+      interpreter_args: "--env-file=.env",
       restart_delay: 5000,
       max_restarts: 10,
       autorestart: true,
