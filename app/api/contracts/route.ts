@@ -1,179 +1,123 @@
-import { createClient, getUserFromRequest } from '@/lib/supabase/server'
-import { logger } from '@/lib/logger'
-import { ValidationError, UnauthorizedError, NotFoundError, isAppError } from '@/lib/errors'
-import { type NextRequest, NextResponse } from 'next/server'
-// @ts-ignore — JS module, no types needed
-import { verifyContractCaller } from '@/lib/contract-auth.js'
+/**
+ * app/api/contracts/route.js
+ *
+ * GET  /api/contracts         — list open contracts (marketplace feed)
+ * POST /api/contracts         — post a new contract offer (seller)
+ *
+ * ── Why this was 403ing ──────────────────────────────────────────────────
+ * Most likely cause: a middleware.js or previous route handler was checking
+ * for a Supabase Auth session cookie that wallet-only users don't have.
+ *
+ * This route uses contract-auth.js which accepts BOTH:
+ *   - Bearer <supabase-jwt>   for browser users
+ *   - x-relay-api-key: <key>  for agents / SDK / CLI
+ *
+ * GET is intentionally public — anyone can browse the contract marketplace.
+ * POST requires authentication.
+ */
 
-export async function POST(request: NextRequest) {
-  try {
-    const supabase = await createClient()
+import { createClient } from "@supabase/supabase-js";
+// @ts-ignore
+import { createContract } from "@/lib/contract-engine";
+// @ts-ignore
+import { verifyContractCaller, authErrorResponse } from "@/lib/contract-auth";
+import { type NextRequest } from "next/server";
 
-    // Dual-auth: accept Supabase session OR Relay API key
-    // getUserFromRequest handles the session path; verifyContractCaller handles both
-    const auth = await verifyContractCaller(request)
-    if (!auth.ok) {
-      return NextResponse.json({ error: auth.error }, { status: auth.status ?? 401 })
-    }
-
-    const body = await request.json().catch(() => null)
-    if (!body) throw new ValidationError('Invalid JSON body')
-
-    const {
-      provider_id,
-      title,
-      description,
-      budget,
-      timeline_days,
-      requirements,
-      task_type,
-      deliverables = [],
-      dispute_window_hours = 48,
-    } = body
-
-    if (!title?.trim() || !budget) throw new ValidationError('Missing required fields: title, budget')
-
-    const budgetVal = parseFloat(budget)
-    if (isNaN(budgetVal) || budgetVal <= 0) throw new ValidationError('budget must be a positive number')
-
-    // Resolve client agent — from identity returned by auth
-    let clientAgent: { id: string } | null = null
-
-    if (auth.identity.agentId) {
-      // API key path — agentId already resolved
-      clientAgent = { id: auth.identity.agentId }
-    } else {
-      // Session path — look up by user_id
-      const user = await getUserFromRequest(request)
-      if (user) {
-        const { data } = await supabase
-          .from('agents').select('id').eq('user_id', user.id).limit(1).maybeSingle()
-        clientAgent = data
-      }
-    }
-
-    if (!clientAgent) throw new NotFoundError('Your agent not found')
-
-    // Check wallet balance
-    const { data: wallet } = await supabase
-      .from('wallets').select('id, balance').eq('agent_id', clientAgent.id).maybeSingle()
-    if (!wallet || (wallet.balance ?? 0) < budgetVal) {
-      return NextResponse.json(
-        { error: `Insufficient RELAY balance. Need ${budgetVal} RELAY.` },
-        { status: 402 }
-      )
-    }
-
-    const deadline = timeline_days
-      ? new Date(Date.now() + timeline_days * 86400000).toISOString()
-      : new Date(Date.now() + 30 * 86400000).toISOString()
-
-    // Create contract
-    const { data: contract, error: contractError } = await supabase
-      .from('contracts')
-      .insert({
-        client_id:            clientAgent.id,
-        provider_id:          provider_id ?? null,
-        title:                title.trim(),
-        description:          description?.trim() || null,
-        budget_min:           budgetVal,
-        budget_max:           budgetVal,
-        currency:             'RELAY',
-        task_type:            task_type || 'task',
-        deadline,
-        requirements:         requirements || [],
-        dispute_window_hours,
-        status:               provider_id ? 'in_progress' : 'open',
-      })
-      .select()
-      .single()
-
-    if (contractError) throw new Error('Failed to create contract')
-
-    // Create deliverables
-    if (deliverables.length > 0) {
-      await supabase.from('contract_deliverables').insert(
-        deliverables.map((d: { title: string; description?: string }, i: number) => ({
-          contract_id:  contract.id,
-          title:        d.title,
-          description:  d.description ?? '',
-          order_index:  i,
-          status:       'pending',
-        }))
-      )
-    }
-
-    // Lock funds in escrow
-    await supabase.from('escrow').insert({
-      contract_id: contract.id,
-      payer_id:    clientAgent.id,
-      payee_id:    provider_id ?? null,
-      amount:      budgetVal,
-      currency:    'RELAY',
-      status:      'locked',
-    })
-
-    // Deduct from wallet
-    await supabase.from('wallets')
-      .update({ balance: Math.max(0, wallet.balance - budgetVal) })
-      .eq('id', wallet.id)
-
-    // Record transaction
-    await supabase.from('transactions').insert({
-      from_agent_id: clientAgent.id,
-      to_agent_id:   null,
-      contract_id:   contract.id,
-      amount:        budgetVal,
-      currency:      'RELAY',
-      type:          'escrow',
-      status:        'completed',
-      description:   `Escrow locked: ${title.trim()}`,
-    })
-
-    logger.info('Contract created', { contractId: contract.id, budget: budgetVal })
-
-    return NextResponse.json({ success: true, contract }, { status: 201 })
-
-  } catch (error) {
-    if (isAppError(error)) {
-      return NextResponse.json({ error: error.message }, { status: error.statusCode })
-    }
-    logger.error('Contract creation error', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
-  }
-}
+// ---------------------------------------------------------------------------
+// GET — public contract marketplace feed
+// No auth required — this is intentionally public like a job board
+// ---------------------------------------------------------------------------
 
 export async function GET(request: NextRequest) {
-  try {
-    const supabase = await createClient()
-    const { searchParams } = new URL(request.url)
-    const status     = searchParams.get('status')
-    const providerId = searchParams.get('provider_id')
-    const clientId   = searchParams.get('client_id')
-    const limit      = Math.min(parseInt(searchParams.get('limit') || '50'), 100)
+  const { searchParams } = new URL(request.url);
+  const status     = searchParams.get("status")     ?? "OPEN";
+  const agentId    = searchParams.get("agentId");
+  const limit      = Math.min(parseInt(searchParams.get("limit") ?? "20"), 100);
+  const offset     = parseInt(searchParams.get("offset") ?? "0");
 
-    let query = supabase
-      .from('contracts')
-      .select(`
-        id, title, description, status, task_type, budget_min, budget_max, currency,
-        deadline, created_at, updated_at,
-        client:agents!contracts_client_id_fkey(id, handle, display_name, avatar_url),
-        provider:agents!contracts_provider_id_fkey(id, handle, display_name, avatar_url)
-      `)
-      .order('created_at', { ascending: false })
-      .limit(limit)
+  const db = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!   // anon key — respects RLS
+  );
 
-    if (status)     query = query.eq('status', status)
-    if (providerId) query = query.eq('provider_id', providerId)
-    if (clientId)   query = query.eq('client_id', clientId)
+  let query = db
+    .from("contracts")
+    .select(`
+      id,
+      title,
+      description,
+      deliverable_type,
+      price_relay,
+      deadline_hours,
+      status,
+      created_at,
+      seller_agent_id,
+      agents!seller_agent_id (
+        display_name,
+        quality_score:agent_rewards(quality_score)
+      )
+    `)
+    .eq("status", status)
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
 
-    const { data: contracts, error } = await query
-    if (error) throw new Error('Failed to fetch contracts')
+  if (agentId) query = query.eq("seller_agent_id", agentId);
 
-    return NextResponse.json({ contracts: contracts ?? [] })
+  const { data, error } = await query;
 
-  } catch (error) {
-    logger.error('Contract fetch error', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  if (error) {
+    return Response.json({ error: error.message }, { status: 500 });
   }
+
+  return Response.json({
+    contracts: data ?? [],
+    pagination: { limit, offset },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// POST — create a contract offer (seller posts a service)
+//
+// x402 parallel: resource server registering payment requirements
+// ACP parallel:  acp sell create
+// ---------------------------------------------------------------------------
+
+export async function POST(request: NextRequest) {
+  // Auth — POST requires authentication
+  const auth = await verifyContractCaller(request);
+  if (!auth.ok || !auth.identity) return authErrorResponse(auth.error, auth.status);
+
+  const { agentId, wallet } = auth.identity;
+  if (!agentId) {
+    return Response.json(
+      { error: "You must have an active agent to post a contract. Create one at /agents/create." },
+      { status: 403 }
+    );
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const { title, description, deliverableType, priceRelay, deadlineHours, requirements } = body as Record<string, unknown>;
+
+  const result = await createContract({
+    sellerAgentId:    agentId,
+    sellerWallet:     wallet,
+    title,
+    description,
+    deliverableType,
+    priceRelay:       Number(priceRelay),
+    deadlineHours:    Number(deadlineHours ?? 24),
+    requirementsJson: requirements ?? null,
+  });
+
+  if (!result.ok) {
+    return Response.json({ error: result.error }, { status: 400 });
+  }
+
+  return Response.json(result.data, { status: 201 });
 }
