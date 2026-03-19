@@ -54,16 +54,12 @@ async function agentHeartbeat(agent) {
       return;
     }
 
-    // 3. Insert post into Relay feed
-    // Note: posts table has no post_type or tokens_earned — use metadata
+    // 2. Insert post into Relay feed (post_type now a real column)
     const { error: postError } = await supabase.from("posts").insert({
       agent_id: agent.id,
       content: content.trim(),
       media_type: "text",
-      metadata: {
-        heartbeat: true,
-        interval_ms: agent.heartbeat_interval_ms ?? DEFAULT_INTERVAL_MS,
-      },
+      post_type: "autonomous",
     });
 
     if (postError) {
@@ -71,8 +67,15 @@ async function agentHeartbeat(agent) {
       return;
     }
 
-    // 4. Update agent_online_status (last_heartbeat + mark online)
     const now = new Date().toISOString();
+
+    // 3. Update last_heartbeat directly on the agent row
+    await supabase
+      .from("agents")
+      .update({ last_heartbeat: now })
+      .eq("id", agent.id);
+
+    // 4. Upsert agent_online_status (mark online for network dashboard)
     await supabase
       .from("agent_online_status")
       .upsert(
@@ -87,7 +90,7 @@ async function agentHeartbeat(agent) {
         { onConflict: "agent_id" }
       );
 
-    // 5. Record a heartbeat event in agent_heartbeats
+    // 5. Record heartbeat event log
     await supabase.from("agent_heartbeats").insert({
       agent_id: agent.id,
       status: "idle",
@@ -116,6 +119,7 @@ function registerAgent(agent) {
     clearInterval(activeIntervals.get(agentId));
   }
 
+  // Use per-agent override if set, otherwise fall back to service default
   const intervalMs = agent.heartbeat_interval_ms ?? DEFAULT_INTERVAL_MS;
   const label = agent.display_name ?? agent.handle ?? agentId;
 
@@ -157,20 +161,10 @@ function deregisterAgent(agentId) {
 async function loadAgents() {
   console.log("[heartbeat] Loading active agents from Supabase...");
 
-  // Join with agent_online_status to get each agent's configured interval
+  // heartbeat_interval_ms now lives directly on agents — no join needed
   const { data: agents, error } = await supabase
     .from("agents")
-    .select(`
-      id,
-      handle,
-      display_name,
-      bio,
-      system_prompt,
-      capabilities,
-      model_family,
-      heartbeat_enabled,
-      online_status:agent_online_status(heartbeat_interval_ms)
-    `)
+    .select("id, handle, display_name, bio, system_prompt, capabilities, model_family, heartbeat_interval_ms")
     .eq("heartbeat_enabled", true)
     .eq("is_active", true);
 
@@ -186,15 +180,7 @@ async function loadAgents() {
 
   console.log(`[heartbeat] Found ${agents.length} agent(s) to activate.`);
 
-  // Flatten online_status into the agent object
-  const normalized = agents.map((a) => ({
-    ...a,
-    heartbeat_interval_ms:
-      (Array.isArray(a.online_status) ? a.online_status[0] : a.online_status)
-        ?.heartbeat_interval_ms ?? DEFAULT_INTERVAL_MS,
-  }));
-
-  for (const agent of normalized) {
+  for (const agent of agents) {
     registerAgent(agent);
   }
 }
@@ -209,27 +195,14 @@ function watchAgentChanges() {
     .on(
       "postgres_changes",
       { event: "*", schema: "public", table: "agents" },
-      async (payload) => {
+      (payload) => {
         const { eventType, new: updated, old } = payload;
 
         if (eventType === "UPDATE") {
           if (updated.heartbeat_enabled && updated.is_active) {
             console.log(`[realtime] Agent "${updated.display_name ?? updated.handle}" updated — re-registering`);
-            // Re-fetch with online_status join so interval_ms is included
-            const { data } = await supabase
-              .from("agents")
-              .select(`id, handle, display_name, bio, system_prompt, capabilities, model_family, heartbeat_enabled, online_status:agent_online_status(heartbeat_interval_ms)`)
-              .eq("id", updated.id)
-              .single();
-            if (data) {
-              const agent = {
-                ...data,
-                heartbeat_interval_ms:
-                  (Array.isArray(data.online_status) ? data.online_status[0] : data.online_status)
-                    ?.heartbeat_interval_ms ?? DEFAULT_INTERVAL_MS,
-              };
-              registerAgent(agent);
-            }
+            // payload includes all columns — no extra fetch needed
+            registerAgent(updated);
           } else {
             console.log(`[realtime] Agent "${updated.display_name ?? updated.handle}" disabled — stopping heartbeat`);
             deregisterAgent(updated.id);
@@ -238,7 +211,7 @@ function watchAgentChanges() {
 
         if (eventType === "INSERT" && updated.heartbeat_enabled && updated.is_active) {
           console.log(`[realtime] New agent "${updated.display_name ?? updated.handle}" — registering`);
-          registerAgent({ ...updated, heartbeat_interval_ms: DEFAULT_INTERVAL_MS });
+          registerAgent(updated);
         }
 
         if (eventType === "DELETE") {

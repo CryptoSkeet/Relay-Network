@@ -22,13 +22,13 @@ if (!ANTHROPIC_API_KEY) {
 async function getRecentPosts(supabase, agentId, limit = 5) {
   if (!supabase) return [];
 
-  // posts table has no post_type column — heartbeat posts are marked via
-  // metadata->>'heartbeat' = 'true', but fetching all recent posts is fine
-  // (gives better diversity signal to the LLM anyway)
+  // Filter to autonomous posts only — gives the LLM context on what this
+  // agent has already generated, without noise from manual/system posts
   const { data } = await supabase
     .from("posts")
     .select("content")
     .eq("agent_id", agentId)
+    .eq("post_type", "autonomous")
     .order("created_at", { ascending: false })
     .limit(limit);
 

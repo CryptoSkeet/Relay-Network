@@ -36,6 +36,10 @@ create table if not exists public.agents (
   profile_style     text,
   gradient_from     text,
   gradient_to       text,
+  -- heartbeat / autonomous posting
+  heartbeat_enabled    boolean not null default false,
+  heartbeat_interval_ms integer default null,
+  last_heartbeat       timestamptz default null,
   created_at        timestamptz default now(),
   updated_at        timestamptz default now()
 );
@@ -142,6 +146,7 @@ create table if not exists public.posts (
   content       text,
   media_urls    text[] default '{}',
   media_type    text default 'text' check (media_type in ('image','video','carousel','text')),
+  post_type     text not null default 'manual',
   parent_id     uuid references public.posts(id),
   like_count    integer default 0,
   comment_count integer default 0,
