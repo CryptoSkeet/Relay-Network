@@ -21,7 +21,7 @@ import { generateAgentPost } from "./agent-content-generator.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY; // service role — bypasses RLS
-const DEFAULT_INTERVAL_MS = parseInt(process.env.HEARTBEAT_INTERVAL_MS ?? "30000");
+const DEFAULT_INTERVAL_MS = parseInt(process.env.HEARTBEAT_INTERVAL_MS ?? "60000");
 const MAX_CONCURRENT_AGENTS = parseInt(process.env.MAX_CONCURRENT_AGENTS ?? "5");
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
@@ -164,9 +164,8 @@ async function loadAgents() {
   // heartbeat_interval_ms now lives directly on agents — no join needed
   const { data: agents, error } = await supabase
     .from("agents")
-    .select("id, handle, display_name, bio, system_prompt, capabilities, model_family, heartbeat_interval_ms")
-    .eq("heartbeat_enabled", true)
-    .eq("is_active", true);
+    .select("id, handle, display_name, bio, capabilities, model_family, heartbeat_interval_ms")
+    .eq("heartbeat_enabled", true);
 
   if (error) {
     console.error("[heartbeat] Failed to load agents:", error.message);
@@ -199,17 +198,19 @@ function watchAgentChanges() {
         const { eventType, new: updated, old } = payload;
 
         if (eventType === "UPDATE") {
-          if (updated.heartbeat_enabled && updated.is_active) {
-            console.log(`[realtime] Agent "${updated.display_name ?? updated.handle}" updated — re-registering`);
-            // payload includes all columns — no extra fetch needed
-            registerAgent(updated);
-          } else {
-            console.log(`[realtime] Agent "${updated.display_name ?? updated.handle}" disabled — stopping heartbeat`);
-            deregisterAgent(updated.id);
+          // Only act if heartbeat_enabled is explicitly present in the payload
+          if ("heartbeat_enabled" in updated) {
+            if (updated.heartbeat_enabled) {
+              console.log(`[realtime] Agent "${updated.display_name ?? updated.handle}" updated — re-registering`);
+              registerAgent(updated);
+            } else {
+              console.log(`[realtime] Agent "${updated.display_name ?? updated.handle}" disabled — stopping heartbeat`);
+              deregisterAgent(updated.id);
+            }
           }
         }
 
-        if (eventType === "INSERT" && updated.heartbeat_enabled && updated.is_active) {
+        if (eventType === "INSERT" && updated.heartbeat_enabled) {
           console.log(`[realtime] New agent "${updated.display_name ?? updated.handle}" — registering`);
           registerAgent(updated);
         }
@@ -220,7 +221,14 @@ function watchAgentChanges() {
       }
     )
     .subscribe((status) => {
-      console.log(`[realtime] Supabase channel status: ${status}`);
+      if (status === 'SUBSCRIBED') {
+        console.log('[realtime] Watching agents table for config changes');
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        if (!watchAgentChanges._warned) {
+          console.warn('[realtime] Channel unavailable — restart service to pick up agent config changes');
+          watchAgentChanges._warned = true;
+        }
+      }
     });
 }
 

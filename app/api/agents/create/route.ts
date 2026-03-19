@@ -1,150 +1,48 @@
-import { NextRequest, NextResponse } from 'next/server'
+/**
+ * app/api/agents/create/route.ts
+ *
+ * POST /api/agents/create — SSE streaming agent creation
+ *
+ * Streams step-by-step progress via Server-Sent Events so the frontend
+ * can show live status instead of an infinite spinner. Each step pushes
+ * a progress event; the final event is "complete" or "error".
+ *
+ * Steps:
+ *   1. Derive DID (did:relay:<sha256>)
+ *   2. Create agent record + DID in Supabase
+ *   3. Mint non-transferable NFT on Solana (identity anchor)
+ *   4. Create wallet with signup bonus
+ *   5. Initialize reputation + online status + notifications
+ */
+
+import { NextRequest } from 'next/server'
 import { createClient, getUserFromRequest } from '@/lib/supabase/server'
 import { AGENT_TYPE_CAPABILITIES, type AgentType } from '@/lib/relay/agent-engine'
+import { Connection } from '@solana/web3.js'
+// @ts-expect-error — JS module, no types
+import { deriveAgentDID, mintAgentNFT, loadPayerKeypair } from '@/lib/agent-factory'
 
-const SIGNUP_BONUS = 100 // RELAY tokens
+const SIGNUP_BONUS = 100
+const SOLANA_RPC = process.env.NEXT_PUBLIC_SOLANA_RPC ?? 'https://api.devnet.solana.com'
 
-export async function POST(request: NextRequest) {
-  const supabase = await createClient()
-  const user = await getUserFromRequest(request)
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+// ---------------------------------------------------------------------------
+// SSE helpers
+// ---------------------------------------------------------------------------
 
-  try {
-    const body = await request.json().catch(() => null)
-    if (!body) return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+const encoder = new TextEncoder()
 
-    const { handle, displayName, bio, agentType, systemPrompt, avatarUrl } = body
-
-    // Validate required fields
-    if (!handle || !displayName || !agentType) {
-      return NextResponse.json(
-        { error: 'Missing required fields: handle, displayName, agentType' },
-        { status: 400 }
-      )
-    }
-
-    if (!/^[a-z0-9_-]{3,30}$/.test(handle)) {
-      return NextResponse.json(
-        { error: 'Handle must be 3-30 chars, lowercase letters, numbers, underscores, hyphens only' },
-        { status: 400 }
-      )
-    }
-
-    const validTypes: AgentType[] = ['researcher', 'coder', 'writer', 'analyst', 'negotiator', 'custom']
-    if (!validTypes.includes(agentType)) {
-      return NextResponse.json({ error: `agentType must be one of: ${validTypes.join(', ')}` }, { status: 400 })
-    }
-
-    // Check handle availability
-    const { data: existing } = await supabase
-      .from('agents').select('id').eq('handle', handle).maybeSingle()
-    if (existing) return NextResponse.json({ error: 'Handle already taken' }, { status: 409 })
-
-    // Limit 5 agents per user
-    const { count } = await supabase
-      .from('agents')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-    if ((count ?? 0) >= 5) {
-      return NextResponse.json({ error: 'Maximum 5 agents per user' }, { status: 403 })
-    }
-
-    // Create agent
-    const { data: agent, error: agentError } = await supabase
-      .from('agents')
-      .insert({
-        user_id:      user.id,
-        handle,
-        display_name: displayName,
-        bio:          bio ?? `${displayName} — autonomous ${agentType} agent on RELAY.`,
-        agent_type:   agentType,
-        capabilities: AGENT_TYPE_CAPABILITIES[agentType as AgentType] ?? ['general-purpose'],
-        system_prompt: systemPrompt ?? null,
-        avatar_url:   avatarUrl ?? null,
-        model_family: 'claude-sonnet-4-6',
-        is_verified:  false,
-        is_active:    true,
-        reputation_score: 50,
-      })
-      .select()
-      .single()
-
-    if (agentError) throw agentError
-
-    // Create wallet with signup bonus
-    const { error: walletError } = await supabase
-      .from('wallets')
-      .insert({
-        agent_id:        agent.id,
-        balance:         SIGNUP_BONUS,
-        staked_balance:  0,
-        locked_balance:  0,
-        lifetime_earned: SIGNUP_BONUS,
-        lifetime_spent:  0,
-        currency:        'RELAY',
-      })
-
-    if (walletError) console.error('Wallet creation error:', walletError)
-
-    // Record signup bonus transaction
-    await supabase.from('transactions').insert({
-      from_agent_id: null,
-      to_agent_id:   agent.id,
-      amount:        SIGNUP_BONUS,
-      currency:      'RELAY',
-      type:          'airdrop',
-      status:        'completed',
-      description:   'Network sign-up bonus',
-    })
-
-    // Initialize reputation record
-    await supabase.from('agent_reputation').insert({
-      agent_id:            agent.id,
-      reputation_score:    50,
-      completed_contracts: 0,
-      failed_contracts:    0,
-      disputes:            0,
-      spam_flags:          0,
-      peer_endorsements:   0,
-      time_on_network_days: 0,
-      is_suspended:        false,
-    })
-
-    // Initialize online status
-    await supabase.from('agent_online_status').insert({
-      agent_id:          agent.id,
-      is_online:         false,
-      consecutive_misses: 0,
-      current_status:    'idle',
-    })
-
-    // Welcome notification
-    await supabase.from('notifications').insert({
-      agent_id: agent.id,
-      type:     'payment',
-      title:    `Welcome to RELAY, @${handle}!`,
-      body:     `You received ${SIGNUP_BONUS} RELAY as a sign-up bonus. Start by exploring open contracts or posting to the feed.`,
-      data:     { bonus: SIGNUP_BONUS },
-      read:     false,
-    })
-
-    return NextResponse.json({
-      success: true,
-      agent,
-      message: `Agent @${handle} deployed with ${SIGNUP_BONUS} RELAY sign-up bonus.`,
-    })
-
-  } catch (error) {
-    console.error('Agent create error:', error)
-    const message = error instanceof Error ? error.message : 'Internal server error'
-    return NextResponse.json({ error: message }, { status: 500 })
-  }
+function sseEvent(type: string, data: Record<string, unknown>) {
+  return encoder.encode(`data: ${JSON.stringify({ type, ...data })}\n\n`)
 }
+
+// ---------------------------------------------------------------------------
+// GET — list agents for authenticated user (unchanged)
+// ---------------------------------------------------------------------------
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
   const user = await getUserFromRequest(request)
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { data: agents, error } = await supabase
     .from('agents')
@@ -156,7 +54,210 @@ export async function GET(request: NextRequest) {
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
 
-  if (error) return NextResponse.json({ error: 'Failed to fetch agents' }, { status: 500 })
+  if (error) return Response.json({ error: 'Failed to fetch agents' }, { status: 500 })
+  return Response.json({ agents: agents ?? [] })
+}
 
-  return NextResponse.json({ agents: agents ?? [] })
+// ---------------------------------------------------------------------------
+// POST — create agent with SSE progress stream
+// ---------------------------------------------------------------------------
+
+export async function POST(request: NextRequest) {
+  const body = await request.json().catch(() => null)
+  if (!body) return Response.json({ error: 'Invalid JSON body' }, { status: 400 })
+
+  const { handle, displayName, bio, agentType, systemPrompt, avatarUrl, creatorWallet } = body
+
+  // Validate before opening the stream — bad inputs get a plain JSON error
+  if (!handle || !displayName || !agentType) {
+    return Response.json(
+      { error: 'Missing required fields: handle, displayName, agentType' },
+      { status: 400 }
+    )
+  }
+  if (!/^[a-z0-9_-]{3,30}$/.test(handle)) {
+    return Response.json(
+      { error: 'Handle must be 3-30 chars, lowercase letters, numbers, underscores, hyphens only' },
+      { status: 400 }
+    )
+  }
+  const validTypes: AgentType[] = ['researcher', 'coder', 'writer', 'analyst', 'negotiator', 'custom']
+  if (!validTypes.includes(agentType)) {
+    return Response.json({ error: `agentType must be one of: ${validTypes.join(', ')}` }, { status: 400 })
+  }
+
+  const supabase = await createClient()
+  const user = await getUserFromRequest(request)
+  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      const push = (type: string, data: Record<string, unknown>) => {
+        controller.enqueue(sseEvent(type, data))
+      }
+
+      try {
+        // ── Guard: handle availability ────────────────────────────────────
+        const { data: existing } = await supabase
+          .from('agents').select('id').eq('handle', handle).maybeSingle()
+        if (existing) {
+          push('error', { message: 'Handle already taken' })
+          return
+        }
+
+        // ── Guard: 5-agent limit ──────────────────────────────────────────
+        const { count } = await supabase
+          .from('agents')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+        if ((count ?? 0) >= 5) {
+          push('error', { message: 'Maximum 5 agents per user' })
+          return
+        }
+
+        // ── Step 1: Derive DID ────────────────────────────────────────────
+        push('progress', { step: 'did', message: 'Generating agent identity...' })
+        const { did } = deriveAgentDID(creatorWallet ?? user.id, displayName)
+
+        // ── Step 2: Insert agent + DID ────────────────────────────────────
+        push('progress', { step: 'supabase', message: 'Registering agent...' })
+
+        const { data: agent, error: agentError } = await supabase
+          .from('agents')
+          .insert({
+            user_id:       user.id,
+            handle,
+            display_name:  displayName,
+            bio:           bio ?? `${displayName} — autonomous ${agentType} agent on RELAY.`,
+            agent_type:    agentType,
+            capabilities:  AGENT_TYPE_CAPABILITIES[agentType as AgentType] ?? ['general-purpose'],
+            system_prompt: systemPrompt ?? null,
+            avatar_url:    avatarUrl ?? null,
+            model_family:  'claude-sonnet-4-6',
+            is_verified:   false,
+            reputation_score: 50,
+            creator_wallet: creatorWallet ?? null,
+            status:        'pending',
+          })
+          .select()
+          .single()
+
+        if (agentError) throw new Error(agentError.message)
+
+        // Store DID in agent_identities
+        await supabase.from('agent_identities').insert({
+          agent_id:   agent.id,
+          did,
+          public_key: creatorWallet ?? user.id,
+        })
+
+        // ── Step 3: Solana mint (optional — requires RELAY_PAYER_SECRET_KEY) ──
+        let mintAddress: string | null = null
+        const payerKeypair = loadPayerKeypair()
+
+        if (payerKeypair && creatorWallet) {
+          push('progress', { step: 'solana', message: 'Anchoring identity on Solana...' })
+          try {
+            const connection = new Connection(SOLANA_RPC, 'confirmed')
+            const mintResult = await mintAgentNFT(connection, payerKeypair, creatorWallet)
+            if (mintResult.ok) {
+              mintAddress = mintResult.data.mintAddress
+              await supabase
+                .from('agents')
+                .update({ on_chain_mint: mintAddress, status: 'active', activated_at: new Date().toISOString() })
+                .eq('id', agent.id)
+            } else {
+              console.warn('[create] Solana mint failed (non-fatal):', mintResult.error)
+            }
+          } catch (err) {
+            // Non-fatal — agent still usable without on-chain anchor
+            console.warn('[create] Solana mint error (non-fatal):', err)
+          }
+        }
+
+        // Mark active even without Solana mint
+        if (!mintAddress) {
+          await supabase
+            .from('agents')
+            .update({ status: 'active' })
+            .eq('id', agent.id)
+        }
+
+        // ── Step 4: Wallet + signup bonus ─────────────────────────────────
+        push('progress', { step: 'wallet', message: 'Creating wallet...' })
+
+        await supabase.from('wallets').insert({
+          agent_id:        agent.id,
+          balance:         SIGNUP_BONUS,
+          staked_balance:  0,
+          locked_balance:  0,
+          lifetime_earned: SIGNUP_BONUS,
+          lifetime_spent:  0,
+          currency:        'RELAY',
+        })
+
+        await supabase.from('transactions').insert({
+          from_agent_id: null,
+          to_agent_id:   agent.id,
+          amount:        SIGNUP_BONUS,
+          currency:      'RELAY',
+          type:          'airdrop',
+          status:        'completed',
+          description:   'Network sign-up bonus',
+        })
+
+        // ── Step 5: Reputation + online status + notification ─────────────
+        push('progress', { step: 'init', message: 'Initializing agent profile...' })
+
+        await Promise.all([
+          supabase.from('agent_reputation').insert({
+            agent_id:             agent.id,
+            reputation_score:     50,
+            completed_contracts:  0,
+            failed_contracts:     0,
+            disputes:             0,
+            spam_flags:           0,
+            peer_endorsements:    0,
+            time_on_network_days: 0,
+            is_suspended:         false,
+          }),
+          supabase.from('agent_online_status').insert({
+            agent_id:           agent.id,
+            is_online:          false,
+            consecutive_misses: 0,
+            current_status:     'idle',
+          }),
+          supabase.from('notifications').insert({
+            agent_id: agent.id,
+            type:     'payment',
+            title:    `Welcome to RELAY, @${handle}!`,
+            body:     `You received ${SIGNUP_BONUS} RELAY as a sign-up bonus. Start by exploring open contracts or posting to the feed.`,
+            data:     { bonus: SIGNUP_BONUS },
+            read:     false,
+          }),
+        ])
+
+        push('complete', {
+          agentId:     agent.id,
+          did,
+          mintAddress,
+          handle,
+          message:     `Agent @${handle} deployed with ${SIGNUP_BONUS} RELAY sign-up bonus.`,
+        })
+
+      } catch (err) {
+        push('error', { message: err instanceof Error ? err.message : 'Internal server error' })
+      } finally {
+        controller.close()
+      }
+    },
+  })
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type':  'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection':    'keep-alive',
+    },
+  })
 }
