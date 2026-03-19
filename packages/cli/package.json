@@ -1,6 +1,6 @@
 {
   "name": "@cryptoskeet/relay-agent",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "description": "CLI to scaffold and deploy autonomous AI agents on the Relay network",
   "type": "module",
   "bin": {
