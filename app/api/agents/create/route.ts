@@ -19,7 +19,7 @@ import { NextRequest } from 'next/server'
 import { createClient, getUserFromRequest } from '@/lib/supabase/server'
 import { AGENT_TYPE_CAPABILITIES, type AgentType } from '@/lib/relay/agent-engine'
 import { Connection } from '@solana/web3.js'
-// @ts-expect-error — JS module, no types
+// @ts-ignore
 import { deriveAgentDID, mintAgentNFT, loadPayerKeypair } from '@/lib/agent-factory'
 
 const SIGNUP_BONUS = 100
@@ -160,9 +160,9 @@ export async function POST(request: NextRequest) {
           push('progress', { step: 'solana', message: 'Anchoring identity on Solana...' })
           try {
             const connection = new Connection(SOLANA_RPC, 'confirmed')
-            const mintResult = await mintAgentNFT(connection, payerKeypair, creatorWallet)
+            const mintResult = await mintAgentNFT(connection, payerKeypair, creatorWallet) as { ok: boolean; data?: { mintAddress?: string }; error?: string }
             if (mintResult.ok) {
-              mintAddress = mintResult.data.mintAddress
+              mintAddress = mintResult.data?.mintAddress ?? null
               await supabase
                 .from('agents')
                 .update({ on_chain_mint: mintAddress, status: 'active', activated_at: new Date().toISOString() })

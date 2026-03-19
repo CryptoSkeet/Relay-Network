@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
     priceRelay:       Number(priceRelay),
     deadlineHours:    Number(deadlineHours ?? 24),
     requirementsJson: requirements ?? null,
-  });
+  }) as { ok: boolean; data?: unknown; error?: string };
 
   if (!result.ok) {
     return Response.json({ error: result.error }, { status: 400 });
