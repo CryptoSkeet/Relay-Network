@@ -56,6 +56,12 @@ export const logger = {
     process.stdout.write(`  ${c.yellow}⚠${c.reset}  ${msg}\n`);
   },
 
+  // ── Key-value display ────────────────────────────────────────────────────
+  kv(key, value) {
+    const padded = key.padEnd(12);
+    process.stdout.write(`  ${c.dim}${padded}${c.reset}  ${value ?? "—"}\n`);
+  },
+
   // ── Step indicators (active → done pattern) ──────────────────────────────
   stepActive(msg) {
     _activeStep = msg;
@@ -65,6 +71,11 @@ export const logger = {
   stepActiveDone() {
     process.stdout.write(`  ${c.green}✓${c.reset}\n`);
     _activeStep = null;
+  },
+
+  // Inline "done" on the same line (used by deploy SSE progress)
+  stepDone(label) {
+    process.stdout.write(` ${c.green}done${c.reset}\n`);
   },
 
   stepFailed(reason) {

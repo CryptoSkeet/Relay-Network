@@ -1,13 +1,20 @@
 /**
  * src/lib/config.js
- * Read/write relay.config.js in project directories
+ * Read/write relay.config.js in project directories + resolve API credentials
  */
 
 import { writeFileSync, readFileSync, existsSync } from "fs";
 import { join, resolve } from "path";
+import { homedir } from "os";
+
+const CREDS_FILE = join(homedir(), ".relay", "credentials.json");
+
+// ---------------------------------------------------------------------------
+// Project config (relay.config.js)
+// ---------------------------------------------------------------------------
 
 /**
- * Write relay.config.js as a JS module (not JSON — allows comments)
+ * Write relay.config.js as a JS module (allows comments, easier to edit)
  */
 export function writeProjectConfig(projectDir, config) {
   const content = [
@@ -22,8 +29,7 @@ export function writeProjectConfig(projectDir, config) {
 }
 
 /**
- * Load relay.config.js from a project directory
- * Uses dynamic import so it works with both ESM and CJS configs
+ * Load relay.config.js from a project directory via dynamic import
  */
 export async function loadProjectConfig(dir) {
   const projectDir = resolve(dir ?? ".");
@@ -33,13 +39,17 @@ export async function loadProjectConfig(dir) {
     throw new Error(`No relay.config.js found in ${projectDir}`);
   }
 
-  // Dynamic import handles ESM default exports
-  const mod = await import(configPath + `?t=${Date.now()}`); // bust cache on re-reads
+  // Cache-bust so re-reads pick up changes in dev
+  const mod = await import(`${configPath}?t=${Date.now()}`);
   return mod.default ?? mod;
 }
 
+// ---------------------------------------------------------------------------
+// Project .env
+// ---------------------------------------------------------------------------
+
 /**
- * Read RELAY_AGENT_ID and RELAY_API_KEY from .env in project dir
+ * Read key=value pairs from .env in project dir
  */
 export function loadProjectEnv(dir) {
   const projectDir = resolve(dir ?? ".");
@@ -55,4 +65,29 @@ export function loadProjectEnv(dir) {
     vars[trimmed.slice(0, eq).trim()] = trimmed.slice(eq + 1).trim();
   }
   return vars;
+}
+
+// ---------------------------------------------------------------------------
+// Global credentials (~/.relay/credentials.json)
+// ---------------------------------------------------------------------------
+
+function loadGlobalCreds() {
+  try {
+    return JSON.parse(readFileSync(CREDS_FILE, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolve API connection config.
+ * Priority: process env vars > ~/.relay/credentials.json
+ */
+export function resolveApiConfig() {
+  const creds = loadGlobalCreds();
+  return {
+    apiKey: process.env.RELAY_API_KEY ?? creds?.apiKey  ?? null,
+    wallet: process.env.RELAY_WALLET  ?? creds?.wallet  ?? null,
+    apiUrl: process.env.RELAY_API_URL ?? "https://v0-ai-agent-instagram.vercel.app",
+  };
 }
