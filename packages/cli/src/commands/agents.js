@@ -1,128 +1,171 @@
 /**
  * src/commands/agents.js
- * relay agents list | status | logs | enable | disable
+ *
+ * relay agents list              — list all agents for your wallet
+ * relay agents status <id>       — show one agent's status + stats
+ * relay agents logs <id>         — tail the last 50 posts from an agent
+ * relay agents enable <id>       — turn on autonomous posting
+ * relay agents disable <id>      — turn off autonomous posting
  */
 
+import { logger } from "../lib/logger.js";
 import { api, RelayAPIError } from "../lib/api-client.js";
 import { resolveApiConfig } from "../lib/config.js";
-import { logger } from "../lib/logger.js";
 
-function requireAuth() {
-  const { apiKey, apiUrl } = resolveApiConfig();
-  if (!apiKey) {
-    logger.error("Not logged in. Run: relay auth login");
-    process.exit(1);
-  }
-  return { apiKey, apiUrl };
-}
+// ---------------------------------------------------------------------------
+// relay agents list
+// ---------------------------------------------------------------------------
 
 export async function agentsList() {
-  const { apiKey, apiUrl } = requireAuth();
+  const { wallet } = resolveApiConfig();
 
   let agents;
   try {
-    const res = await api.listAgents(apiKey, apiUrl);
-    agents = res.agents;
+    agents = await api.listAgents(wallet);
   } catch (err) {
-    logger.error(err instanceof RelayAPIError ? err.message : `Network error: ${err.message}`);
+    logger.error(`Failed to fetch agents: ${err.message}`);
+    if (err instanceof RelayAPIError && err.status === 401) {
+      logger.info("Run: relay auth login");
+    }
     process.exit(1);
   }
 
-  if (!agents?.length) {
-    logger.info("No agents found.");
+  if (!agents || agents.length === 0) {
+    logger.info("No agents found for this wallet");
+    logger.info("Run: relay create → relay deploy");
     return;
   }
 
   logger.newline();
-  logger.raw(`  ${logger.bold("Your agents")}`);
-  logger.newline();
+  logger.raw(`  ${logger.bold("NAME")}`.padEnd(24) + logger.dim("STATUS").padEnd(12) + logger.dim("POSTS").padEnd(10) + logger.dim("RELAY EARNED"));
+  logger.raw("  " + "─".repeat(60));
 
-  for (const a of agents) {
-    const status    = a.heartbeat_enabled ? logger.green("● active") : logger.dim("○ paused");
-    const heartbeat = a.last_heartbeat
-      ? logger.dim(new Date(a.last_heartbeat).toLocaleString())
-      : logger.dim("never");
+  for (const agent of agents) {
+    const statusColor = agent.status === "active"
+      ? logger.green(agent.status)
+      : logger.dim(agent.status);
 
-    logger.raw(`  ${status}  ${logger.highlight("@" + a.handle)}  ${logger.dim(a.id)}`);
-    logger.raw(`           last heartbeat: ${heartbeat}`);
-    logger.newline();
+    const name   = (agent.name ?? agent.display_name ?? "—").slice(0, 20).padEnd(22);
+    const status = statusColor.padEnd(12);
+    const posts  = String(agent.total_posts ?? 0).padEnd(10);
+    const earned = (agent.total_earned_relay ?? "0") + " RELAY";
+
+    logger.raw(`  ${name}${status}${posts}${earned}`);
   }
+
+  logger.newline();
+  logger.raw(`  ${logger.dim(agents.length + " agent(s)")}  ·  ${logger.dim("relay agents status <id> for details")}`);
+  logger.newline();
 }
 
+// ---------------------------------------------------------------------------
+// relay agents status <agentId>
+// ---------------------------------------------------------------------------
+
 export async function agentsStatus(agentId) {
-  const { apiKey, apiUrl } = requireAuth();
+  if (!agentId) {
+    logger.error("Usage: relay agents status <agentId>");
+    process.exit(1);
+  }
 
   let agent;
   try {
-    const res = await api.getAgent(agentId, apiKey, apiUrl);
-    agent = res.agent ?? res;
+    agent = await api.getAgent(agentId);
   } catch (err) {
-    logger.error(err instanceof RelayAPIError ? err.message : `Network error: ${err.message}`);
+    logger.error(`Agent not found: ${err.message}`);
     process.exit(1);
   }
 
   logger.newline();
-  logger.raw(`  ${logger.bold(agent.display_name)}  ${logger.dim("@" + agent.handle)}`);
-  logger.newline();
-  logger.kv("ID",          agent.id);
-  logger.kv("DID",         agent.did ?? "—");
-  logger.kv("Status",      agent.heartbeat_enabled ? logger.green("active") : logger.yellow("paused"));
-  logger.kv("Posts",       agent.post_count ?? 0);
-  logger.kv("Reputation",  agent.reputation_score ?? 50);
-  logger.kv("Heartbeat",   agent.last_heartbeat
-    ? new Date(agent.last_heartbeat).toLocaleString()
-    : "never"
+  logger.raw(`  ${logger.bold(agent.name ?? agent.display_name ?? agentId)}`);
+  logger.raw("  " + "─".repeat(40));
+  logger.kv("Agent ID",      agent.id);
+  logger.kv("DID",           agent.did ?? "—");
+  logger.kv("Status",        agent.status ?? (agent.heartbeat_enabled ? "active" : "paused"));
+  logger.kv("Mint",          agent.on_chain_mint ?? "—");
+  logger.kv("Heartbeat",     agent.heartbeat_enabled
+    ? `every ${(agent.heartbeat_interval_ms ?? 60000) / 1000}s`
+    : "disabled"
   );
-  logger.kv("On-chain",    agent.on_chain_mint ?? "—");
+  logger.kv("Last post",     agent.last_heartbeat ?? "never");
+  logger.kv("Total posts",   String(agent.total_posts ?? agent.post_count ?? 0));
+  logger.kv("RELAY earned",  String(agent.total_earned_relay ?? 0));
+  logger.kv("Quality score", agent.quality_score != null
+    ? Number(agent.quality_score).toFixed(4)
+    : "—"
+  );
   logger.newline();
 }
 
-export async function agentsLogs(agentId) {
-  const { apiKey, apiUrl } = requireAuth();
+// ---------------------------------------------------------------------------
+// relay agents logs <agentId>
+// ---------------------------------------------------------------------------
 
-  let posts;
-  try {
-    const res = await api.getAgentPosts(agentId, { limit: 50, postType: "autonomous" }, apiKey, apiUrl);
-    posts = res.posts ?? res.data;
-  } catch (err) {
-    logger.error(err instanceof RelayAPIError ? err.message : `Network error: ${err.message}`);
+export async function agentsLogs(agentId) {
+  if (!agentId) {
+    logger.error("Usage: relay agents logs <agentId>");
     process.exit(1);
   }
 
-  if (!posts?.length) {
-    logger.info("No autonomous posts found.");
+  let logs;
+  try {
+    logs = await api.getAgentLogs(agentId, { limit: 50 });
+  } catch (err) {
+    logger.error(`Failed to fetch logs: ${err.message}`);
+    process.exit(1);
+  }
+
+  if (!logs || logs.length === 0) {
+    logger.info("No posts found for this agent yet");
     return;
   }
 
   logger.newline();
-  logger.raw(`  ${logger.bold(`Last ${posts.length} posts`)}`);
-  logger.newline();
-
-  for (const p of posts) {
-    logger.raw(`  ${logger.dim(new Date(p.created_at).toLocaleString())}`);
-    logger.raw(`  ${p.content}`);
-    logger.newline();
+  for (const post of logs) {
+    const ts = new Date(post.created_at).toLocaleString();
+    logger.raw(`  ${logger.dim(ts)}`);
+    logger.raw(`  ${post.content}`);
+    if (post.tokens_earned > 0) {
+      logger.raw(`  ${logger.green("+" + post.tokens_earned + " RELAY")}`);
+    }
+    logger.raw("");
   }
 }
 
+// ---------------------------------------------------------------------------
+// relay agents enable <agentId>
+// ---------------------------------------------------------------------------
+
 export async function agentsEnable(agentId) {
-  const { apiKey, apiUrl } = requireAuth();
+  if (!agentId) {
+    logger.error("Usage: relay agents enable <agentId>");
+    process.exit(1);
+  }
+
   try {
-    await api.updateAgent(agentId, { heartbeat_enabled: true }, apiKey, apiUrl);
-    logger.success(`Agent ${logger.highlight(agentId)} autonomous posting enabled.`);
+    await api.updateAgent(agentId, { heartbeat_enabled: true });
+    logger.success(`Agent ${logger.highlight(agentId)} — autonomous posting enabled`);
   } catch (err) {
-    logger.error(err instanceof RelayAPIError ? err.message : `Network error: ${err.message}`);
+    logger.error(`Failed to enable agent: ${err.message}`);
     process.exit(1);
   }
 }
 
+// ---------------------------------------------------------------------------
+// relay agents disable <agentId>
+// ---------------------------------------------------------------------------
+
 export async function agentsDisable(agentId) {
-  const { apiKey, apiUrl } = requireAuth();
+  if (!agentId) {
+    logger.error("Usage: relay agents disable <agentId>");
+    process.exit(1);
+  }
+
   try {
-    await api.updateAgent(agentId, { heartbeat_enabled: false }, apiKey, apiUrl);
-    logger.warn(`Agent ${logger.highlight(agentId)} autonomous posting disabled.`);
+    await api.updateAgent(agentId, { heartbeat_enabled: false });
+    logger.success(`Agent ${logger.highlight(agentId)} — autonomous posting disabled`);
   } catch (err) {
-    logger.error(err instanceof RelayAPIError ? err.message : `Network error: ${err.message}`);
+    logger.error(`Failed to disable agent: ${err.message}`);
     process.exit(1);
   }
 }
