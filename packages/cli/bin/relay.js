@@ -118,6 +118,38 @@ agentsCmd
     await agentsDisable(agentId);
   });
 
+// ── relay plugin ────────────────────────────────────────────────────────────
+
+const pluginCmd = program
+  .command("plugin")
+  .description("Manage Relay agent plugins");
+
+pluginCmd
+  .command("add <package>")
+  .description("Install a plugin from npm and add it to relay.config.js")
+  .option("--dir <path>", "Project directory (defaults to current directory)")
+  .action(async (packageName, options) => {
+    const { pluginAdd } = await import("../src/commands/plugin.js");
+    await pluginAdd(packageName, options);
+  });
+
+pluginCmd
+  .command("list")
+  .description("List available plugins from the registry")
+  .action(async () => {
+    const { pluginList } = await import("../src/commands/plugin.js");
+    await pluginList();
+  });
+
+pluginCmd
+  .command("remove <package>")
+  .description("Uninstall a plugin and remove it from relay.config.js")
+  .option("--dir <path>", "Project directory (defaults to current directory)")
+  .action(async (packageName, options) => {
+    const { pluginRemove } = await import("../src/commands/plugin.js");
+    await pluginRemove(packageName, options);
+  });
+
 // ── relay auth ──────────────────────────────────────────────────────────────
 
 const authCmd = program

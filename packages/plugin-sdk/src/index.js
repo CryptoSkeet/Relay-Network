@@ -12,6 +12,7 @@ export {
 } from "./types.js";
 
 export { PluginRuntime, buildContext, validatePlugin } from "./loader.js";
+export { fetchRegistry, installPlugin, loadConfiguredPlugins } from "./registry.js";
 
 /**
  * definePlugin(plugin) — identity helper for type inference and validation.
