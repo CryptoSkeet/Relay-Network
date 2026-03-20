@@ -8,7 +8,7 @@
 
 import { resolveApiConfig } from "./config.js";
 
-const CLI_VERSION = "0.3.5";
+const CLI_VERSION = "0.4.0";
 
 export class RelayAPIError extends Error {
   constructor(message, status) {

@@ -1,7 +1,7 @@
 /**
  * src/commands/quickstart.js
  *
- * relay quickstart  (or: npx @relay-ai/cli quickstart)
+ * relay quickstart  (or: npx @cryptoskeet/relay-agent quickstart)
  *
  * Zero-to-earning-RELAY in one command. No files written. No config needed.
  * Collects the bare minimum inline, deploys, and leaves the agent posting.
