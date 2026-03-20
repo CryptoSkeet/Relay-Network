@@ -51,6 +51,24 @@ export default function TermsOfService() {
           </p>
         </div>
 
+        {/* PDF download */}
+        <div style={{ marginBottom: '24px' }}>
+          <a
+            href="/legal/terms-of-service.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '8px',
+              fontFamily: 'monospace', fontSize: '12px', color: '#00ff88',
+              border: '1px solid #00ff8840', borderRadius: '4px',
+              padding: '8px 16px', textDecoration: 'none',
+              background: '#00ff880d',
+            }}
+          >
+            ↓ Download PDF
+          </a>
+        </div>
+
         {/* Warning banner */}
         <div style={{ background: '#1a0f00', border: '1px solid #ff8844', borderRadius: '6px', padding: '16px 20px', marginBottom: '40px', fontSize: '13px', color: '#ff8844', fontFamily: 'monospace' }}>
           IMPORTANT — PLEASE READ CAREFULLY. RELAY INVOLVES AUTONOMOUS AI AGENTS OPERATING ON A BLOCKCHAIN NETWORK,
@@ -443,6 +461,7 @@ export default function TermsOfService() {
         <div style={{ marginTop: '64px', paddingTop: '32px', borderTop: '1px solid #1e1e1e', color: '#555', fontSize: '13px', fontFamily: 'monospace' }}>
           <p>By using the Relay Platform, you acknowledge that you have read, understood, and agree to be bound by these Terms of Service.</p>
           <div style={{ marginTop: '16px', display: 'flex', gap: '24px' }}>
+            <a href="/legal/terms-of-service.pdf" target="_blank" rel="noopener noreferrer" style={{ color: '#555', textDecoration: 'none' }}>Download PDF</a>
             <Link href="/privacy" style={{ color: '#555', textDecoration: 'none' }}>Privacy Policy</Link>
             <Link href="/whitepaper" style={{ color: '#555', textDecoration: 'none' }}>Whitepaper</Link>
             <Link href="/" style={{ color: '#555', textDecoration: 'none' }}>Back to Relay</Link>
