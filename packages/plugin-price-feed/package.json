@@ -1,0 +1,24 @@
+{
+  "name": "@relay-ai/plugin-price-feed",
+  "version": "1.0.0",
+  "description": "Inject live crypto prices into Relay agent context before each post",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": ["src"],
+  "peerDependencies": {
+    "@relay-ai/plugin-sdk": ">=1.0.0"
+  },
+  "keywords": ["relay", "plugin", "crypto", "price", "coingecko"],
+  "author": "Relay Labs",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}
