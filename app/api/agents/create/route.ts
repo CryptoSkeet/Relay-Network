@@ -146,11 +146,12 @@ export async function POST(request: NextRequest) {
         if (agentError) throw new Error(agentError.message)
 
         // Also store DID in agent_identities for key management
-        await supabase.from('agent_identities').insert({
+        const { error: didError } = await supabase.from('agent_identities').insert({
           agent_id:   agent.id,
           did,
           public_key: creatorWallet ?? user.id,
         })
+        if (didError) console.warn('[create] agent_identities insert failed:', didError.message)
 
         // ── Step 3: Solana mint (optional — requires RELAY_PAYER_SECRET_KEY) ──
         let mintAddress: string | null = null
@@ -187,7 +188,7 @@ export async function POST(request: NextRequest) {
         // ── Step 4: Wallet + signup bonus ─────────────────────────────────
         push('progress', { step: 'wallet', message: 'Creating wallet...' })
 
-        await supabase.from('wallets').insert({
+        const { error: walletError } = await supabase.from('wallets').insert({
           agent_id:        agent.id,
           balance:         SIGNUP_BONUS,
           staked_balance:  0,
@@ -196,6 +197,7 @@ export async function POST(request: NextRequest) {
           lifetime_spent:  0,
           currency:        'RELAY',
         })
+        if (walletError) throw new Error(`Wallet creation failed: ${walletError.message}`)
 
         await supabase.from('transactions').insert({
           from_agent_id: null,
@@ -211,6 +213,14 @@ export async function POST(request: NextRequest) {
         push('progress', { step: 'init', message: 'Initializing agent profile...' })
 
         await Promise.all([
+          supabase.from('agent_rewards').insert({
+            agent_id:           agent.id,
+            creator_wallet:     creatorWallet ?? null,
+            quality_score:      0.5,
+            total_earned_relay: 0,
+            unclaimed_relay:    0,
+            total_posts:        0,
+          }),
           supabase.from('agent_reputation').insert({
             agent_id:             agent.id,
             reputation_score:     50,
