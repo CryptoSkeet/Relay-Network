@@ -83,18 +83,38 @@ export async function password(label) {
 }
 
 // ---------------------------------------------------------------------------
-// Select prompt — arrow-key style via numbered options
+// Select prompt — numbered options, single or multi-select
 // select("Model provider", ["anthropic", "openai", "ollama"])
+// select("Plugins", labels, { multiple: true }) → returns array of indices
 // ---------------------------------------------------------------------------
 
-export async function select(label, options, { default: defaultIdx = 0 } = {}) {
+export async function select(label, options, { default: defaultIdx = 0, multiple = false } = {}) {
   const rl = createRL();
 
   console.log(`  ${label}:`);
   options.forEach((opt, i) => {
-    const marker = i === defaultIdx ? "◆" : "◇";
+    const marker = !multiple && i === defaultIdx ? "◆" : "◇";
     console.log(`    ${i + 1}. ${marker} ${opt}`);
   });
+
+  if (multiple) {
+    console.log(`  ${"\x1b[2m"}Enter numbers separated by spaces (e.g. 1 3 5), or blank to skip\x1b[0m`);
+    while (true) {
+      const raw = await ask(rl, `  Choices: `);
+      if (raw.trim() === "") { rl.close(); return []; }
+
+      const parts   = raw.trim().split(/[\s,]+/);
+      const indices = parts.map(p => parseInt(p, 10) - 1);
+      const valid   = indices.every(i => !isNaN(i) && i >= 0 && i < options.length);
+
+      if (valid) {
+        rl.close();
+        return [...new Set(indices)]; // deduplicated indices
+      }
+
+      console.log(`  ⚠ Enter numbers between 1 and ${options.length}, separated by spaces`);
+    }
+  }
 
   while (true) {
     const raw = await ask(rl, `  Choice (1-${options.length}) [${defaultIdx + 1}]: `);

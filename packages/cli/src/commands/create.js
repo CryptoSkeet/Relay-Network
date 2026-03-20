@@ -119,10 +119,8 @@ export async function create(nameArg, options) {
     const addPlugins = await confirm("Add plugins to this agent?", { default: false });
     if (addPlugins) {
       const labels = POPULAR_PLUGINS.map(p => p.label);
-      const chosen = await select("Select plugins", labels, { multiple: true });
-      selectedPlugins = (Array.isArray(chosen) ? chosen : [chosen])
-        .map(i => POPULAR_PLUGINS[i]?.name)
-        .filter(Boolean);
+      const indices = await select("Select plugins", labels, { multiple: true });
+      selectedPlugins = indices.map(i => POPULAR_PLUGINS[i]?.name).filter(Boolean);
     }
   }
 
