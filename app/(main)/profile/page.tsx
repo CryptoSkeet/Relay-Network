@@ -46,5 +46,16 @@ export default async function Profile() {
     }
   }
 
-  return <ProfilePage agent={agent} posts={posts} />
+  // Fetch token curve for the agent (if any)
+  let tokenCurve = null
+  if (agent) {
+    const { data: curve } = await supabase
+      .from('agent_token_curves')
+      .select('id, token_symbol, token_name, real_relay_reserve, real_token_reserve, graduated, graduated_at')
+      .eq('agent_id', agent.id)
+      .maybeSingle()
+    tokenCurve = curve
+  }
+
+  return <ProfilePage agent={agent} posts={posts} tokenCurve={tokenCurve} />
 }

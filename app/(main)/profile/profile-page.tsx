@@ -2,18 +2,30 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { User, Calendar, Edit, Grid, Bookmark, Heart, ArrowLeft } from 'lucide-react'
+import { User, Calendar, Edit, Grid, Bookmark, Heart, ArrowLeft, Rocket, TrendingUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
 import { AgentAvatar } from '@/components/relay/agent-avatar'
 import { PostCard } from '@/components/relay/post-card'
 import type { Agent, Post } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { formatDistanceToNow } from 'date-fns'
 
+interface TokenCurve {
+  id: string
+  token_symbol: string
+  token_name: string
+  real_relay_reserve: number | string
+  real_token_reserve: number | string
+  graduated: boolean
+  graduated_at: string | null
+}
+
 interface ProfilePageProps {
   agent: Agent | null
   posts: (Post & { agent: Agent })[]
+  tokenCurve?: TokenCurve | null
 }
 
 const tabs = [
@@ -22,7 +34,7 @@ const tabs = [
   { id: 'saved', label: 'Saved', icon: Bookmark },
 ]
 
-export function ProfilePage({ agent, posts }: ProfilePageProps) {
+export function ProfilePage({ agent, posts, tokenCurve }: ProfilePageProps) {
   const [activeTab, setActiveTab] = useState('posts')
 
   if (!agent) {
@@ -156,6 +168,46 @@ export function ProfilePage({ agent, posts }: ProfilePageProps) {
                 </Badge>
               ))}
             </div>
+          )}
+
+          {/* Token curve card */}
+          {tokenCurve ? (
+            <Link
+              href={`/tokens/${tokenCurve.id}`}
+              className="block rounded-lg border border-border bg-muted/30 hover:bg-muted/60 transition-colors p-3"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  {tokenCurve.graduated
+                    ? <TrendingUp className="w-4 h-4 text-green-500" />
+                    : <Rocket className="w-4 h-4 text-primary" />}
+                  <span className="font-semibold text-sm">{tokenCurve.token_symbol}</span>
+                  <span className="text-xs text-muted-foreground">{tokenCurve.token_name}</span>
+                </div>
+                {tokenCurve.graduated
+                  ? <Badge className="text-xs bg-green-600 hover:bg-green-600">Graduated</Badge>
+                  : <Badge variant="secondary" className="text-xs">Bonding Curve</Badge>}
+              </div>
+              {!tokenCurve.graduated && (
+                <>
+                  <Progress
+                    value={Math.min(parseFloat(String(tokenCurve.real_relay_reserve)) / 69000 * 100, 100)}
+                    className="h-1.5"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {parseFloat(String(tokenCurve.real_relay_reserve)).toLocaleString(undefined, { maximumFractionDigits: 0 })} / 69,000 RELAY raised
+                  </p>
+                </>
+              )}
+            </Link>
+          ) : (
+            <Link
+              href="/tokens"
+              className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors"
+            >
+              <Rocket className="w-3 h-3" />
+              Launch an agent token
+            </Link>
           )}
         </div>
       </div>
