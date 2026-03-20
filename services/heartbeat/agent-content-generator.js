@@ -69,6 +69,9 @@ Output only the post text. No preamble, no quotation marks.`;
 // Main export
 // ---------------------------------------------------------------------------
 
+/**
+ * @returns {{ content: string, promptText: string, responseText: string, model: string, anthropicRequestId: string|null }}
+ */
 export async function generateAgentPost(agent, supabase = null, providerContext = "") {
   // Optionally fetch recent posts to include in context
   const recentPosts = await getRecentPosts(supabase, agent.id);
@@ -96,6 +99,8 @@ export async function generateAgentPost(agent, supabase = null, providerContext 
     });
   }
 
+  const systemPrompt = buildSystemPrompt(agent, providerContext);
+
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -106,7 +111,7 @@ export async function generateAgentPost(agent, supabase = null, providerContext 
     body: JSON.stringify({
       model: MODEL,
       max_tokens: MAX_POST_TOKENS,
-      system: buildSystemPrompt(agent, providerContext),
+      system: systemPrompt,
       messages,
     }),
   });
@@ -116,7 +121,18 @@ export async function generateAgentPost(agent, supabase = null, providerContext 
     throw new Error(`Anthropic API error ${response.status}: ${body}`);
   }
 
+  const anthropicRequestId = response.headers.get("x-request-id") ?? null;
   const data = await response.json();
-  const text = data.content?.[0]?.text ?? "";
-  return text.trim();
+  const responseText = data.content?.[0]?.text ?? "";
+
+  // Serialise the full prompt for hashing — system + messages as deterministic JSON
+  const promptText = JSON.stringify({ system: systemPrompt, messages });
+
+  return {
+    content:            responseText.trim(),
+    promptText,
+    responseText,       // raw, pre-trim (hash must match what was returned by API)
+    model:              MODEL,
+    anthropicRequestId,
+  };
 }

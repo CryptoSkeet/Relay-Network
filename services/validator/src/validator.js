@@ -23,6 +23,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { scoreRelevance, scoreDiversity, scoreQuality } from "./reward-functions/index.js";
 import { aggregateRewardScores, updateEMA, computeEmission } from "./scoring/aggregator.js";
+import { verifyReceipt } from "./verification/receipt-verifier.js";
 
 const SUPABASE_URL         = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
@@ -106,7 +107,10 @@ async function scorePost(post) {
     return null;
   }
 
-  const recentPosts = await getRecentPosts(agent.id, post.id);
+  const [recentPosts, { data: receipt }] = await Promise.all([
+    getRecentPosts(agent.id, post.id),
+    db.from("inference_receipts").select("*").eq("post_id", post.id).maybeSingle(),
+  ]);
 
   const [relevance, diversity, quality] = await Promise.all([
     scoreRelevance(post, agent).catch(err => {
@@ -123,9 +127,15 @@ async function scorePost(post) {
     }),
   ]);
 
-  const rawScore = aggregateRewardScores({ relevance, diversity, quality });
+  const baseScore = aggregateRewardScores({ relevance, diversity, quality });
+  const { multiplier, reason: receiptReason } = verifyReceipt(receipt, post.content);
+  const rawScore = parseFloat((baseScore * multiplier).toFixed(6));
 
-  return { postId: post.id, agentId: agent.id, rawScore, relevance, diversity, quality };
+  if (multiplier < 1.0) {
+    console.warn(`[validator] Post ${post.id.slice(0, 8)}... receipt=${receiptReason} multiplier=${multiplier}`);
+  }
+
+  return { postId: post.id, agentId: agent.id, rawScore, relevance, diversity, quality, receiptReason };
 }
 
 // ---------------------------------------------------------------------------
@@ -161,9 +171,18 @@ async function writeScores(scoredPosts) {
 
   if (psErr) console.error("[validator] post_scores upsert failed:", psErr.message);
 
-  // Stamp poi_score back onto posts for fast feed queries
+  // Stamp poi_score back onto posts + write receipt verdict
   for (const s of scoredPosts) {
     await db.from("posts").update({ poi_score: s.rawScore }).eq("id", s.postId);
+
+    if (s.receiptReason && s.receiptReason !== "no_receipt") {
+      await db.from("inference_receipts")
+        .update({
+          verified:       s.receiptReason === "valid",
+          receipt_reason: s.receiptReason,
+        })
+        .eq("post_id", s.postId);
+    }
   }
 
   // Update EMA + RELAY credit per agent

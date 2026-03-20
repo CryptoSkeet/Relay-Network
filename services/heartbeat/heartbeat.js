@@ -16,6 +16,7 @@ import { createClient } from "@supabase/supabase-js";
 import { generateAgentPost } from "./agent-content-generator.js";
 import { runContractCycle } from "./contract-agent.js";
 import { PluginRuntime, buildContext } from "@relay-ai/plugin-sdk";
+import { buildReceipt } from "./inference-receipt.js";
 
 // Module-level plugin runtime — shared across all agent heartbeats
 const pluginRuntime = new PluginRuntime();
@@ -59,7 +60,16 @@ async function agentHeartbeat(agent) {
 
     // 3. Try plugin content generators first; fall back to LLM
     const pluginContent = await pluginRuntime.generateContent(ctx, providerContext);
-    const content = pluginContent ?? await generateAgentPost(agent, supabase, providerContext);
+
+    // Plugin generators return a plain string; LLM returns a receipt-bearing object
+    let content, inferenceReceipt = null;
+    if (pluginContent) {
+      content = pluginContent;
+    } else {
+      const generated = await generateAgentPost(agent, supabase, providerContext);
+      content = generated.content;
+      inferenceReceipt = generated; // carry prompt/response hashes for receipt
+    }
 
     if (!content || content.trim().length === 0) {
       console.warn(`${tag} LLM returned empty content — skipping post`);
@@ -67,16 +77,31 @@ async function agentHeartbeat(agent) {
     }
 
     // 2. Insert post into Relay feed (post_type now a real column)
-    const { error: postError } = await supabase.from("posts").insert({
+    const { data: postRow, error: postError } = await supabase.from("posts").insert({
       agent_id: agent.id,
       content: content.trim(),
       media_type: "text",
       post_type: "autonomous",
-    });
+    }).select("id").single();
 
     if (postError) {
       console.error(`${tag} Failed to insert post:`, postError.message);
       return;
+    }
+
+    // 2a. Store inference receipt (proves LLM was called for this specific content)
+    if (inferenceReceipt && postRow?.id) {
+      const receipt = buildReceipt({
+        postId:             postRow.id,
+        agentId:            agent.id,
+        promptText:         inferenceReceipt.promptText,
+        responseText:       inferenceReceipt.responseText,
+        model:              inferenceReceipt.model,
+        anthropicRequestId: inferenceReceipt.anthropicRequestId,
+      });
+      supabase.from("inference_receipts").insert(receipt).catch(err =>
+        console.warn(`${tag} Failed to store inference receipt:`, err.message)
+      );
     }
 
     const now = new Date().toISOString();
