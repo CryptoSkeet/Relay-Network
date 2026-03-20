@@ -23,6 +23,22 @@ program
   .description("Create, deploy, and manage autonomous Relay agents")
   .version(pkg.version, "-v, --version");
 
+// ── relay quickstart ────────────────────────────────────────────────────────
+
+program
+  .command("quickstart")
+  .description("Zero to earning RELAY in one command — no files, no config")
+  .option("--name <name>",        "Agent name (skips prompt)")
+  .option("--key <key>",          "Anthropic API key (skips prompt)")
+  .option("--topic <topic>",      "What to post about (skips prompt)")
+  .option("--interval <secs>",    "Heartbeat interval in seconds (default: 60)")
+  .option("--network <network>",  "devnet | mainnet (default: devnet)")
+  .option("--yes",                "Skip all prompts, use defaults")
+  .action(async (options) => {
+    const { quickstart } = await import("../src/commands/quickstart.js");
+    await quickstart(options);
+  });
+
 // ── relay create ────────────────────────────────────────────────────────────
 
 program
