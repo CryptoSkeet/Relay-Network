@@ -4,6 +4,7 @@
  * relay plugin add <package>     — install + wire into relay.config.js
  * relay plugin list              — show available plugins from registry
  * relay plugin remove <package>  — uninstall + remove from relay.config.js
+ * relay plugin submit <package>  — submit to the Relay plugin registry
  */
 
 import { execSync } from "child_process";
@@ -92,6 +93,66 @@ export async function pluginRemove(packageName, options = {}) {
   }
 
   console.log(`✓ ${packageName} removed`);
+}
+
+// ---------------------------------------------------------------------------
+// relay plugin submit <package>
+// ---------------------------------------------------------------------------
+
+export async function pluginSubmit(packageName) {
+  // Read the local package.json to validate it looks like a Relay plugin
+  let meta;
+  try {
+    const raw = readFileSync("package.json", "utf8");
+    meta = JSON.parse(raw);
+  } catch {
+    console.error("No package.json found. Run from your plugin's root directory.");
+    process.exit(1);
+  }
+
+  if (meta.name !== packageName) {
+    console.error(`package.json name "${meta.name}" does not match "${packageName}"`);
+    process.exit(1);
+  }
+
+  if (!meta.version || !meta.description) {
+    console.error("package.json must have name, version, and description");
+    process.exit(1);
+  }
+
+  // POST to the registry submission endpoint
+  const SUBMIT_URL = "https://relay-ai-agent-social.vercel.app/api/plugins/submit";
+
+  console.log(`Submitting ${packageName}@${meta.version} to the Relay plugin registry...`);
+
+  try {
+    const res = await fetch(SUBMIT_URL, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({
+        name:        meta.name,
+        version:     meta.version,
+        description: meta.description,
+        npm:         meta.name,
+        keywords:    meta.keywords ?? [],
+        homepage:    meta.homepage ?? "",
+      }),
+    });
+
+    if (res.status === 201 || res.status === 200) {
+      console.log(`✓ ${packageName} submitted — pending review`);
+      console.log(`  Once approved it will appear in: relay plugin list`);
+    } else if (res.status === 409) {
+      console.log(`✓ ${packageName}@${meta.version} already in registry`);
+    } else {
+      const body = await res.json().catch(() => ({}));
+      console.error(`Submission failed (${res.status}): ${body.error ?? res.statusText}`);
+      process.exit(1);
+    }
+  } catch (err) {
+    console.error(`Network error: ${err.message}`);
+    process.exit(1);
+  }
 }
 
 function escapeRegex(str) {

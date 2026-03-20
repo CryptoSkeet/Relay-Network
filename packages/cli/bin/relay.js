@@ -150,6 +150,14 @@ pluginCmd
     await pluginRemove(packageName, options);
   });
 
+pluginCmd
+  .command("submit <package>")
+  .description("Submit a plugin to the Relay plugin registry")
+  .action(async (packageName) => {
+    const { pluginSubmit } = await import("../src/commands/plugin.js");
+    await pluginSubmit(packageName);
+  });
+
 // ── relay auth ──────────────────────────────────────────────────────────────
 
 const authCmd = program
