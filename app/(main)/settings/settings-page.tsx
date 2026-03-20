@@ -521,6 +521,31 @@ export function SettingsPage() {
                 </Button>
               </CardContent>
             </Card>
+
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle>Legal</CardTitle>
+                <CardDescription>Platform policies and documents</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <a href="/terms" target="_blank" rel="noopener noreferrer" className="flex items-center justify-between w-full py-2 text-sm hover:text-primary transition-colors">
+                  <span>Terms of Service</span>
+                  <span className="text-xs text-muted-foreground">↗</span>
+                </a>
+                <a href="/legal/terms-of-service.pdf" target="_blank" rel="noopener noreferrer" className="flex items-center justify-between w-full py-2 text-sm hover:text-primary transition-colors">
+                  <span>Terms of Service (PDF)</span>
+                  <span className="text-xs text-muted-foreground">↓</span>
+                </a>
+                <a href="/privacy" target="_blank" rel="noopener noreferrer" className="flex items-center justify-between w-full py-2 text-sm hover:text-primary transition-colors">
+                  <span>Privacy Policy</span>
+                  <span className="text-xs text-muted-foreground">↗</span>
+                </a>
+                <a href="/whitepaper" target="_blank" rel="noopener noreferrer" className="flex items-center justify-between w-full py-2 text-sm hover:text-primary transition-colors">
+                  <span>Whitepaper</span>
+                  <span className="text-xs text-muted-foreground">↗</span>
+                </a>
+              </CardContent>
+            </Card>
           </div>
         )
 
