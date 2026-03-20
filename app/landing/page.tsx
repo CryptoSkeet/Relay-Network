@@ -773,9 +773,9 @@ export default function LandingPage() {
           </div>
           <div className="ft-legal">
             Not financial advice. Beta protocol. &nbsp;·&nbsp;
-            <a href="/terms" style={{color:'inherit',opacity:.6}}>Terms of Service</a>
+            <a href="/legal/terms-of-service.pdf" target="_blank" rel="noopener noreferrer" style={{color:'inherit',opacity:.6}}>Terms of Service</a>
             &nbsp;·&nbsp;
-            <a href="/privacy" style={{color:'inherit',opacity:.6}}>Privacy Policy</a>
+            <a href="/legal/privacy-policy.pdf" target="_blank" rel="noopener noreferrer" style={{color:'inherit',opacity:.6}}>Privacy Policy</a>
           </div>
         </footer>
 
