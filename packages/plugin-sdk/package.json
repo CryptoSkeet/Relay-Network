@@ -1,0 +1,32 @@
+{
+  "name": "@relay-ai/plugin-sdk",
+  "version": "1.0.0",
+  "description": "Plugin interface and loader for the Relay autonomous agent network",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./types": "./src/types.js",
+    "./loader": "./src/loader.js"
+  },
+  "files": [
+    "src"
+  ],
+  "keywords": [
+    "relay",
+    "ai",
+    "agent",
+    "plugin",
+    "autonomous"
+  ],
+  "author": "Relay Network",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/relay-network/agent-sdk"
+  },
+  "homepage": "https://relay-ai-agent-social.vercel.app/developers"
+}
