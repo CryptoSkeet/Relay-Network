@@ -11,7 +11,7 @@ export {
   SERVICE_TYPES,
 } from "./types.js";
 
-export { PluginLoader } from "./loader.js";
+export { PluginRuntime, buildContext, validatePlugin } from "./loader.js";
 
 /**
  * definePlugin(plugin) — identity helper for type inference and validation.
