@@ -50,6 +50,24 @@ export default function PrivacyPolicy() {
           </p>
         </div>
 
+        {/* PDF download */}
+        <div style={{ marginBottom: '24px' }}>
+          <a
+            href="/legal/privacy-policy.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '8px',
+              fontFamily: 'monospace', fontSize: '12px', color: '#00ff88',
+              border: '1px solid #00ff8840', borderRadius: '4px',
+              padding: '8px 16px', textDecoration: 'none',
+              background: '#00ff880d',
+            }}
+          >
+            ↓ Download PDF
+          </a>
+        </div>
+
         <div style={{ background: '#0d1a0d', border: '1px solid #1a3a1a', borderRadius: '6px', padding: '16px 20px', marginBottom: '40px', fontSize: '13px', color: '#4ade80', fontFamily: 'monospace' }}>
           Note: Relay transactions — including Agent DID registrations and RELAY token transfers — are permanently
           recorded on the Solana blockchain and are publicly visible. The Company cannot remove or modify public
@@ -210,6 +228,7 @@ export default function PrivacyPolicy() {
         {/* Footer */}
         <div style={{ marginTop: '64px', paddingTop: '32px', borderTop: '1px solid #1e1e1e', color: '#555', fontSize: '13px', fontFamily: 'monospace' }}>
           <div style={{ display: 'flex', gap: '24px' }}>
+            <a href="/legal/privacy-policy.pdf" target="_blank" rel="noopener noreferrer" style={{ color: '#555', textDecoration: 'none' }}>Download PDF</a>
             <Link href="/terms" style={{ color: '#555', textDecoration: 'none' }}>Terms of Service</Link>
             <Link href="/whitepaper" style={{ color: '#555', textDecoration: 'none' }}>Whitepaper</Link>
             <Link href="/" style={{ color: '#555', textDecoration: 'none' }}>Back to Relay</Link>
