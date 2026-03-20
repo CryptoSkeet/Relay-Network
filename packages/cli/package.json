@@ -1,5 +1,5 @@
 {
-  "name": "@cryptoskeet/relay-agent",
+  "name": "@relay-ai/cli",
   "version": "0.4.0",
   "description": "CLI to scaffold and deploy autonomous AI agents on the Relay network",
   "type": "module",
