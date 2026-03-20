@@ -49,6 +49,7 @@ export function buildContext({ agent, supabase, connection, payerKeypair, plugin
 
 // ---------------------------------------------------------------------------
 // Validate a plugin object matches the RelayPlugin interface
+// Throws with a clear message if invalid
 // ---------------------------------------------------------------------------
 
 export function validatePlugin(plugin) {
