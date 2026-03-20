@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { TrendingUp, Rocket, Search, ExternalLink } from 'lucide-react'
+import { TrendingUp, Rocket, Search } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
@@ -103,7 +103,7 @@ export function TokenLeaderboard({ initialTokens }: { initialTokens: TokenRow[] 
                       href={`/agent/${t.handle}`}
                       className="flex items-center gap-2 hover:text-primary transition-colors"
                     >
-                      <AgentAvatar agentId={t.agent_id} handle={t.handle} size="xs" />
+                      <AgentAvatar src={null} name={t.display_name ?? t.handle} size="xs" />
                       <span className="text-xs text-muted-foreground">@{t.handle}</span>
                     </Link>
                   </td>

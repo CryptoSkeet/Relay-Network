@@ -10,6 +10,7 @@ import { Progress } from '@/components/ui/progress'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AgentAvatar } from '@/components/relay/agent-avatar'
+import { DaoPanel } from './dao-panel'
 import { formatDistanceToNow } from 'date-fns'
 import { cn } from '@/lib/utils'
 
@@ -145,7 +146,7 @@ export function TokenTradingPage({ curve, recentTrades }: { curve: Curve; recent
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-3">
                   {agent && (
-                    <AgentAvatar agentId={agent.id} handle={agent.handle} size="md" />
+                    <AgentAvatar src={null} name={agent.display_name ?? agent.handle} size="md" />
                   )}
                   <div>
                     <div className="flex items-center gap-2">
@@ -227,56 +228,67 @@ export function TokenTradingPage({ curve, recentTrades }: { curve: Curve; recent
             </Card>
           </div>
 
-          {/* Trade history */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Recent Trades</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {recentTrades.length === 0 ? (
-                <p className="text-center text-muted-foreground text-sm py-8">No trades yet — be the first.</p>
-              ) : (
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-border text-muted-foreground">
-                      <th className="text-left px-4 py-2 font-medium">Type</th>
-                      <th className="text-right px-4 py-2 font-medium">RELAY</th>
-                      <th className="text-right px-4 py-2 font-medium">Tokens</th>
-                      <th className="text-right px-4 py-2 font-medium">Price</th>
-                      <th className="text-right px-4 py-2 font-medium">Time</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recentTrades.map(t => (
-                      <tr key={t.id} className="border-b border-border last:border-0">
-                        <td className="px-4 py-2">
-                          <span className={cn('font-semibold', t.side === 'buy' ? 'text-green-500' : 'text-red-500')}>
-                            {t.side === 'buy' ? (
-                              <span className="flex items-center gap-1"><ArrowUpRight className="w-3 h-3" />Buy</span>
-                            ) : (
-                              <span className="flex items-center gap-1"><ArrowDownLeft className="w-3 h-3" />Sell</span>
-                            )}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2 text-right tabular-nums">
-                          {parseFloat(String(t.relay_amount)).toFixed(2)}
-                        </td>
-                        <td className="px-4 py-2 text-right tabular-nums">
-                          {formatTokens(parseFloat(String(t.tokens_amount)))}
-                        </td>
-                        <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">
-                          {parseFloat(String(t.price_per_token)).toExponential(2)}
-                        </td>
-                        <td className="px-4 py-2 text-right text-muted-foreground">
-                          {formatDistanceToNow(new Date(t.created_at), { addSuffix: true })}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </CardContent>
-          </Card>
+          {/* Trades + Governance tabs */}
+          <Tabs defaultValue="trades">
+            <TabsList className="w-full">
+              <TabsTrigger value="trades" className="flex-1">Trades</TabsTrigger>
+              <TabsTrigger value="governance" className="flex-1">Governance</TabsTrigger>
+            </TabsList>
+            <TabsContent value="governance" className="mt-3">
+              <DaoPanel agentId={curve.agent_id} curveId={curve.id} walletAddress={wallet || undefined} />
+            </TabsContent>
+            <TabsContent value="trades" className="mt-0">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Recent Trades</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {recentTrades.length === 0 ? (
+                    <p className="text-center text-muted-foreground text-sm py-8">No trades yet — be the first.</p>
+                  ) : (
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-border text-muted-foreground">
+                          <th className="text-left px-4 py-2 font-medium">Type</th>
+                          <th className="text-right px-4 py-2 font-medium">RELAY</th>
+                          <th className="text-right px-4 py-2 font-medium">Tokens</th>
+                          <th className="text-right px-4 py-2 font-medium">Price</th>
+                          <th className="text-right px-4 py-2 font-medium">Time</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {recentTrades.map(t => (
+                          <tr key={t.id} className="border-b border-border last:border-0">
+                            <td className="px-4 py-2">
+                              <span className={cn('font-semibold', t.side === 'buy' ? 'text-green-500' : 'text-red-500')}>
+                                {t.side === 'buy' ? (
+                                  <span className="flex items-center gap-1"><ArrowUpRight className="w-3 h-3" />Buy</span>
+                                ) : (
+                                  <span className="flex items-center gap-1"><ArrowDownLeft className="w-3 h-3" />Sell</span>
+                                )}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2 text-right tabular-nums">
+                              {parseFloat(String(t.relay_amount)).toFixed(2)}
+                            </td>
+                            <td className="px-4 py-2 text-right tabular-nums">
+                              {formatTokens(parseFloat(String(t.tokens_amount)))}
+                            </td>
+                            <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">
+                              {parseFloat(String(t.price_per_token)).toExponential(2)}
+                            </td>
+                            <td className="px-4 py-2 text-right text-muted-foreground">
+                              {formatDistanceToNow(new Date(t.created_at), { addSuffix: true })}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
 
         {/* Right column: buy/sell panel */}
@@ -349,7 +361,7 @@ export function TokenTradingPage({ curve, recentTrades }: { curve: Curve; recent
                         <>
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Tokens out</span>
-                            <span className="font-semibold tabular-nums">{formatTokens(preview.tokensOut!)}</span>
+                            <span className="font-semibold tabular-nums">{formatTokens(('tokensOut' in preview ? preview.tokensOut : 0))}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Avg price</span>
@@ -360,7 +372,7 @@ export function TokenTradingPage({ curve, recentTrades }: { curve: Curve; recent
                         <>
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">RELAY out</span>
-                            <span className="font-semibold tabular-nums">{(preview as any).relayOut!.toFixed(4)}</span>
+                            <span className="font-semibold tabular-nums">{('relayOut' in preview ? preview.relayOut : 0).toFixed(4)}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Avg price</span>
@@ -438,7 +450,7 @@ export function TokenTradingPage({ curve, recentTrades }: { curve: Curve; recent
               <CardContent className="pt-4">
                 <p className="text-xs text-muted-foreground mb-2">Created by</p>
                 <Link href={`/agent/${agent.handle}`} className="flex items-center gap-3 hover:text-primary transition-colors">
-                  <AgentAvatar agentId={agent.id} handle={agent.handle} size="sm" />
+                  <AgentAvatar src={null} name={agent.display_name ?? agent.handle} size="sm" />
                   <div>
                     <p className="font-semibold text-sm">{agent.display_name}</p>
                     <p className="text-xs text-muted-foreground">@{agent.handle}</p>
