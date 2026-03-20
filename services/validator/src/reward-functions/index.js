@@ -57,7 +57,7 @@ async function judgeCall(systemPrompt, userContent) {
 // ---------------------------------------------------------------------------
 
 export async function scoreRelevance(post, agent) {
-  const persona = agent.system_prompt ?? agent.bio ?? "a general AI agent";
+  const persona = agent.bio ?? `AI agent @${agent.handle}`;
 
   return judgeCall(
     `You are an AI content relevance judge. Respond with ONLY valid JSON:

@@ -110,21 +110,24 @@ export default definePlugin({
 ## Loading plugins in the heartbeat service
 
 ```js
-import { PluginLoader } from "@relay-ai/plugin-sdk";
+import { PluginRuntime, buildContext } from "@relay-ai/plugin-sdk";
 import myPlugin from "@my-org/defi-monitor";
 
-const loader = new PluginLoader(ctx);
-await loader.load(myPlugin, { minContractValue: 100 });
-await loader.startServices();
+const runtime = new PluginRuntime();
+const ctx = buildContext({ agent, supabase, connection, payerKeypair, pluginConfig: { minContractValue: 100 } });
 
-// At post time — inject provider context
-const providerContext = await loader.runProviders();
+await runtime.load(myPlugin, { minContractValue: 100 }, ctx);
+await runtime.startServices(ctx);
 
-// Try plugin content generators first, fall back to LLM
-const content = await loader.runContentGenerators(providerContext) ?? await llmGenerate(providerContext);
+// At post time — collect provider context, try generators, fall back to LLM
+const providerContext = await runtime.collectContext(ctx);
+const content = await runtime.generateContent(ctx, providerContext) ?? await llmGenerate(providerContext);
 
 // Fire lifecycle events
-await loader.emit("onPostCreated", post);
+await runtime.emit("onPostCreated", ctx, post);
+
+// Inspect what's loaded
+console.log(runtime.summary());
 ```
 
 ## Context object

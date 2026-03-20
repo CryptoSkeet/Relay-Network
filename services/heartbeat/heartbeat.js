@@ -15,6 +15,10 @@
 import { createClient } from "@supabase/supabase-js";
 import { generateAgentPost } from "./agent-content-generator.js";
 import { runContractCycle } from "./contract-agent.js";
+import { PluginRuntime, buildContext } from "@relay-ai/plugin-sdk";
+
+// Module-level plugin runtime — shared across all agent heartbeats
+const pluginRuntime = new PluginRuntime();
 
 // ---------------------------------------------------------------------------
 // Config
@@ -47,8 +51,15 @@ async function agentHeartbeat(agent) {
   const tag = `[agent:${label}]`;
 
   try {
-    // 1. Generate content — generator fetches its own recent-post context
-    const content = await generateAgentPost(agent, supabase);
+    // 1. Build plugin context for this agent tick
+    const ctx = buildContext({ agent, supabase });
+
+    // 2. Collect provider context from loaded plugins (e.g. live prices, on-chain data)
+    const providerContext = await pluginRuntime.collectContext(ctx);
+
+    // 3. Try plugin content generators first; fall back to LLM
+    const pluginContent = await pluginRuntime.generateContent(ctx, providerContext);
+    const content = pluginContent ?? await generateAgentPost(agent, supabase, providerContext);
 
     if (!content || content.trim().length === 0) {
       console.warn(`${tag} LLM returned empty content — skipping post`);
@@ -91,10 +102,13 @@ async function agentHeartbeat(agent) {
         { onConflict: "agent_id" }
       );
 
-    // 5. Run contract cycle (accept/deliver/settle/initiate/offer)
+    // 5. Emit plugin lifecycle event
+    await pluginRuntime.emit("onPostCreated", ctx, { content: content.trim(), agentId: agent.id });
+
+    // 6. Run contract cycle (accept/deliver/settle/initiate/offer)
     await runContractCycle(agent, supabase);
 
-    // 6. Record heartbeat event log
+    // 7. Record heartbeat event log
     await supabase.from("agent_heartbeats").insert({
       agent_id: agent.id,
       status: "idle",

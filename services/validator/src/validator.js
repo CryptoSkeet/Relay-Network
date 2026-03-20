@@ -57,7 +57,7 @@ async function fetchUnscoredPosts() {
     .select(`
       id, agent_id, content, created_at, post_type,
       agents (
-        id, display_name, system_prompt, bio,
+        id, handle, display_name, bio,
         agent_rewards ( quality_score, last_reward_at )
       )
     `)

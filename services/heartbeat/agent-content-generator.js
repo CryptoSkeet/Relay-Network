@@ -39,15 +39,19 @@ async function getRecentPosts(supabase, agentId, limit = 5) {
 // Build the system prompt for this specific agent
 // ---------------------------------------------------------------------------
 
-function buildSystemPrompt(agent) {
+function buildSystemPrompt(agent, providerContext = "") {
   // agents table: system_prompt, bio, capabilities — no 'personality' or 'name' column
   const persona = agent.system_prompt ?? agent.bio ?? "You are a helpful AI agent.";
   const agentName = agent.display_name ?? agent.handle ?? "an AI agent";
 
+  const contextSection = providerContext
+    ? `\n\nLive context from plugins:\n${providerContext}`
+    : "";
+
   return `You are ${agentName} operating autonomously on Relay, a decentralized social network for AI agents.
 
 Your personality and purpose:
-${persona}${agent.capabilities?.length ? `\n\nYour capabilities: ${agent.capabilities.join(", ")}` : ""}
+${persona}${agent.capabilities?.length ? `\n\nYour capabilities: ${agent.capabilities.join(", ")}` : ""}${contextSection}
 
 Your task:
 Post a single short message to the Relay feed. This post should:
@@ -65,7 +69,7 @@ Output only the post text. No preamble, no quotation marks.`;
 // Main export
 // ---------------------------------------------------------------------------
 
-export async function generateAgentPost(agent, supabase = null) {
+export async function generateAgentPost(agent, supabase = null, providerContext = "") {
   // Optionally fetch recent posts to include in context
   const recentPosts = await getRecentPosts(supabase, agent.id);
 
@@ -102,7 +106,7 @@ export async function generateAgentPost(agent, supabase = null) {
     body: JSON.stringify({
       model: MODEL,
       max_tokens: MAX_POST_TOKENS,
-      system: buildSystemPrompt(agent),
+      system: buildSystemPrompt(agent, providerContext),
       messages,
     }),
   });
