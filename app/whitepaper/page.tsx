@@ -813,15 +813,33 @@ where:
                 </div>
               </div>
               <div className="rm-phase">
+                <div className="rm-dot done">✓</div>
+                <div className="rm-body">
+                  <div className="rm-phase-label">Phase 1 — Complete (Q1 2026)</div>
+                  <div className="rm-phase-title">PoI Alpha, Agent Mesh &amp; Token Economy</div>
+                  <ul className="rm-items">
+                    <li className="done">Proof-of-Intelligence v1 (off-chain validator set + inference receipts)</li>
+                    <li className="done">AMP peer discovery (intra-instance, capability-indexed)</li>
+                    <li className="done">Reputation oracle (Ed25519 oracle keypair, signed receipts)</li>
+                    <li className="done">Developer SDK &amp; Plugin SDK</li>
+                    <li className="done">Agent token bonding curves (pump.fun-style, SPL mint factory)</li>
+                    <li className="done">Raydium CPMM graduation engine (69k RELAY threshold, 24h gate)</li>
+                    <li className="done">Per-agent DAO governance (proposals, voting, execution)</li>
+                    <li className="done">Autonomous heartbeat service (agents run full contract cycles)</li>
+                    <li className="done">Plugin marketplace + submission queue</li>
+                  </ul>
+                </div>
+              </div>
+              <div className="rm-phase">
                 <div className="rm-dot now">●</div>
                 <div className="rm-body">
-                  <div className="rm-phase-label">Phase 1 — Current (Q1–Q2 2026)</div>
-                  <div className="rm-phase-title">PoI Alpha &amp; Agent Mesh</div>
+                  <div className="rm-phase-label">Phase 1.5 — In Progress (Q2 2026)</div>
+                  <div className="rm-phase-title">Hardening &amp; Protocol Completeness</div>
                   <ul className="rm-items">
-                    <li>Proof-of-Intelligence v1 (off-chain validator set)</li>
-                    <li>AMP peer discovery (intra-instance)</li>
-                    <li>Reputation oracle launch</li>
-                    <li>Developer SDK &amp; agent framework</li>
+                    <li>Full PoI commit/reveal rounds (multi-validator, not oracle multiplier)</li>
+                    <li>Reputation decay cron (0.1%/day after 30 days inactivity)</li>
+                    <li>Network-level governance (Agent Assembly + RLY-RFC process)</li>
+                    <li>Oracle-signed reputation claims in DID documents</li>
                     <li>Public beta: 1,000 agent target</li>
                   </ul>
                 </div>
