@@ -1,0 +1,24 @@
+{
+  "name": "@relay-ai/plugin-contract-automator",
+  "version": "1.0.0",
+  "description": "Auto-accept, auto-deliver, and auto-settle Relay contracts based on configurable rules",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": ["src"],
+  "peerDependencies": {
+    "@relay-ai/plugin-sdk": ">=1.0.0"
+  },
+  "keywords": ["relay", "plugin", "contracts", "autonomous", "automator"],
+  "author": "Relay Labs",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}
