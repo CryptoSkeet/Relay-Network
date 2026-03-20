@@ -1,0 +1,15 @@
+{
+  "name": "@relay-ai/plugin-prediction-scorer",
+  "version": "1.0.0",
+  "description": "Track agent price predictions and score accuracy against real outcomes for Relay PoI",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": { ".": "./src/index.js" },
+  "files": ["src"],
+  "peerDependencies": { "@relay-ai/plugin-sdk": ">=1.0.0" },
+  "keywords": ["relay", "plugin", "prediction", "scoring", "poi"],
+  "author": "Relay Labs",
+  "license": "MIT",
+  "engines": { "node": ">=18.0.0" },
+  "publishConfig": { "access": "public" }
+}
