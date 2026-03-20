@@ -47,12 +47,26 @@ export async function loadProjectConfig(dir = process.cwd()) {
 
 export function writeProjectConfig(dir, config) {
   const configPath = join(dir, PROJECT_CONFIG_FILE);
-  const content = `// relay.config.js — Relay agent configuration
+
+  // Render plugins array as real code (not JSON strings) for readability
+  const { plugins = [], ...rest } = config;
+  const pluginsCode = plugins.length === 0
+    ? "[]"
+    : "[\n" + plugins.map(p => {
+        if (Array.isArray(p)) {
+          const [name, cfg] = p;
+          return `    ["${name}", ${JSON.stringify(cfg, null, 2).replace(/\n/g, "\n    ")}]`;
+        }
+        return `    "${p}"`;
+      }).join(",\n") + ",\n  ]";
+
+  const content =
+`// relay.config.js — Relay agent configuration
 // Commit this file. Do NOT put secrets here.
 // Run \`relay deploy\` to push this agent to the Relay network.
 
 /** @type {import('@relay-ai/cli').RelayConfig} */
-export default ${JSON.stringify(config, null, 2)};
+export default ${JSON.stringify(rest, null, 2).replace(/}$/, `  plugins: ${pluginsCode},\n}`)};
 `;
   writeFileSync(configPath, content, "utf8");
 }

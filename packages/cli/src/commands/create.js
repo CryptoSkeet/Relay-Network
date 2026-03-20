@@ -27,6 +27,16 @@ import { logger } from "../lib/logger.js";
 import { prompt, select, confirm } from "../lib/prompts.js";
 import { writeProjectConfig } from "../lib/config.js";
 
+const POPULAR_PLUGINS = [
+  { name: "@relay-ai/plugin-price-feed",         label: "Price Feed      — live crypto prices in every post" },
+  { name: "@relay-ai/plugin-news-feed",           label: "News Feed       — breaking crypto/AI headlines" },
+  { name: "@relay-ai/plugin-sentiment-feed",      label: "Sentiment Feed  — Fear & Greed + funding rates" },
+  { name: "@relay-ai/plugin-contract-automator",  label: "Contract Auto   — auto-accept/deliver/settle contracts" },
+  { name: "@relay-ai/plugin-twitter-mirror",      label: "Twitter Mirror  — mirror high-scoring posts to X" },
+  { name: "@relay-ai/plugin-onchain-alerts",      label: "Onchain Alerts  — Solana whale move tracker" },
+  { name: "@relay-ai/plugin-defi-trader",         label: "DeFi Trader     — autonomous Jupiter swaps" },
+];
+
 // ---------------------------------------------------------------------------
 // Model defaults per provider
 // ---------------------------------------------------------------------------
@@ -54,7 +64,7 @@ function fillTemplate(templatePath, vars) {
 // Main command
 // ---------------------------------------------------------------------------
 
-export async function create(nameArg, options = {}) {
+export async function create(nameArg, options) {
   logger.banner("relay create", "Scaffold a new Relay agent project");
 
   // ── Collect inputs ───────────────────────────────────────────────────────
@@ -97,6 +107,25 @@ export async function create(nameArg, options = {}) {
 
   const heartbeatEnabled = await confirm("Enable autonomous posting?", { default: true });
 
+  // ── Plugin selection ─────────────────────────────────────────────────────
+
+  let selectedPlugins = [];
+  if (!options?.skipPlugins) {
+    logger.newline();
+    logger.info("Add plugins? (space to toggle, enter to confirm)");
+    logger.dim("  Available: price-feed, news-feed, sentiment, contract-automator, twitter-mirror, ...");
+    logger.newline();
+
+    const addPlugins = await confirm("Add plugins to this agent?", { default: false });
+    if (addPlugins) {
+      const labels = POPULAR_PLUGINS.map(p => p.label);
+      const chosen = await select("Select plugins", labels, { multiple: true });
+      selectedPlugins = (Array.isArray(chosen) ? chosen : [chosen])
+        .map(i => POPULAR_PLUGINS[i]?.name)
+        .filter(Boolean);
+    }
+  }
+
   logger.newline();
 
   // ── Create project directory ─────────────────────────────────────────────
@@ -130,6 +159,7 @@ export async function create(nameArg, options = {}) {
     relay: {
       network: "devnet",
     },
+    plugins: selectedPlugins,
   });
   logger.stepActiveDone();
 
@@ -181,10 +211,17 @@ export async function create(nameArg, options = {}) {
 
   logger.newline();
   logger.success(`Created ${logger.highlight(name + "/")} — agent project ready`);
+  if (selectedPlugins.length > 0) {
+    logger.info(`Plugins scaffolded: ${selectedPlugins.map(p => p.split("/").pop()).join(", ")}`);
+    logger.info(`Run ${logger.highlight(`cd ${name} && npm install`)} to install them.`);
+  }
   logger.newline();
   logger.raw("  Next steps:");
   logger.raw("");
   logger.raw(`    ${logger.dim("$")} ${logger.highlight(`cd ${name}`)}`);
+  if (selectedPlugins.length > 0) {
+    logger.raw(`    ${logger.dim("$")} ${logger.highlight("npm install")}`);
+  }
   if (modelDefaults.apiKeyEnv) {
     logger.raw(`    ${logger.dim("$")} ${logger.highlight(`export ${modelDefaults.apiKeyEnv}=your-key`)}`);
   }
