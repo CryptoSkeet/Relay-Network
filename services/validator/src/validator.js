@@ -173,11 +173,16 @@ async function writeScores(scoredPosts) {
 }
 
 async function updateAgentScore(agentId, scoredPosts) {
-  const { data: reward } = await db
-    .from("agent_rewards")
-    .select("quality_score, total_earned_relay, unclaimed_relay, total_posts, last_reward_at")
-    .eq("agent_id", agentId)
-    .single();
+  const [{ data: reward }, { data: splits }] = await Promise.all([
+    db.from("agent_rewards")
+      .select("quality_score, total_earned_relay, unclaimed_relay, total_posts, last_reward_at")
+      .eq("agent_id", agentId)
+      .single(),
+    db.from("agent_reward_splits")
+      .select("wallet, label, share_pct")
+      .eq("agent_id", agentId)
+      .order("share_pct", { ascending: false }),
+  ]);
 
   const currentQuality = reward?.quality_score ?? 0.5;
   const lastRewardAt   = reward?.last_reward_at ? new Date(reward.last_reward_at) : null;
@@ -208,10 +213,29 @@ async function updateAgentScore(agentId, scoredPosts) {
     return;
   }
 
+  // Write payout ledger rows — one per scored post that earned RELAY
+  if (totalNewRelay > 0 && splits?.length > 0) {
+    const splitSnapshot = splits.map(s => ({
+      wallet:        s.wallet,
+      label:         s.label,
+      share_pct:     parseFloat(s.share_pct),
+      relay_amount:  parseFloat((totalNewRelay * parseFloat(s.share_pct) / 100).toFixed(6)),
+    }));
+
+    // One aggregate payout row per validator step (not per post) for efficiency
+    const lastPostId = scoredPosts[scoredPosts.length - 1]?.postId ?? null;
+    await db.from("agent_reward_payouts").insert({
+      agent_id:       agentId,
+      post_id:        lastPostId,
+      total_relay:    parseFloat(totalNewRelay.toFixed(6)),
+      split_snapshot: splitSnapshot,
+    });
+  }
+
   console.log(
     `[validator] ${agentId.slice(0, 8)}... ` +
     `quality: ${currentQuality.toFixed(3)} → ${newQuality.toFixed(3)} ` +
-    `(+${totalNewRelay.toFixed(3)} RELAY)`
+    `(+${totalNewRelay.toFixed(3)} RELAY${splits?.length > 1 ? `, ${splits.length} stakeholders` : ""})`
   );
 }
 

@@ -221,6 +221,15 @@ export async function POST(request: NextRequest) {
             unclaimed_relay:    0,
             total_posts:        0,
           }),
+          // Seed 100% split to creator wallet so the validator can distribute immediately
+          creatorWallet
+            ? supabase.from('agent_reward_splits').insert({
+                agent_id:  agent.id,
+                wallet:    creatorWallet,
+                label:     'creator',
+                share_pct: 100,
+              })
+            : Promise.resolve(),
           supabase.from('agent_reputation').insert({
             agent_id:             agent.id,
             reputation_score:     50,
