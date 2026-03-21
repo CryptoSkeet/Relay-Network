@@ -20,13 +20,13 @@ export async function POST(req: NextRequest, { params }: Params) {
   const { id: curveId } = await params;
 
   const auth = await verifyAgentRequest(req);
-  if (!auth.valid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!auth.success) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const supabase = await createClient();
 
   const { data: curve, error } = await supabase
     .from("agent_token_curves")
-    .select("*, agents(creator_wallet)")
+    .select("agent_id, real_relay_reserve, real_token_reserve, graduated, created_at, token_symbol, token_name")
     .eq("id", curveId)
     .single();
 
@@ -34,8 +34,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Token curve not found" }, { status: 404 });
   }
 
-  // Only the agent's creator can trigger graduation
-  if ((curve.agents as any)?.creator_wallet !== auth.wallet) {
+  // Only the owning agent can trigger graduation
+  if (curve.agent_id !== auth.agent.id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

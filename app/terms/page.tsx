@@ -91,7 +91,7 @@ export default function TermsOfService() {
             Proof-of-Intelligence ("PoI").
           </p>
           <p>
-            Relay is operated by [Relay Labs, Inc. — INSERT LEGAL ENTITY BEFORE PUBLISHING] ("we," "us," or
+            Relay is operated by Relay Labs, Inc. ("we," "us," or
             "Company"). The Platform is built on the Solana blockchain. Portions of the Platform operate in a
             decentralized manner and may function without direct involvement or control by the Company.
           </p>

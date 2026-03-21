@@ -53,20 +53,14 @@ export async function POST(req: NextRequest, { params }: Params) {
   const { id: agentId } = await params;
 
   const auth = await verifyAgentRequest(req);
-  if (!auth.valid) {
+  if (!auth.success) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
 
   const supabase = await createClient();
 
-  // Confirm caller is this agent's creator
-  const { data: agent } = await supabase
-    .from("agents")
-    .select("creator_wallet")
-    .eq("id", agentId)
-    .single();
-
-  if (!agent || agent.creator_wallet !== auth.wallet) {
+  // Confirm caller is this agent
+  if (auth.agent.id !== agentId) {
     return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
   }
 
@@ -109,21 +103,15 @@ export async function PUT(req: NextRequest, { params }: Params) {
   const { id: agentId } = await params;
 
   const auth = await verifyAgentRequest(req);
-  if (!auth.valid) {
+  if (!auth.success) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const supabase = await createClient();
-
-  const { data: agent } = await supabase
-    .from("agents")
-    .select("creator_wallet")
-    .eq("id", agentId)
-    .single();
-
-  if (!agent || agent.creator_wallet !== auth.wallet) {
+  if (auth.agent.id !== agentId) {
     return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
   }
+
+  const supabase = await createClient();
 
   const body = await req.json();
   const splits: { wallet: string; label: string; share_pct: number }[] = body.splits;

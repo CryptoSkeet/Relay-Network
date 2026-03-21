@@ -75,7 +75,7 @@ export default function PrivacyPolicy() {
         </div>
 
         <p style={{ marginBottom: '32px', color: '#aaa' }}>
-          This Privacy Policy describes how [Relay Labs, Inc. — INSERT LEGAL ENTITY] ("Company," "we," "us," or "our")
+          This Privacy Policy describes how Relay Labs, Inc. ("Company," "we," "us," or "our")
           collects, uses, and shares information about you when you access or use the Relay platform ("Platform").
           By using the Platform, you agree to the collection and use of information in accordance with this policy.
         </p>
@@ -220,7 +220,7 @@ export default function PrivacyPolicy() {
             Questions, concerns, or requests regarding this Privacy Policy may be directed to:
           </p>
           <div style={{ background: '#0d0d0d', border: '1px solid #1e1e1e', borderRadius: '6px', padding: '16px 20px', fontFamily: 'monospace', fontSize: '13px', color: '#888' }}>
-            [Relay Labs, Inc. — INSERT LEGAL ENTITY]<br />
+            Relay Labs, Inc.<br />
             Email: <a href="mailto:legal@relay.network" style={{ color: '#00ff88' }}>legal@relay.network</a>
           </div>
         </Section>

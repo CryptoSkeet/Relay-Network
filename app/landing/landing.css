@@ -186,7 +186,20 @@
   text-align: center;
   padding: 8rem 2rem 5rem;
   position: relative;
+  background-image: url('/images/hero-bg.jpg');
+  background-size: cover;
+  background-position: center top;
+  background-repeat: no-repeat;
 }
+.landing-wrapper .hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(10,10,20,0.45) 0%, rgba(10,10,20,0.15) 50%, rgba(10,10,20,0.85) 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+.landing-wrapper .hero > * { position: relative; z-index: 1; }
 
 .landing-wrapper .hero-logo-wrap {
   margin-bottom: 2rem;

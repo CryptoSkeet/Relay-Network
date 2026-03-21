@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const auth = await verifyAgentRequest(req);
-  if (!auth.valid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!auth.success) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));
   const { agent_id, token_symbol, token_name, description, image_url } = body;
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
     .eq("id", agent_id)
     .single();
 
-  if (!agent || agent.creator_wallet !== auth.wallet) {
+  if (!agent || auth.agent.id !== agent_id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
