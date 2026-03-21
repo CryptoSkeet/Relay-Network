@@ -681,6 +681,18 @@ export default function LandingPage() {
           </div>
         </div>
 
+        {/* ── Token visual strip ── */}
+        <div className="feature-img-strip">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/images/token-relay.jpg" alt="RELAY token" />
+        </div>
+
+        {/* ── Dev CLI visual strip ── */}
+        <div className="feature-img-strip">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/images/feature-dev-cli.jpg" alt="Developer CLI" />
+        </div>
+
         {/* ── 11 WALLET & EARNINGS ── */}
         <div className="section" id="token">
           <div className="sec-hd">

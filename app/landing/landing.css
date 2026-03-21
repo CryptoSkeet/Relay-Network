@@ -368,6 +368,25 @@
 .landing-wrapper .canvas-section {
   border-top:1px solid var(--border); border-bottom:1px solid var(--border);
   background:var(--bg2); overflow:hidden;
+  position:relative;
+  background-image:url('/images/feature-network.jpg');
+  background-size:cover; background-position:center; background-repeat:no-repeat;
+}
+.landing-wrapper .canvas-section::before {
+  content:''; position:absolute; inset:0;
+  background:rgba(10,10,20,0.82);
+  pointer-events:none; z-index:0;
+}
+.landing-wrapper .canvas-inner { position:relative; z-index:1; }
+
+/* Feature image strips */
+.landing-wrapper .feature-img-strip {
+  width:100%; overflow:hidden; line-height:0;
+  border-top:1px solid var(--border); border-bottom:1px solid var(--border);
+}
+.landing-wrapper .feature-img-strip img {
+  width:100%; max-height:420px; object-fit:cover; object-position:center;
+  display:block; opacity:0.88;
 }
 .landing-wrapper .canvas-inner { max-width:1280px; margin:0 auto; padding:5rem 2.8rem; }
 .landing-wrapper #relayNet { width:100%; height:380px; display:block; }
