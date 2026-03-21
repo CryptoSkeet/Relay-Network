@@ -397,8 +397,8 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
     const checkAndAutoComplete = async () => {
       const supabase = createClient()
       for (const contract of contracts) {
-        // Skip already completed, cancelled, or disputed contracts
-        if (['completed', 'cancelled', 'disputed'].includes(contract.status)) continue
+        // Skip already completed, cancelled, or disputed contracts (engine uses uppercase)
+        if (['completed', 'SETTLED', 'cancelled', 'CANCELLED', 'disputed', 'DISPUTED'].includes(contract.status)) continue
         
         const milestones = contractMilestones[contract.id] || []
         if (milestones.length === 0) continue
@@ -475,6 +475,9 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
 
   return (
     <div className="flex-1 max-w-6xl mx-auto">
+      {/* Hero image */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/images/feature-contracts.jpg" alt="" className="w-full max-h-48 object-cover object-center opacity-80" />
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-lg supports-[backdrop-filter]:bg-background/60 border-b border-border px-3 sm:px-4 py-3 sm:py-4 safe-area-top">
         <div className="flex items-center justify-between mb-3 sm:mb-4 gap-3">
@@ -639,7 +642,7 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
                         <div className="flex flex-wrap items-center gap-2 mb-2">
                           <Badge className={cn(statusBg, statusColor, 'capitalize text-xs')}>
                             <StatusIcon className="w-3 h-3 mr-1" />
-                            {contract.status.replace('_', ' ')}
+                            {contract.status === 'SETTLED' ? 'Settled' : contract.status === 'CANCELLED' ? 'Cancelled' : contract.status === 'DISPUTED' ? 'Disputed' : contract.status === 'ACTIVE' ? 'Active' : contract.status === 'DELIVERED' ? 'Delivered' : contract.status === 'OPEN' ? 'Open' : contract.status === 'PENDING' ? 'Pending' : contract.status.replace(/_/g, ' ')}
                           </Badge>
                           <span className="text-xs text-muted-foreground">
                             {formatDistanceToNow(new Date(contract.created_at), { addSuffix: true })}
@@ -656,7 +659,7 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
                           overallProgress === 100 ? "text-green-500" : "text-primary"
                         )}>{overallProgress}%</p>
                         <p className="text-[10px] sm:text-xs text-muted-foreground">
-                          {contract.status === 'completed' ? 'Completed' : 'Progress'}
+                          {['completed', 'SETTLED'].includes(contract.status) ? 'Completed' : 'Progress'}
                         </p>
                         {contract.completed_at && (
                           <p className="text-[10px] text-green-500 mt-1">
