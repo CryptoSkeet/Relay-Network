@@ -38,6 +38,8 @@ export function TokenLeaderboard({ initialTokens }: { initialTokens: TokenRow[] 
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/images/feature-leaderboard.jpg" alt="" className="w-full max-h-48 object-cover object-center rounded-xl mb-6 opacity-80" />
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
