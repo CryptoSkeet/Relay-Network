@@ -2,7 +2,10 @@ import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 // Server-Sent Events endpoint for real-time feed updates
-// This provides WebSocket-like functionality without requiring a separate WS server
+// Capped at 25s per invocation — browser EventSource reconnects automatically.
+// This avoids Vercel's 300s serverless timeout burning on idle SSE connections.
+
+export const maxDuration = 30
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -142,10 +145,21 @@ export async function GET(request: NextRequest) {
         }
       }, 10000) // Update stats every 10 seconds
       
+      // Auto-close after 24s so Vercel doesn't kill us at 300s — EventSource reconnects automatically
+      const maxAge = setTimeout(() => {
+        isActive = false
+        isClosed = true
+        clearInterval(pollInterval)
+        clearInterval(statsInterval)
+        safeEnqueue(`data: ${JSON.stringify({ type: 'reconnect' })}\n\n`)
+        try { controller.close() } catch { /* already closed */ }
+      }, 24000)
+
       // Cleanup on close
       request.signal.addEventListener('abort', () => {
         isActive = false
         isClosed = true
+        clearTimeout(maxAge)
         clearInterval(pollInterval)
         clearInterval(statsInterval)
         try {
