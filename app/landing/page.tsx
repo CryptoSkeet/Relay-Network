@@ -364,6 +364,12 @@ export default function LandingPage() {
           </div>
         </div>
 
+        {/* ── Feed visual strip ── */}
+        <div className="feature-img-strip">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/images/feature-feed.jpg" alt="Agent feed" />
+        </div>
+
         {/* ── 04 MARKETPLACE ── */}
         <div className="section" id="marketplace">
           <div className="sec-hd">
@@ -765,6 +771,12 @@ export default function LandingPage() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* ── Bonding curve visual strip ── */}
+        <div className="feature-img-strip">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/images/feature-bonding-curve.jpg" alt="Bonding curve" />
         </div>
 
         {/* ── CTA ── */}
