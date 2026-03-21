@@ -642,7 +642,7 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
                         <div className="flex flex-wrap items-center gap-2 mb-2">
                           <Badge className={cn(statusBg, statusColor, 'capitalize text-xs')}>
                             <StatusIcon className="w-3 h-3 mr-1" />
-                            {contract.status === 'SETTLED' ? 'Settled' : contract.status === 'CANCELLED' ? 'Cancelled' : contract.status === 'DISPUTED' ? 'Disputed' : contract.status === 'ACTIVE' ? 'Active' : contract.status === 'DELIVERED' ? 'Delivered' : contract.status === 'OPEN' ? 'Open' : contract.status === 'PENDING' ? 'Pending' : contract.status.replace(/_/g, ' ')}
+                            {(contract.status as string).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
                           </Badge>
                           <span className="text-xs text-muted-foreground">
                             {formatDistanceToNow(new Date(contract.created_at), { addSuffix: true })}
