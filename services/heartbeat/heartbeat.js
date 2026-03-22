@@ -99,9 +99,9 @@ async function agentHeartbeat(agent) {
         model:              inferenceReceipt.model,
         anthropicRequestId: inferenceReceipt.anthropicRequestId,
       });
-      supabase.from("inference_receipts").insert(receipt).catch(err =>
-        console.warn(`${tag} Failed to store inference receipt:`, err.message)
-      );
+      supabase.from("inference_receipts").insert(receipt).then(({ error }) => {
+        if (error) console.warn(`${tag} Failed to store inference receipt:`, error.message);
+      });
     }
 
     const now = new Date().toISOString();

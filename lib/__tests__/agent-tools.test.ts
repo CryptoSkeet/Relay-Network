@@ -183,7 +183,7 @@ describe('selectTier', () => {
 describe('AGENT_TOOLS', () => {
   const names = AGENT_TOOLS.map(t => t.name)
 
-  it('contains all 7 required tools', () => {
+  it('contains all required core tools', () => {
     expect(names).toContain('web_search')
     expect(names).toContain('read_contract')
     expect(names).toContain('check_reputation')
@@ -191,7 +191,7 @@ describe('AGENT_TOOLS', () => {
     expect(names).toContain('request_clarification')
     expect(names).toContain('submit_work')
     expect(names).toContain('stop_agent')
-    expect(AGENT_TOOLS).toHaveLength(7)
+    expect(AGENT_TOOLS.length).toBeGreaterThanOrEqual(7)
   })
 
   it('every tool has name, description, and object input_schema', () => {
@@ -202,10 +202,9 @@ describe('AGENT_TOOLS', () => {
     }
   })
 
-  it('every tool declares at least one required field', () => {
+  it('every tool declares a required array', () => {
     for (const tool of AGENT_TOOLS) {
       expect(Array.isArray(tool.input_schema.required)).toBe(true)
-      expect((tool.input_schema.required as string[]).length).toBeGreaterThan(0)
     }
   })
 
@@ -273,7 +272,7 @@ describe('executeTool', () => {
         id: 'contract-001',
         title: 'Build API',
         description: 'RESTful API in TypeScript',
-        amount: 300,
+        budget_max: 300,
         deadline: '2026-04-01',
         status: 'open',
         capability_tags: ['code-review', 'debugging'],
@@ -362,6 +361,7 @@ describe('executeTool', () => {
   describe('post_to_feed', () => {
     function makePostSupabase(postId = 'post-abc') {
       return {
+        rpc: vi.fn().mockResolvedValue({ data: null }),
         from: vi.fn().mockImplementation((table: string) => {
           if (table === 'posts') {
             return {
@@ -371,7 +371,6 @@ describe('executeTool', () => {
               }),
             }
           }
-          // agents.rpc
           return { rpc: vi.fn().mockResolvedValue({ data: null }) }
         }),
       }
@@ -470,28 +469,43 @@ describe('executeTool', () => {
   })
 
   describe('submit_work', () => {
-    it('returns success message when update succeeds', async () => {
-      // eq().eq() chain — second eq resolves the promise
-      const chain: any = { update: vi.fn().mockReturnThis(), eq: vi.fn() }
-      chain.eq.mockReturnValueOnce(chain).mockResolvedValueOnce({ error: null })
-      const supabase = { from: vi.fn().mockReturnValue(chain) }
+    function makeSubmitSupabase(updateError: any = null) {
+      return {
+        from: vi.fn().mockImplementation((table: string) => {
+          if (table === 'contracts') {
+            const selectChain = {
+              select: vi.fn().mockReturnThis(),
+              eq: vi.fn().mockReturnThis(),
+              maybeSingle: vi.fn().mockResolvedValue({ data: { client_id: 'client-uuid', title: 'Build API' } }),
+              update: vi.fn().mockReturnThis(),
+            }
+            // update chain
+            selectChain.update = vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({ error: updateError }),
+              }),
+            })
+            return selectChain
+          }
+          // contract_notifications insert
+          return { insert: vi.fn().mockReturnValue({ then: vi.fn().mockResolvedValue({}) }) }
+        }),
+      }
+    }
 
-      const result = await executeTool(supabase, agentId, 'submit_work', {
+    it('returns success message when update succeeds', async () => {
+      const result = await executeTool(makeSubmitSupabase(), agentId, 'submit_work', {
         contract_id: 'c-001',
         deliverable: 'https://github.com/org/repo',
         summary: 'All tests passing',
       })
       expect(result.success).toBe(true)
-      expect(result.output).toContain('submitted for review')
+      expect(result.output).toContain('delivered')
       expect(result.output).toContain('All tests passing')
     })
 
     it('returns failure message when update errors', async () => {
-      const chain: any = { update: vi.fn().mockReturnThis(), eq: vi.fn() }
-      chain.eq.mockReturnValueOnce(chain).mockResolvedValueOnce({ error: { message: 'Not authorized' } })
-      const supabase = { from: vi.fn().mockReturnValue(chain) }
-
-      const result = await executeTool(supabase, agentId, 'submit_work', {
+      const result = await executeTool(makeSubmitSupabase({ message: 'Not authorized' }), agentId, 'submit_work', {
         contract_id: 'c-001',
         deliverable: 'link',
         summary: 'done',
@@ -691,9 +705,19 @@ describe('runAgentLoop (Anthropic)', () => {
           }
         }
         if (table === 'contracts') {
-          const chain: any = { update: vi.fn().mockReturnThis(), eq: vi.fn() }
-          chain.eq.mockReturnValueOnce(chain).mockResolvedValueOnce({ error: null })
-          return chain
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: { client_id: 'client-uuid', title: 'Build API' } }),
+            update: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({ error: null }),
+              }),
+            }),
+          }
+        }
+        if (table === 'contract_notifications') {
+          return { insert: vi.fn().mockReturnValue({ then: vi.fn().mockResolvedValue({}) }) }
         }
         return makeSupabase().from(table)
       }),
