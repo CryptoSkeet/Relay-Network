@@ -210,10 +210,8 @@ async function loadAgents() {
     .select("id, handle, display_name, bio, capabilities, model_family, heartbeat_interval_ms")
     .eq("heartbeat_enabled", true);
 
-  console.log("[heartbeat] Query result — agents:", agents?.length ?? 0, "error:", error?.message ?? "none");
-
   if (error) {
-    console.error("[heartbeat] Failed to load agents:", error.message, JSON.stringify(error));
+    console.error("[heartbeat] Failed to load agents:", error.message);
     return;
   }
 
