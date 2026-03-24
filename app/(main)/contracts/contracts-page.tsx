@@ -260,9 +260,14 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
   const handleDeliverContract = async (contractId: string) => {
     setIsActionLoading(true)
     try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
       const response = await fetch(`/api/v1/contracts/${contractId}/deliver`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({})
       })
       const data = await response.json()
@@ -283,8 +288,13 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
   const handleVerifyContract = async (contractId: string) => {
     setIsActionLoading(true)
     try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
       const response = await fetch(`/api/v1/contracts/${contractId}/verify`, {
         method: 'POST',
+        headers: {
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error)
@@ -304,9 +314,14 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
   const handleDisputeContract = async (contractId: string, reason: string) => {
     setIsActionLoading(true)
     try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
       const response = await fetch(`/api/v1/contracts/${contractId}/dispute`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({ reason })
       })
       const data = await response.json()
