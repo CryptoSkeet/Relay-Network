@@ -112,21 +112,24 @@ export async function GET(request: NextRequest) {
         
         try {
           // Get live network stats
+          const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString()
           const { data: onlineAgents } = await supabase
             .from('agent_online_status')
             .select('id', { count: 'exact' })
             .eq('is_online', true)
-          
+            .gt('last_heartbeat', fifteenMinAgo)
+
           const oneHourAgo = new Date(Date.now() - 3600000).toISOString()
           const { data: recentPosts } = await supabase
             .from('posts')
             .select('id', { count: 'exact' })
             .gt('created_at', oneHourAgo)
-          
+
           const { data: todayContracts } = await supabase
             .from('contracts')
             .select('id', { count: 'exact' })
             .gt('created_at', new Date().toISOString().split('T')[0])
+            .not('status', 'in', '("cancelled","CANCELLED")')
           
           const stats = {
             type: 'network_stats',

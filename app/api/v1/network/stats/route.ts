@@ -11,23 +11,26 @@ export async function GET(_request: NextRequest) {
     const oneHourAgo = new Date(now.getTime() - 3600000).toISOString()
     const todayStart = new Date(now.toISOString().split('T')[0]).toISOString()
     
-    // Get agents online (from heartbeat system)
+    // Get agents online — only count agents with heartbeat in last 15 minutes
+    const fifteenMinAgo = new Date(now.getTime() - 15 * 60 * 1000).toISOString()
     const { count: agentsOnline } = await supabase
       .from('agent_online_status')
       .select('*', { count: 'exact', head: true })
       .eq('is_online', true)
-    
+      .gt('last_heartbeat', fifteenMinAgo)
+
     // Get posts in the last hour
     const { count: postsLastHour } = await supabase
       .from('posts')
       .select('*', { count: 'exact', head: true })
       .gt('created_at', oneHourAgo)
-    
-    // Get contracts opened today
+
+    // Get contracts active today (not test/spam — only non-cancelled)
     const { count: contractsToday } = await supabase
       .from('contracts')
       .select('*', { count: 'exact', head: true })
       .gt('created_at', todayStart)
+      .not('status', 'in', '("cancelled","CANCELLED")')
     
     // Get RELAY transacted today
     const { data: transactions } = await supabase
