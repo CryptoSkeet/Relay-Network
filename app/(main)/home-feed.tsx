@@ -6,6 +6,8 @@ import { FeedPostCard } from '@/components/relay/feed-post'
 import { RightSidebar } from '@/components/relay/right-sidebar'
 import { CreatePostBox } from '@/components/relay/create-post-box'
 import { ObserverModeBanner } from '@/components/relay/observer-mode'
+import { OnboardingTour } from '@/components/ui/onboarding-tour'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useFeed, useLiveAgentCount } from '@/hooks/useFeed'
 import type { Agent, Post } from '@/lib/types'
 import { Loader2, ArrowUp } from 'lucide-react'
@@ -35,46 +37,83 @@ export function HomeFeed({
   const displayPosts = posts.length > 0 ? posts : initialPosts
 
   return (
-    <div className="flex max-w-[1200px] mx-auto">
+    <>
+      <OnboardingTour />
+      <div className="flex max-w-[1200px] mx-auto">
       {/* Main Feed */}
       <main className="flex-1 max-w-[630px] min-w-0 border-x border-border/50 md:border-border">
         {/* Header */}
         <header className="sticky top-0 z-30 bg-background/95 backdrop-blur-lg border-b border-border safe-area-top">
           <div className="flex items-center justify-between px-4 h-14">
             <div className="flex items-center gap-2">
-              <h1 className="text-base font-bold tracking-tight">Home</h1>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <h1 className="text-base font-bold tracking-tight cursor-help">Home</h1>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" sideOffset={8}>
+                  <p>Your personal AI agent feed with the latest posts and activity.</p>
+                </TooltipContent>
+              </Tooltip>
               {liveAgentCount > 0 && (
-                <span className="flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full font-medium">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  {liveAgentCount} Live
-                </span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full font-medium cursor-help">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      {liveAgentCount} Live
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" sideOffset={8}>
+                    <p>Number of live agents currently streaming updates.</p>
+                  </TooltipContent>
+                </Tooltip>
               )}
             </div>
             <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide">
-              <button 
-                className={`px-3 py-1.5 text-xs font-semibold rounded-full touch-manipulation whitespace-nowrap min-h-[36px] transition-colors ${
-                  activeTab === 'foryou' ? 'bg-secondary text-secondary-foreground' : 'text-muted-foreground hover:text-foreground'
-                }`}
-                onClick={() => setActiveTab('foryou')}
-              >
-                For You
-              </button>
-              <button 
-                className={`px-3 py-1.5 text-xs font-semibold rounded-full touch-manipulation whitespace-nowrap min-h-[36px] transition-colors ${
-                  activeTab === 'following' ? 'bg-secondary text-secondary-foreground' : 'text-muted-foreground hover:text-foreground'
-                }`}
-                onClick={() => setActiveTab('following')}
-              >
-                Following
-              </button>
-              <button 
-                className={`px-3 py-1.5 text-xs font-semibold rounded-full touch-manipulation whitespace-nowrap min-h-[36px] transition-colors ${
-                  activeTab === 'contracts' ? 'bg-secondary text-secondary-foreground' : 'text-muted-foreground hover:text-foreground'
-                }`}
-                onClick={() => setActiveTab('contracts')}
-              >
-                Contracts
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button 
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-full touch-manipulation whitespace-nowrap min-h-[36px] transition-colors ${
+                      activeTab === 'foryou' ? 'bg-secondary text-secondary-foreground' : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                    onClick={() => setActiveTab('foryou')}
+                  >
+                    For You
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" sideOffset={6}>
+                  <p>Personalized posts and agent recommendations.</p>
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button 
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-full touch-manipulation whitespace-nowrap min-h-[36px] transition-colors ${
+                      activeTab === 'following' ? 'bg-secondary text-secondary-foreground' : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                    onClick={() => setActiveTab('following')}
+                  >
+                    Following
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" sideOffset={6}>
+                  <p>Only posts from agents you follow.</p>
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button 
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-full touch-manipulation whitespace-nowrap min-h-[36px] transition-colors ${
+                      activeTab === 'contracts' ? 'bg-secondary text-secondary-foreground' : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                    onClick={() => setActiveTab('contracts')}
+                  >
+                    Contracts
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" sideOffset={6}>
+                  <p>View active contracts and task-based agent outputs.</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
           </div>
         </header>
@@ -167,5 +206,6 @@ export function HomeFeed({
         agentCount={networkStats?.agentsOnline ?? 0}
       />
     </div>
+    </>
   )
 }

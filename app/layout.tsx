@@ -2,6 +2,11 @@ import type { Metadata, Viewport } from 'next'
 import { Barlow, Barlow_Condensed, Share_Tech_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
+import { getValidatedEnv } from '@/lib/env-validation'
+import ErrorBoundary from '@/components/ErrorBoundary'
+
+// Validate environment variables on app startup
+getValidatedEnv()
 
 const barlow = Barlow({ 
   subsets: ["latin"],
@@ -58,7 +63,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className={`${barlow.variable} ${barlowCondensed.variable} ${shareTechMono.variable} font-sans antialiased`}>
-        {children}
+        <ErrorBoundary>
+          {children}
+        </ErrorBoundary>
         <Analytics />
       </body>
     </html>

@@ -163,3 +163,106 @@ export async function checkRateLimitMiddleware(
   // This is just a placeholder for middleware flow
   return { allowed: true }
 }
+
+// ============================================
+// PRODUCTION SECURITY ENHANCEMENTS
+// ============================================
+
+/**
+ * Validate API key authentication for server-side routes
+ */
+export function validateApiKey(request: NextRequest): boolean {
+  const apiKey = request.headers.get('x-relay-api-key')
+  const expectedKey = process.env.RELAY_API_KEY
+
+  if (!apiKey || !expectedKey) {
+    return false
+  }
+
+  // Use constant-time comparison to prevent timing attacks
+  try {
+    return crypto.timingSafeEqual(
+      Buffer.from(apiKey, 'utf8'),
+      Buffer.from(expectedKey, 'utf8')
+    )
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Enhanced CORS validation with environment-based origin checking
+ */
+export function getCorsHeaders(request: NextRequest): Record<string, string> {
+  const origin = request.headers.get('origin')
+  const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '').split(',').map(o => o.trim())
+
+  // Always allow same-origin and configured origins
+  const allowOrigin = !origin || allowedOrigins.includes(origin) ? origin : allowedOrigins[0]
+
+  return {
+    'Access-Control-Allow-Origin': allowOrigin || '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-relay-api-key, x-agent-signature, x-request-id',
+    'Access-Control-Max-Age': '86400',
+  }
+}
+
+/**
+ * Request sanitization - remove potentially dangerous headers
+ */
+export function sanitizeRequestHeaders(request: NextRequest): NextRequest {
+  const sanitized = new NextRequest(request)
+
+  // Remove headers that could be used for header injection or routing attacks
+  const dangerousHeaders = [
+    'host',
+    'x-forwarded-host',
+    'x-forwarded-proto',
+    'x-forwarded-port',
+    'x-original-url',
+    'x-rewrite-url',
+    'x-host',
+    'x-forwarded-server'
+  ]
+
+  dangerousHeaders.forEach(header => {
+    sanitized.headers.delete(header)
+  })
+
+  return sanitized
+}
+
+/**
+ * Security event logging for production monitoring
+ */
+export function logSecurityEvent(
+  event: string,
+  details: Record<string, unknown>,
+  request?: NextRequest
+) {
+  // In production, this would integrate with your logging service
+  console.warn(`[SECURITY] ${event}:`, {
+    ...details,
+    timestamp: new Date().toISOString(),
+    ip: request?.headers.get('x-forwarded-for') || request?.headers.get('x-real-ip'),
+    userAgent: request?.headers.get('user-agent'),
+    url: request?.url,
+    method: request?.method
+  })
+}
+
+/**
+ * Validate request size to prevent DoS attacks
+ */
+export function validateRequestSize(request: NextRequest, maxSize: number = 10 * 1024 * 1024): boolean {
+  const contentLength = request.headers.get('content-length')
+  if (contentLength) {
+    const size = parseInt(contentLength, 10)
+    if (size > maxSize) {
+      logSecurityEvent('Request too large', { size, maxSize }, request)
+      return false
+    }
+  }
+  return true
+}

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { AgentAvatar } from './agent-avatar'
 import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { TrendingUp, Zap, FileText, ArrowUpRight } from 'lucide-react'
 import type { Agent } from '@/lib/types'
 
@@ -142,7 +143,14 @@ export function RightSidebar({
       <div className="text-xs text-muted-foreground space-y-2 px-1">
         <div className="flex flex-wrap gap-x-2 gap-y-1">
           <Link href="/about" className="hover:text-foreground">About</Link>
-          <Link href="/help" className="hover:text-foreground">Help</Link>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link href="/help" className="hover:text-foreground">Help</Link>
+            </TooltipTrigger>
+            <TooltipContent side="top" sideOffset={6}>
+              <p>Get guided onboarding, docs, and community support.</p>
+            </TooltipContent>
+          </Tooltip>
           <Link href="/api" className="hover:text-foreground">API</Link>
           <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
           <Link href="/terms" className="hover:text-foreground">Terms</Link>

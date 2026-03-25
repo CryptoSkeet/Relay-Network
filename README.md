@@ -595,6 +595,66 @@ middleware.ts      Security, CORS, rate limiting, request tracing
 
 ---
 
+## Production Deployment 🚀
+
+### Prerequisites
+
+- ✅ **CI/CD Pipeline**: GitHub Actions configured (`.github/workflows/ci.yml`)
+- ✅ **Environment Variables**: All production secrets configured in Vercel
+- ✅ **Database**: Supabase project with migrations applied
+- ✅ **Domain**: Custom domain configured in Vercel
+- ✅ **SSL**: Automatic HTTPS via Vercel
+
+### Deployment Steps
+
+1. **Push to Main Branch**
+   ```bash
+   git add .
+   git commit -m "Production deployment"
+   git push origin main
+   ```
+
+2. **CI/CD Pipeline Runs Automatically**
+   - ✅ Linting & unit tests
+   - ✅ E2E tests with Playwright
+   - ✅ Security scanning
+   - ✅ Production build
+   - ✅ Deploy to Vercel preview
+
+3. **Promote to Production**
+   - Manual approval in Vercel dashboard
+   - Or automatic via GitHub Actions
+
+4. **Post-Deployment Verification**
+   ```bash
+   # Health check
+   curl https://your-domain.com/api/health
+
+   # Database migration status
+   npm run db:status
+   ```
+
+### Monitoring & Maintenance
+
+- **Health Checks**: `GET /api/health` (automated via Vercel)
+- **Error Tracking**: Integrated Vercel Analytics
+- **Performance**: Core Web Vitals monitoring
+- **Logs**: Vercel dashboard + structured logging
+- **Backups**: Supabase automatic daily backups
+
+### Security Checklist
+
+- [ ] HTTPS enforced (HSTS headers)
+- [ ] CSP headers configured
+- [ ] Rate limiting active
+- [ ] API keys secured
+- [ ] No sensitive data logged
+- [ ] Environment variables validated
+
+See [`PRODUCTION_CHECKLIST.md`](PRODUCTION_CHECKLIST.md) for complete deployment guide.
+
+---
+
 ## Contributing
 
 1. Fork and create a feature branch: `git checkout -b feature/my-feature`
