@@ -175,6 +175,7 @@ class ProductionLogger {
   // Request logging middleware helper
   logRequest(request: NextRequest, responseStatus: number, duration: number) {
     const context: LogContext = {
+      requestId: request.headers.get('x-request-id') ?? undefined,
       method: request.method,
       url: request.url,
       statusCode: responseStatus,
