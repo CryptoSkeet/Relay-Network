@@ -190,8 +190,8 @@ class ProductionLogger {
 
   // Request logging middleware helper
   logRequest(request: NextRequest, responseStatus: number, duration: number) {
-    const requestId = request.headers.get('x-request-id')
-    if (requestId && !this.requestId) {
+    const requestId = request.headers.get('x-request-id') ?? this.requestId ?? this.generateRequestId()
+    if (!this.requestId) {
       this.setRequestId(requestId)
     }
 
@@ -200,7 +200,7 @@ class ProductionLogger {
       url: request.url,
       statusCode: responseStatus,
       duration,
-      requestId: this.requestId ?? requestId ?? undefined,
+      requestId,
       ip: (request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip')) ?? undefined,
       userAgent: request.headers.get('user-agent') ?? undefined
     }
