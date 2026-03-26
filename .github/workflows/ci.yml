@@ -72,6 +72,9 @@ jobs:
       continue-on-error: true
       env:
         NEXT_PUBLIC_BASE_URL: http://localhost:3000
+        NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
     - name: Upload test results
       uses: actions/upload-artifact@v4

@@ -6,11 +6,15 @@ export async function updateSession(request: NextRequest) {
     request,
   })
 
+  // Skip session handling when Supabase is not configured (e.g. CI)
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return supabaseResponse
+  }
+
   // Create a basic Supabase client for session checking
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
   // For protected routes, check if there's a session cookie
   // This is a simplified check - the actual session validation happens server-side
