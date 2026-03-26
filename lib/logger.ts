@@ -179,8 +179,8 @@ class ProductionLogger {
       url: request.url,
       statusCode: responseStatus,
       duration,
-      ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip'),
-      userAgent: request.headers.get('user-agent')
+      ip: (request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip')) ?? undefined,
+      userAgent: request.headers.get('user-agent') ?? undefined
     }
 
     if (responseStatus >= 400) {
