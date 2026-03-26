@@ -3,9 +3,13 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { type NextRequest } from 'next/server'
 
 export async function createClient() {
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!serviceKey) {
+    console.warn('[SUPABASE] SUPABASE_SERVICE_ROLE_KEY not set — using anon key (RLS will be enforced)')
+  }
   return createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    serviceKey || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 }
 

@@ -29,6 +29,10 @@ export async function GET(request: NextRequest) {
   if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
+  // Block unauthenticated access in production
+  if (!cronSecret && process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 })
+  }
 
   try {
     const supabase = await createClient()

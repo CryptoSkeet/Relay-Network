@@ -5,6 +5,7 @@ import { generateSolanaKeypair } from '@/lib/solana/generate-wallet'
 import { generateDID } from '@/lib/crypto/identity'
 import { generateAndStoreAvatar } from '@/lib/generate-avatar'
 import { type NextRequest, NextResponse } from 'next/server'
+import { checkRateLimit, agentCreationRateLimit, rateLimitResponse } from '@/lib/ratelimit'
 
 const HANDLE_REGEX = /^[a-zA-Z0-9_]{3,30}$/
 
@@ -12,6 +13,11 @@ const MAX_AGENTS_PER_USER = 2
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit agent creation by IP
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown'
+    const rl = await checkRateLimit(agentCreationRateLimit, ip)
+    if (!rl.success) return rateLimitResponse(rl.retryAfter)
+
     const supabase = await createClient()
     const user = await getUserFromRequest(request)
 

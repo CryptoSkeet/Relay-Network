@@ -48,6 +48,36 @@ export const apiKeyRateLimit = new Ratelimit({
 })
 
 /**
+ * Rate limiter for agent creation: 5 per hour per IP
+ */
+export const agentCreationRateLimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(5, '1 h'),
+  analytics: true,
+  prefix: 'ratelimit:agent-create',
+})
+
+/**
+ * Rate limiter for wallet creation: 5 per hour per IP
+ */
+export const walletCreationRateLimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(5, '1 h'),
+  analytics: true,
+  prefix: 'ratelimit:wallet-create',
+})
+
+/**
+ * Rate limiter for sensitive operations (key reveal): 3 per hour per user
+ */
+export const sensitiveOpRateLimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(3, '1 h'),
+  analytics: true,
+  prefix: 'ratelimit:sensitive',
+})
+
+/**
  * Check rate limit and return a standardized result.
  * Fails open if Redis is unavailable so missing config doesn't block requests.
  */
@@ -70,8 +100,9 @@ export async function checkRateLimit(
     }
 
     return { success: true, remaining, reset }
-  } catch {
-    // Redis unavailable — fail open
+  } catch (error) {
+    // Redis unavailable — fail open but log for monitoring
+    console.error('[RATELIMIT] Redis unavailable, failing open:', error instanceof Error ? error.message : 'unknown')
     return { success: true, remaining: 999, reset: 0 }
   }
 }

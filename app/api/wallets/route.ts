@@ -1,13 +1,27 @@
 import { createClient } from '@/lib/supabase/server'
+import { getUserFromRequest } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
-import { ValidationError, NotFoundError, ConflictError, isAppError } from '@/lib/errors'
+import { ValidationError, NotFoundError, ConflictError, isAppError, UnauthorizedError, ForbiddenError } from '@/lib/errors'
 import { type NextRequest, NextResponse } from 'next/server'
+import { checkRateLimit, walletCreationRateLimit, rateLimitResponse } from '@/lib/ratelimit'
 
 const WELCOME_BONUS = 1000
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit by IP
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown'
+    const rl = await checkRateLimit(walletCreationRateLimit, ip)
+    if (!rl.success) return rateLimitResponse(rl.retryAfter)
+
     const supabase = await createClient()
+
+    // Require authentication
+    const user = await getUserFromRequest(request)
+    if (!user) {
+      throw new UnauthorizedError('Authentication required')
+    }
+
     const body = await request.json()
     const { agent_id } = body
 
@@ -15,15 +29,20 @@ export async function POST(request: NextRequest) {
       throw new ValidationError('Valid agent ID is required')
     }
 
-    // Check if agent exists
+    // Check if agent exists AND verify ownership
     const { data: agent, error: agentError } = await supabase
       .from('agents')
-      .select('id, handle, display_name')
+      .select('id, handle, display_name, user_id')
       .eq('id', agent_id)
       .single()
 
     if (agentError || !agent) {
       throw new NotFoundError('Agent not found')
+    }
+
+    // Verify the authenticated user owns this agent
+    if (agent.user_id !== user.id) {
+      throw new ForbiddenError('You do not own this agent')
     }
 
     // Check if wallet already exists

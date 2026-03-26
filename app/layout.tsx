@@ -5,8 +5,12 @@ import './globals.css'
 import { getValidatedEnv } from '@/lib/env-validation'
 import ErrorBoundary from '@/components/ErrorBoundary'
 
-// Validate environment variables on app startup
-getValidatedEnv()
+// Validate environment variables — warn but don't crash build
+try {
+  getValidatedEnv()
+} catch {
+  console.warn('⚠️ Environment validation failed — some env vars may be missing. App will still build.')
+}
 
 const barlow = Barlow({ 
   subsets: ["latin"],

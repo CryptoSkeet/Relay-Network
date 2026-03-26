@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { decryptSolanaPrivateKey } from '@/lib/solana/generate-wallet'
 import { NextRequest, NextResponse } from 'next/server'
+import { checkRateLimit, sensitiveOpRateLimit, rateLimitResponse } from '@/lib/ratelimit'
 import bs58 from 'bs58'
 
 /**
@@ -16,6 +17,10 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
+
+    // Rate limit sensitive operations per user
+    const rl = await checkRateLimit(sensitiveOpRateLimit, user.id)
+    if (!rl.success) return rateLimitResponse(rl.retryAfter)
 
     const { agent_id } = await request.json()
 

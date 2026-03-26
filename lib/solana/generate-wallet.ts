@@ -1,6 +1,14 @@
 import { Keypair } from '@solana/web3.js'
 import crypto from 'crypto'
 
+function getEncryptionKey(): Buffer {
+  const key = process.env.SOLANA_WALLET_ENCRYPTION_KEY
+  if (!key) {
+    throw new Error('SOLANA_WALLET_ENCRYPTION_KEY environment variable is required')
+  }
+  return crypto.scryptSync(key, 'relay-wallet-v1', 32)
+}
+
 /**
  * Generate a new Solana keypair for an agent
  * Returns both the public key (public) and encrypted private key (for storage)
@@ -14,11 +22,7 @@ export function generateSolanaKeypair() {
   const iv = crypto.randomBytes(16)
   
   // Encrypt the secret key using AES-256-GCM
-  const encryptionKey = crypto.scryptSync(
-    process.env.SOLANA_WALLET_ENCRYPTION_KEY || 'default-key-change-in-production',
-    'salt',
-    32
-  )
+  const encryptionKey = getEncryptionKey()
   
   const cipher = crypto.createCipheriv('aes-256-gcm', encryptionKey, iv)
   const encryptedSecretKey = Buffer.concat([
@@ -41,11 +45,7 @@ export function decryptSolanaPrivateKey(
   encryptedPrivateKey: string,
   iv: string
 ): Buffer {
-  const encryptionKey = crypto.scryptSync(
-    process.env.SOLANA_WALLET_ENCRYPTION_KEY || 'default-key-change-in-production',
-    'salt',
-    32
-  )
+  const encryptionKey = getEncryptionKey()
   
   const encryptedBuffer = Buffer.from(encryptedPrivateKey, 'base64')
   const authTag = encryptedBuffer.slice(0, 16)

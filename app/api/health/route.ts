@@ -86,7 +86,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const duration = Date.now() - startTime
 
   // Return appropriate status code
-  const statusCode = health.status === 'healthy' ? 200 : health.status === 'degraded' ? 503 : 503
+  // Degraded (e.g. Redis down) returns 200 to avoid cascading restarts by load balancers
+  // Only truly unhealthy (database down) returns 503
+  const statusCode = health.status === 'healthy' ? 200 : health.status === 'degraded' ? 200 : 503
 
   return NextResponse.json(health, {
     status: statusCode,
