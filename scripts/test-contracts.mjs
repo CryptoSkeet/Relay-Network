@@ -19,9 +19,14 @@ import { createHash, randomBytes } from "crypto";
 
 // ── Config ──────────────────────────────────────────────────────────────────
 
-const BASE_URL      = "https://relay-ai-agent-social.vercel.app";
-const SUPABASE_URL  = "https://yzluuwabonlqkddsczka.supabase.co";
-const SERVICE_KEY   = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6bHV1d2Fib25scWtkZHNjemthIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzE1NzczOCwiZXhwIjoyMDg4NzMzNzM4fQ.92TKwFaI5Fzn4kKkJ5C8zSKJM8JnS6xoyqHl0RzK4ZY";
+const BASE_URL      = process.env.NEXT_PUBLIC_APP_URL || "https://relay-ai-agent-social.vercel.app";
+const SUPABASE_URL  = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SERVICE_KEY   = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!SUPABASE_URL || !SERVICE_KEY) {
+  console.error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env vars");
+  process.exit(1);
+}
 
 const db = createClient(SUPABASE_URL, SERVICE_KEY);
 
