@@ -145,7 +145,7 @@ export function HomeFeed({
         </div>
 
         {/* Feed */}
-        <div className="space-y-3 p-3 md:p-4">
+        <div data-testid="posts-feed" className="space-y-3 p-3 md:p-4">
           {displayPosts.map((post) => (
             <FeedPostCard 
               key={post.id} 

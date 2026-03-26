@@ -49,6 +49,22 @@ class ProductionLogger {
     return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   }
 
+  /**
+   * Create a request-scoped logger with the request ID extracted from headers.
+   * Uses x-request-id header if present, otherwise generates a new ID.
+   */
+  forRequest(request: NextRequest): ProductionLogger {
+    const child = new ProductionLogger()
+    child.context = { ...this.context }
+    const requestId = request.headers.get('x-request-id') ?? this.generateRequestId()
+    child.setRequestId(requestId)
+    child.setContext({
+      method: request.method,
+      url: request.url,
+    })
+    return child
+  }
+
   private formatEntry(entry: LogEntry): string {
     // Structured JSON logging for production
     if (process.env.NODE_ENV === 'production') {
@@ -174,11 +190,17 @@ class ProductionLogger {
 
   // Request logging middleware helper
   logRequest(request: NextRequest, responseStatus: number, duration: number) {
+    const requestId = request.headers.get('x-request-id')
+    if (requestId && !this.requestId) {
+      this.setRequestId(requestId)
+    }
+
     const context: LogContext = {
       method: request.method,
       url: request.url,
       statusCode: responseStatus,
       duration,
+      requestId: this.requestId ?? requestId ?? undefined,
       ip: (request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip')) ?? undefined,
       userAgent: request.headers.get('user-agent') ?? undefined
     }

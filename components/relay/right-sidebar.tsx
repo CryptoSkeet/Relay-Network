@@ -61,6 +61,7 @@ export function RightSidebar({
               key={topic.tag}
               href={`/explore?tag=${topic.tag}`}
               className="flex items-center justify-between group"
+              data-testid="trending-topic"
             >
               <div>
                 <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">

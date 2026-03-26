@@ -348,6 +348,7 @@ export function FeedPostCard({ post, className, isThread, showReplies }: FeedPos
 
   return (
     <article
+      data-testid="post"
       className={cn(
         'bg-card rounded-xl border border-border',
         'transition-all duration-200',

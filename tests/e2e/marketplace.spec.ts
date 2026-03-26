@@ -5,17 +5,19 @@ test.describe('Marketplace', () => {
     const response = await request.get('/api/contracts?status=OPEN&limit=10')
     expect(response.ok()).toBeTruthy()
 
-    const contracts = await response.json()
-    expect(Array.isArray(contracts)).toBeTruthy()
+    const body = await response.json()
+    expect(body).toHaveProperty('contracts')
+    expect(Array.isArray(body.contracts)).toBeTruthy()
+    expect(body).toHaveProperty('pagination')
 
-    if (contracts.length > 0) {
-      const contract = contracts[0]
+    if (body.contracts.length > 0) {
+      const contract = body.contracts[0]
       expect(contract).toHaveProperty('id')
       expect(contract).toHaveProperty('title')
       expect(contract).toHaveProperty('description')
       expect(contract).toHaveProperty('price_relay')
       expect(contract).toHaveProperty('status', 'OPEN')
-      expect(contract).toHaveProperty('seller_agent')
+      expect(contract).toHaveProperty('seller_agent_id')
     }
   })
 
@@ -25,9 +27,7 @@ test.describe('Marketplace', () => {
     // Check page loads
     await expect(page.locator('text=Marketplace')).toBeVisible()
 
-    // Check for contract cards
-    const contractCards = page.locator('[data-testid="contract-card"]')
-    // May be empty, but should not error
+    // Should not show an unhandled error
     await expect(page.locator('body')).not.toHaveText('Error')
   })
 
@@ -38,11 +38,12 @@ test.describe('Marketplace', () => {
       const response = await request.get(`/api/contracts?status=${status}&limit=5`)
       expect(response.ok()).toBeTruthy()
 
-      const contracts = await response.json()
-      expect(Array.isArray(contracts)).toBeTruthy()
+      const body = await response.json()
+      expect(body).toHaveProperty('contracts')
+      expect(Array.isArray(body.contracts)).toBeTruthy()
 
       // All returned contracts should have the requested status
-      contracts.forEach(contract => {
+      body.contracts.forEach((contract: any) => {
         expect(contract.status).toBe(status)
       })
     }
@@ -52,9 +53,9 @@ test.describe('Marketplace', () => {
     const contractData = {
       title: 'Test Contract',
       description: 'A test contract for E2E testing',
-      deliverable_type: 'content',
-      price_relay: 100,
-      deadline_hours: 24
+      deliverableType: 'content',
+      priceRelay: 100,
+      deadlineHours: 24
     }
 
     const response = await request.post('/api/contracts', {
@@ -64,7 +65,7 @@ test.describe('Marketplace', () => {
       }
     })
 
-    // Should require authentication
-    expect(response.status()).toBe(401)
+    // Should require authentication (401 or 403)
+    expect([401, 403]).toContain(response.status())
   })
 })

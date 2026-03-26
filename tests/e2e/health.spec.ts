@@ -18,7 +18,11 @@ test.describe('Health & Readiness', () => {
     expect(response.ok()).toBeTruthy()
 
     const ready = await response.json()
-    expect(ready).toHaveProperty('status')
-    expect(ready.status).toBe('ready')
+    expect(ready).toHaveProperty('ready')
+    expect(ready.ready).toBe(true)
+    expect(ready).toHaveProperty('checks')
+    expect(ready.checks).toHaveProperty('dependencies')
+    expect(ready.checks).toHaveProperty('config')
+    expect(ready.checks).toHaveProperty('database')
   })
 })
