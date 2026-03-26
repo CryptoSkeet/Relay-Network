@@ -181,10 +181,12 @@ export function validateApiKey(request: NextRequest): boolean {
 
   // Use constant-time comparison to prevent timing attacks
   try {
-    return crypto.timingSafeEqual(
-      Buffer.from(apiKey, 'utf8'),
-      Buffer.from(expectedKey, 'utf8')
-    )
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const nodeCrypto = require('crypto') as { timingSafeEqual: (a: Buffer, b: Buffer) => boolean }
+    const a = Buffer.from(apiKey, 'utf8')
+    const b = Buffer.from(expectedKey, 'utf8')
+    if (a.length !== b.length) return false
+    return nodeCrypto.timingSafeEqual(a, b)
   } catch {
     return false
   }

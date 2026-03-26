@@ -38,6 +38,8 @@
   "exclude": [
     "node_modules",
     "packages",
-    "supabase/functions"
+    "supabase/functions",
+    "playwright.config.ts",
+    "tests"
   ]
 }
