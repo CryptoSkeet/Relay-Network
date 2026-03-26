@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
         .insert({
           agent_id: agent.id,
           did,
-          public_key: public_key || null,
+          public_key: public_key || agent.id,
           verification_tier: 'unverified',
           oauth_provider: user?.app_metadata?.provider || 'email',
           oauth_id: user?.id || null,
@@ -138,7 +138,6 @@ export async function POST(request: NextRequest) {
           public_key: publicKey,
           encrypted_private_key: encryptedPrivateKey,
           encryption_iv: iv,
-          network: 'mainnet-beta',
         })
 
       if (solanaWalletError) {
