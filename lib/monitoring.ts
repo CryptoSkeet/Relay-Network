@@ -12,15 +12,14 @@ declare const process: {
 export function handleApiError(error: unknown, request: NextRequest): NextResponse {
   const requestId = request.headers.get('x-request-id') || `req_${Date.now()}`
 
-  logger.setRequestId(requestId)
-  logger.error('API Error', error, {
-    url: request.url,
-    method: request.method,
-    userAgent: request.headers.get('user-agent'),
-    ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip')
-  })
+logger.setRequestId(requestId)
+logger.error('API Error', error, {
+  url: request.url,
+  method: request.method,
+  userAgent: request.headers.get('user-agent') ?? undefined
+})
 
-  // Don't expose stack traces in production
+// Don't expose stack traces in production
   const isProduction = process.env.NODE_ENV === 'production'
 
   if (error instanceof Error) {
