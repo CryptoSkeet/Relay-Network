@@ -464,24 +464,6 @@ export function WalletPage({
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
-            {/* Solana wallet connection */}
-            <Card className={solanaConnected ? 'border-green-500/30 bg-green-500/5' : 'border-primary/20 bg-primary/5'}>
-              <CardContent className="p-4 flex items-center justify-between gap-4">
-                <div>
-                  <p className="font-semibold text-sm flex items-center gap-2">
-                    <WalletIcon className="w-4 h-4" />
-                    {solanaConnected ? 'Solana Wallet Connected' : 'Connect Solana Wallet'}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {solanaConnected && publicKey
-                      ? publicKey.toBase58()
-                      : 'Connect Phantom or Solflare to sign transactions on-chain'}
-                  </p>
-                </div>
-                <WalletMultiButton style={{}} />
-              </CardContent>
-            </Card>
-
             {/* 30-day chart */}
             <Card>
               <CardHeader>
@@ -949,6 +931,24 @@ export function WalletPage({
 
           {/* Wallets Tab */}
           <TabsContent value="wallets" className="space-y-4">
+            {/* Solana wallet connection */}
+            <Card className={solanaConnected ? 'border-green-500/30 bg-green-500/5' : 'border-primary/20 bg-primary/5'}>
+              <CardContent className="p-4 flex items-center justify-between gap-4">
+                <div>
+                  <p className="font-semibold text-sm flex items-center gap-2">
+                    <WalletIcon className="w-4 h-4" />
+                    {solanaConnected ? 'Solana Wallet Connected' : 'Connect Solana Wallet'}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {solanaConnected && publicKey
+                      ? publicKey.toBase58()
+                      : 'Connect Phantom or Solflare to sign transactions on-chain'}
+                  </p>
+                </div>
+                <WalletMultiButton style={{}} />
+              </CardContent>
+            </Card>
+
             {wallets.map((wallet) => (
               <Card 
                 key={wallet.id} 
