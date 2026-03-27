@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useId } from 'react'
+import { useState, useId, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import {
   Code, Terminal, Book, Zap, Key, Webhook, Play, Copy, Check,
   ExternalLink, ChevronRight, ChevronDown, ChevronUp, Loader2, Plus, Trash2, Eye, EyeOff,
@@ -518,7 +519,7 @@ curl -X POST https://relay.network/api/v1/contracts/ct_xxx/accept \\
   }
 ]
 
-export function DeveloperPortal({ userAgent, apiKeys, webhooks, liveBounties }: DeveloperPortalProps) {
+export function DeveloperPortal({ userAgent: serverUserAgent, apiKeys: serverApiKeys, webhooks, liveBounties }: DeveloperPortalProps) {
   const tabsId = useId()
   const [activeTab, setActiveTab] = useState('quickstart')
   const [selectedEndpoint, setSelectedEndpoint] = useState(API_ENDPOINTS[0])
@@ -536,6 +537,44 @@ export function DeveloperPortal({ userAgent, apiKeys, webhooks, liveBounties }: 
   const [expandedFramework, setExpandedFramework] = useState<string | null>('typescript')
   const [bounties, setBounties] = useState<LiveBounty[]>(liveBounties ?? [])
   const [claimingBounty, setClaimingBounty] = useState<string | null>(null)
+  const [userAgent, setUserAgent] = useState<Agent | null>(serverUserAgent)
+  const [apiKeys, setApiKeys] = useState<APIKey[]>(serverApiKeys)
+  const [createdKeyValue, setCreatedKeyValue] = useState<string | null>(null)
+
+  // Load user agent + API keys client-side so auth works via browser session
+  useEffect(() => {
+    async function loadUserData() {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data: agent } = await supabase
+        .from('agents').select('*').eq('user_id', user.id)
+        .order('created_at', { ascending: false }).limit(1).maybeSingle()
+      if (!agent) return
+      setUserAgent(agent)
+      const { data: keys } = await supabase
+        .from('agent_api_keys')
+        .select('id, key_prefix, name, scopes, last_used_at, expires_at, is_active, created_at')
+        .eq('agent_id', agent.id)
+        .order('created_at', { ascending: false })
+      if (keys) setApiKeys(keys)
+    }
+    loadUserData()
+  }, [])
+
+  const getAuthHeader = async (): Promise<Record<string, string>> => {
+    const supabase = createClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    return session ? { Authorization: `Bearer ${session.access_token}` } : {}
+  }
+
+  const refreshApiKeys = async () => {
+    if (!userAgent) return
+    const auth = await getAuthHeader()
+    const res = await fetch(`/api/v1/api-keys?agent_id=${userAgent.id}`, { headers: auth })
+    const data = await res.json()
+    if (data.success) setApiKeys(data.data ?? [])
+  }
 
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text)
@@ -545,28 +584,24 @@ export function DeveloperPortal({ userAgent, apiKeys, webhooks, liveBounties }: 
 
   const createApiKey = async () => {
     if (!userAgent || !newKeyName.trim()) return
-    
     setIsCreating(true)
+    setCreatedKeyValue(null)
     try {
+      const auth = await getAuthHeader()
       const response = await fetch('/api/v1/api-keys', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          agent_id: userAgent.id,
-          name: newKeyName,
-          scopes: ['read', 'write']
-        })
+        headers: { 'Content-Type': 'application/json', ...auth },
+        body: JSON.stringify({ agent_id: userAgent.id, name: newKeyName.trim(), scopes: ['read', 'write'] })
       })
       const data = await response.json()
       if (data.success) {
-        alert(`API Key created! Save this - it won't be shown again:\n\n${data.data.key}`)
-        setIsApiKeyDialogOpen(false)
+        setCreatedKeyValue(data.data.key)
         setNewKeyName('')
-        window.location.reload()
+        await refreshApiKeys()
       } else {
         alert(data.error || 'Failed to create API key')
       }
-    } catch (error) {
+    } catch {
       alert('Failed to create API key')
     } finally {
       setIsCreating(false)
@@ -1494,6 +1529,20 @@ agent.start().then(() => console.log('Agent is live!'))`}</code>
                           <Badge variant={key.is_active ? 'default' : 'secondary'}>
                             {key.is_active ? 'Active' : 'Revoked'}
                           </Badge>
+                          {key.is_active && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-destructive hover:text-destructive"
+                              onClick={async () => {
+                                const auth = await getAuthHeader()
+                                await fetch(`/api/v1/api-keys?id=${key.id}&agent_id=${userAgent!.id}`, { method: 'DELETE', headers: auth })
+                                await refreshApiKeys()
+                              }}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -1807,7 +1856,7 @@ agent.start().then(() => console.log('Agent is live!'))`}</code>
       </div>
 
       {/* Create API Key Dialog */}
-      <Dialog open={isApiKeyDialogOpen} onOpenChange={setIsApiKeyDialogOpen}>
+      <Dialog open={isApiKeyDialogOpen} onOpenChange={(open) => { setIsApiKeyDialogOpen(open); if (!open) setCreatedKeyValue(null) }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create API Key</DialogTitle>
@@ -1816,21 +1865,42 @@ agent.start().then(() => console.log('Agent is live!'))`}</code>
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div>
-              <Label>Key Name</Label>
-              <Input
-                value={newKeyName}
-                onChange={(e) => setNewKeyName(e.target.value)}
-                placeholder="e.g., Production Key"
-              />
-            </div>
+            {!createdKeyValue ? (
+              <div>
+                <Label>Key Name</Label>
+                <Input
+                  value={newKeyName}
+                  onChange={(e) => setNewKeyName(e.target.value)}
+                  placeholder="e.g., production, my-script"
+                  onKeyDown={(e) => e.key === 'Enter' && createApiKey()}
+                />
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-green-400 uppercase tracking-wide">
+                  Key created — save it now, it won&apos;t be shown again
+                </p>
+                <code className="block text-xs font-mono bg-muted p-3 rounded break-all select-all">
+                  {createdKeyValue}
+                </code>
+                <Button size="sm" variant="outline" onClick={() => navigator.clipboard.writeText(createdKeyValue)}>
+                  <Copy className="w-3 h-3 mr-1" /> Copy
+                </Button>
+              </div>
+            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsApiKeyDialogOpen(false)}>Cancel</Button>
-            <Button onClick={createApiKey} disabled={isCreating || !newKeyName.trim()}>
-              {isCreating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-              Create Key
-            </Button>
+            {!createdKeyValue ? (
+              <>
+                <Button variant="outline" onClick={() => setIsApiKeyDialogOpen(false)}>Cancel</Button>
+                <Button onClick={createApiKey} disabled={isCreating || !newKeyName.trim()}>
+                  {isCreating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  Create Key
+                </Button>
+              </>
+            ) : (
+              <Button onClick={() => { setIsApiKeyDialogOpen(false); setCreatedKeyValue(null) }}>Done</Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
