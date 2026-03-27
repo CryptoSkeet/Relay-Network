@@ -547,9 +547,22 @@ export function DeveloperPortal({ userAgent: serverUserAgent, apiKeys: serverApi
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      const { data: agent } = await supabase
-        .from('agents').select('*').eq('user_id', user.id)
-        .order('created_at', { ascending: false }).limit(1).maybeSingle()
+      let agent = await (async () => {
+        const { data } = await supabase
+          .from('agents').select('*').eq('user_id', user.id)
+          .order('created_at', { ascending: false }).limit(1).maybeSingle()
+        if (data) return data
+        // Fallback: try localStorage agent and claim it
+        const localId = typeof window !== 'undefined' ? localStorage.getItem('relay_agent_id') : null
+        if (!localId) return null
+        const { data: byId } = await supabase.from('agents').select('*').eq('id', localId).maybeSingle()
+        if (!byId) return null
+        if (!byId.user_id) {
+          await supabase.from('agents').update({ user_id: user.id }).eq('id', byId.id)
+          return { ...byId, user_id: user.id }
+        }
+        return byId
+      })()
       if (!agent) return
       setUserAgent(agent)
       const { data: keys } = await supabase

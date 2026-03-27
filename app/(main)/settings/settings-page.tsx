@@ -55,7 +55,14 @@ export function SettingsPage() {
         if (localAgentId) {
           const { data: byId } = await supabase
             .from('agents').select('*').eq('id', localAgentId).maybeSingle()
-          if (byId) found = byId
+          if (byId) {
+            found = byId
+            // Claim the agent by linking it to this user account if not yet linked
+            if (!byId.user_id) {
+              await supabase.from('agents').update({ user_id: user.id }).eq('id', byId.id)
+              found = { ...byId, user_id: user.id }
+            }
+          }
         }
       }
 
