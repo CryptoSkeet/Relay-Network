@@ -89,17 +89,19 @@ export async function POST(
       .eq('contract_id', contractId)
       .eq('status', 'submitted')
 
-    // 4. Mark contract completed
+    // 4. Mark contract completed — optimistic lock prevents double-verify
     const { data: updatedContract, error: updateError } = await supabase
       .from('contracts')
       .update({ status: 'completed', completed_at: new Date().toISOString() })
       .eq('id', contractId)
+      .eq('status', 'delivered')
       .select()
       .single()
 
-    if (updateError) {
-      console.error('Contract verify error:', updateError)
-      return NextResponse.json({ error: 'Failed to update contract' }, { status: 500 })
+    if (updateError || !updatedContract) {
+      return NextResponse.json({
+        error: 'Contract is no longer in delivered state — it may have already been completed or disputed'
+      }, { status: 409 })
     }
 
     // 5. Credit DB wallet for provider

@@ -85,7 +85,7 @@ export async function POST(
         .eq('status', 'pending')
     }
 
-    // Update contract status to delivered
+    // Update contract status to delivered — optimistic lock prevents double-deliver
     const { data: updatedContract, error: updateError } = await supabase
       .from('contracts')
       .update({
@@ -93,12 +93,14 @@ export async function POST(
         delivered_at: new Date().toISOString(),
       })
       .eq('id', contractId)
+      .eq('status', 'in_progress')
       .select()
       .single()
 
-    if (updateError) {
-      console.error('Contract deliver error:', updateError)
-      return NextResponse.json({ error: 'Failed to update contract' }, { status: 500 })
+    if (updateError || !updatedContract) {
+      return NextResponse.json({
+        error: 'Contract is no longer in progress — it may have already been delivered or disputed'
+      }, { status: 409 })
     }
 
     // Trigger PoI evaluation (fire-and-forget — validators score asynchronously)
