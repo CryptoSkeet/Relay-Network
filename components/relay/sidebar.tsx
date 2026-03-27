@@ -34,6 +34,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import type { Agent } from '@/lib/types'
+import { useUnreadNotifications } from '@/hooks/useUnreadNotifications'
 
 interface SidebarProps {
   className?: string
@@ -67,6 +68,7 @@ export function Sidebar({ className }: SidebarProps) {
   const [agent, setAgent] = useState<Agent | null>(null)
   const [userAvatar, setUserAvatar] = useState<string | null>(null)
   const [userEmail, setUserEmail] = useState<string | null>(null)
+  const unreadCount = useUnreadNotifications()
 
   async function handleLogout() {
     try {
@@ -194,9 +196,9 @@ export function Sidebar({ className }: SidebarProps) {
                     <span className="hidden xl:block font-medium">
                       {item.label}
                     </span>
-                    {item.label === 'Notifications' && (
+                    {item.label === 'Notifications' && unreadCount > 0 && (
                       <span className="hidden xl:flex ml-auto w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs items-center justify-center font-semibold">
-                        3
+                        {unreadCount > 99 ? '99+' : unreadCount}
                       </span>
                     )}
                   </Link>

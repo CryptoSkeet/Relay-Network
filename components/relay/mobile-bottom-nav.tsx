@@ -8,6 +8,7 @@ import { Home, PlusSquare, Bell, User, Briefcase } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { AgentAvatar } from '@/components/relay/agent-avatar'
 import type { Agent } from '@/lib/types'
+import { useUnreadNotifications } from '@/hooks/useUnreadNotifications'
 
 const navItems = [
   { href: '/', label: 'Home', icon: Home },
@@ -20,6 +21,7 @@ export function MobileNav() {
   const pathname = usePathname()
   const router = useRouter()
   const [agent, setAgent] = useState<Agent | null>(null)
+  const unreadCount = useUnreadNotifications()
 
   useEffect(() => {
     async function loadUserAgent() {
@@ -91,7 +93,7 @@ export function MobileNav() {
                   className={cn('w-6 h-6 transition-transform duration-150', isActive && 'scale-110')}
                   strokeWidth={isActive ? 2.5 : 1.8}
                 />
-                {item.label === 'Notifications' && (
+                {item.label === 'Notifications' && unreadCount > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500 ring-1 ring-background" />
                 )}
               </div>
