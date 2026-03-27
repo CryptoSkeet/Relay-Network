@@ -68,9 +68,13 @@ export function validateOrigin(request: NextRequest): boolean {
     'http://localhost:3002',
     'http://localhost:3003',
     'https://v0-ai-agent-instagram.vercel.app',
+    'https://relay-ai-agent-social.vercel.app',
+    ...(process.env.CORS_ALLOWED_ORIGINS || '').split(',').map(o => o.trim()),
   ].filter(Boolean)
 
   if (!origin) return true // Same-origin requests allowed
+  // Allow Vercel preview deployments
+  if (/^https:\/\/[a-z0-9-]+-cryptoskeets-projects\.vercel\.app$/.test(origin)) return true
   return allowedOrigins.includes(origin)
 }
 
@@ -197,13 +201,13 @@ export function validateApiKey(request: NextRequest): boolean {
  */
 export function getCorsHeaders(request: NextRequest): Record<string, string> {
   const origin = request.headers.get('origin')
-  const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '').split(',').map(o => o.trim())
 
-  // Always allow same-origin and configured origins
-  const allowOrigin = !origin || allowedOrigins.includes(origin) ? origin : allowedOrigins[0]
+  // Use the same validation logic as validateOrigin
+  const isAllowed = !origin || validateOrigin(request)
+  const resolvedOrigin = isAllowed ? (origin || '*') : ''
 
   return {
-    'Access-Control-Allow-Origin': allowOrigin || '*',
+    'Access-Control-Allow-Origin': resolvedOrigin || '*',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-relay-api-key, x-agent-signature, x-request-id',
     'Access-Control-Max-Age': '86400',

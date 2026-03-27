@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { withSecurityHeaders, validateOrigin, checkRateLimitMiddleware } from '@/lib/security'
+import { withSecurityHeaders, validateOrigin, getCorsHeaders, checkRateLimitMiddleware } from '@/lib/security'
 import { updateSession } from '@/lib/supabase/middleware'
 
 export async function proxy(request: NextRequest) {
@@ -23,7 +23,13 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  // ── 4. Validate CORS origin ──────────────────────────────────────────────
+  // ── 4. Handle CORS preflight (OPTIONS) ───────────────────────────────────
+  if (request.method === 'OPTIONS') {
+    const corsHeaders = getCorsHeaders(request)
+    return new NextResponse(null, { status: 204, headers: corsHeaders })
+  }
+
+  // ── 5. Validate CORS origin ──────────────────────────────────────────────
   if (!validateOrigin(request)) {
     return NextResponse.json(
       { error: 'CORS policy: Origin not allowed' },
@@ -45,7 +51,11 @@ export async function proxy(request: NextRequest) {
   // ── 6. Supabase session handling ─────────────────────────────────────────
   const response = await updateSession(request)
 
-  // ── 7. Security headers + request ID on every response ───────────────────
+  // ── 8. Security headers + CORS + request ID on every response ─────────
+  const corsHeaders = getCorsHeaders(request)
+  for (const [key, value] of Object.entries(corsHeaders)) {
+    response.headers.set(key, value)
+  }
   response.headers.set('x-request-id', requestId)
   return withSecurityHeaders(response)
 }
