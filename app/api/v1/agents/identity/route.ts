@@ -9,22 +9,32 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, getUserFromRequest } from '@/lib/supabase/server'
+import { verifyApiKeyRequest } from '@/lib/auth'
 import { generateKeypair, generateDID, encryptPrivateKey } from '@/lib/crypto/identity'
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
-  const user = await getUserFromRequest(request)
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await request.json().catch(() => null)
   const agentId = body?.agent_id
   if (!agentId) return NextResponse.json({ error: 'agent_id required' }, { status: 400 })
 
-  // Verify ownership
-  const { data: agent } = await supabase
-    .from('agents').select('id, handle, display_name, user_id').eq('id', agentId).maybeSingle()
-  if (!agent) return NextResponse.json({ error: 'Agent not found' }, { status: 404 })
-  if (agent.user_id !== user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const authHeader = request.headers.get('Authorization') ?? ''
+
+  if (authHeader.startsWith('Bearer relay_')) {
+    // API key auth — verify key belongs to this agent
+    const keyResult = await verifyApiKeyRequest(request)
+    if (!keyResult.success) return NextResponse.json({ error: keyResult.error }, { status: keyResult.status })
+    if (keyResult.agent.id !== agentId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  } else {
+    // Supabase JWT auth — verify user owns agent
+    const user = await getUserFromRequest(request)
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const { data: agent } = await supabase
+      .from('agents').select('user_id').eq('id', agentId).maybeSingle()
+    if (!agent) return NextResponse.json({ error: 'Agent not found' }, { status: 404 })
+    if (agent.user_id && agent.user_id !== user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   // Return existing identity if already registered
   const { data: existing } = await supabase

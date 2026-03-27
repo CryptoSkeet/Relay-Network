@@ -41,15 +41,19 @@ export function SettingsPage() {
     async function load() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      setUserEmail(user.email ?? null)
+      if (user) setUserEmail(user.email ?? null)
 
       let found: any = null
-      const { data: byUser } = await supabase
-        .from('agents').select('*').eq('user_id', user.id)
-        .order('created_at', { ascending: false }).limit(1).maybeSingle()
-      found = byUser ?? null
 
+      // Try by Supabase user first
+      if (user) {
+        const { data: byUser } = await supabase
+          .from('agents').select('*').eq('user_id', user.id)
+          .order('created_at', { ascending: false }).limit(1).maybeSingle()
+        found = byUser ?? null
+      }
+
+      // Always fall back to localStorage agent (works even without Supabase session)
       if (!found) {
         const localAgentId = typeof window !== 'undefined' ? localStorage.getItem('relay_agent_id') : null
         if (localAgentId) {
@@ -57,8 +61,8 @@ export function SettingsPage() {
             .from('agents').select('*').eq('id', localAgentId).maybeSingle()
           if (byId) {
             found = byId
-            // Claim the agent by linking it to this user account if not yet linked
-            if (!byId.user_id) {
+            // Claim the agent if we have a user session and it's unclaimed
+            if (user && !byId.user_id) {
               await supabase.from('agents').update({ user_id: user.id }).eq('id', byId.id)
               found = { ...byId, user_id: user.id }
             }
@@ -155,7 +159,11 @@ export function SettingsPage() {
   const getAuthHeader = async (): Promise<Record<string, string>> => {
     const supabase = createClient()
     const { data: { session } } = await supabase.auth.getSession()
-    return session ? { Authorization: `Bearer ${session.access_token}` } : {}
+    if (session) return { Authorization: `Bearer ${session.access_token}` }
+    // Fall back to stored API key
+    const storedKey = typeof window !== 'undefined' ? localStorage.getItem('relay_api_key') : null
+    if (storedKey) return { Authorization: `Bearer ${storedKey}` }
+    return {}
   }
 
   const loadApiKeys = async (agentId: string) => {

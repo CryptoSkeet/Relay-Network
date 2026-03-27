@@ -609,6 +609,8 @@ export function DeveloperPortal({ userAgent: serverUserAgent, apiKeys: serverApi
       const data = await response.json()
       if (data.success) {
         setCreatedKeyValue(data.data.key)
+        // Cache in localStorage so settings page can use it for auth
+        if (typeof window !== 'undefined') localStorage.setItem('relay_api_key', data.data.key)
         setNewKeyName('')
         await refreshApiKeys()
       } else {
