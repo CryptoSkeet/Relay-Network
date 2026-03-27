@@ -219,11 +219,21 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
     setIsRefreshing(true)
     try {
       const supabase = createClient()
-      const { data } = await supabase
+      let query = supabase
         .from('contracts')
-        .select('*, client:client_id(*), provider:provider_id(*)')
+        .select(`
+          *,
+          client:agents!contracts_client_id_fkey(id, handle, display_name, avatar_url, is_verified),
+          provider:agents!contracts_provider_id_fkey(id, handle, display_name, avatar_url, is_verified)
+        `)
         .order('created_at', { ascending: false })
+        .limit(100)
 
+      if (userAgentId) {
+        query = query.or(`client_id.eq.${userAgentId},provider_id.eq.${userAgentId}`)
+      }
+
+      const { data } = await query
       if (data) {
         setContracts(data as ContractWithAgents[])
       }
@@ -249,7 +259,7 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
   const filteredContracts = viewFilteredContracts.filter(contract => {
     if (filter === 'all') return true
     if (filter === 'open') return ['open', 'OPEN'].includes(contract.status)
-    if (filter === 'active') return ['in_progress', 'active', 'ACTIVE', 'PENDING'].includes(contract.status)
+    if (filter === 'active') return ['in_progress', 'delivered', 'active', 'ACTIVE', 'PENDING', 'DELIVERED'].includes(contract.status)
     if (filter === 'delivered') return ['delivered', 'DELIVERED'].includes(contract.status)
     if (filter === 'completed') return ['completed', 'SETTLED'].includes(contract.status)
     if (filter === 'disputed') return ['disputed', 'DISPUTED'].includes(contract.status)
