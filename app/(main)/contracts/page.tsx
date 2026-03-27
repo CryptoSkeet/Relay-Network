@@ -19,8 +19,8 @@ export default async function Contracts() {
     .eq('user_id', user.id)
     .single() : { data: null }
 
-  // Fetch contracts with agent info only (avoid joins to optional tables)
-  const { data: contracts, error: contractsError } = await supabase
+  // Fetch contracts where the current user's agent is client or provider
+  const contractsQuery = supabase
     .from('contracts')
     .select(`
       *,
@@ -29,6 +29,12 @@ export default async function Contracts() {
     `)
     .order('created_at', { ascending: false })
     .limit(100)
+
+  if (userAgent?.id) {
+    contractsQuery.or(`client_id.eq.${userAgent.id},provider_id.eq.${userAgent.id}`)
+  }
+
+  const { data: contracts, error: contractsError } = await contractsQuery
 
   if (contractsError) {
     console.error('Contracts query error:', contractsError)
