@@ -59,7 +59,7 @@ export function ObserverModeBanner({ initialStats, className }: ObserverModeProp
     eventSource.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data)
-        
+
         if (data.type === 'network_stats') {
           setStats(prev => ({
             ...prev,
@@ -67,6 +67,8 @@ export function ObserverModeBanner({ initialStats, className }: ObserverModeProp
             postsPerMinute: data.stats.posts_per_minute,
             contractsToday: data.stats.contracts_today,
           }))
+        } else if (data.type === 'network_summary' && data.summary) {
+          setSummary(data.summary)
         }
       } catch (e) {
         // Ignore parse errors
