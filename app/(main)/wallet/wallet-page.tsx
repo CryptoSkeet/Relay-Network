@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { 
   Wallet as WalletIcon, ArrowUpRight, ArrowDownLeft, TrendingUp, Lock, Coins, 
   Send, Plus, History, Zap, Gift, CreditCard, LineChart, Sparkles,
-  Timer, Target, CheckCircle2, AlertCircle, Loader2, ChevronRight
+  Timer, Target, CheckCircle2, AlertCircle, Loader2, ChevronRight, ArrowRightLeft, ExternalLink
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -13,6 +13,8 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Slider } from '@/components/ui/slider'
 import { Progress } from '@/components/ui/progress'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 import { AgentAvatar } from '@/components/relay/agent-avatar'
 import { SolanaHoldings } from '@/components/relay/solana-holdings'
 import { WalletKeys } from '@/components/relay/wallet-keys'
@@ -122,6 +124,21 @@ export function WalletPage({
   const [activeTab, setActiveTab] = useState('overview')
   const [isClient, setIsClient] = useState(false)
 
+  // Send modal state
+  const [showSendModal, setShowSendModal] = useState(false)
+  const [sendRecipient, setSendRecipient] = useState('')
+  const [sendAmount, setSendAmount] = useState('')
+  const [isSending, setIsSending] = useState(false)
+  const [sendResult, setSendResult] = useState<{ success: boolean; message: string; explorer?: string } | null>(null)
+
+  // Swap state
+  const [swapDirection, setSwapDirection] = useState<'relay_to_sol' | 'sol_to_relay'>('relay_to_sol')
+  const [swapAmount, setSwapAmount] = useState('')
+  const [swapQuote, setSwapQuote] = useState<any>(null)
+  const [isQuoting, setIsQuoting] = useState(false)
+  const [isSwapping, setIsSwapping] = useState(false)
+  const [swapResult, setSwapResult] = useState<{ success: boolean; message: string; explorer?: string } | null>(null)
+
   // Ensure consistent rendering between server and client
   useEffect(() => {
     setIsClient(true)
@@ -201,6 +218,98 @@ export function WalletPage({
     }
   }
 
+  const handleSend = async () => {
+    if (!sendRecipient.trim() || !sendAmount || Number(sendAmount) <= 0) return
+    setIsSending(true)
+    setSendResult(null)
+    try {
+      const recipient = sendRecipient.trim()
+      const isAddress = recipient.length >= 32 && !recipient.startsWith('@')
+      const payload: Record<string, any> = { amount: Number(sendAmount) }
+      if (isAddress) {
+        payload.recipient_address = recipient
+      } else {
+        payload.recipient_handle = recipient.replace(/^@/, '')
+      }
+
+      const res = await fetch('/api/v1/wallet/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setSendResult({ success: true, message: `Sent ${sendAmount} RELAY`, explorer: data.explorer })
+        router.refresh()
+      } else {
+        setSendResult({ success: false, message: data.error || 'Transfer failed' })
+      }
+    } catch (err: any) {
+      setSendResult({ success: false, message: err.message || 'Transfer failed' })
+    } finally {
+      setIsSending(false)
+    }
+  }
+
+  const fetchSwapQuote = useCallback(async () => {
+    if (!swapAmount || Number(swapAmount) <= 0) {
+      setSwapQuote(null)
+      return
+    }
+    setIsQuoting(true)
+    setSwapQuote(null)
+    try {
+      const res = await fetch(`/api/v1/wallet/swap?direction=${swapDirection}&amount=${swapAmount}`)
+      const data = await res.json()
+      if (data.success) {
+        setSwapQuote(data.quote)
+      } else {
+        setSwapQuote({ error: data.error, hint: data.hint })
+      }
+    } catch {
+      setSwapQuote({ error: 'Failed to fetch quote' })
+    } finally {
+      setIsQuoting(false)
+    }
+  }, [swapDirection, swapAmount])
+
+  // Debounced quote fetch
+  useEffect(() => {
+    if (!swapAmount || Number(swapAmount) <= 0) return
+    const timeout = setTimeout(fetchSwapQuote, 500)
+    return () => clearTimeout(timeout)
+  }, [fetchSwapQuote, swapAmount])
+
+  const handleSwap = async () => {
+    if (!swapAmount || Number(swapAmount) <= 0) return
+    setIsSwapping(true)
+    setSwapResult(null)
+    try {
+      const res = await fetch('/api/v1/wallet/swap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ direction: swapDirection, amount: Number(swapAmount) }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setSwapResult({
+          success: true,
+          message: `Swapped ${data.input.amount} ${data.input.token} → ${data.output.amount} ${data.output.token}`,
+          explorer: data.explorer,
+        })
+        setSwapAmount('')
+        setSwapQuote(null)
+        router.refresh()
+      } else {
+        setSwapResult({ success: false, message: data.error || 'Swap failed' })
+      }
+    } catch (err: any) {
+      setSwapResult({ success: false, message: err.message || 'Swap failed' })
+    } finally {
+      setIsSwapping(false)
+    }
+  }
+
   // Generate chart data from transactions - only on client to avoid hydration mismatch
   const chartData = useMemo(() => {
     if (!isClient) {
@@ -251,9 +360,13 @@ export function WalletPage({
             <p className="text-muted-foreground text-sm hidden sm:block">Manage your tokens, stake for reputation, earn rewards</p>
           </div>
           <div className="flex gap-2 shrink-0">
-            <Button variant="outline" size="sm" className="gap-2">
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => { setSendResult(null); setShowSendModal(true) }}>
               <Send className="w-4 h-4" />
               <span className="hidden sm:inline">Send</span>
+            </Button>
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => setActiveTab('swap')}>
+              <ArrowRightLeft className="w-4 h-4" />
+              <span className="hidden sm:inline">Swap</span>
             </Button>
             <Button
               size="sm"
@@ -309,10 +422,14 @@ export function WalletPage({
       {/* Content */}
       <div className="p-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid grid-cols-3 sm:grid-cols-6 w-full">
+          <TabsList className="grid grid-cols-4 sm:grid-cols-7 w-full">
             <TabsTrigger value="overview">
               <LineChart className="w-4 h-4 mr-2" />
               Overview
+            </TabsTrigger>
+            <TabsTrigger value="swap">
+              <ArrowRightLeft className="w-4 h-4 mr-2" />
+              Swap
             </TabsTrigger>
             <TabsTrigger value="stake">
               <Lock className="w-4 h-4 mr-2" />
@@ -423,6 +540,147 @@ export function WalletPage({
                     </div>
                   ))}
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Swap Tab */}
+          <TabsContent value="swap" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ArrowRightLeft className="w-5 h-5 text-primary" />
+                  Swap Tokens
+                </CardTitle>
+                <CardDescription>
+                  Swap between RELAY and SOL using Jupiter aggregator
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Direction toggle */}
+                <div className="flex items-center gap-4">
+                  <div className="flex-1 p-4 rounded-lg bg-muted/50 border">
+                    <p className="text-xs text-muted-foreground mb-1">You send</p>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        placeholder="0.00"
+                        value={swapAmount}
+                        onChange={(e) => setSwapAmount(e.target.value)}
+                        className="border-0 bg-transparent text-2xl font-bold p-0 h-auto focus-visible:ring-0"
+                        min="0"
+                        step="any"
+                      />
+                      <Badge variant="secondary" className="text-sm shrink-0">
+                        {swapDirection === 'relay_to_sol' ? 'RELAY' : 'SOL'}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="rounded-full shrink-0"
+                    onClick={() => {
+                      setSwapDirection(d => d === 'relay_to_sol' ? 'sol_to_relay' : 'relay_to_sol')
+                      setSwapQuote(null)
+                      setSwapResult(null)
+                    }}
+                  >
+                    <ArrowRightLeft className="w-4 h-4" />
+                  </Button>
+
+                  <div className="flex-1 p-4 rounded-lg bg-muted/50 border">
+                    <p className="text-xs text-muted-foreground mb-1">You receive</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-2xl font-bold flex-1">
+                        {isQuoting ? (
+                          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                        ) : swapQuote?.output_amount != null ? (
+                          swapQuote.output_amount.toFixed(swapDirection === 'relay_to_sol' ? 6 : 2)
+                        ) : (
+                          <span className="text-muted-foreground">0.00</span>
+                        )}
+                      </p>
+                      <Badge variant="secondary" className="text-sm shrink-0">
+                        {swapDirection === 'relay_to_sol' ? 'SOL' : 'RELAY'}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quote details */}
+                {swapQuote && !swapQuote.error && (
+                  <div className="p-4 rounded-lg bg-primary/5 border border-primary/20 space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Rate</span>
+                      <span>1 {swapQuote.input_token} ≈ {(swapQuote.output_amount / swapQuote.input_amount).toFixed(6)} {swapQuote.output_token}</span>
+                    </div>
+                    {swapQuote.price_impact_pct && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Price impact</span>
+                        <span className={Number(swapQuote.price_impact_pct) > 1 ? 'text-red-500' : 'text-green-500'}>
+                          {Number(swapQuote.price_impact_pct).toFixed(2)}%
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Slippage tolerance</span>
+                      <span>{(swapQuote.slippage_bps / 100).toFixed(1)}%</span>
+                    </div>
+                    {swapQuote.route_plan?.length > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Route</span>
+                        <span>{swapQuote.route_plan.join(' → ')}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Error / no-route message */}
+                {swapQuote?.error && (
+                  <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm text-destructive font-medium">{swapQuote.error}</p>
+                        {swapQuote.hint && <p className="text-xs text-muted-foreground mt-1">{swapQuote.hint}</p>}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Swap result */}
+                {swapResult && (
+                  <div className={cn(
+                    'p-4 rounded-lg border',
+                    swapResult.success ? 'bg-green-500/10 border-green-500/20' : 'bg-destructive/10 border-destructive/20'
+                  )}>
+                    <div className="flex items-center gap-2">
+                      {swapResult.success ? <CheckCircle2 className="w-4 h-4 text-green-500" /> : <AlertCircle className="w-4 h-4 text-destructive" />}
+                      <p className="text-sm font-medium">{swapResult.message}</p>
+                    </div>
+                    {swapResult.explorer && (
+                      <a href={swapResult.explorer} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1 mt-2">
+                        <ExternalLink className="w-3 h-3" /> View on Solscan
+                      </a>
+                    )}
+                  </div>
+                )}
+
+                {/* Swap button */}
+                <Button
+                  className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                  size="lg"
+                  onClick={handleSwap}
+                  disabled={isSwapping || !swapAmount || Number(swapAmount) <= 0 || !!swapQuote?.error || isQuoting}
+                >
+                  {isSwapping ? (
+                    <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Swapping...</>
+                  ) : (
+                    <><ArrowRightLeft className="w-4 h-4 mr-2" /> Swap {swapDirection === 'relay_to_sol' ? 'RELAY → SOL' : 'SOL → RELAY'}</>
+                  )}
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>
@@ -792,6 +1050,80 @@ export function WalletPage({
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Send RELAY Dialog */}
+      <Dialog open={showSendModal} onOpenChange={setShowSendModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Send className="w-5 h-5" />
+              Send RELAY
+            </DialogTitle>
+            <DialogDescription>
+              Send RELAY tokens to another agent by handle or wallet address
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Recipient</label>
+              <Input
+                placeholder="@handle or Solana wallet address"
+                value={sendRecipient}
+                onChange={(e) => setSendRecipient(e.target.value)}
+                disabled={isSending}
+              />
+              <p className="text-xs text-muted-foreground">
+                Enter an agent handle (e.g. @agent_name) or a Solana wallet address
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Amount (RELAY)</label>
+              <Input
+                type="number"
+                placeholder="0.00"
+                value={sendAmount}
+                onChange={(e) => setSendAmount(e.target.value)}
+                min="0"
+                step="any"
+                disabled={isSending}
+              />
+            </div>
+
+            {sendResult && (
+              <div className={cn(
+                'p-3 rounded-lg border text-sm',
+                sendResult.success ? 'bg-green-500/10 border-green-500/20' : 'bg-destructive/10 border-destructive/20'
+              )}>
+                <div className="flex items-center gap-2">
+                  {sendResult.success ? <CheckCircle2 className="w-4 h-4 text-green-500" /> : <AlertCircle className="w-4 h-4 text-destructive" />}
+                  <span>{sendResult.message}</span>
+                </div>
+                {sendResult.explorer && (
+                  <a href={sendResult.explorer} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1 mt-2">
+                    <ExternalLink className="w-3 h-3" /> View on Solscan
+                  </a>
+                )}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSendModal(false)} disabled={isSending}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSend}
+              disabled={isSending || !sendRecipient.trim() || !sendAmount || Number(sendAmount) <= 0}
+              className="gap-2"
+            >
+              {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              {isSending ? 'Sending...' : 'Send RELAY'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
