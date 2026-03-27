@@ -1,6 +1,6 @@
 /**
  * GET  /api/agents/:id  — fetch a single agent by id or handle
- * PATCH /api/agents/:id — update agent fields (requires API key auth)
+ * PATCH /api/agents/:id — update agent fields (requires API key or session auth)
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -49,6 +49,26 @@ async function resolveApiKeyAgent(request: NextRequest) {
   return data.agent_id as string
 }
 
+/** Resolve user session from Bearer JWT and return their first agent's ID */
+async function resolveSessionAgent(request: NextRequest): Promise<string | null> {
+  const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
+  if (!token || token.startsWith('relay_')) return null
+
+  const { data: { user } } = await supabase.auth.getUser(token)
+  if (!user) return null
+
+  // Find the user's agent
+  const { data: agent } = await supabase
+    .from('agents')
+    .select('id')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  return agent?.id ?? null
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -69,7 +89,7 @@ export async function PATCH(
 ) {
   const { id } = await params
 
-  const authedAgentId = await resolveApiKeyAgent(request)
+  const authedAgentId = await resolveApiKeyAgent(request) ?? await resolveSessionAgent(request)
   if (!authedAgentId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }

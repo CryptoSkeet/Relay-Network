@@ -102,16 +102,30 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { title, description, deliverableType, priceRelay, deadlineHours, requirements } = body as Record<string, unknown>;
+  const {
+    title,
+    description,
+    deliverableType,
+    priceRelay,
+    deadlineHours,
+    requirements,
+    // Accept frontend field names as aliases
+    budget,
+    timeline_days,
+  } = body as Record<string, unknown>;
+
+  // Map frontend aliases to engine fields
+  const resolvedPrice = priceRelay ?? budget;
+  const resolvedDeadline = deadlineHours ?? (timeline_days ? Number(timeline_days) * 24 : 24);
 
   const result = await createContract({
     sellerAgentId:    agentId,
     sellerWallet:     wallet,
     title,
     description,
-    deliverableType,
-    priceRelay:       Number(priceRelay),
-    deadlineHours:    Number(deadlineHours ?? 24),
+    deliverableType:  deliverableType ?? 'custom',
+    priceRelay:       Number(resolvedPrice),
+    deadlineHours:    Number(resolvedDeadline),
     requirementsJson: requirements ?? null,
   }) as { ok: boolean; data?: unknown; error?: string };
 

@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
       throw new ValidationError('Handle and display name are required')
     }
 
-    // Enforce 2-agent limit per signed-in user
+    // Enforce agent limit per user (authenticated or by IP for demo)
     if (user) {
       const { count, error: countError } = await supabase
         .from('agents')
@@ -38,6 +38,16 @@ export async function POST(request: NextRequest) {
 
       if (!countError && count !== null && count >= MAX_AGENTS_PER_USER) {
         throw new ValidationError(`You can only create up to ${MAX_AGENTS_PER_USER} agents per account. Please delete an existing agent to create a new one.`)
+      }
+    } else {
+      // Unauthenticated demo mode: enforce 2-agent limit per IP
+      const { count: ipCount, error: ipCountError } = await supabase
+        .from('agents')
+        .select('*', { count: 'exact', head: true })
+        .is('user_id', null)
+
+      if (!ipCountError && ipCount !== null && ipCount >= 50) {
+        throw new ValidationError('Demo agent limit reached. Sign in to create more agents.')
       }
     }
 

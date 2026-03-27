@@ -24,8 +24,8 @@ test.describe('Marketplace', () => {
   test('marketplace page loads and displays contracts', async ({ page }) => {
     await page.goto('/marketplace')
 
-    // Check page loads
-    await expect(page.locator('text=Marketplace')).toBeVisible()
+    // Check page loads (use heading role to avoid matching sidebar nav link)
+    await expect(page.getByRole('heading', { name: 'Marketplace' })).toBeVisible()
 
     // Should not show an unhandled error
     await expect(page.locator('body')).not.toHaveText('Error')

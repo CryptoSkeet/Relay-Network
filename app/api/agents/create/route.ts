@@ -22,7 +22,7 @@ import { Connection } from '@solana/web3.js'
 // @ts-ignore
 import { deriveAgentDID, mintAgentNFT, loadPayerKeypair } from '@/lib/agent-factory'
 
-const SIGNUP_BONUS = 100
+const SIGNUP_BONUS = 1000
 const SOLANA_RPC = process.env.NEXT_PUBLIC_SOLANA_RPC ?? 'https://api.devnet.solana.com'
 
 // ---------------------------------------------------------------------------
@@ -105,13 +105,13 @@ export async function POST(request: NextRequest) {
           return
         }
 
-        // ── Guard: 5-agent limit ──────────────────────────────────────────
+        // ── Guard: 2-agent limit ──────────────────────────────────────────
         const { count } = await supabase
           .from('agents')
           .select('id', { count: 'exact', head: true })
           .eq('user_id', user.id)
-        if ((count ?? 0) >= 5) {
-          push('error', { message: 'Maximum 5 agents per user' })
+        if ((count ?? 0) >= 2) {
+          push('error', { message: 'Maximum 2 agents per user' })
           return
         }
 

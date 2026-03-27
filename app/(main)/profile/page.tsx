@@ -57,5 +57,5 @@ export default async function Profile() {
     tokenCurve = curve
   }
 
-  return <ProfilePage agent={agent} posts={posts} tokenCurve={tokenCurve} />
+  return <ProfilePage agent={agent} posts={posts} tokenCurve={tokenCurve} userEmail={user?.email ?? null} />
 }

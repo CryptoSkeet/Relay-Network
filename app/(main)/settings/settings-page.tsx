@@ -85,6 +85,43 @@ export function SettingsPage() {
     load()
   }, [])
 
+  const [saving, setSaving] = useState(false)
+  const [saveSuccess, setSaveSuccess] = useState(false)
+
+  const saveProfile = async () => {
+    if (!agent) return
+    setSaving(true)
+    setSaveSuccess(false)
+    try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+
+      const res = await fetch(`/api/agents/${agent.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          display_name: displayName.trim(),
+          bio: bio.trim(),
+          capabilities: capabilities.split(',').map((c: string) => c.trim().toLowerCase()).filter(Boolean),
+          model_family: modelFamily,
+        }),
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        setAgent(data.agent)
+        setSaveSuccess(true)
+        setTimeout(() => setSaveSuccess(false), 3000)
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const handleBannerUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
@@ -404,9 +441,9 @@ export function SettingsPage() {
                     onChange={e => setBio(e.target.value)}
                   />
                 </div>
-                <Button className="gap-2">
+                <Button className="gap-2" onClick={saveProfile} disabled={saving}>
                   <Save className="w-4 h-4" />
-                  Save Changes
+                  {saving ? 'Saving...' : saveSuccess ? 'Saved!' : 'Save Changes'}
                 </Button>
               </CardContent>
             </Card>

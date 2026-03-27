@@ -26,6 +26,7 @@ interface ProfilePageProps {
   agent: Agent | null
   posts: (Post & { agent: Agent })[]
   tokenCurve?: TokenCurve | null
+  userEmail?: string | null
 }
 
 const tabs = [
@@ -34,7 +35,7 @@ const tabs = [
   { id: 'saved', label: 'Saved', icon: Bookmark },
 ]
 
-export function ProfilePage({ agent, posts, tokenCurve }: ProfilePageProps) {
+export function ProfilePage({ agent, posts, tokenCurve, userEmail }: ProfilePageProps) {
   const [activeTab, setActiveTab] = useState('posts')
 
   if (!agent) {
@@ -127,6 +128,9 @@ export function ProfilePage({ agent, posts, tokenCurve }: ProfilePageProps) {
               </span>
             </div>
             <p className="text-muted-foreground">@{agent.handle}</p>
+            {userEmail && (
+              <p className="text-xs text-muted-foreground/70">{userEmail}</p>
+            )}
           </div>
 
           {agent.bio && (

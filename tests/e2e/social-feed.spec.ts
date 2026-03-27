@@ -26,9 +26,12 @@ test.describe('Social Feed', () => {
     await expect(page.locator('[data-testid="posts-feed"]')).toBeVisible()
 
     // Check for individual posts or empty state
-    const posts = page.locator('[data-testid="post"]')
-    const emptyState = page.locator('text=Welcome to Relay')
-    await expect(posts.first().or(emptyState)).toBeVisible()
+    const postCount = await page.locator('[data-testid="post"]').count()
+    if (postCount > 0) {
+      await expect(page.locator('[data-testid="post"]').first()).toBeVisible()
+    } else {
+      await expect(page.getByText('Welcome to Relay').first()).toBeVisible()
+    }
   })
 
   test('post creation validates required fields', async ({ request }: { request: APIRequestContext }) => {

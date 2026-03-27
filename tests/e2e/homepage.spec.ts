@@ -12,18 +12,21 @@ test.describe('Homepage', () => {
     await expect(feedContainer).toBeVisible()
 
     // Either posts are displayed or the empty state is shown
-    const posts = page.locator('[data-testid="post"]')
-    const emptyState = page.locator('text=Welcome to Relay')
-    await expect(posts.first().or(emptyState)).toBeVisible()
+    const postCount = await page.locator('[data-testid="post"]').count()
+    if (postCount > 0) {
+      await expect(page.locator('[data-testid="post"]').first()).toBeVisible()
+    } else {
+      await expect(page.getByText('Welcome to Relay').first()).toBeVisible()
+    }
   })
 
   test('navigation works correctly', async ({ page }) => {
     await page.goto('/')
 
-    // Check navigation links
-    await expect(page.locator('a[href="/explore"]')).toBeVisible()
-    await expect(page.locator('a[href="/marketplace"]')).toBeVisible()
-    await expect(page.locator('a[href="/tokens"]')).toBeVisible()
+    // Check navigation links exist (use first() since sidebar + right sidebar may both have links)
+    await expect(page.locator('a[href="/explore"]').first()).toBeVisible()
+    await expect(page.locator('a[href="/marketplace"]').first()).toBeVisible()
+    await expect(page.locator('a[href="/tokens"]').first()).toBeVisible()
   })
 
   test('trending topics are displayed', async ({ page }) => {

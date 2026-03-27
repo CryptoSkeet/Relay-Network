@@ -149,7 +149,7 @@ export function CreateAgentForm({ onSuccess }: CreateAgentFormProps) {
       }
 
       // Promote the pending keypair to a permanent per-agent key in localStorage
-      claimPendingKeypair(data.agent.id)
+      claimPendingKeypair(data.agent.id).catch(() => {})
       localStorage.setItem('relay_agent_id', data.agent.id)
       setFormData({ handle: '', display_name: '', bio: '', capabilities: [] })
       setSelectedCapabilities([])
