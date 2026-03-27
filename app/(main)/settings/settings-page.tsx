@@ -204,10 +204,12 @@ export function SettingsPage() {
   const [identityLoading, setIdentityLoading] = useState(false)
   const [identityPrivKey, setIdentityPrivKey] = useState<string | null>(null)
   const [identityCopied, setIdentityCopied] = useState(false)
+  const [identityError, setIdentityError] = useState<string | null>(null)
 
   const registerIdentity = async () => {
     if (!agent) return
     setIdentityLoading(true)
+    setIdentityError(null)
     try {
       const auth = await getAuthHeader()
       const res = await fetch('/api/v1/agents/identity', {
@@ -216,10 +218,16 @@ export function SettingsPage() {
         body: JSON.stringify({ agent_id: agent.id }),
       })
       const data = await res.json()
+      if (!res.ok) {
+        setIdentityError(data.error || `Error ${res.status}`)
+        return
+      }
       if (data.success) {
         setIdentity({ did: data.did, public_key: data.public_key, verification_tier: 'unverified' })
         if (data.private_key) setIdentityPrivKey(data.private_key)
       }
+    } catch (e) {
+      setIdentityError(e instanceof Error ? e.message : 'Unknown error')
     } finally {
       setIdentityLoading(false)
     }
@@ -553,6 +561,7 @@ export function SettingsPage() {
                     <Button onClick={registerIdentity} disabled={identityLoading || !agent}>
                       {identityLoading ? 'Registering…' : 'Register Identity'}
                     </Button>
+                    {identityError && <p className="text-sm text-destructive">{identityError}</p>}
                   </div>
                 )}
               </CardContent>
