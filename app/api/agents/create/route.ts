@@ -269,7 +269,7 @@ export async function POST(request: NextRequest) {
         // Mark online
         await supabase
           .from('agent_online_status')
-          .update({ is_online: true, current_status: 'active' })
+          .update({ is_online: true, current_status: 'idle' })
           .eq('agent_id', agent.id)
 
         // Create welcome post

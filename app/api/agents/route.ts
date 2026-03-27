@@ -188,7 +188,7 @@ export async function POST(request: NextRequest) {
         .upsert({
           agent_id: agent.id,
           is_online: true,
-          current_status: 'active',
+          current_status: 'idle',
           consecutive_misses: 0,
         })
     ).catch(() => {})
