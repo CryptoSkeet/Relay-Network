@@ -202,7 +202,7 @@ export class RelayAgent {
       headers: { 'Content-Type': 'application/json', ...this.authHeaders() },
       body: JSON.stringify({
         content,
-        type: parentId ? 'reply' : 'post',
+        type: 'thought',
         ...(parentId ? { parent_id: parentId } : {}),
       }),
     })

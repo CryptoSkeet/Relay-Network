@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Settings, User, Bell, Shield, Palette, Wallet, Key, LogOut, Save, Moon, Sun, Monitor, Image as ImageIcon, Zap } from 'lucide-react'
+import { Settings, User, Bell, Shield, Palette, Wallet, Key, Save, Moon, Sun, Monitor, Image as ImageIcon, Zap, LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -85,6 +85,11 @@ export function SettingsPage() {
         if (w) setWallet(w)
 
         await loadApiKeys(found.id)
+
+        // Load existing identity
+        const idRes = await fetch(`/api/v1/agents/identity?agent_id=${found.id}`)
+        const idData = await idRes.json()
+        if (idData.identity) setIdentity(idData.identity)
       }
     }
     load()
@@ -191,6 +196,32 @@ export function SettingsPage() {
       await loadApiKeys(agent.id)
     } finally {
       setRevokingId(null)
+    }
+  }
+
+  // Identity state
+  const [identity, setIdentity] = useState<{ did: string; public_key: string; verification_tier: string } | null>(null)
+  const [identityLoading, setIdentityLoading] = useState(false)
+  const [identityPrivKey, setIdentityPrivKey] = useState<string | null>(null)
+  const [identityCopied, setIdentityCopied] = useState(false)
+
+  const registerIdentity = async () => {
+    if (!agent) return
+    setIdentityLoading(true)
+    try {
+      const auth = await getAuthHeader()
+      const res = await fetch('/api/v1/agents/identity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...auth },
+        body: JSON.stringify({ agent_id: agent.id }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setIdentity({ did: data.did, public_key: data.public_key, verification_tier: 'unverified' })
+        if (data.private_key) setIdentityPrivKey(data.private_key)
+      }
+    } finally {
+      setIdentityLoading(false)
     }
   }
 
@@ -482,6 +513,48 @@ export function SettingsPage() {
                     <option value="custom">Custom</option>
                   </select>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Cryptographic Identity */}
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Shield className="w-4 h-4" /> Cryptographic Identity</CardTitle>
+                <CardDescription>Your agent&apos;s DID and Ed25519 signing key for the Relay network</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {identity ? (
+                  <>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wide">DID</Label>
+                      <code className="block text-xs font-mono bg-muted p-2 rounded break-all">{identity.did}</code>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wide">Public Key</Label>
+                      <code className="block text-xs font-mono bg-muted p-2 rounded break-all">{identity.public_key}</code>
+                    </div>
+                    {identityPrivKey && (
+                      <div className="p-4 rounded-lg border border-yellow-500/30 bg-yellow-500/5 space-y-2">
+                        <p className="text-xs font-semibold text-yellow-400 uppercase tracking-wide">Save your private key — shown once</p>
+                        <code className="block text-xs font-mono bg-muted p-2 rounded break-all select-all">{identityPrivKey}</code>
+                        <Button size="sm" variant="outline" onClick={() => {
+                          navigator.clipboard.writeText(identityPrivKey)
+                          setIdentityCopied(true)
+                          setTimeout(() => setIdentityCopied(false), 2000)
+                        }}>
+                          {identityCopied ? 'Copied!' : 'Copy Private Key'}
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">No cryptographic identity found. Register to get a DID and signing keypair.</p>
+                    <Button onClick={registerIdentity} disabled={identityLoading || !agent}>
+                      {identityLoading ? 'Registering…' : 'Register Identity'}
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
