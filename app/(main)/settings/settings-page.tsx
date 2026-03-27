@@ -44,14 +44,12 @@ export function SettingsPage() {
       if (!user) return
       setUserEmail(user.email ?? null)
 
-      // 1. Try to find agent by user_id
       let found: any = null
       const { data: byUser } = await supabase
         .from('agents').select('*').eq('user_id', user.id)
         .order('created_at', { ascending: false }).limit(1).maybeSingle()
       found = byUser ?? null
 
-      // 2. Fallback: check localStorage for relay_agent_id (set by create-agent form)
       if (!found) {
         const localAgentId = typeof window !== 'undefined' ? localStorage.getItem('relay_agent_id') : null
         if (localAgentId) {
@@ -190,7 +188,7 @@ export function SettingsPage() {
   }
 
   const [heartbeatEnabled,  setHeartbeatEnabled]  = useState(false)
-  const [heartbeatInterval, setHeartbeatInterval] = useState(60)   // minutes
+  const [heartbeatInterval, setHeartbeatInterval] = useState(60)
   const [hbSaving, setHbSaving] = useState(false)
   const [hbSaved,  setHbSaved]  = useState(false)
   const [hbError,  setHbError]  = useState<string | null>(null)
@@ -373,12 +371,9 @@ export function SettingsPage() {
                   </div>
                 </div>
 
-                {/* Preview */}
                 <div
                   className="h-32 rounded-xl border overflow-hidden"
-                  style={{
-                    background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})`,
-                  }}
+                  style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})` }}
                 />
               </div>
 
@@ -394,6 +389,7 @@ export function SettingsPage() {
         </div>
       )
     }
+
     switch (activeSection) {
       case 'profile':
         return (
@@ -697,7 +693,6 @@ export function SettingsPage() {
       case 'api-keys':
         return (
           <div className="space-y-6">
-            {/* Create new key */}
             <Card className="glass-card">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><Key className="w-4 h-4" /> API Keys</CardTitle>
@@ -726,7 +721,6 @@ export function SettingsPage() {
                     </div>
                     {keyError && <p className="text-sm text-destructive">{keyError}</p>}
 
-                    {/* Show new key once */}
                     {createdKey && (
                       <div className="p-4 rounded-lg border border-green-500/30 bg-green-500/5 space-y-2">
                         <p className="text-xs font-semibold text-green-400 uppercase tracking-wide">
@@ -745,7 +739,6 @@ export function SettingsPage() {
               </CardContent>
             </Card>
 
-            {/* Existing keys */}
             {apiKeys.length > 0 && (
               <Card className="glass-card">
                 <CardHeader>
@@ -788,7 +781,6 @@ export function SettingsPage() {
               </Card>
             )}
 
-            {/* SDK quickstart */}
             <Card className="glass-card">
               <CardHeader>
                 <CardTitle>SDK Quickstart</CardTitle>
@@ -907,7 +899,6 @@ pm2 save`}</pre>
 
   return (
     <div className="flex-1 max-w-4xl mx-auto">
-      {/* Header */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border p-4">
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <Settings className="w-6 h-6 text-primary" />
@@ -916,7 +907,6 @@ pm2 save`}</pre>
       </div>
 
       <div className="flex gap-6 p-4">
-        {/* Sidebar */}
         <aside className="w-56 shrink-0">
           <nav className="space-y-1">
             {settingsSections.map((section) => (
@@ -937,7 +927,6 @@ pm2 save`}</pre>
           </nav>
         </aside>
 
-        {/* Content */}
         <main className="flex-1">
           {renderSection()}
         </main>
