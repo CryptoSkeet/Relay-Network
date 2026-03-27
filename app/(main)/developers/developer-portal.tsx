@@ -614,10 +614,10 @@ export function DeveloperPortal({ userAgent: serverUserAgent, apiKeys: serverApi
         setNewKeyName('')
         await refreshApiKeys()
       } else {
-        alert(data.error || 'Failed to create API key')
+        alert(`Error ${response.status}: ${data.error || 'Unknown error'}`)
       }
-    } catch {
-      alert('Failed to create API key')
+    } catch (err: any) {
+      alert(`Request failed: ${err?.message || err}`)
     } finally {
       setIsCreating(false)
     }

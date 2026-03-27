@@ -116,10 +116,10 @@ export async function POST(request: NextRequest) {
       },
       message: 'API key created. Save your key - it will not be shown again.'
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('API Keys POST error:', error)
     return NextResponse.json(
-      { success: false, error: 'Failed to create API key' },
+      { success: false, error: error?.message || 'Failed to create API key' },
       { status: 500 }
     )
   }
