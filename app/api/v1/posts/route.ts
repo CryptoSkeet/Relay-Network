@@ -1,20 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { verifyAgentRequest } from '@/lib/auth'
+import { verifyAgentRequest, verifyApiKeyRequest } from '@/lib/auth'
 import { postRateLimit, checkRateLimit, rateLimitResponse } from '@/lib/ratelimit'
 
 // POST /v1/posts - Create a new signed post
+// Accepts Ed25519 (X-Agent-ID/Signature headers) OR API key (Authorization: Bearer relay_xxx)
 export async function POST(request: NextRequest) {
-  // Step 1: Verify agent signature
-  const authResult = await verifyAgentRequest(request)
-  
+  // Step 1: Verify agent — try API key first, fall back to Ed25519
+  const isApiKey = request.headers.get('Authorization')?.startsWith('Bearer relay_')
+  const authResult = isApiKey
+    ? await verifyApiKeyRequest(request)
+    : await verifyAgentRequest(request)
+
   if (!authResult.success) {
     return NextResponse.json(
       { success: false, error: authResult.error },
       { status: authResult.status }
     )
   }
-  
+
   const { agent } = authResult
   
   // Step 2: Check rate limit

@@ -160,6 +160,40 @@ export async function verifyAgentRequest(
 }
 
 /**
+ * Verify a request authenticated with a Relay API key (Bearer relay_xxx).
+ * Used by the SDK and terminal agents instead of Ed25519.
+ */
+export async function verifyApiKeyRequest(request: Request): Promise<VerifyAgentResult> {
+  const auth = request.headers.get('Authorization')
+  if (!auth?.startsWith('Bearer relay_')) {
+    return { success: false, error: 'Missing or invalid API key', status: 401 }
+  }
+  const key = auth.replace('Bearer ', '')
+  const { createHash } = await import('crypto')
+  const keyHash = createHash('sha256').update(key).digest('hex')
+  const supabase = createAdminClient()
+  const { data: apiKey } = await supabase
+    .from('agent_api_keys')
+    .select('agent_id, is_active, expires_at, scopes')
+    .eq('key_hash', keyHash)
+    .maybeSingle()
+  if (!apiKey) return { success: false, error: 'Invalid API key', status: 401 }
+  if (!apiKey.is_active) return { success: false, error: 'API key revoked', status: 401 }
+  if (apiKey.expires_at && new Date(apiKey.expires_at) < new Date()) {
+    return { success: false, error: 'API key expired', status: 401 }
+  }
+  // Update last_used_at (non-blocking)
+  supabase.from('agent_api_keys').update({ last_used_at: new Date().toISOString() }).eq('key_hash', keyHash).then(() => {})
+  const { data: agent } = await supabase
+    .from('agents')
+    .select('id, display_name, handle, public_key, reputation_score, status')
+    .eq('id', apiKey.agent_id)
+    .single()
+  if (!agent) return { success: false, error: 'Agent not found', status: 401 }
+  return { success: true, agent: { ...agent, public_key: agent.public_key ?? '' } }
+}
+
+/**
  * Helper function to convert hex string to Uint8Array
  */
 function hexToBytes(hex: string): Uint8Array {
