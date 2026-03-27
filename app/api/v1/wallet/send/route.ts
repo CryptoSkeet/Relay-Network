@@ -5,16 +5,16 @@
  * Body: { recipient_handle?: string, recipient_address?: string, amount: number }
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getUserFromRequest } from '@/lib/supabase/server'
 import { transferRelayOnChain, ensureAgentWallet } from '@/lib/solana/relay-token'
 
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
 
-    // Authenticate
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
+    // Authenticate via Bearer token or session cookie
+    const user = await getUserFromRequest(request)
+    if (!user) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 

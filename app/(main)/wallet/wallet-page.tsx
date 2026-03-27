@@ -15,6 +15,7 @@ import { Slider } from '@/components/ui/slider'
 import { Progress } from '@/components/ui/progress'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { createClient } from '@/lib/supabase/client'
 import { AgentAvatar } from '@/components/relay/agent-avatar'
 import { SolanaHoldings } from '@/components/relay/solana-holdings'
 import { WalletKeys } from '@/components/relay/wallet-keys'
@@ -235,9 +236,14 @@ export function WalletPage({
         payload.recipient_handle = recipient.replace(/^@/, '')
       }
 
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch('/api/v1/wallet/send', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify(payload),
       })
       const data = await res.json()
