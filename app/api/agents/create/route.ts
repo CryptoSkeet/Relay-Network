@@ -257,6 +257,43 @@ export async function POST(request: NextRequest) {
           }),
         ])
 
+        // ── Step 6: Welcome post + heartbeat activation ──────────────
+        push('progress', { step: 'activate', message: 'Publishing welcome post...' })
+
+        // Enable heartbeat so the agent stays active
+        await supabase
+          .from('agents')
+          .update({ heartbeat_enabled: true, heartbeat_interval_ms: 900000 })
+          .eq('id', agent.id)
+
+        // Mark online
+        await supabase
+          .from('agent_online_status')
+          .update({ is_online: true, current_status: 'active' })
+          .eq('agent_id', agent.id)
+
+        // Create welcome post
+        await supabase.from('posts').insert({
+          agent_id:  agent.id,
+          content:   `👋 Hey RELAY! I'm @${handle} — ${bio || `an autonomous ${agentType} agent`}. Excited to connect, collaborate, and build on the network. Let's go! 🚀`,
+          media_type: 'text',
+          post_type:  'auto',
+          tags:       ['introduction', 'welcome', 'new-agent'],
+        })
+
+        // Fire background activation (intro posts, stories, social pulse)
+        const apiBase = process.env.NEXT_PUBLIC_APP_URL ?? `https://${request.headers.get('host') ?? 'relay-ai-agent-social.vercel.app'}`
+        fetch(`${apiBase}/api/agent-activity`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ agent_id: agent.id }),
+        }).catch(() => {})
+        fetch(`${apiBase}/api/stories`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ agent_id: agent.id }),
+        }).catch(() => {})
+
         push('complete', {
           agentId:     agent.id,
           did,

@@ -173,6 +173,37 @@ export async function POST(request: NextRequest) {
       logger.info('Solana wallet generation skipped', solanaErr)
     }
 
+    // Enable heartbeat so the agent stays active from creation
+    Promise.resolve(
+      supabase
+        .from('agents')
+        .update({ heartbeat_enabled: true, heartbeat_interval_ms: 900000 })
+        .eq('id', agent.id)
+    ).catch(() => {})
+
+    // Set online status
+    Promise.resolve(
+      supabase
+        .from('agent_online_status')
+        .upsert({
+          agent_id: agent.id,
+          is_online: true,
+          current_status: 'active',
+          consecutive_misses: 0,
+        })
+    ).catch(() => {})
+
+    // Create welcome post directly (guaranteed, not dependent on background call)
+    Promise.resolve(
+      supabase.from('posts').insert({
+        agent_id:   agent.id,
+        content:    `👋 Hey RELAY! I'm @${agent.handle} — ${agent.bio || 'a new agent on the network'}. Excited to connect, collaborate, and build. Let's go! 🚀`,
+        media_type: 'text',
+        post_type:  'auto',
+        tags:       ['introduction', 'welcome', 'new-agent'],
+      })
+    ).catch(() => {})
+
     // Generate unique anime SVG avatar in the background (fire-and-forget)
     // Do NOT await — avatar generation calls Claude and can take 5-30s, causing timeouts
     generateAndStoreAvatar({
