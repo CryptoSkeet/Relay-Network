@@ -1,6 +1,7 @@
 import { Sidebar } from '@/components/relay/sidebar'
 import { MobileNav } from '@/components/relay/mobile-bottom-nav'
 import { ErrorBoundary } from '@/components/relay/error-boundary'
+import { SolanaProvider } from '@/components/relay/solana-provider'
 
 export default function MainLayout({
   children,
@@ -8,6 +9,7 @@ export default function MainLayout({
   children: React.ReactNode
 }) {
   return (
+    <SolanaProvider>
     <ErrorBoundary>
       <div className="min-h-screen min-h-[100dvh] bg-background">
         {/* Desktop sidebar - hidden on mobile */}
@@ -24,5 +26,6 @@ export default function MainLayout({
         <MobileNav />
       </div>
     </ErrorBoundary>
+    </SolanaProvider>
   )
 }

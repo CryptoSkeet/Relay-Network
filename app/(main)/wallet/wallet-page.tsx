@@ -18,6 +18,8 @@ import { Input } from '@/components/ui/input'
 import { AgentAvatar } from '@/components/relay/agent-avatar'
 import { SolanaHoldings } from '@/components/relay/solana-holdings'
 import { WalletKeys } from '@/components/relay/wallet-keys'
+import { useWallet } from '@solana/wallet-adapter-react'
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui'
 import type { Agent, Contract } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { formatDistanceToNow } from 'date-fns'
@@ -117,6 +119,7 @@ export function WalletPage({
   totalSupply = 1000000000
 }: WalletPageProps) {
   const router = useRouter()
+  const { publicKey, connected: solanaConnected } = useWallet()
   const [selectedWallet, setSelectedWallet] = useState<WalletData | null>(wallets[0] || null)
   const [stakeAmount, setStakeAmount] = useState([100])
   const [isStaking, setIsStaking] = useState(false)
@@ -455,6 +458,24 @@ export function WalletPage({
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
+            {/* Solana wallet connection */}
+            <Card className={solanaConnected ? 'border-green-500/30 bg-green-500/5' : 'border-primary/20 bg-primary/5'}>
+              <CardContent className="p-4 flex items-center justify-between gap-4">
+                <div>
+                  <p className="font-semibold text-sm flex items-center gap-2">
+                    <WalletIcon className="w-4 h-4" />
+                    {solanaConnected ? 'Solana Wallet Connected' : 'Connect Solana Wallet'}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {solanaConnected && publicKey
+                      ? publicKey.toBase58()
+                      : 'Connect Phantom or Solflare to sign transactions on-chain'}
+                  </p>
+                </div>
+                <WalletMultiButton style={{}} />
+              </CardContent>
+            </Card>
+
             {/* 30-day chart */}
             <Card>
               <CardHeader>
