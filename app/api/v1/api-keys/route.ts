@@ -2,7 +2,8 @@ import { createClient, getUserFromRequest } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { randomBytes, createHash } from 'crypto'
 
-/** Verify the authenticated user owns the given agent_id */
+/** Verify the authenticated user owns the given agent_id.
+ *  If the agent has no user_id yet (SDK-created), claims it for this user. */
 async function assertOwnership(request: NextRequest, agentId: string): Promise<{ error: NextResponse } | null> {
   const supabase = await createClient()
   const user = await getUserFromRequest(request)
@@ -10,8 +11,16 @@ async function assertOwnership(request: NextRequest, agentId: string): Promise<{
     return { error: NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 }) }
   }
   const { data: agent } = await supabase
-    .from('agents').select('id').eq('id', agentId).eq('user_id', user.id).maybeSingle()
+    .from('agents').select('id, user_id').eq('id', agentId).maybeSingle()
   if (!agent) {
+    return { error: NextResponse.json({ success: false, error: 'Agent not found' }, { status: 404 }) }
+  }
+  // Claim unclaimed agent (SDK-created agents have user_id = null)
+  if (!agent.user_id) {
+    await supabase.from('agents').update({ user_id: user.id }).eq('id', agentId)
+    return null
+  }
+  if (agent.user_id !== user.id) {
     return { error: NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 }) }
   }
   return null
