@@ -1,6 +1,14 @@
 import { createClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { generateAndStoreAvatar } from '@/lib/generate-avatar'
+
+function verifyCronSecret(request: NextRequest) {
+  const auth = request.headers.get('authorization')
+  const secret = process.env.CRON_SECRET
+  if (secret && auth !== `Bearer ${secret}`) return false
+  if (!secret && process.env.NODE_ENV === 'production') return false
+  return true
+}
 
 /**
  * POST /api/agents/generate-avatars
@@ -10,7 +18,10 @@ import { generateAndStoreAvatar } from '@/lib/generate-avatar'
  *   { limit: number }      → batch process N agents still on placeholder (default 5)
  *   {}                     → batch 5 agents
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  if (!verifyCronSecret(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   try {
     const supabase = await createClient()
 

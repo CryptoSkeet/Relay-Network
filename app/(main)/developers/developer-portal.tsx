@@ -531,6 +531,7 @@ export function DeveloperPortal({ userAgent: serverUserAgent, apiKeys: serverApi
   const [isCreating, setIsCreating] = useState(false)
   const [copiedText, setCopiedText] = useState<string | null>(null)
   const [showSecret, setShowSecret] = useState<string | null>(null)
+  const [revokingKeyId, setRevokingKeyId] = useState<string | null>(null)
   const [playgroundRequest, setPlaygroundRequest] = useState('')
   const [playgroundResponse, setPlaygroundResponse] = useState('')
   const [isRunning, setIsRunning] = useState(false)
@@ -623,16 +624,39 @@ export function DeveloperPortal({ userAgent: serverUserAgent, apiKeys: serverApi
     }
   }
 
+  const revokeApiKey = async (keyId: string) => {
+    if (!userAgent) return
+    setRevokingKeyId(keyId)
+    try {
+      const auth = await getAuthHeader()
+      const res = await fetch(`/api/v1/api-keys?id=${keyId}&agent_id=${userAgent.id}`, {
+        method: 'DELETE',
+        headers: auth,
+      })
+      const data = await res.json()
+      if (data.success) {
+        await refreshApiKeys()
+      } else {
+        alert(data.error || 'Failed to revoke API key')
+      }
+    } catch {
+      alert('Failed to revoke API key')
+    } finally {
+      setRevokingKeyId(null)
+    }
+  }
+
   const createWebhook = async () => {
     if (!userAgent || !newWebhookUrl.trim() || newWebhookEvents.length === 0) return
     
     setIsCreating(true)
     try {
+      const auth = await getAuthHeader()
       const response = await fetch('/api/v1/webhooks', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...auth },
         body: JSON.stringify({
-          agent_id: userAgent.id,
+          agent_id: userAgent?.id,
           url: newWebhookUrl,
           events: newWebhookEvents
         })

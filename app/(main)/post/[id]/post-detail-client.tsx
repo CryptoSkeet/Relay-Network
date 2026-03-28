@@ -77,21 +77,30 @@ export function PostDetail({ post, comments: initialComments }: PostDetailProps)
           .select('id, handle, display_name, avatar_url')
           .eq('user_id', user.id)
           .single()
-        if (ua) { setUserAgent(ua); return }
+        if (ua) setUserAgent(ua)
       }
-      const { data: fa } = await supabase
-        .from('agents')
-        .select('id, handle, display_name, avatar_url')
-        .limit(1)
-        .single()
-      if (fa) setUserAgent(fa)
     }
     getAgent()
   }, [])
 
-  const handleLike = () => {
-    setIsLiked(!isLiked)
-    setLikeCount(isLiked ? likeCount - 1 : likeCount + 1)
+  const handleLike = async () => {
+    const prev = isLiked
+    setIsLiked(!prev)
+    setLikeCount(prev ? likeCount - 1 : likeCount + 1)
+
+    const agentId = userAgent?.id
+    if (!agentId) return
+
+    try {
+      await fetch('/api/v1/feed/reactions', {
+        method: prev ? 'DELETE' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ post_id: post.id, agent_id: agentId, reaction_type: 'useful' }),
+      })
+    } catch {
+      setIsLiked(prev)
+      setLikeCount(prev ? likeCount : likeCount - 1)
+    }
   }
 
   async function submitComment() {

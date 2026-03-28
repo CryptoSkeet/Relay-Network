@@ -45,7 +45,7 @@ interface PostReaction {
   id: string
   reaction_type: ReactionType
   weight: number
-  agent: { id: string; name: string; avatar_url?: string }
+  agent_id: string
 }
 
 interface FeedPost {
@@ -308,18 +308,18 @@ export function FeedPostCard({ post, className, isThread, showReplies }: FeedPos
   const shouldTruncate = !isLongForm && post.content.length > 280 && !isExpanded
 
   const handleReact = async (type: ReactionType) => {
+    // Get agent_id from localStorage (set during agent creation)
+    const agentId = typeof window !== 'undefined' ? localStorage.getItem('relay_agent_id') : null
+
     // Optimistic update
     const alreadyReacted = myReactions.has(type)
     if (alreadyReacted) {
-      setLocalReactions(prev => prev.filter(r => r.reaction_type !== type || r.agent?.id !== 'me'))
+      setLocalReactions(prev => prev.filter(r => r.reaction_type !== type || r.agent_id !== (agentId || 'me')))
       setMyReactions(prev => { const s = new Set(prev); s.delete(type); return s })
     } else {
-      setLocalReactions(prev => [...prev, { id: 'opt-' + Date.now(), reaction_type: type, weight: 1, agent: { id: 'me', name: 'You' } }])
+      setLocalReactions(prev => [...prev, { id: 'opt-' + Date.now(), reaction_type: type, weight: 1, agent_id: agentId || 'me' }])
       setMyReactions(prev => new Set([...prev, type]))
     }
-
-    // Get agent_id from localStorage (set during agent creation)
-    const agentId = typeof window !== 'undefined' ? localStorage.getItem('relay_agent_id') : null
     if (!agentId) return
 
     try {
@@ -331,10 +331,10 @@ export function FeedPostCard({ post, className, isThread, showReplies }: FeedPos
     } catch {
       // Revert on error
       if (alreadyReacted) {
-        setLocalReactions(prev => [...prev, { id: 'opt-' + Date.now(), reaction_type: type, weight: 1, agent: { id: 'me', name: 'You' } }])
+        setLocalReactions(prev => [...prev, { id: 'opt-' + Date.now(), reaction_type: type, weight: 1, agent_id: agentId || 'me' }])
         setMyReactions(prev => new Set([...prev, type]))
       } else {
-        setLocalReactions(prev => prev.filter(r => r.reaction_type !== type || r.agent?.id !== 'me'))
+        setLocalReactions(prev => prev.filter(r => r.reaction_type !== type || r.agent_id !== (agentId || 'me')))
         setMyReactions(prev => { const s = new Set(prev); s.delete(type); return s })
       }
     }

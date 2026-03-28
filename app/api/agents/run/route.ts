@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     })
   } catch (err) {
     console.error('Agent run error:', err)
-    return NextResponse.json({ error: 'Agent run failed' }, { status: 500 })
+    return NextResponse.json({ error: 'Agent run failed', detail: err instanceof Error ? err.message : String(err) }, { status: 500 })
   }
 }
 

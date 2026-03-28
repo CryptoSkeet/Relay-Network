@@ -1,6 +1,14 @@
 import { createClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { buildAgentProfile, generateAgentComment } from '@/lib/smart-agent'
+
+function verifyCronSecret(request: NextRequest) {
+  const auth = request.headers.get('authorization')
+  const secret = process.env.CRON_SECRET
+  if (secret && auth !== `Bearer ${secret}`) return false
+  if (!secret && process.env.NODE_ENV === 'production') return false
+  return true
+}
 
 // Comment templates for various situations
 const commentTemplates = {
@@ -48,7 +56,10 @@ const commentTemplates = {
 }
 
 // POST - Generate constant social engagement (likes, comments, follows)
-export async function POST() {
+export async function POST(request: NextRequest) {
+  if (!verifyCronSecret(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   try {
     const supabase = await createClient()
     
@@ -80,7 +91,7 @@ export async function POST() {
     let followsAdded = 0
     
     // Generate random likes
-    const numLikes = Math.floor(Math.random() * 8) + 3
+    const numLikes = Math.floor(Math.random() * 12) + 8
     for (let i = 0; i < numLikes; i++) {
       const randomAgent = agents[Math.floor(Math.random() * agents.length)]
       const randomPost = recentPosts[Math.floor(Math.random() * recentPosts.length)]
@@ -88,23 +99,28 @@ export async function POST() {
       // Don't like own posts
       if (randomAgent.id === randomPost.agent_id) continue
       
-      const { error } = await supabase.from('likes').upsert({
+      const reactionTypes = ['useful', 'fast', 'accurate', 'collaborative', 'insightful', 'creative']
+      const rt = reactionTypes[Math.floor(Math.random() * reactionTypes.length)]
+      await supabase.from('post_reactions').delete().eq('post_id', randomPost.id).eq('agent_id', randomAgent.id)
+      const { error } = await supabase.from('post_reactions').insert({
         agent_id: randomAgent.id,
-        post_id: randomPost.id
-      }, { onConflict: 'agent_id,post_id', ignoreDuplicates: true })
+        post_id: randomPost.id,
+        reaction_type: rt,
+        weight: 1
+      })
       
       if (!error) {
         likesAdded++
-        // Update post like count
+        const { data: rCount } = await supabase.from('post_reactions').select('id', { count: 'exact' }).eq('post_id', randomPost.id)
         await supabase
           .from('posts')
-          .update({ like_count: (randomPost.like_count || 0) + 1 })
+          .update({ like_count: rCount?.length || 0 })
           .eq('id', randomPost.id)
       }
     }
     
     // Generate random comments
-    const numComments = Math.floor(Math.random() * 4) + 1
+    const numComments = Math.floor(Math.random() * 6) + 3
     for (let i = 0; i < numComments; i++) {
       const randomAgent = agents[Math.floor(Math.random() * agents.length)]
       const randomPost = recentPosts[Math.floor(Math.random() * recentPosts.length)]

@@ -106,7 +106,7 @@ export const AGENT_TOOLS: Anthropic.Tool[] = [
       type: 'object' as const,
       properties: {
         post_id:       { type: 'string', description: 'UUID of the post to react to' },
-        reaction_type: { type: 'string', description: 'Reaction: like, fire, mind_blown, heart, clap, eyes' },
+        reaction_type: { type: 'string', description: 'Reaction: useful, fast, accurate, collaborative, insightful, creative' },
       },
       required: ['post_id', 'reaction_type'],
     },
@@ -420,9 +420,18 @@ async function handleCommentOnPost(
   if (error) return `Failed to comment: ${error.message}`
 
   // Increment comment_count on the post
-  await supabase.rpc('increment_comment_count', { post_id: input.post_id }).catch(() => {
-    supabase.from('posts').update({ comment_count: supabase.rpc('comment_count_increment') })
-  })
+  const { data: postRow } = await supabase
+    .from('posts')
+    .select('comment_count')
+    .eq('id', input.post_id)
+    .maybeSingle()
+
+  if (postRow) {
+    await supabase
+      .from('posts')
+      .update({ comment_count: (postRow.comment_count ?? 0) + 1 })
+      .eq('id', input.post_id)
+  }
 
   return `Comment posted (id: ${data.id}): "${content}"`
 }
@@ -432,25 +441,32 @@ async function handleReactToPost(
   agentId: string,
   input: Record<string, string>,
 ): Promise<string> {
-  const validReactions = ['like', 'fire', 'mind_blown', 'heart', 'clap', 'eyes']
-  const reaction_type = validReactions.includes(input.reaction_type) ? input.reaction_type : 'like'
+  const validReactions = ['useful', 'fast', 'accurate', 'collaborative', 'insightful', 'creative']
+  const reaction_type = validReactions.includes(input.reaction_type) ? input.reaction_type : 'useful'
+
+  // Delete existing reaction, then insert new one (no unique constraint issues)
+  await supabase
+    .from('post_reactions')
+    .delete()
+    .eq('post_id', input.post_id)
+    .eq('agent_id', agentId)
 
   const { error } = await supabase
     .from('post_reactions')
-    .upsert({ post_id: input.post_id, agent_id: agentId, reaction_type, weight: 1 },
-             { onConflict: 'post_id,agent_id' })
+    .insert({ post_id: input.post_id, agent_id: agentId, reaction_type, weight: 1 })
 
   if (error) return `Failed to react: ${error.message}`
 
-  // Increment like_count manually (RPC not available)
-  const { data: postRow } = await supabase
-    .from('posts').select('like_count').eq('id', input.post_id).maybeSingle()
-  if (postRow) {
-    await supabase
-      .from('posts')
-      .update({ like_count: (postRow.like_count ?? 0) + 1 })
-      .eq('id', input.post_id)
-  }
+  // Update like_count to reflect total reactions on this post
+  const { data: reactions } = await supabase
+    .from('post_reactions')
+    .select('id', { count: 'exact' })
+    .eq('post_id', input.post_id)
+
+  await supabase
+    .from('posts')
+    .update({ like_count: reactions?.length || 0 })
+    .eq('id', input.post_id)
 
   return `Reacted with "${reaction_type}" to post ${input.post_id}`
 }
@@ -927,10 +943,19 @@ export async function runAgentLoop(
   memories: AgentMemory[],
   options: AgentLoopOptions,
 ): Promise<AgentLoopResult> {
-  // Prefer Anthropic for native tool_use; fall back to OpenAI function calling
+  // Try Anthropic first, fall back to OpenAI on any failure
   if (hasAnthropic()) {
-    return runAgentLoopAnthropic(supabase, agent, memories, options)
-  } else if (hasOpenAI()) {
+    try {
+      return await runAgentLoopAnthropic(supabase, agent, memories, options)
+    } catch (err) {
+      console.warn('Anthropic loop failed, trying OpenAI fallback:', err instanceof Error ? err.message : err)
+      if (hasOpenAI()) {
+        return runAgentLoopOpenAI(supabase, agent, memories, options)
+      }
+      throw err
+    }
+  }
+  if (hasOpenAI()) {
     return runAgentLoopOpenAI(supabase, agent, memories, options)
   }
   throw new Error('No LLM API key configured (ANTHROPIC_API_KEY or OPENAI_API_KEY)')

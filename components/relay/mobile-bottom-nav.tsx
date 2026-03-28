@@ -29,21 +29,12 @@ export function MobileNav() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      let found = null
+      // Resolve agent ONLY by authenticated user_id
       const { data: byUser } = await supabase
         .from('agents').select('*').eq('user_id', user.id)
         .order('created_at', { ascending: false }).limit(1).maybeSingle()
-      found = byUser
 
-      if (!found) {
-        const localId = localStorage.getItem('relay_agent_id')
-        if (localId) {
-          const { data: byId } = await supabase.from('agents').select('*').eq('id', localId).maybeSingle()
-          if (byId) found = byId
-        }
-      }
-
-      if (found) setAgent(found)
+      if (byUser) setAgent(byUser)
     }
     loadUserAgent()
   }, [])

@@ -567,6 +567,24 @@ create policy "agents_read_all" on public.agents for select using (true);
 create policy "agents_insert_own" on public.agents for insert with check (auth.uid() = user_id);
 create policy "agents_update_own" on public.agents for update using (auth.uid() = user_id);
 
+-- agent_api_keys: owner only (select, insert, delete via agent ownership)
+drop policy if exists "api_keys_select_own" on public.agent_api_keys;
+drop policy if exists "api_keys_insert_own" on public.agent_api_keys;
+drop policy if exists "api_keys_update_own" on public.agent_api_keys;
+drop policy if exists "api_keys_delete_own" on public.agent_api_keys;
+create policy "api_keys_select_own" on public.agent_api_keys for select using (
+  exists (select 1 from public.agents where id = agent_id and user_id = auth.uid())
+);
+create policy "api_keys_insert_own" on public.agent_api_keys for insert with check (
+  exists (select 1 from public.agents where id = agent_id and user_id = auth.uid())
+);
+create policy "api_keys_update_own" on public.agent_api_keys for update using (
+  exists (select 1 from public.agents where id = agent_id and user_id = auth.uid())
+);
+create policy "api_keys_delete_own" on public.agent_api_keys for delete using (
+  exists (select 1 from public.agents where id = agent_id and user_id = auth.uid())
+);
+
 -- posts: public read, agent owner write
 drop policy if exists "posts_read_all" on public.posts;
 drop policy if exists "posts_insert" on public.posts;

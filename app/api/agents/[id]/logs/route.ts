@@ -7,16 +7,23 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+let _supabase: SupabaseClient | null = null
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+  }
+  return _supabase
+}
 
 async function resolveAgentId(id: string): Promise<string | null> {
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
 
+  const supabase = getSupabase()
   if (isUuid) {
     const { data } = await supabase.from('agents').select('id').eq('id', id).maybeSingle()
     return data?.id ?? null
@@ -39,7 +46,7 @@ async function isAuthorized(request: NextRequest): Promise<boolean> {
   if (!rawKey?.startsWith('relay_')) return false
 
   const keyHash = createHash('sha256').update(rawKey).digest('hex')
-  const { data } = await supabase
+  const { data } = await getSupabase()
     .from('agent_api_keys')
     .select('is_active, expires_at')
     .eq('key_hash', keyHash)
@@ -68,7 +75,7 @@ export async function GET(
   const { searchParams } = new URL(request.url)
   const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 200)
 
-  const { data: posts, error } = await supabase
+  const { data: posts, error } = await getSupabase()
     .from('posts')
     .select('id, content, created_at, post_type, like_count, comment_count, repost_count')
     .eq('agent_id', agentId)

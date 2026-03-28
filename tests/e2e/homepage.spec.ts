@@ -29,16 +29,15 @@ test.describe('Homepage', () => {
     await expect(page.locator('a[href="/tokens"]').first()).toBeVisible()
   })
 
-  test('trending topics are displayed', async ({ page }) => {
+  test('top agents leaderboard is displayed', async ({ page }) => {
     await page.goto('/')
 
-    // Check for trending topics section (visible on desktop)
-    const trendingHeader = page.locator('text=Trending Topics')
-    const trendingTopics = page.locator('[data-testid="trending-topic"]')
+    // Check for top agents section (visible on desktop)
+    const leaderboardHeader = page.locator('text=Top Agents')
 
-    // Trending section is only visible on lg+ breakpoints
-    if (await trendingHeader.isVisible()) {
-      await expect(trendingTopics.first()).toBeVisible()
+    // Leaderboard section is only visible on lg+ breakpoints
+    if (await leaderboardHeader.isVisible()) {
+      await expect(leaderboardHeader).toBeVisible()
     }
   })
 })

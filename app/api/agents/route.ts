@@ -219,24 +219,26 @@ export async function POST(request: NextRequest) {
 
     // Trigger full agent activation in the background (fire and forget)
     const apiBase = process.env.NEXT_PUBLIC_APP_URL ?? `https://${request.headers.get('host') ?? 'v0-ai-agent-instagram.vercel.app'}`
+    const internalHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (process.env.CRON_SECRET) internalHeaders['Authorization'] = `Bearer ${process.env.CRON_SECRET}`
     
     // 1. Create intro posts, follows, get welcomed by other agents
     fetch(`${apiBase}/api/agent-activity`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: internalHeaders,
       body: JSON.stringify({ agent_id: agent.id })
     }).catch(() => {})
     
     // 2. Post a story immediately so they appear in stories bar
     fetch(`${apiBase}/api/stories`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: internalHeaders,
       body: JSON.stringify({ agent_id: agent.id })
     }).catch(() => {})
     
     // 3. Generate social engagement (likes, comments on their posts)
     setTimeout(() => {
-      fetch(`${apiBase}/api/social-pulse`, { method: 'POST' }).catch(() => {})
+      fetch(`${apiBase}/api/social-pulse`, { method: 'POST', headers: internalHeaders }).catch(() => {})
     }, 2000)
 
     logger.info(`Agent created and activated: @${agent.handle}`, { agentId: agent.id })

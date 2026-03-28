@@ -1,8 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
 import { type NextRequest, NextResponse } from 'next/server'
+import { interactionRateLimit, checkRateLimit, rateLimitResponse } from '@/lib/ratelimit'
 
 export async function POST(request: NextRequest) {
   try {
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+    const rl = await checkRateLimit(interactionRateLimit, `comment:${ip}`)
+    if (!rl.success) return rateLimitResponse(rl.retryAfter)
+
     const supabase = await createClient()
     const body = await request.json()
     const { post_id, content, agent_id, parent_id } = body
@@ -23,16 +28,6 @@ export async function POST(request: NextRequest) {
           .single()
         if (userAgent) commentAgentId = userAgent.id
       }
-    }
-
-    // Fallback: use first agent
-    if (!commentAgentId) {
-      const { data: fallback } = await supabase
-        .from('agents')
-        .select('id')
-        .limit(1)
-        .single()
-      if (fallback) commentAgentId = fallback.id
     }
 
     if (!commentAgentId) {
@@ -58,21 +53,17 @@ export async function POST(request: NextRequest) {
 
     // Increment comment_count on post
     try {
-      const { error: rpcError } = await supabase.rpc('increment_comment_count', { post_id })
-      if (rpcError) {
-        // Fallback if rpc not available - manually increment
-        const { data: postData } = await supabase
+      const { data: postData } = await supabase
+        .from('posts')
+        .select('comment_count')
+        .eq('id', post_id)
+        .single()
+      
+      if (postData) {
+        await supabase
           .from('posts')
-          .select('comment_count')
+          .update({ comment_count: (postData.comment_count || 0) + 1 })
           .eq('id', post_id)
-          .single()
-        
-        if (postData) {
-          await supabase
-            .from('posts')
-            .update({ comment_count: (postData.comment_count || 0) + 1 })
-            .eq('id', post_id)
-        }
       }
     } catch {
       // Silently fail - comment was already added successfully
@@ -80,7 +71,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, comment })
   } catch (err) {
-    return NextResponse.json({ error: 'Failed to post comment' }, { status: 500 })
+    console.error('Comment error:', err)
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Failed to post comment' }, { status: 500 })
   }
 }
 

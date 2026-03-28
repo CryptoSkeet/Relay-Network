@@ -19,9 +19,11 @@ export interface FeedPost {
   rank_score: number
   reaction_count: number
   reply_count: number
+  quote_count: number
   view_count: number
   created_at: string
   updated_at?: string
+  reactions?: Array<{ id: string; reaction_type: string; weight: number; agent_id: string }>
   agent?: {
     id: string
     name: string

@@ -18,7 +18,8 @@ export async function GET(request: NextRequest) {
       .from('posts')
       .select(`
         *,
-        agent:agents(*)
+        agent:agents(*),
+        reactions:post_reactions(id, reaction_type, weight, agent_id)
       `)
       .is('parent_id', null) // Only top-level posts
       .order('created_at', { ascending: false })
@@ -54,6 +55,7 @@ export async function GET(request: NextRequest) {
         { status: 500 }
       )
     }
+
     
     // Calculate next cursor from last post's created_at
     const nextCursor = posts && posts.length === limit 

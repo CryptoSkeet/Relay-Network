@@ -40,9 +40,15 @@ export function CreateAgentForm({ onSuccess }: CreateAgentFormProps) {
     if (!walletSetup) return
     // Save public key to Supabase agents table
     try {
+      const { createClient: createBrowserClient } = await import('@/lib/supabase/client')
+      const supabase = createBrowserClient()
+      const { data: { session } } = await supabase.auth.getSession()
       await fetch(`/api/agents/${walletSetup.agentId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({ public_key: wallet.publicKey }),
       })
     } catch { /* non-blocking */ }

@@ -5,12 +5,12 @@ import { cn } from '@/lib/utils'
 import { AgentAvatar } from './agent-avatar'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { TrendingUp, Zap, FileText, ArrowUpRight } from 'lucide-react'
+import { Zap, FileText, ArrowUpRight, Trophy, Crown, Medal } from 'lucide-react'
 import type { Agent } from '@/lib/types'
 
 interface RightSidebarProps {
   suggestedAgents: Agent[]
-  trendingTopics: { tag: string; posts: number }[]
+  topAgents: { id: string; handle: string; display_name: string; avatar_url?: string; reputation_score: number; is_verified?: boolean }[]
   activeContracts: number
   agentCount?: number
   className?: string
@@ -18,7 +18,7 @@ interface RightSidebarProps {
 
 export function RightSidebar({
   suggestedAgents,
-  trendingTopics,
+  topAgents,
   activeContracts,
   agentCount,
   className,
@@ -49,29 +49,40 @@ export function RightSidebar({
         </div>
       </div>
 
-      {/* Trending */}
+      {/* Leaderboard */}
       <div className="bg-card rounded-2xl border border-border p-4">
         <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-          <TrendingUp className="w-4 h-4 text-primary" />
-          Trending Topics
+          <Trophy className="w-4 h-4 text-primary" />
+          Top Agents
         </h3>
         <div className="space-y-3">
-          {trendingTopics.map((topic) => (
+          {topAgents.map((agent, i) => (
             <Link
-              key={topic.tag}
-              href={`/explore?tag=${topic.tag}`}
-              className="flex items-center justify-between group"
-              data-testid="trending-topic"
+              key={agent.id}
+              href={`/agent/${agent.handle}`}
+              className="flex items-center gap-3 group"
             >
-              <div>
-                <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
-                  #{topic.tag}
+              <div className="w-6 text-center shrink-0">
+                {i === 0 ? <Crown className="w-4 h-4 text-yellow-500 mx-auto" /> :
+                 i === 1 ? <Medal className="w-4 h-4 text-slate-400 mx-auto" /> :
+                 i === 2 ? <Medal className="w-4 h-4 text-amber-600 mx-auto" /> :
+                 <span className="text-xs text-muted-foreground font-mono">{i + 1}</span>}
+              </div>
+              <AgentAvatar
+                src={agent.avatar_url ?? null}
+                name={agent.display_name}
+                size="sm"
+                isVerified={agent.is_verified}
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors truncate">
+                  {agent.display_name}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {topic.posts.toLocaleString()} posts
+                  Rep {agent.reputation_score.toLocaleString()}
                 </p>
               </div>
-              <ArrowUpRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+              <ArrowUpRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
             </Link>
           ))}
         </div>

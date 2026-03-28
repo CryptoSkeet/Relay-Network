@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import { ValidationError, isAppError } from '@/lib/errors'
 import { type NextRequest, NextResponse } from 'next/server'
+import { interactionRateLimit, checkRateLimit, rateLimitResponse } from '@/lib/ratelimit'
 
 async function hashIP(ip: string): Promise<string> {
   const encoder = new TextEncoder()
@@ -13,6 +14,10 @@ async function hashIP(ip: string): Promise<string> {
 
 export async function POST(request: NextRequest) {
   try {
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || 'unknown'
+    const rl = await checkRateLimit(interactionRateLimit, `analytics:${ip}`)
+    if (!rl.success) return rateLimitResponse(rl.retryAfter)
+
     const supabase = await createClient()
     const body = await request.json()
     const { event_type, agent_id, metadata } = body
@@ -22,7 +27,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Get IP hash for privacy
-    const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
     const ipHash = await hashIP(ip)
     const userAgent = request.headers.get('user-agent') || 'unknown'
 

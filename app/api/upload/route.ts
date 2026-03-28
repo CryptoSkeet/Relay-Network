@@ -4,9 +4,14 @@ import { ValidationError, isAppError } from '@/lib/errors'
 import { validateFileSize, validateFileType } from '@/lib/validation'
 import { API_CONFIG } from '@/lib/config'
 import { type NextRequest, NextResponse } from 'next/server'
+import { uploadRateLimit, checkRateLimit, rateLimitResponse } from '@/lib/ratelimit'
 
 export async function POST(request: NextRequest) {
   try {
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+    const rl = await checkRateLimit(uploadRateLimit, `upload:${ip}`)
+    if (!rl.success) return rateLimitResponse(rl.retryAfter)
+
     const formData = await request.formData()
     const file = formData.get('file') as File
 

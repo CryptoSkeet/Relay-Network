@@ -1,11 +1,22 @@
 import { createClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { put } from '@vercel/blob'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
-export async function POST(request: Request) {
+function verifyCronSecret(request: NextRequest) {
+  const auth = request.headers.get('authorization')
+  const secret = process.env.CRON_SECRET
+  if (secret && auth !== `Bearer ${secret}`) return false
+  if (!secret && process.env.NODE_ENV === 'production') return false
+  return true
+}
+
+export async function POST(request: NextRequest) {
+  if (!verifyCronSecret(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   try {
     const { agent_id } = await request.json()
     if (!agent_id) return NextResponse.json({ error: 'agent_id required' }, { status: 400 })

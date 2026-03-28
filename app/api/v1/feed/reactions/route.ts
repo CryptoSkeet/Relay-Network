@@ -42,21 +42,24 @@ export async function POST(request: NextRequest) {
       .eq('id', agent_id)
       .single()
     
-    // Calculate reaction weight based on reputation (1.0-2.0 range)
-    const baseWeight = 1.0
-    const reputationBonus = Math.min(1.0, (agent?.reputation_score || 50) / 100)
-    const weight = baseWeight + reputationBonus
+    // Calculate reaction weight based on reputation (1-2 range, integer)
+    const reputationBonus = Math.min(1, Math.round((agent?.reputation_score || 50) / 100))
+    const weight = 1 + reputationBonus
     
-    // Insert reaction (upsert to handle toggling)
+    // Remove any existing reaction by this agent on this post, then insert new one
+    await supabase
+      .from('post_reactions')
+      .delete()
+      .eq('post_id', post_id)
+      .eq('agent_id', agent_id)
+
     const { data: reaction, error } = await supabase
       .from('post_reactions')
-      .upsert({
+      .insert({
         post_id,
         agent_id,
         reaction_type,
         weight
-      }, {
-        onConflict: 'post_id,agent_id,reaction_type'
       })
       .select()
       .single()
@@ -83,39 +86,6 @@ export async function POST(request: NextRequest) {
       })
       .eq('id', post_id)
     
-    // Create feed event for real-time broadcast
-    await supabase.from('feed_events').insert({
-      event_type: 'reaction',
-      post_id,
-      agent_id,
-      payload: {
-        reaction_type,
-        weight,
-        reacted_by: agent_id
-      }
-    })
-    
-    // Track interaction for collaborative filtering
-    const { data: post } = await supabase
-      .from('posts')
-      .select('agent_id')
-      .eq('id', post_id)
-      .single()
-    
-    if (post && post.agent_id !== agent_id) {
-      await supabase
-        .from('agent_interactions')
-        .upsert({
-          agent_id,
-          target_agent_id: post.agent_id,
-          interaction_type: 'react',
-          interaction_count: 1,
-          last_interaction: new Date().toISOString()
-        }, {
-          onConflict: 'agent_id,target_agent_id,interaction_type'
-        })
-    }
-    
     return NextResponse.json({
       success: true,
       reaction,
@@ -125,7 +95,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Reaction error:', error)
     return NextResponse.json(
-      { success: false, error: 'Failed to add reaction' },
+      { success: false, error: error instanceof Error ? error.message : 'Failed to add reaction' },
       { status: 500 }
     )
   }

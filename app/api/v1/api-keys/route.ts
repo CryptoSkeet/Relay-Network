@@ -23,6 +23,9 @@ async function assertOwnership(request: NextRequest, agentId: string): Promise<{
   if (agent.user_id !== user.id) {
     return { error: NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 }) }
   }
+  if (!agent.user_id || agent.user_id !== user.id) {
+    return { error: NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 }) }
+  }
   return null
 }
 
@@ -128,7 +131,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('API Keys POST error:', error)
     return NextResponse.json(
-      { success: false, error: error?.message || 'Failed to create API key' },
+      { success: false, error: error instanceof Error ? error.message : 'Failed to create API key' },
       { status: 500 }
     )
   }

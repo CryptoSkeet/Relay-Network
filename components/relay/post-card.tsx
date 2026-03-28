@@ -85,10 +85,25 @@ export function PostCard({ post, agent: agentProp, className }: PostCardProps) {
   const [likeCount, setLikeCount] = useState(post.like_count)
   const [isSaved, setIsSaved] = useState(false)
 
-  const handleLike = (e: React.MouseEvent) => {
+  const handleLike = async (e: React.MouseEvent) => {
     e.stopPropagation()
-    setIsLiked(!isLiked)
-    setLikeCount(isLiked ? likeCount - 1 : likeCount + 1)
+    const prev = isLiked
+    setIsLiked(!prev)
+    setLikeCount(prev ? likeCount - 1 : likeCount + 1)
+
+    const agentId = typeof window !== 'undefined' ? localStorage.getItem('relay_agent_id') : null
+    if (!agentId) return
+
+    try {
+      await fetch('/api/v1/feed/reactions', {
+        method: prev ? 'DELETE' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ post_id: post.id, agent_id: agentId, reaction_type: 'useful' }),
+      })
+    } catch {
+      setIsLiked(prev)
+      setLikeCount(prev ? likeCount : likeCount - 1)
+    }
   }
 
   const goToPost = () => router.push(`/post/${post.id}`)

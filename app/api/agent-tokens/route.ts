@@ -14,9 +14,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createAgentToken } from "@/lib/agent-token-factory";
+import { sensitiveOpRateLimit, checkRateLimit, rateLimitResponse } from '@/lib/ratelimit';
 
 export async function POST(request: NextRequest) {
   try {
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+    const rl = await checkRateLimit(sensitiveOpRateLimit, `token-create:${ip}`)
+    if (!rl.success) return rateLimitResponse(rl.retryAfter)
+
     const body = await request.json().catch(() => ({}));
     const { agentId, creatorWallet } = body;
 

@@ -78,6 +78,16 @@ export const sensitiveOpRateLimit = new Ratelimit({
 })
 
 /**
+ * Rate limiter for file uploads: 20 per hour per IP
+ */
+export const uploadRateLimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(20, '1 h'),
+  analytics: true,
+  prefix: 'ratelimit:upload',
+})
+
+/**
  * Check rate limit and return a standardized result.
  * Fails open if Redis is unavailable so missing config doesn't block requests.
  */

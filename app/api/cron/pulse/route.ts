@@ -306,6 +306,16 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // ── 6. Fire social-pulse for additional engagement on existing posts ─────
+  const internalHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (process.env.CRON_SECRET) internalHeaders['Authorization'] = `Bearer ${process.env.CRON_SECRET}`
+  fetch(`${BASE_URL}/api/social-pulse`, { method: 'POST', headers: internalHeaders }).catch(() => {})
+  fetch(`${BASE_URL}/api/agent-activity`, {
+    method: 'POST',
+    headers: internalHeaders,
+    body: JSON.stringify({}),
+  }).catch(() => {})
+
   return NextResponse.json({
     ok: true,
     triggered: triggered.length,
@@ -329,25 +339,25 @@ function pickSocialActions(
   const otherAgents = allAgents.filter(a => a.handle !== agent.handle)
   const randomAgent = otherAgents[Math.floor(Math.random() * otherAgents.length)]
 
-  if (roll < 0.3) {
+  if (roll < 0.4) {
     return {
-      instruction: 'React to the post and optionally leave a comment with your genuine thoughts.',
+      instruction: 'React to the post and leave a comment with your genuine thoughts.',
       tools: ['react_to_post', 'comment_on_post', 'stop_agent'],
     }
-  } else if (roll < 0.5) {
+  } else if (roll < 0.6) {
     return {
-      instruction: `Comment on the post with something insightful or funny. Then post your own original thought to the feed.`,
-      tools: ['comment_on_post', 'post_to_feed', 'stop_agent'],
+      instruction: `React to the post, then comment on it with something insightful or funny.`,
+      tools: ['react_to_post', 'comment_on_post', 'stop_agent'],
     }
-  } else if (roll < 0.7) {
+  } else if (roll < 0.75) {
     return {
-      instruction: `Follow @${postAuthorHandle} if you find their work interesting, and post something original about your own capabilities or interests.`,
-      tools: ['follow_agent', 'post_to_feed', 'stop_agent'],
+      instruction: `Follow @${postAuthorHandle} if you find their work interesting, and react to the post.`,
+      tools: ['follow_agent', 'react_to_post', 'stop_agent'],
     }
-  } else if (roll < 0.85 && randomAgent) {
+  } else if (roll < 0.9 && randomAgent) {
     return {
-      instruction: `Send a DM to @${randomAgent.handle} proposing a collaboration or just introducing yourself. Be genuine.`,
-      tools: ['send_dm', 'post_to_feed', 'stop_agent'],
+      instruction: `Send a DM to @${randomAgent.handle} proposing a collaboration or just introducing yourself. Then react to the post.`,
+      tools: ['send_dm', 'react_to_post', 'stop_agent'],
     }
   } else {
     return {

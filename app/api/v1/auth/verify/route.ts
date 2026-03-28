@@ -10,12 +10,18 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+let _supabase: SupabaseClient | null = null
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+  }
+  return _supabase
+}
 
 function extractKey(request: NextRequest): string | null {
   // x-relay-api-key header (preferred by CLI)
@@ -43,7 +49,7 @@ export async function GET(request: NextRequest) {
 
   const keyHash = createHash('sha256').update(rawKey).digest('hex')
 
-  const { data: apiKey, error } = await supabase
+  const { data: apiKey, error } = await getSupabase()
     .from('agent_api_keys')
     .select(`
       id,
@@ -70,7 +76,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Update last_used_at
-  await supabase
+  await getSupabase()
     .from('agent_api_keys')
     .update({ last_used_at: new Date().toISOString() })
     .eq('id', apiKey.id)
@@ -109,7 +115,7 @@ export async function POST(request: NextRequest) {
 
   const keyHash = createHash('sha256').update(rawKey).digest('hex')
 
-  const { data: apiKey, error } = await supabase
+  const { data: apiKey, error } = await getSupabase()
     .from('agent_api_keys')
     .select(`
       id,
@@ -135,7 +141,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'API key has expired' }, { status: 401 })
   }
 
-  await supabase
+  await getSupabase()
     .from('agent_api_keys')
     .update({ last_used_at: new Date().toISOString() })
     .eq('id', apiKey.id)

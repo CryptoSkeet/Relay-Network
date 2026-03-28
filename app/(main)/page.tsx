@@ -21,12 +21,13 @@ export default async function HomePage() {
         id,
         reaction_type,
         weight,
-        agent:agents(id, display_name, avatar_url)
+        agent_id
       )
     `)
     .is('parent_id', null)
     .order('created_at', { ascending: false })
     .limit(20)
+
 
   // Get suggested agents (different from top agents)
   const { data: suggestedAgents } = await supabase
@@ -36,38 +37,12 @@ export default async function HomePage() {
     .order('follower_count', { ascending: false })
     .limit(5)
 
-  // Fetch trending topics from database
-  const oneHourAgo = new Date(Date.now() - 3600000).toISOString()
-  const { data: dbTrending } = await supabase
-    .from('trending_topics')
-    .select('*')
-    .gt('time_window', oneHourAgo)
-    .order('engagement_score', { ascending: false })
+  // Fetch top agents by reputation for leaderboard
+  const { data: topAgents } = await supabase
+    .from('agents')
+    .select('id, handle, display_name, avatar_url, reputation_score, is_verified')
+    .order('reputation_score', { ascending: false })
     .limit(5)
-
-  // Map database trending — query real post counts if no trending_topics row yet
-  let trendingTopics: { tag: string; posts: number }[] = []
-  if (dbTrending?.length) {
-    trendingTopics = dbTrending.map(t => ({ tag: t.topic, posts: t.post_count }))
-  } else {
-    // Count real posts by hashtag from the posts table
-    const { data: hashtagCounts } = await supabase
-      .from('posts')
-      .select('content')
-      .limit(500)
-    const tagMap: Record<string, number> = {}
-    for (const { content } of hashtagCounts || []) {
-      const tags = (content as string).match(/#(\w+)/g) || []
-      for (const tag of tags) {
-        const t = tag.slice(1)
-        tagMap[t] = (tagMap[t] || 0) + 1
-      }
-    }
-    trendingTopics = Object.entries(tagMap)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([tag, posts]) => ({ tag, posts }))
-  }
 
   // Fetch network stats for observer mode
   const { count: agentsOnline } = await supabase
@@ -90,7 +65,7 @@ export default async function HomePage() {
       agents={agents || []}
       posts={posts || []}
       suggestedAgents={suggestedAgents || []}
-      trendingTopics={trendingTopics}
+      topAgents={topAgents || []}
       networkStats={networkStats}
     />
   )

@@ -1,21 +1,29 @@
 /**
  * GET  /api/agents/:id  — fetch a single agent by id or handle
- * PATCH /api/agents/:id — update agent fields (requires API key or session auth)
+ * PATCH /api/agents/:id — update agent fields (API key or session auth)
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { getUserFromRequest } from '@/lib/supabase/server'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+let _supabase: SupabaseClient | null = null
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+  }
+  return _supabase
+}
 
 async function resolveAgent(id: string) {
   // Try UUID first, then handle
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
 
+  const supabase = getSupabase()
   if (isUuid) {
     const { data } = await supabase.from('agents').select('*').eq('id', id).maybeSingle()
     return data
@@ -38,7 +46,7 @@ async function resolveApiKeyAgent(request: NextRequest) {
   if (!rawKey?.startsWith('relay_')) return null
 
   const keyHash = createHash('sha256').update(rawKey).digest('hex')
-  const { data } = await supabase
+  const { data } = await getSupabase()
     .from('agent_api_keys')
     .select('agent_id, is_active, expires_at')
     .eq('key_hash', keyHash)
@@ -54,6 +62,7 @@ async function resolveSessionAgent(request: NextRequest): Promise<string | null>
   const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
   if (!token || token.startsWith('relay_')) return null
 
+  const supabase = getSupabase()
   const { data: { user } } = await supabase.auth.getUser(token)
   if (!user) return null
 
@@ -89,19 +98,22 @@ export async function PATCH(
 ) {
   const { id } = await params
 
-  const authedAgentId = await resolveApiKeyAgent(request) ?? await resolveSessionAgent(request)
-  if (!authedAgentId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
   const agent = await resolveAgent(id)
   if (!agent) {
     return NextResponse.json({ error: 'Agent not found' }, { status: 404 })
   }
 
-  // Only the key owner can update their own agent
-  if (agent.id !== authedAgentId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  // Auth: API key or Supabase session (user must own the agent)
+  const authedAgentId = await resolveApiKeyAgent(request)
+  if (authedAgentId) {
+    if (agent.id !== authedAgentId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+  } else {
+    const user = await getUserFromRequest(request)
+    if (!user || agent.user_id !== user.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
   }
 
   let body: Record<string, unknown>
@@ -112,7 +124,7 @@ export async function PATCH(
   }
 
   // Whitelist updatable fields
-  const allowed = ['display_name', 'bio', 'avatar_url', 'capabilities', 'heartbeat_enabled', 'heartbeat_interval_ms', 'model_family']
+  const allowed = ['display_name', 'bio', 'avatar_url', 'capabilities', 'heartbeat_enabled', 'heartbeat_interval_ms', 'model_family', 'public_key']
   const updates: Record<string, unknown> = {}
   for (const key of allowed) {
     if (key in body) updates[key] = body[key]
@@ -122,7 +134,7 @@ export async function PATCH(
     return NextResponse.json({ error: 'No updatable fields provided' }, { status: 400 })
   }
 
-  const { data: updated, error } = await supabase
+  const { data: updated, error } = await getSupabase()
     .from('agents')
     .update(updates)
     .eq('id', agent.id)

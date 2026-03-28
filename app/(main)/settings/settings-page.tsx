@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Settings, User, Bell, Shield, Palette, Wallet, Key, Save, Moon, Sun, Monitor, Image as ImageIcon, Zap, LogOut } from 'lucide-react'
+import { Settings, User, Bell, Shield, Palette, Wallet, Key, Save, Moon, Sun, Monitor, Image as ImageIcon, Zap, LogOut, Fingerprint } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -12,6 +12,7 @@ import { createClient } from '@/lib/supabase/client'
 
 const settingsSections = [
   { id: 'profile', label: 'Profile', icon: User },
+  { id: 'identity', label: 'Identity', icon: Fingerprint },
   { id: 'customization', label: 'Profile Style', icon: Palette },
   { id: 'notifications', label: 'Notifications', icon: Bell },
   { id: 'privacy', label: 'Privacy & Security', icon: Shield },
@@ -24,6 +25,7 @@ const settingsSections = [
 export function SettingsPage() {
   const [activeSection, setActiveSection] = useState('profile')
   const [agent, setAgent] = useState<any>(null)
+  const [identity, setIdentity] = useState<{ did?: string; public_key?: string; verification_tier?: string } | null>(null)
   const [wallet, setWallet] = useState<{ address: string; balance: number } | null>(null)
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [displayName, setDisplayName] = useState('')
@@ -87,6 +89,10 @@ export function SettingsPage() {
         const { data: w } = await supabase
           .from('wallets').select('address, balance').eq('agent_id', found.id).maybeSingle()
         if (w) setWallet(w)
+
+        const { data: ident } = await supabase
+          .from('agent_identities').select('did, public_key, verification_tier').eq('agent_id', found.id).maybeSingle()
+        if (ident) setIdentity(ident)
 
         await loadApiKeys(found.id)
 
@@ -207,8 +213,7 @@ export function SettingsPage() {
     }
   }
 
-  // Identity state
-  const [identity, setIdentity] = useState<{ did: string; public_key: string; verification_tier: string } | null>(null)
+  // Identity state (extended from initial declaration)
   const [identityLoading, setIdentityLoading] = useState(false)
   const [identityPrivKey, setIdentityPrivKey] = useState<string | null>(null)
   const [identityCopied, setIdentityCopied] = useState(false)
@@ -445,6 +450,61 @@ export function SettingsPage() {
     }
 
     switch (activeSection) {
+      case 'identity':
+        return (
+          <div className="space-y-6">
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Fingerprint className="w-5 h-5 text-primary" />
+                  Agent Identity
+                </CardTitle>
+                <CardDescription>Your agent&apos;s decentralized identity and cryptographic keys</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {!agent ? (
+                  <p className="text-sm text-muted-foreground p-3 bg-muted/50 rounded-lg">
+                    Create an agent first to view identity information.
+                  </p>
+                ) : (
+                  <>
+                    <div className="space-y-3">
+                      <div className="p-4 rounded-lg bg-muted/50 space-y-2">
+                        <Label className="text-xs uppercase tracking-wide text-muted-foreground">Agent ID</Label>
+                        <p className="text-sm font-mono break-all select-all">{agent.id}</p>
+                      </div>
+                      <div className="p-4 rounded-lg bg-muted/50 space-y-2">
+                        <Label className="text-xs uppercase tracking-wide text-muted-foreground">DID (Decentralized Identifier)</Label>
+                        <p className="text-sm font-mono break-all select-all">
+                          {identity?.did ?? agent.public_key ? `did:key:z${agent.public_key?.slice(0, 32)}...` : 'Not registered'}
+                        </p>
+                      </div>
+                      <div className="p-4 rounded-lg bg-muted/50 space-y-2">
+                        <Label className="text-xs uppercase tracking-wide text-muted-foreground">Public Key (Ed25519)</Label>
+                        <p className="text-sm font-mono break-all select-all">
+                          {identity?.public_key ?? agent.public_key ?? 'Not registered'}
+                        </p>
+                      </div>
+                      <div className="p-4 rounded-lg bg-muted/50 space-y-2">
+                        <Label className="text-xs uppercase tracking-wide text-muted-foreground">Verification Tier</Label>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-sm font-medium px-2 py-0.5 rounded-full ${
+                            identity?.verification_tier === 'verified' ? 'bg-green-500/15 text-green-400' :
+                            identity?.verification_tier === 'enhanced' ? 'bg-blue-500/15 text-blue-400' :
+                            'bg-muted text-muted-foreground'
+                          }`}>
+                            {identity?.verification_tier ?? 'basic'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )
+
       case 'profile':
         return (
           <div className="space-y-6">

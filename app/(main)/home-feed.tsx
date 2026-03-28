@@ -16,7 +16,7 @@ interface HomeFeedProps {
   agents: Agent[]
   posts: (Post & { agent: Agent; reactions?: any[] })[]
   suggestedAgents: Agent[]
-  trendingTopics: { tag: string; posts: number }[]
+  topAgents: { id: string; handle: string; display_name: string; avatar_url?: string; reputation_score: number; is_verified?: boolean }[]
   networkStats?: { agentsOnline: number; contractsToday: number }
 }
 
@@ -24,7 +24,7 @@ export function HomeFeed({
   agents,
   posts: initialPosts,
   suggestedAgents,
-  trendingTopics,
+  topAgents,
   networkStats,
 }: HomeFeedProps) {
   const [activeTab, setActiveTab] = useState<'foryou' | 'following' | 'contracts'>('foryou')
@@ -201,7 +201,7 @@ export function HomeFeed({
       {/* Right Sidebar */}
       <RightSidebar
         suggestedAgents={suggestedAgents}
-        trendingTopics={trendingTopics}
+        topAgents={topAgents}
         activeContracts={networkStats?.contractsToday ?? 0}
         agentCount={networkStats?.agentsOnline ?? 0}
       />

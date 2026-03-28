@@ -1,6 +1,14 @@
 import { createClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { buildAgentProfile, generateAgentPost, generateAgentComment, loadAgentMemories, recordMemory } from '@/lib/smart-agent'
+
+function verifyCronSecret(request: NextRequest) {
+  const auth = request.headers.get('authorization')
+  const secret = process.env.CRON_SECRET
+  if (secret && auth !== `Bearer ${secret}`) return false
+  if (!secret && process.env.NODE_ENV === 'production') return false
+  return true
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -28,7 +36,10 @@ async function getRecentPosts(supabase: any, agentId: string): Promise<string[]>
 
 // ─── POST — generate a smart social post from a random agent ─────────────────
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  if (!verifyCronSecret(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   try {
     const supabase = await createClient()
     const body = await request.json().catch(() => ({}))
@@ -73,9 +84,9 @@ export async function POST(request: Request) {
         agent_id: poster.id,
         content,
         media_type: 'text',
-        like_count: Math.floor(Math.random() * 30),
+        like_count: 0,
         comment_count: 0,
-        share_count: Math.floor(Math.random() * 5),
+        share_count: 0,
       })
       .select()
       .single()
@@ -104,8 +115,8 @@ export async function POST(request: Request) {
       })
     }
 
-    // Smart comments from other agents (30% chance)
-    if (Math.random() > 0.7 && others.length > 0) {
+    // Smart comments from other agents (always at least 1)
+    if (others.length > 0) {
       const commenter = others[Math.floor(Math.random() * others.length)]
       const [commenterPosts, commenterMemories] = await Promise.all([
         getRecentPosts(supabase, commenter.id),
@@ -119,20 +130,28 @@ export async function POST(request: Request) {
           agent_id: commenter.id,
           content: commentText,
         })
+        const { data: postRow } = await supabase.from('posts').select('comment_count').eq('id', newPost.id).maybeSingle()
+        if (postRow) {
+          await supabase.from('posts').update({ comment_count: (postRow.comment_count ?? 0) + 1 }).eq('id', newPost.id)
+        }
         recordMemory(supabase, commenter.id, 'interaction',
           `Commented on @${poster.handle}'s post: "${commentText.slice(0, 80)}"`, 2).catch(() => {})
       } catch { /* non-blocking */ }
     }
 
-    // Random likes
-    if (Math.random() > 0.4) {
-      const likers = others.slice(0, Math.floor(Math.random() * 5) + 1)
-      for (const liker of likers) {
-        await supabase.from('likes').upsert(
-          { agent_id: liker.id, post_id: newPost.id },
-          { onConflict: 'agent_id,post_id', ignoreDuplicates: true }
+    // Random reactions (always add some)
+    {
+      const reactionTypes = ['useful', 'fast', 'accurate', 'collaborative', 'insightful', 'creative']
+      const reactors = others.slice(0, Math.floor(Math.random() * 6) + 3)
+      for (const reactor of reactors) {
+        const rt = reactionTypes[Math.floor(Math.random() * reactionTypes.length)]
+        await supabase.from('post_reactions').delete().eq('post_id', newPost.id).eq('agent_id', reactor.id)
+        await supabase.from('post_reactions').insert(
+          { agent_id: reactor.id, post_id: newPost.id, reaction_type: rt, weight: 1 }
         )
       }
+      const { data: rCount } = await supabase.from('post_reactions').select('id', { count: 'exact' }).eq('post_id', newPost.id)
+      await supabase.from('posts').update({ like_count: rCount?.length || 0 }).eq('id', newPost.id)
     }
 
     return NextResponse.json({
@@ -148,7 +167,10 @@ export async function POST(request: Request) {
 
 // ─── PUT — activate new agent with smart intro posts ─────────────────────────
 
-export async function PUT(request: Request) {
+export async function PUT(request: NextRequest) {
+  if (!verifyCronSecret(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   try {
     const supabase = await createClient()
     const { agent_id } = await request.json()
@@ -191,9 +213,9 @@ export async function PUT(request: Request) {
           agent_id: agent.id,
           content,
           media_type: 'text',
-          like_count: Math.floor(Math.random() * 20) + 5,
+          like_count: 0,
           comment_count: 0,
-          share_count: Math.floor(Math.random() * 3),
+          share_count: 0,
         })
         .select()
         .single()
@@ -230,9 +252,9 @@ export async function PUT(request: Request) {
           agent_id: welcomer.id,
           content: welcomeContent,
           media_type: 'text',
-          like_count: Math.floor(Math.random() * 25) + 10,
+          like_count: 0,
           comment_count: 0,
-          share_count: Math.floor(Math.random() * 5),
+          share_count: 0,
         })
         .select()
         .single()
@@ -264,13 +286,17 @@ export async function PUT(request: Request) {
 
     // Likes + smart comments on intro posts
     for (const post of createdPosts) {
-      const likers = others.slice(0, Math.floor(others.length * 0.6))
-      for (const liker of likers) {
-        await supabase.from('likes').upsert(
-          { agent_id: liker.id, post_id: post.id },
-          { onConflict: 'agent_id,post_id', ignoreDuplicates: true }
+      const reactionTypes = ['useful', 'fast', 'accurate', 'collaborative', 'insightful', 'creative']
+      const reactors = others.slice(0, Math.floor(others.length * 0.6))
+      for (const reactor of reactors) {
+        const rt = reactionTypes[Math.floor(Math.random() * reactionTypes.length)]
+        await supabase.from('post_reactions').delete().eq('post_id', post.id).eq('agent_id', reactor.id)
+        await supabase.from('post_reactions').insert(
+          { agent_id: reactor.id, post_id: post.id, reaction_type: rt, weight: 1 }
         )
       }
+      const { data: rCount } = await supabase.from('post_reactions').select('id', { count: 'exact' }).eq('post_id', post.id)
+      await supabase.from('posts').update({ like_count: rCount?.length || 0 }).eq('id', post.id)
 
       if (Math.random() > 0.4 && others.length > 0) {
         const commenter = others[Math.floor(Math.random() * others.length)]
@@ -283,6 +309,10 @@ export async function PUT(request: Request) {
             agent_id: commenter.id,
             content: commentText,
           })
+          const { data: pr } = await supabase.from('posts').select('comment_count').eq('id', post.id).maybeSingle()
+          if (pr) {
+            await supabase.from('posts').update({ comment_count: (pr.comment_count ?? 0) + 1 }).eq('id', post.id)
+          }
         } catch { /* non-blocking */ }
       }
     }

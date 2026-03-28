@@ -10,7 +10,7 @@ import {
   Compass,
   MessageCircle,
   Bell,
-  PlusSquare,
+  Bot,
   Briefcase,
   FileText,
   Settings,
@@ -23,6 +23,7 @@ import {
   LogOut,
   Radio,
   Code,
+  ChevronDown,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { AgentAvatar } from './agent-avatar'
@@ -40,21 +41,20 @@ interface SidebarProps {
   className?: string
 }
 
-const mainNavItems = [
-  { href: '/', label: 'Home', icon: Home },
+const coreNavItems = [
+  { href: '/', label: 'Feed', icon: Home },
   { href: '/explore', label: 'Explore', icon: Compass },
-  { href: '/marketplace', label: 'Marketplace', icon: Briefcase },
   { href: '/contracts', label: 'Contracts', icon: FileText },
   { href: '/wallet', label: 'Wallet', icon: Wallet },
-  { href: '/token', label: 'RELAY Token', icon: Coins },
-  { href: '/tokens', label: 'Agent Tokens', icon: Rocket },
-  { href: '/businesses', label: 'Businesses', icon: Building2 },
-  { href: '/messages', label: 'Messages', icon: MessageCircle },
   { href: '/notifications', label: 'Notifications', icon: Bell },
 ]
 
-const secondaryNavItems = [
-  { href: '/create', label: 'Create', icon: PlusSquare },
+const moreNavItems = [
+  { href: '/marketplace', label: 'Marketplace', icon: Briefcase },
+  { href: '/token', label: 'Token', icon: Coins },
+  { href: '/tokens', label: 'Agent Tokens', icon: Rocket },
+  { href: '/businesses', label: 'Businesses', icon: Building2 },
+  { href: '/messages', label: 'Messages', icon: MessageCircle },
   { href: '/network', label: 'Network', icon: Radio },
   { href: '/developers', label: 'Developers', icon: Code },
   { href: '/audit', label: 'Audit', icon: Shield },
@@ -69,6 +69,14 @@ export function Sidebar({ className }: SidebarProps) {
   const [userAvatar, setUserAvatar] = useState<string | null>(null)
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const unreadCount = useUnreadNotifications()
+  const [moreOpen, setMoreOpen] = useState(false)
+
+  // Auto-expand "More" when on a nested page
+  useEffect(() => {
+    if (moreNavItems.some((item) => pathname === item.href)) {
+      setMoreOpen(true)
+    }
+  }, [pathname])
 
   async function handleLogout() {
     try {
@@ -93,50 +101,20 @@ export function Sidebar({ className }: SidebarProps) {
       setUserAvatar(oauthAvatar)
       setUserEmail(user.user_metadata?.full_name || user.email || null)
 
-      const userId = user.id
-
-      async function claimAgent(agentId: string) {
-        const { data: a } = await supabase.from('agents').select('*').eq('id', agentId).maybeSingle()
-        if (a) {
-          setAgent(a)
-          await supabase.from('agents').update({ user_id: userId }).eq('id', agentId)
-          localStorage.setItem('relay_agent_id', agentId)
-          return true
-        }
-        return false
-      }
-
-      // 1. user_id match (newly created agents)
+      // Resolve agent ONLY by authenticated user_id — no localStorage fallbacks
+      // This is the single source of truth for user→agent binding
       const { data } = await supabase
         .from('agents').select('*').eq('user_id', user.id)
         .order('created_at', { ascending: false }).limit(1).maybeSingle()
-      if (data) { setAgent(data); return }
-
-      // 2. relay_agent_id in localStorage
-      const storedId = localStorage.getItem('relay_agent_id')
-      if (storedId && await claimAgent(storedId)) return
-
-      // 3. Any relay_keypair_<uuid> key in localStorage (set by claimPendingKeypair)
-      const keypairKey = Object.keys(localStorage).find(k => k.startsWith('relay_keypair_'))
-      if (keypairKey) {
-        const agentId = keypairKey.replace('relay_keypair_', '')
-        if (await claimAgent(agentId)) return
+      if (data) {
+        setAgent(data)
+        localStorage.setItem('relay_agent_id', data.id)
+        return
       }
 
-      // 4. agent_identities.oauth_id lookup
-      const { data: identity } = await supabase
-        .from('agent_identities').select('agent_id').eq('oauth_id', user.id).maybeSingle()
-      if (identity?.agent_id && await claimAgent(identity.agent_id)) return
-
-      // 5. Last resort: most recent unclaimed agent (user created it before auth fix)
-      const { data: unclaimed } = await supabase
-        .from('agents').select('*').is('user_id', null)
-        .order('created_at', { ascending: false }).limit(1).maybeSingle()
-      if (unclaimed) {
-        setAgent(unclaimed)
-        await supabase.from('agents').update({ user_id: user.id }).eq('id', unclaimed.id)
-        localStorage.setItem('relay_agent_id', unclaimed.id)
-      }
+      // No agent found — user needs to create one via /create-agent
+      // Clear any stale localStorage that could cause confusion
+      localStorage.removeItem('relay_agent_id')
     }
     loadAgent()
   }, [])
@@ -172,7 +150,7 @@ export function Sidebar({ className }: SidebarProps) {
 
         {/* Main navigation */}
         <nav className="flex-1 px-2 xl:px-3 py-4 space-y-1 overflow-y-auto">
-          {mainNavItems.map((item) => {
+          {coreNavItems.map((item) => {
             const isActive = pathname === item.href
             return (
               <Tooltip key={item.href}>
@@ -210,9 +188,58 @@ export function Sidebar({ className }: SidebarProps) {
             )
           })}
 
-          <div className="my-4 h-px bg-sidebar-border" />
+          {/* Primary action — Create Agent */}
+          <div className="py-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Link
+                  href="/create-agent"
+                  className={cn(
+                    'flex items-center justify-center xl:justify-start gap-4 px-3 py-3.5 rounded-xl',
+                    'bg-primary text-primary-foreground font-semibold',
+                    'hover:bg-primary/90 transition-all duration-200',
+                    'shadow-lg shadow-primary/25'
+                  )}
+                >
+                  <Bot className="w-6 h-6 shrink-0" />
+                  <span className="hidden xl:block">Create Agent</span>
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent side="right" sideOffset={10}>
+                <p>Create Agent</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
 
-          {secondaryNavItems.map((item) => {
+          <div className="my-2 h-px bg-sidebar-border" />
+
+          {/* More — collapsible */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => setMoreOpen((v) => !v)}
+                className={cn(
+                  'w-full flex items-center gap-4 px-3 py-3 rounded-xl',
+                  'transition-all duration-200',
+                  'hover:bg-sidebar-accent',
+                  'text-sidebar-foreground/70 hover:text-sidebar-foreground'
+                )}
+              >
+                <ChevronDown
+                  className={cn(
+                    'w-6 h-6 shrink-0 transition-transform duration-200',
+                    !moreOpen && '-rotate-90'
+                  )}
+                />
+                <span className="hidden xl:block font-medium">More</span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right" sideOffset={10}>
+              <p>More</p>
+            </TooltipContent>
+          </Tooltip>
+
+          {moreOpen && moreNavItems.map((item) => {
             const isActive = pathname === item.href
             return (
               <Tooltip key={item.href}>
@@ -224,16 +251,17 @@ export function Sidebar({ className }: SidebarProps) {
                       'transition-all duration-200',
                       'hover:bg-sidebar-accent',
                       isActive && 'bg-sidebar-accent text-sidebar-primary',
-                      !isActive && 'text-sidebar-foreground/70 hover:text-sidebar-foreground'
+                      !isActive && 'text-sidebar-foreground/70 hover:text-sidebar-foreground',
+                      'xl:pl-6'
                     )}
                   >
                     <item.icon
                       className={cn(
-                        'w-6 h-6 shrink-0',
+                        'w-5 h-5 shrink-0',
                         isActive && 'text-primary'
                       )}
                     />
-                    <span className="hidden xl:block font-medium">
+                    <span className="hidden xl:block text-sm font-medium">
                       {item.label}
                     </span>
                   </Link>

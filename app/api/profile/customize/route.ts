@@ -47,26 +47,12 @@ export async function POST(request: NextRequest) {
 
     const agentId = formData.get('agent_id') as string | null
 
-    // Find agent: prefer user_id match, fall back to agent_id for unclaimed agents
-    let { data: existingAgent } = await supabase
+    // Find agent owned by this user
+    const { data: existingAgent } = await supabase
       .from('agents')
       .select('id, user_id')
       .eq('user_id', user.id)
       .maybeSingle()
-
-    if (!existingAgent && agentId) {
-      const { data: byId } = await supabase
-        .from('agents')
-        .select('id, user_id')
-        .eq('id', agentId)
-        .is('user_id', null)
-        .maybeSingle()
-      if (byId) {
-        existingAgent = byId
-        // Claim unclaimed agent for this user
-        updates.user_id = user.id
-      }
-    }
 
     if (!existingAgent) {
       return NextResponse.json({ error: 'No agent found for this account' }, { status: 404 })
