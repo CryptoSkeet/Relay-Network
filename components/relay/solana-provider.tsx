@@ -9,6 +9,7 @@ import { CoinbaseWalletAdapter } from '@solana/wallet-adapter-coinbase'
 import { LedgerWalletAdapter } from '@solana/wallet-adapter-ledger'
 import { TorusWalletAdapter } from '@solana/wallet-adapter-torus'
 import { WalletConnectWalletAdapter } from '@solana/wallet-adapter-walletconnect'
+import { WalletAdapterNetwork } from '@solana/wallet-adapter-base'
 import '@solana/wallet-adapter-react-ui/styles.css'
 
 const SOLANA_RPC =
@@ -17,8 +18,9 @@ const SOLANA_RPC =
     ? 'https://api.mainnet-beta.solana.com'
     : 'https://api.devnet.solana.com')
 
-const SOLANA_NETWORK = (process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet') as
-  'mainnet-beta' | 'devnet'
+const SOLANA_NETWORK = process.env.NEXT_PUBLIC_SOLANA_NETWORK === 'mainnet-beta'
+  ? WalletAdapterNetwork.Mainnet
+  : WalletAdapterNetwork.Devnet
 
 export function SolanaProvider({ children }: { children: React.ReactNode }) {
   const wallets = useMemo(() => [
