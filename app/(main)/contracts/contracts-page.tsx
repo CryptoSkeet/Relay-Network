@@ -258,10 +258,10 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
 
   const filteredContracts = viewFilteredContracts.filter(contract => {
     if (filter === 'all') return true
-    if (filter === 'open') return ['open', 'OPEN'].includes(contract.status)
-    if (filter === 'active') return ['in_progress', 'delivered', 'active', 'ACTIVE', 'PENDING', 'DELIVERED'].includes(contract.status)
+    if (filter === 'open') return ['open', 'OPEN', 'PENDING'].includes(contract.status)
+    if (filter === 'active') return ['in_progress', 'active', 'ACTIVE', 'DELIVERED', 'delivered'].includes(contract.status)
     if (filter === 'delivered') return ['delivered', 'DELIVERED'].includes(contract.status)
-    if (filter === 'completed') return ['completed', 'SETTLED'].includes(contract.status)
+    if (filter === 'completed') return ['completed', 'SETTLED', 'CANCELLED', 'cancelled'].includes(contract.status)
     if (filter === 'disputed') return ['disputed', 'DISPUTED'].includes(contract.status)
     return contract.status === filter
   })
@@ -285,7 +285,7 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
       
       // Update local state
       setContracts(prev => prev.map(c =>
-        c.id === contractId ? { ...c, status: 'delivered' as const } : c
+        c.id === contractId ? { ...c, status: 'DELIVERED' as const } : c
       ))
       setSelectedContract(null)
     } catch (error) {
@@ -311,7 +311,7 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
       
       // Update local state
       setContracts(prev => prev.map(c => 
-        c.id === contractId ? { ...c, status: 'completed' } : c
+        c.id === contractId ? { ...c, status: 'SETTLED' } : c
       ))
       setSelectedContract(null)
     } catch (error) {
@@ -403,7 +403,7 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
     const { error } = await supabase
       .from('contracts')
       .update({ 
-        status: 'completed', 
+        status: 'SETTLED', 
         completed_at: new Date().toISOString() 
       })
       .eq('id', contractId)
@@ -411,60 +411,23 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
     if (!error) {
       setContracts(prev => prev.map(c => 
         c.id === contractId 
-          ? { ...c, status: 'completed', completed_at: new Date().toISOString() }
+          ? { ...c, status: 'SETTLED', completed_at: new Date().toISOString() }
           : c
       ))
     }
   }
 
-  // Auto-check and complete contracts when all milestones reach 100%
-  useEffect(() => {
-    const checkAndAutoComplete = async () => {
-      const supabase = createClient()
-      for (const contract of contracts) {
-        // Skip already completed, cancelled, or disputed contracts (engine uses uppercase)
-        if (['completed', 'SETTLED', 'cancelled', 'CANCELLED', 'disputed', 'DISPUTED'].includes(contract.status)) continue
-        
-        const milestones = contractMilestones[contract.id] || []
-        if (milestones.length === 0) continue
-        
-        // Check if all milestones are at 100%
-        const allComplete = milestones.every(m => m.progress_percent === 100)
-        
-        if (allComplete) {
-          // Auto-complete the contract directly
-          const { error } = await supabase
-            .from('contracts')
-            .update({ 
-              status: 'completed', 
-              completed_at: new Date().toISOString() 
-            })
-            .eq('id', contract.id)
-
-          if (!error) {
-            setContracts(prev => prev.map(c => 
-              c.id === contract.id 
-                ? { ...c, status: 'completed', completed_at: new Date().toISOString() }
-                : c
-            ))
-          }
-        }
-      }
-    }
-
-    // Only run when we have milestone data
-    if (Object.keys(contractMilestones).length > 0) {
-      checkAndAutoComplete()
-    }
-  }, [contractMilestones, contracts])
+  // Auto-complete is disabled — contracts should only transition via the
+  // contract engine API (deliver → verify → SETTLED). The old useEffect was
+  // silently mass-writing 'completed' on every page view, corrupting data.
 
   const stats = useMemo(() => {
     const baseContracts = viewFilteredContracts
     return {
       total: baseContracts.length,
-      active: baseContracts.filter(c => ['in_progress', 'delivered', 'active', 'ACTIVE', 'PENDING', 'DELIVERED'].includes(c.status)).length,
-      completed: baseContracts.filter(c => ['completed', 'SETTLED'].includes(c.status)).length,
-      open: baseContracts.filter(c => ['open', 'OPEN'].includes(c.status)).length,
+      open: baseContracts.filter(c => ['open', 'OPEN', 'PENDING'].includes(c.status)).length,
+      active: baseContracts.filter(c => ['in_progress', 'active', 'ACTIVE', 'DELIVERED', 'delivered'].includes(c.status)).length,
+      completed: baseContracts.filter(c => ['completed', 'SETTLED', 'CANCELLED', 'cancelled'].includes(c.status)).length,
       disputed: baseContracts.filter(c => ['disputed', 'DISPUTED'].includes(c.status)).length,
     }
   }, [viewFilteredContracts])

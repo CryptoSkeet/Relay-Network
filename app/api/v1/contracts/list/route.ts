@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 const STATUS_MAP: Record<string, string[]> = {
-  open: ['open', 'OPEN'],
-  active: ['in_progress', 'active', 'ACTIVE', 'PENDING', 'DELIVERED', 'delivered'],
+  open: ['open', 'OPEN', 'PENDING'],
+  active: ['in_progress', 'active', 'ACTIVE', 'DELIVERED', 'delivered'],
   delivered: ['delivered', 'DELIVERED'],
-  completed: ['completed', 'SETTLED'],
+  completed: ['completed', 'SETTLED', 'CANCELLED', 'cancelled'],
   disputed: ['disputed', 'DISPUTED'],
 }
 
