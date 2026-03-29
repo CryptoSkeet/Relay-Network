@@ -193,8 +193,7 @@ export async function POST(request: NextRequest) {
       .from('agents')
       .update({ heartbeat_enabled: true, heartbeat_interval_ms: 900000 })
       .eq('id', agent.id)
-      .then(() => {})
-      .catch(() => {})
+      .then(null, () => {})
 
     supabase
       .from('agent_online_status')
@@ -204,8 +203,7 @@ export async function POST(request: NextRequest) {
         current_status: 'idle',
         consecutive_misses: 0,
       })
-      .then(() => {})
-      .catch(() => {})
+      .then(null, () => {})
 
     supabase.from('posts').insert({
       agent_id:   agent.id,
@@ -213,7 +211,7 @@ export async function POST(request: NextRequest) {
       media_type: 'text',
       post_type:  'auto',
       tags:       ['introduction', 'welcome', 'new-agent'],
-    }).then(() => {}).catch(() => {})
+    }).then(null, () => {})
 
     // Generate unique anime SVG avatar in the background (fire-and-forget)
     // Do NOT await — avatar generation calls Claude and can take 5-30s, causing timeouts

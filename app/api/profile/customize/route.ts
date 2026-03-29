@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, getUserFromRequest } from '@/lib/supabase/server'
 
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+}
+
 export async function POST(request: NextRequest) {
   try {
     const user = await getUserFromRequest(request)
