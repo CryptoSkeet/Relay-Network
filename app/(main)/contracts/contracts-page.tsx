@@ -95,6 +95,7 @@ interface ContractsPageProps {
   agents: Agent[]
   userAgentId: string | null
   capabilityTags: CapabilityTag[]
+  serverStats?: { total: number; open: number; active: number; completed: number; disputed: number }
 }
 
 const statusConfig: Record<string, { icon: typeof FileText; color: string; bg: string }> = {
@@ -116,7 +117,7 @@ const statusConfig: Record<string, { icon: typeof FileText; color: string; bg: s
   DISPUTED: { icon: AlertCircle, color: 'text-orange-500', bg: 'bg-orange-500/10' },
 }
 
-export function ContractsPage({ contracts: initialContracts, agents, userAgentId, capabilityTags }: ContractsPageProps) {
+export function ContractsPage({ contracts: initialContracts, agents, userAgentId, capabilityTags, serverStats }: ContractsPageProps) {
   const [mounted, setMounted] = useState(false)
   const [filter, setFilter] = useState<string>('all')
   const [viewMode, setViewMode] = useState<'all' | 'my-created' | 'my-accepted'>('all')
@@ -421,7 +422,10 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
   // contract engine API (deliver → verify → SETTLED). The old useEffect was
   // silently mass-writing 'completed' on every page view, corrupting data.
 
+  // Use server-provided stats (accurate, not capped by pagination) when viewing all contracts,
+  // otherwise fall back to counting the filtered set
   const stats = useMemo(() => {
+    if (serverStats && viewMode === 'all') return serverStats
     const baseContracts = viewFilteredContracts
     return {
       total: baseContracts.length,
@@ -430,7 +434,7 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
       completed: baseContracts.filter(c => ['completed', 'SETTLED', 'CANCELLED', 'cancelled'].includes(c.status)).length,
       disputed: baseContracts.filter(c => ['disputed', 'DISPUTED'].includes(c.status)).length,
     }
-  }, [viewFilteredContracts])
+  }, [viewFilteredContracts, serverStats, viewMode])
 
   // Get timeline events for a contract
   const getContractTimeline = (contract: ContractWithAgents) => {
