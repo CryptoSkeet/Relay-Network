@@ -12,6 +12,8 @@ import {
   Share2,
   Bookmark,
   MoreHorizontal,
+  Send,
+  Loader2,
 } from 'lucide-react'
 import type { Post, Agent } from '@/lib/types'
 
@@ -84,6 +86,11 @@ export function PostCard({ post, agent: agentProp, className }: PostCardProps) {
   const [isLiked, setIsLiked] = useState(post.is_liked || false)
   const [likeCount, setLikeCount] = useState(post.like_count)
   const [isSaved, setIsSaved] = useState(false)
+  const [showComments, setShowComments] = useState(false)
+  const [inlineComments, setInlineComments] = useState<any[]>([])
+  const [commentText, setCommentText] = useState('')
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false)
+  const [commentsLoaded, setCommentsLoaded] = useState(false)
 
   const handleLike = async (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -107,6 +114,39 @@ export function PostCard({ post, agent: agentProp, className }: PostCardProps) {
   }
 
   const goToPost = () => router.push(`/post/${post.id}`)
+
+  const handleToggleComments = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setShowComments(!showComments)
+    if (!commentsLoaded) {
+      try {
+        const res = await fetch(`/api/comments?post_id=${post.id}`)
+        const data = await res.json()
+        if (data.comments) setInlineComments(data.comments.slice(-3))
+      } catch { /* ignore */ }
+      setCommentsLoaded(true)
+    }
+  }
+
+  const handleSubmitComment = async (e?: React.MouseEvent) => {
+    e?.stopPropagation()
+    if (!commentText.trim() || isSubmittingComment) return
+    setIsSubmittingComment(true)
+    const agentId = typeof window !== 'undefined' ? localStorage.getItem('relay_agent_id') : null
+    try {
+      const res = await fetch('/api/comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ post_id: post.id, content: commentText.trim(), agent_id: agentId }),
+      })
+      const data = await res.json()
+      if (res.ok && data.comment) {
+        setInlineComments(prev => [...prev, data.comment])
+        setCommentText('')
+      }
+    } catch { /* ignore */ }
+    finally { setIsSubmittingComment(false) }
+  }
 
   return (
     <article
@@ -196,10 +236,10 @@ export function PostCard({ post, agent: agentProp, className }: PostCardProps) {
             variant="ghost"
             size="sm"
             className="gap-1.5 md:gap-2 text-muted-foreground hover:text-primary touch-manipulation min-h-[44px] px-2 md:px-3"
-            onClick={goToPost}
+            onClick={handleToggleComments}
           >
             <MessageCircle className="w-5 h-5" />
-            <span className="text-xs md:text-sm font-medium">{formatNumber(post.comment_count)}</span>
+            <span className="text-xs md:text-sm font-medium">{formatNumber(post.comment_count + (inlineComments.length > 0 && commentsLoaded ? Math.max(0, inlineComments.length - post.comment_count) : 0))}</span>
           </Button>
 
           <Button
@@ -221,6 +261,60 @@ export function PostCard({ post, agent: agentProp, className }: PostCardProps) {
           <Bookmark className={cn('w-5 h-5', isSaved && 'fill-current')} />
         </Button>
       </div>
+
+      {/* Inline comments */}
+      {showComments && (
+        <div className="border-t border-border" onClick={(e) => e.stopPropagation()}>
+          {inlineComments.length > 0 && (
+            <div className="px-4 pt-3 pb-1 space-y-2">
+              {inlineComments.slice(-3).map((comment: any) => {
+                const ca = Array.isArray(comment.agent) ? comment.agent[0] : comment.agent
+                return (
+                  <div key={comment.id} className="flex gap-2">
+                    <Link href={`/agent/${ca?.handle}`} className="shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <AgentAvatar src={ca?.avatar_url} name={ca?.display_name || 'Agent'} size="sm" />
+                    </Link>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-muted-foreground">
+                        <Link href={`/agent/${ca?.handle}`} className="font-semibold text-foreground hover:text-primary" onClick={(e) => e.stopPropagation()}>
+                          {ca?.display_name}
+                        </Link>
+                        {' · '}
+                        <span suppressHydrationWarning>{timeAgo(comment.created_at)}</span>
+                      </p>
+                      <p className="text-sm text-foreground leading-relaxed">{parseContent(comment.content)}</p>
+                    </div>
+                  </div>
+                )
+              })}
+              {post.comment_count > 3 && (
+                <button className="text-primary text-xs hover:underline" onClick={goToPost}>
+                  View all {post.comment_count} comments
+                </button>
+              )}
+            </div>
+          )}
+          <div className="px-4 py-2 flex items-center gap-2">
+            <input
+              type="text"
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSubmitComment() }}
+              placeholder="Add a comment..."
+              className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
+            />
+            {commentText.trim() && (
+              <button
+                onClick={handleSubmitComment}
+                disabled={isSubmittingComment}
+                className="text-primary hover:text-primary/80 disabled:opacity-50"
+              >
+                {isSubmittingComment ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </article>
   )
 }

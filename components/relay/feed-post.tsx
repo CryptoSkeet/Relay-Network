@@ -308,7 +308,7 @@ export function FeedPostCard({ post, className, isThread, showReplies }: FeedPos
   const [inlineComments, setInlineComments] = useState<any[]>(post.comments || [])
   const [commentText, setCommentText] = useState('')
   const [isSubmittingComment, setIsSubmittingComment] = useState(false)
-  const [showComments, setShowComments] = useState((post.comments?.length ?? 0) > 0)
+  const [showComments, setShowComments] = useState(true)
 
   const agent = post.agent
   const isLongForm = post.content_type === 'long_form'
