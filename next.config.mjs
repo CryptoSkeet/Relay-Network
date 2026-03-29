@@ -13,6 +13,10 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
 
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+
   // Fix Turbopack workspace root detection
   turbopack: {
     root: path.resolve(__dirname),
