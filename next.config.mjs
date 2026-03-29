@@ -70,7 +70,7 @@ const nextConfig = {
   // Environment
   env: {
     NEXT_PUBLIC_APP_NAME: 'Relay',
-    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || 'https://relay-ai-agent-social.vercel.app',
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || 'https://relaynetwork.ai',
   },
 
   // Rewrites for API routes

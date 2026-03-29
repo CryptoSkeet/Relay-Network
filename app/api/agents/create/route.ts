@@ -18,11 +18,13 @@
 import { NextRequest } from 'next/server'
 import { createClient, getUserFromRequest } from '@/lib/supabase/server'
 import { AGENT_TYPE_CAPABILITIES, type AgentType } from '@/lib/relay/agent-engine'
+import { checkRateLimit, agentCreationRateLimit, rateLimitResponse } from '@/lib/ratelimit'
 import { Connection } from '@solana/web3.js'
 // @ts-ignore
 import { deriveAgentDID, mintAgentNFT, loadPayerKeypair } from '@/lib/agent-factory'
 
 const SIGNUP_BONUS = 1000
+const MAX_AGENTS_PER_USER = 5
 const SOLANA_RPC = process.env.NEXT_PUBLIC_SOLANA_RPC ?? 'https://api.devnet.solana.com'
 
 // ---------------------------------------------------------------------------
@@ -63,6 +65,11 @@ export async function GET(request: NextRequest) {
 // ---------------------------------------------------------------------------
 
 export async function POST(request: NextRequest) {
+  // Rate limit agent creation by IP (must happen before stream opens)
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown'
+  const rl = await checkRateLimit(agentCreationRateLimit, ip)
+  if (!rl.success) return rateLimitResponse(rl.retryAfter)
+
   const body = await request.json().catch(() => null)
   if (!body) return Response.json({ error: 'Invalid JSON body' }, { status: 400 })
 
@@ -110,8 +117,8 @@ export async function POST(request: NextRequest) {
           .from('agents')
           .select('id', { count: 'exact', head: true })
           .eq('user_id', user.id)
-        if ((count ?? 0) >= 2) {
-          push('error', { message: 'Maximum 2 agents per user' })
+        if ((count ?? 0) >= MAX_AGENTS_PER_USER) {
+          push('error', { message: `Maximum ${MAX_AGENTS_PER_USER} agents per user` })
           return
         }
 
@@ -143,7 +150,14 @@ export async function POST(request: NextRequest) {
           .select()
           .single()
 
-        if (agentError) throw new Error(agentError.message)
+        if (agentError) {
+          // Handle unique constraint violation (concurrent handle claim)
+          if (agentError.code === '23505' || agentError.message?.includes('duplicate') || agentError.message?.includes('unique')) {
+            push('error', { message: 'Handle already taken' })
+            return
+          }
+          throw new Error(agentError.message)
+        }
 
         // Also store DID in agent_identities for key management
         const { error: didError } = await supabase.from('agent_identities').insert({
@@ -282,15 +296,17 @@ export async function POST(request: NextRequest) {
         })
 
         // Fire background activation (intro posts, stories, social pulse)
-        const apiBase = process.env.NEXT_PUBLIC_APP_URL ?? `https://${request.headers.get('host') ?? 'relay-ai-agent-social.vercel.app'}`
+        const apiBase = process.env.NEXT_PUBLIC_APP_URL || `https://${request.headers.get('host') || 'relay.app'}`
+        const bgHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
+        if (process.env.CRON_SECRET) bgHeaders['Authorization'] = `Bearer ${process.env.CRON_SECRET}`
         fetch(`${apiBase}/api/agent-activity`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: bgHeaders,
           body: JSON.stringify({ agent_id: agent.id }),
         }).catch(() => {})
         fetch(`${apiBase}/api/stories`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: bgHeaders,
           body: JSON.stringify({ agent_id: agent.id }),
         }).catch(() => {})
 

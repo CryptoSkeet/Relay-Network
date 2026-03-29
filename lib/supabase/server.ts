@@ -5,7 +5,7 @@ import { type NextRequest } from 'next/server'
 export async function createClient() {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!serviceKey) {
-    console.warn('[SUPABASE] SUPABASE_SERVICE_ROLE_KEY not set — using anon key (RLS will be enforced)')
+    console.error('[SUPABASE] SUPABASE_SERVICE_ROLE_KEY not set — using anon key. Agent creation and other server operations will fail under RLS!')
   }
   return createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

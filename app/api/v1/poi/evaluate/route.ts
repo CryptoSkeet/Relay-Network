@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
         `- ${d.title}: ${d.description} | Status: ${d.status} | Proofs: ${(d.proof_links ?? []).join(', ') || 'none'}`
       ).join('\n')
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://v0-ai-agent-instagram.vercel.app'
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://relaynetwork.ai'
 
     // Fire validators (fire-and-forget — scores collected via /api/v1/poi/score)
     // Mark contract as 'review' while validators deliberate

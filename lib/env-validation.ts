@@ -21,36 +21,36 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().min(1).optional(),
 
   // Solana
-  NEXT_PUBLIC_SOLANA_NETWORK: z.enum(['devnet', 'mainnet-beta']),
-  RELAY_PAYER_SECRET_KEY: z.string().min(1),
-  SOLANA_WALLET_ENCRYPTION_KEY: z.string().min(1),
-  NEXT_PUBLIC_SOLANA_AUTHORITY_PUBKEY: z.string().min(1),
+  NEXT_PUBLIC_SOLANA_NETWORK: z.enum(['devnet', 'mainnet-beta']).optional().default('devnet'),
+  RELAY_PAYER_SECRET_KEY: z.string().min(1).optional(),
+  SOLANA_WALLET_ENCRYPTION_KEY: z.string().min(1).optional(),
+  NEXT_PUBLIC_SOLANA_AUTHORITY_PUBKEY: z.string().min(1).optional(),
 
   // Security
   CRON_SECRET: z.string().min(32),
-  AGENT_ENCRYPTION_KEY: z.string().min(32),
-  CORS_ALLOWED_ORIGINS: z.string().min(1),
+  AGENT_ENCRYPTION_KEY: z.string().min(32).optional(),
+  CORS_ALLOWED_ORIGINS: z.string().min(1).optional().default('https://relaynetwork.ai'),
 
   // Caching
   KV_REST_API_URL: z.string().url(),
   KV_REST_API_TOKEN: z.string().min(1),
 
   // Storage
-  BLOB_READ_WRITE_TOKEN: z.string().min(1),
+  BLOB_READ_WRITE_TOKEN: z.string().min(1).optional(),
 
-  // Feature Flags
-  NEXT_PUBLIC_ENABLE_STORIES: z.string().transform((val: string) => val === 'true'),
-  NEXT_PUBLIC_ENABLE_MESSAGES: z.string().transform((val: string) => val === 'true'),
-  NEXT_PUBLIC_ENABLE_MARKETPLACE: z.string().transform((val: string) => val === 'true'),
+  // Feature Flags (default to enabled)
+  NEXT_PUBLIC_ENABLE_STORIES: z.string().transform((val: string) => val === 'true').optional().default('true'),
+  NEXT_PUBLIC_ENABLE_MESSAGES: z.string().transform((val: string) => val === 'true').optional().default('true'),
+  NEXT_PUBLIC_ENABLE_MARKETPLACE: z.string().transform((val: string) => val === 'true').optional().default('true'),
 
-  // Rate Limiting
-  RATE_LIMIT_WINDOW_MS: z.string().transform((val: string) => Number(val)).refine((val: number) => val > 0),
-  RATE_LIMIT_MAX_REQUESTS: z.string().transform((val: string) => Number(val)).refine((val: number) => val > 0),
+  // Rate Limiting (defaults: 60s window, 100 requests)
+  RATE_LIMIT_WINDOW_MS: z.string().transform((val: string) => Number(val)).refine((val: number) => val > 0).optional().default('60000'),
+  RATE_LIMIT_MAX_REQUESTS: z.string().transform((val: string) => Number(val)).refine((val: number) => val > 0).optional().default('100'),
 
-  // PoI Configuration
-  POI_VALIDATOR_TEMPO: z.string().transform((val: string) => Number(val)).refine((val: number) => val > 0),
-  POI_BATCH_SIZE: z.string().transform((val: string) => Number(val)).refine((val: number) => val > 0),
-  POI_MODEL_WEIGHT: z.string().transform((val: string) => Number(val)).refine((val: number) => val >= 0 && val <= 1),
+  // PoI Configuration (defaults: 15min tempo, batch 10, weight 0.5)
+  POI_VALIDATOR_TEMPO: z.string().transform((val: string) => Number(val)).refine((val: number) => val > 0).optional().default('900000'),
+  POI_BATCH_SIZE: z.string().transform((val: string) => Number(val)).refine((val: number) => val > 0).optional().default('10'),
+  POI_MODEL_WEIGHT: z.string().transform((val: string) => Number(val)).refine((val: number) => val >= 0 && val <= 1).optional().default('0.5'),
 
   // Optional: Stripe
   STRIPE_SECRET_KEY: z.string().min(1).optional(),

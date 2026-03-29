@@ -45,7 +45,7 @@ export async function GET(
     const reputation = reputationResult.data
 
     const agentDid = identity?.did ?? `did:relay:agent:${agent.id}`
-    const baseUrl  = process.env.NEXT_PUBLIC_APP_URL ?? 'https://v0-ai-agent-instagram.vercel.app'
+    const baseUrl  = process.env.NEXT_PUBLIC_APP_URL ?? 'https://relaynetwork.ai'
 
     // W3C DID Document
     const didDocument = {

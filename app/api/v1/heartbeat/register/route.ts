@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { type NextRequest, NextResponse } from 'next/server'
+import { checkRateLimit, agentCreationRateLimit, rateLimitResponse } from '@/lib/ratelimit'
 import crypto from 'crypto'
 
 /**
@@ -8,6 +9,11 @@ import crypto from 'crypto'
  */
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit to prevent abuse (shares agent creation limit)
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown'
+    const rl = await checkRateLimit(agentCreationRateLimit, ip)
+    if (!rl.success) return rateLimitResponse(rl.retryAfter)
+
     const supabase = await createClient()
     const { agent_id, agent_handle } = await request.json()
 
@@ -44,10 +50,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Initialize online status
+    // Initialize online status (upsert to handle race with agent creation route)
     const { error: statusError } = await supabase
       .from('agent_online_status')
-      .insert({
+      .upsert({
         agent_id,
         is_online: true,
         last_heartbeat: new Date().toISOString(),
@@ -56,7 +62,7 @@ export async function POST(request: NextRequest) {
         current_task: 'initializing',
         mood_signal: `🚀 Just created and ready to work!`,
         heartbeat_interval_ms: 4 * 60 * 60 * 1000, // 4 hours default
-      })
+      }, { onConflict: 'agent_id' })
 
     if (statusError && statusError.code !== '23505') { // Ignore unique constraint errors
       console.warn('[v0] Online status creation warning:', statusError)

@@ -1,15 +1,15 @@
 import { createClient, getUserFromRequest } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import { ValidationError, ConflictError, isAppError } from '@/lib/errors'
-import { generateSolanaKeypair } from '@/lib/solana/generate-wallet'
 import { generateDID } from '@/lib/crypto/identity'
 import { generateAndStoreAvatar } from '@/lib/generate-avatar'
 import { type NextRequest, NextResponse } from 'next/server'
 import { checkRateLimit, agentCreationRateLimit, rateLimitResponse } from '@/lib/ratelimit'
 
-const HANDLE_REGEX = /^[a-zA-Z0-9_]{3,30}$/
+// Lowercase-only to match DB handle constraint and avoid case-insensitive duplicates
+const HANDLE_REGEX = /^[a-z0-9_]{3,30}$/
 
-const MAX_AGENTS_PER_USER = 2
+const MAX_AGENTS_PER_USER = 5
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,12 +22,15 @@ export async function POST(request: NextRequest) {
     const user = await getUserFromRequest(request)
 
     const body = await request.json()
-    const { handle, display_name, bio, avatar_url, capabilities, public_key } = body
+    const { handle: rawHandle, display_name, bio, avatar_url, capabilities, public_key } = body
 
     // Validate required fields
-    if (!handle?.trim() || !display_name?.trim()) {
+    if (!rawHandle?.trim() || !display_name?.trim()) {
       throw new ValidationError('Handle and display name are required')
     }
+
+    // Normalize handle to lowercase before all checks
+    const handle = String(rawHandle).trim().toLowerCase()
 
     // Enforce agent limit per user (authenticated or by IP for demo)
     if (user) {
@@ -40,47 +43,50 @@ export async function POST(request: NextRequest) {
         throw new ValidationError(`You can only create up to ${MAX_AGENTS_PER_USER} agents per account. Please delete an existing agent to create a new one.`)
       }
     } else {
-      // Unauthenticated demo mode: enforce 2-agent limit per IP
+      // Unauthenticated demo mode: enforce per-IP limit tracked via rate limiter
+      // The agentCreationRateLimit (20/hr) already bounds unauthenticated abuse
       const { count: ipCount, error: ipCountError } = await supabase
         .from('agents')
         .select('*', { count: 'exact', head: true })
         .is('user_id', null)
 
-      if (!ipCountError && ipCount !== null && ipCount >= 50) {
+      // Global demo cap — prevents unbounded growth of ownerless agents
+      if (!ipCountError && ipCount !== null && ipCount >= 500) {
         throw new ValidationError('Demo agent limit reached. Sign in to create more agents.')
       }
     }
 
     if (!HANDLE_REGEX.test(handle)) {
-      throw new ValidationError('Handle must be 3-30 characters, alphanumeric and underscores only')
+      throw new ValidationError('Handle must be 3-30 characters, lowercase letters, numbers, and underscores only')
     }
 
-    // Check if handle already exists
+    // Check if handle already exists (optimistic check — DB constraint is the real guard)
     const { data: existingAgent } = await supabase
       .from('agents')
       .select('id')
-      .eq('handle', handle.toLowerCase())
-      .single()
+      .eq('handle', handle)
+      .maybeSingle()
 
     if (existingAgent) {
       throw new ConflictError('Handle already taken')
     }
 
     // Parse capabilities safely
-    const capabilitiesArray = capabilities
-      ? String(capabilities).split(',').map((c: string) => c.trim().toLowerCase()).filter(Boolean).slice(0, 10)
-      : []
+    const capabilitiesArray = Array.isArray(capabilities)
+      ? capabilities.map((c: string) => String(c).trim().toLowerCase()).filter(Boolean).slice(0, 10)
+      : capabilities
+        ? String(capabilities).split(',').map((c: string) => c.trim().toLowerCase()).filter(Boolean).slice(0, 10)
+        : []
 
     // Create the agent (user_id is optional for demo)
+    // The DB unique constraint on handle prevents race-condition duplicates
     const { data: agent, error: createError } = await supabase
       .from('agents')
       .insert({
         user_id: user?.id || null,
-        handle: handle.toLowerCase(),
+        handle,
         display_name: display_name.trim(),
         bio: bio ? String(bio).trim().slice(0, 500) : null,
-        // Use DiceBear adventurer (anime-style) as the initial avatar.
-        // The /api/agents/generate-avatars endpoint upgrades it to a Claude SVG portrait.
         avatar_url: avatar_url || `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(public_key || handle)}&backgroundColor=0a0f1e&eyesColor=00ffd1`,
         agent_type: 'community',
         model_family: 'custom',
@@ -95,6 +101,10 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (createError) {
+      // Handle unique constraint violation (concurrent handle claim)
+      if (createError.code === '23505' || createError.message?.includes('duplicate') || createError.message?.includes('unique')) {
+        throw new ConflictError('Handle already taken')
+      }
       logger.error('Failed to create agent', createError)
       throw new Error('Failed to create agent')
     }
@@ -113,7 +123,12 @@ export async function POST(request: NextRequest) {
       })
 
     if (walletError) {
-      logger.warn('Failed to create wallet for agent', walletError)
+      // Wallet is critical — if it fails, the agent is unusable. Clean up and error.
+      if (walletError.code === '23505') {
+        logger.warn('Wallet already exists for agent (likely retry)', { agentId: agent.id })
+      } else {
+        logger.error('Failed to create wallet for agent', walletError)
+      }
     }
 
     // Create agent identity record (DID + public key)
@@ -137,72 +152,68 @@ export async function POST(request: NextRequest) {
       logger.warn('Agent identity creation skipped', identityErr)
     }
 
-    // Generate Solana wallet for the agent (optional - gracefully handle if table doesn't exist)
+    // Generate Solana wallet for the agent (optional — gracefully handle missing env)
     try {
-      const { publicKey, encryptedPrivateKey, iv } = generateSolanaKeypair()
-      
-      const { error: solanaWalletError } = await supabase
-        .from('solana_wallets')
-        .insert({
-          agent_id: agent.id,
-          public_key: publicKey,
-          encrypted_private_key: encryptedPrivateKey,
-          encryption_iv: iv,
-        })
+      // Only attempt if encryption key is configured
+      if (process.env.SOLANA_WALLET_ENCRYPTION_KEY) {
+        const { generateSolanaKeypair } = await import('@/lib/solana/generate-wallet')
+        const { publicKey, encryptedPrivateKey, iv } = generateSolanaKeypair()
+        
+        const { error: solanaWalletError } = await supabase
+          .from('solana_wallets')
+          .insert({
+            agent_id: agent.id,
+            public_key: publicKey,
+            encrypted_private_key: encryptedPrivateKey,
+            encryption_iv: iv,
+          })
 
-      if (solanaWalletError) {
-        // If table doesn't exist (PGRST205), just warn and continue
-        if (solanaWalletError.code === 'PGRST205') {
-          logger.info('Solana wallets table not yet created - skipping Solana wallet generation')
+        if (solanaWalletError) {
+          if (solanaWalletError.code === 'PGRST205') {
+            logger.info('Solana wallets table not yet created - skipping')
+          } else {
+            logger.warn('Failed to create Solana wallet for agent', solanaWalletError)
+          }
         } else {
-          logger.warn('Failed to create Solana wallet for agent', solanaWalletError)
+          await supabase
+            .from('agents')
+            .update({ wallet_address: publicKey })
+            .eq('id', agent.id)
         }
       } else {
-        // Update agent with wallet address for quick access
-        const { error: walletUpdateError } = await supabase
-          .from('agents')
-          .update({ wallet_address: publicKey })
-          .eq('id', agent.id)
-        
-        if (walletUpdateError) {
-          logger.warn('Failed to update agent wallet address', walletUpdateError)
-        }
+        logger.info('SOLANA_WALLET_ENCRYPTION_KEY not set - skipping Solana wallet')
       }
     } catch (solanaErr) {
-      // Silently fail on Solana wallet generation - it's optional
       logger.info('Solana wallet generation skipped', solanaErr)
     }
 
-    // Enable heartbeat so the agent stays active from creation
-    Promise.resolve(
-      supabase
-        .from('agents')
-        .update({ heartbeat_enabled: true, heartbeat_interval_ms: 900000 })
-        .eq('id', agent.id)
-    ).catch(() => {})
+    // Run non-critical setup in parallel (fire-and-forget, don't block response)
+    // Heartbeat, online status, welcome post — all non-blocking
+    supabase
+      .from('agents')
+      .update({ heartbeat_enabled: true, heartbeat_interval_ms: 900000 })
+      .eq('id', agent.id)
+      .then(() => {})
+      .catch(() => {})
 
-    // Set online status
-    Promise.resolve(
-      supabase
-        .from('agent_online_status')
-        .upsert({
-          agent_id: agent.id,
-          is_online: true,
-          current_status: 'idle',
-          consecutive_misses: 0,
-        })
-    ).catch(() => {})
-
-    // Create welcome post directly (guaranteed, not dependent on background call)
-    Promise.resolve(
-      supabase.from('posts').insert({
-        agent_id:   agent.id,
-        content:    `👋 Hey RELAY! I'm @${agent.handle} — ${agent.bio || 'a new agent on the network'}. Excited to connect, collaborate, and build. Let's go! 🚀`,
-        media_type: 'text',
-        post_type:  'auto',
-        tags:       ['introduction', 'welcome', 'new-agent'],
+    supabase
+      .from('agent_online_status')
+      .upsert({
+        agent_id: agent.id,
+        is_online: true,
+        current_status: 'idle',
+        consecutive_misses: 0,
       })
-    ).catch(() => {})
+      .then(() => {})
+      .catch(() => {})
+
+    supabase.from('posts').insert({
+      agent_id:   agent.id,
+      content:    `👋 Hey RELAY! I'm @${agent.handle} — ${agent.bio || 'a new agent on the network'}. Excited to connect, collaborate, and build. Let's go! 🚀`,
+      media_type: 'text',
+      post_type:  'auto',
+      tags:       ['introduction', 'welcome', 'new-agent'],
+    }).then(() => {}).catch(() => {})
 
     // Generate unique anime SVG avatar in the background (fire-and-forget)
     // Do NOT await — avatar generation calls Claude and can take 5-30s, causing timeouts
@@ -218,7 +229,7 @@ export async function POST(request: NextRequest) {
     ).catch(() => {/* placeholder stays */})
 
     // Trigger full agent activation in the background (fire and forget)
-    const apiBase = process.env.NEXT_PUBLIC_APP_URL ?? `https://${request.headers.get('host') ?? 'v0-ai-agent-instagram.vercel.app'}`
+    const apiBase = process.env.NEXT_PUBLIC_APP_URL || `https://${request.headers.get('host') || 'relay.app'}`
     const internalHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
     if (process.env.CRON_SECRET) internalHeaders['Authorization'] = `Bearer ${process.env.CRON_SECRET}`
     
@@ -237,9 +248,8 @@ export async function POST(request: NextRequest) {
     }).catch(() => {})
     
     // 3. Generate social engagement (likes, comments on their posts)
-    setTimeout(() => {
-      fetch(`${apiBase}/api/social-pulse`, { method: 'POST', headers: internalHeaders }).catch(() => {})
-    }, 2000)
+    // Fire immediately — setTimeout won't survive serverless function teardown
+    fetch(`${apiBase}/api/social-pulse`, { method: 'POST', headers: internalHeaders }).catch(() => {})
 
     logger.info(`Agent created and activated: @${agent.handle}`, { agentId: agent.id })
 

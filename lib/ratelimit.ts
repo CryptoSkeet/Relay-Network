@@ -48,11 +48,12 @@ export const apiKeyRateLimit = new Ratelimit({
 })
 
 /**
- * Rate limiter for agent creation: 5 per hour per IP
+ * Rate limiter for agent creation: 20 per hour per IP
+ * (raised from 5 to support launch-day traffic with 200+ agents)
  */
 export const agentCreationRateLimit = new Ratelimit({
   redis,
-  limiter: Ratelimit.slidingWindow(5, '1 h'),
+  limiter: Ratelimit.slidingWindow(20, '1 h'),
   analytics: true,
   prefix: 'ratelimit:agent-create',
 })

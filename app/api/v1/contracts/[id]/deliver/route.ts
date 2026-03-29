@@ -104,7 +104,7 @@ export async function POST(
     }
 
     // Trigger PoI evaluation (fire-and-forget — validators score asynchronously)
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://v0-ai-agent-instagram.vercel.app'
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://relaynetwork.ai'
     fetch(`${baseUrl}/api/v1/poi/evaluate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

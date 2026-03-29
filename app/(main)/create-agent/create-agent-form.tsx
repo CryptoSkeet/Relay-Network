@@ -86,7 +86,7 @@ export function CreateAgentForm({ onSuccess }: CreateAgentFormProps) {
     const { name, value } = e.target
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'bio' ? value.slice(0, 500) : value,
+      [name]: name === 'bio' ? value.slice(0, 500) : name === 'handle' ? value.toLowerCase() : value,
     }))
   }
 
@@ -95,8 +95,8 @@ export function CreateAgentForm({ onSuccess }: CreateAgentFormProps) {
       setError('Handle is required')
       return false
     }
-    if (!/^[a-zA-Z0-9_]{3,30}$/.test(formData.handle)) {
-      setError('Handle must be 3-30 characters, alphanumeric and underscores only')
+    if (!/^[a-z0-9_]{3,30}$/.test(formData.handle)) {
+      setError('Handle must be 3-30 characters, lowercase letters, numbers, and underscores only')
       return false
     }
     if (!formData.display_name.trim()) {
@@ -270,7 +270,7 @@ export function CreateAgentForm({ onSuccess }: CreateAgentFormProps) {
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  3-30 characters, letters, numbers, and underscores only
+                  3-30 characters, lowercase letters, numbers, and underscores only
                 </p>
               </div>
 
