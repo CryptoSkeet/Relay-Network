@@ -21,6 +21,7 @@ import { SolanaHoldings } from '@/components/relay/solana-holdings'
 import { WalletKeys } from '@/components/relay/wallet-keys'
 import { useWallet } from '@solana/wallet-adapter-react'
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui'
+import { WalletReadyState } from '@solana/wallet-adapter-base'
 import type { Agent, Contract } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { formatDistanceToNow } from 'date-fns'
@@ -120,7 +121,7 @@ export function WalletPage({
   totalSupply = 1000000000
 }: WalletPageProps) {
   const router = useRouter()
-  const { publicKey, connected: solanaConnected } = useWallet()
+  const { publicKey, connected: solanaConnected, wallets: solanaWallets, select, connect, disconnect } = useWallet()
   const [selectedWallet, setSelectedWallet] = useState<WalletData | null>(wallets[0] || null)
   const [stakeAmount, setStakeAmount] = useState([100])
   const [isStaking, setIsStaking] = useState(false)
@@ -933,19 +934,57 @@ export function WalletPage({
           <TabsContent value="wallets" className="space-y-4">
             {/* Solana wallet connection */}
             <Card className={solanaConnected ? 'border-green-500/30 bg-green-500/5' : 'border-primary/20 bg-primary/5'}>
-              <CardContent className="p-4 flex items-center justify-between gap-4">
-                <div>
-                  <p className="font-semibold text-sm flex items-center gap-2">
-                    <WalletIcon className="w-4 h-4" />
-                    {solanaConnected ? 'Solana Wallet Connected' : 'Connect Solana Wallet'}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {solanaConnected && publicKey
-                      ? publicKey.toBase58()
-                      : 'Connect Phantom, Solflare, Coinbase, Ledger, or WalletConnect'}
-                  </p>
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-sm flex items-center gap-2">
+                      <WalletIcon className="w-4 h-4" />
+                      {solanaConnected ? 'Solana Wallet Connected' : 'Connect Solana Wallet'}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {solanaConnected && publicKey
+                        ? publicKey.toBase58()
+                        : 'Select a wallet to connect'}
+                    </p>
+                  </div>
+                  {solanaConnected && (
+                    <Button variant="outline" size="sm" onClick={() => disconnect()}>
+                      Disconnect
+                    </Button>
+                  )}
                 </div>
-                <WalletMultiButton style={{}} />
+                {!solanaConnected && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {solanaWallets.map((w) => {
+                      const installed = w.readyState === WalletReadyState.Installed || w.readyState === WalletReadyState.Loadable
+                      return (
+                        <Button
+                          key={w.adapter.name}
+                          variant="outline"
+                          size="sm"
+                          className="flex items-center gap-2 h-10 justify-start"
+                          onClick={async () => {
+                            if (installed) {
+                              select(w.adapter.name)
+                              try { await connect() } catch {}
+                            } else if (w.adapter.url) {
+                              window.open(w.adapter.url, '_blank', 'noopener')
+                            }
+                          }}
+                        >
+                          {w.adapter.icon && (
+                            <img src={w.adapter.icon} alt={w.adapter.name} className="w-5 h-5 rounded" />
+                          )}
+                          <span className="truncate text-xs">{w.adapter.name}</span>
+                          {!installed && (
+                            <ExternalLink className="w-3 h-3 ml-auto opacity-50" />
+                          )}
+                        </Button>
+                      )
+                    })}
+                    <WalletMultiButton style={{ fontSize: '12px', height: '40px' }} />
+                  </div>
+                )}
               </CardContent>
             </Card>
 
