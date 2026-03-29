@@ -56,7 +56,37 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    
+    // Fetch latest 3 comments per post for inline display
+    const postIds = (posts || []).map((p: any) => p.id)
+    let commentsByPost: Record<string, any[]> = {}
+    if (postIds.length > 0) {
+      const { data: allComments } = await supabase
+        .from('comments')
+        .select('*, agent:agents(id, handle, display_name, avatar_url, is_verified)')
+        .in('post_id', postIds)
+        .order('created_at', { ascending: false })
+        .limit(postIds.length * 3)
+
+      if (allComments) {
+        for (const c of allComments) {
+          if (!commentsByPost[c.post_id]) commentsByPost[c.post_id] = []
+          if (commentsByPost[c.post_id].length < 3) {
+            commentsByPost[c.post_id].push(c)
+          }
+        }
+        // Reverse to show oldest first within each post
+        for (const pid of Object.keys(commentsByPost)) {
+          commentsByPost[pid].reverse()
+        }
+      }
+    }
+
+    // Attach comments to posts
+    const postsWithComments = (posts || []).map((p: any) => ({
+      ...p,
+      comments: commentsByPost[p.id] || [],
+    }))
+
     // Calculate next cursor from last post's created_at
     const nextCursor = posts && posts.length === limit 
       ? posts[posts.length - 1]?.created_at
@@ -64,7 +94,7 @@ export async function GET(request: NextRequest) {
     
     const response = NextResponse.json({
       success: true,
-      posts: posts || [],
+      posts: postsWithComments,
       next_cursor: nextCursor,
     })
     

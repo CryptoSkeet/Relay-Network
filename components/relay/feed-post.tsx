@@ -25,6 +25,8 @@ import {
   Users,
   FileText,
   Sparkles,
+  Send,
+  Loader2,
 } from 'lucide-react'
 import type { Agent } from '@/lib/types'
 import ReactMarkdown from 'react-markdown'
@@ -69,6 +71,7 @@ interface FeedPost {
   agent: Agent
   reactions?: PostReaction[]
   replies?: any[]
+  comments?: any[]
 }
 
 interface FeedPostCardProps {
@@ -302,6 +305,10 @@ export function FeedPostCard({ post, className, isThread, showReplies }: FeedPos
   const [showThreadReplies, setShowThreadReplies] = useState(showReplies || false)
   const [localReactions, setLocalReactions] = useState<PostReaction[]>(post.reactions || [])
   const [myReactions, setMyReactions] = useState<Set<ReactionType>>(new Set())
+  const [inlineComments, setInlineComments] = useState<any[]>(post.comments || [])
+  const [commentText, setCommentText] = useState('')
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false)
+  const [showComments, setShowComments] = useState((post.comments?.length ?? 0) > 0)
 
   const agent = post.agent
   const isLongForm = post.content_type === 'long_form'
@@ -342,6 +349,29 @@ export function FeedPostCard({ post, className, isThread, showReplies }: FeedPos
   
   const handleQuoteRelay = () => {
     router.push(`/create?quote=${post.id}`)
+  }
+
+  const handleSubmitComment = async () => {
+    if (!commentText.trim() || isSubmittingComment) return
+    setIsSubmittingComment(true)
+    const agentId = typeof window !== 'undefined' ? localStorage.getItem('relay_agent_id') : null
+    try {
+      const res = await fetch('/api/comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ post_id: post.id, content: commentText.trim(), agent_id: agentId }),
+      })
+      const data = await res.json()
+      if (res.ok && data.comment) {
+        setInlineComments(prev => [...prev, data.comment])
+        setCommentText('')
+        setShowComments(true)
+      }
+    } catch {
+      // Silent fail — user can retry
+    } finally {
+      setIsSubmittingComment(false)
+    }
   }
   
   const goToPost = () => router.push(`/post/${post.id}`)
@@ -460,10 +490,10 @@ export function FeedPostCard({ post, className, isThread, showReplies }: FeedPos
             variant="ghost"
             size="sm"
             className="gap-1.5 text-muted-foreground hover:text-primary h-8 px-2"
-            onClick={goToPost}
+            onClick={() => setShowComments(!showComments)}
           >
             <MessageCircle className="w-4 h-4" />
-            <span className="text-xs">{formatNumber(post.reply_count)}</span>
+            <span className="text-xs">{formatNumber(post.reply_count + (inlineComments.length > (post.comments?.length ?? 0) ? inlineComments.length - (post.comments?.length ?? 0) : 0))}</span>
           </Button>
 
           <Button
@@ -485,6 +515,62 @@ export function FeedPostCard({ post, className, isThread, showReplies }: FeedPos
           </Button>
         </div>
       </div>
+
+      {/* Inline comments */}
+      {showComments && (
+        <div className="border-t border-border">
+          {inlineComments.length > 0 && (
+            <div className="px-4 pt-3 pb-1 space-y-2">
+              {inlineComments.slice(-3).map((comment: any) => {
+                const ca = Array.isArray(comment.agent) ? comment.agent[0] : comment.agent
+                return (
+                  <div key={comment.id} className="flex gap-2">
+                    <Link href={`/agent/${ca?.handle}`} className="shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <AgentAvatar src={ca?.avatar_url} name={ca?.display_name || 'Agent'} size="sm" />
+                    </Link>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-muted-foreground">
+                        <Link href={`/agent/${ca?.handle}`} className="font-semibold text-foreground hover:text-primary" onClick={(e) => e.stopPropagation()}>
+                          {ca?.display_name}
+                        </Link>
+                        {' · '}
+                        <span suppressHydrationWarning>{timeAgo(comment.created_at)}</span>
+                      </p>
+                      <p className="text-sm text-foreground leading-relaxed">{parseContent(comment.content)}</p>
+                    </div>
+                  </div>
+                )
+              })}
+              {(post.reply_count > 3 || inlineComments.length > 3) && (
+                <button className="text-primary text-xs hover:underline" onClick={goToPost}>
+                  View all comments
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Quick comment input */}
+          <div className="px-4 py-2 flex items-center gap-2">
+            <input
+              type="text"
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSubmitComment() }}
+              placeholder="Add a comment..."
+              className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
+            />
+            {commentText.trim() && (
+              <button
+                onClick={handleSubmitComment}
+                disabled={isSubmittingComment}
+                className="text-primary hover:text-primary/80 disabled:opacity-50"
+              >
+                {isSubmittingComment ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
       
       {/* Thread replies preview */}
       {post.replies && post.replies.length > 0 && (

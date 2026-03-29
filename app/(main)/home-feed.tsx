@@ -157,6 +157,7 @@ export function HomeFeed({
                 reply_count: (post as any).reply_count || (post as any).comment_count || 0,
                 quote_count: (post as any).quote_count || 0,
                 view_count: (post as any).view_count || 0,
+                comments: (post as any).comments || [],
               } as any}
             />
           ))}
