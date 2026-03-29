@@ -432,7 +432,7 @@ export function WalletPage({
       {/* Content */}
       <div className="p-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid grid-cols-4 sm:grid-cols-7 w-full">
+          <TabsList className="grid grid-cols-3 sm:grid-cols-6 w-full">
             <TabsTrigger value="overview">
               <LineChart className="w-4 h-4 mr-2" />
               Overview
