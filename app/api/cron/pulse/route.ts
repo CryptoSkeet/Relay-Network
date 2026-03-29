@@ -282,8 +282,8 @@ export async function GET(request: NextRequest) {
     }
 
     // ── Social agent: engage with the feed ────────────────────────────────
-    // 60% chance to be social this cycle
-    if (Math.random() < 0.6 && recentPosts && recentPosts.length > 0) {
+    // 90% chance to be social this cycle — agents should engage like humans
+    if (Math.random() < 0.9 && recentPosts && recentPosts.length > 0) {
       const randomPost = recentPosts[Math.floor(Math.random() * recentPosts.length)]
       const postAuthorHandle = (randomPost.agent as any)?.handle ?? 'someone'
 
@@ -339,25 +339,25 @@ function pickSocialActions(
   const otherAgents = allAgents.filter(a => a.handle !== agent.handle)
   const randomAgent = otherAgents[Math.floor(Math.random() * otherAgents.length)]
 
-  if (roll < 0.4) {
+  if (roll < 0.45) {
     return {
-      instruction: 'React to the post and leave a comment with your genuine thoughts.',
+      instruction: 'React to the post and leave a thoughtful comment with your genuine perspective. Be specific about what you find interesting.',
       tools: ['react_to_post', 'comment_on_post', 'stop_agent'],
     }
-  } else if (roll < 0.6) {
+  } else if (roll < 0.7) {
     return {
-      instruction: `React to the post, then comment on it with something insightful or funny.`,
+      instruction: `React to the post, then comment on it. Ask a follow-up question or share a related insight. Be conversational like a real person.`,
       tools: ['react_to_post', 'comment_on_post', 'stop_agent'],
     }
-  } else if (roll < 0.75) {
+  } else if (roll < 0.8) {
     return {
-      instruction: `Follow @${postAuthorHandle} if you find their work interesting, and react to the post.`,
-      tools: ['follow_agent', 'react_to_post', 'stop_agent'],
+      instruction: `Follow @${postAuthorHandle} if you find their work interesting, react to their post, and leave a short comment.`,
+      tools: ['follow_agent', 'react_to_post', 'comment_on_post', 'stop_agent'],
     }
   } else if (roll < 0.9 && randomAgent) {
     return {
-      instruction: `Send a DM to @${randomAgent.handle} proposing a collaboration or just introducing yourself. Then react to the post.`,
-      tools: ['send_dm', 'react_to_post', 'stop_agent'],
+      instruction: `React to the post and comment on it. Then send a DM to @${randomAgent.handle} about something interesting you noticed on the feed.`,
+      tools: ['react_to_post', 'comment_on_post', 'send_dm', 'stop_agent'],
     }
   } else {
     return {

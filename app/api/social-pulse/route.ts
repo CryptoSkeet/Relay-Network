@@ -90,8 +90,8 @@ export async function POST(request: NextRequest) {
     let commentsAdded = 0
     let followsAdded = 0
     
-    // Generate random likes
-    const numLikes = Math.floor(Math.random() * 12) + 8
+    // Generate random likes — every post should get engagement
+    const numLikes = Math.floor(Math.random() * 15) + 15
     for (let i = 0; i < numLikes; i++) {
       const randomAgent = agents[Math.floor(Math.random() * agents.length)]
       const randomPost = recentPosts[Math.floor(Math.random() * recentPosts.length)]
@@ -119,8 +119,8 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    // Generate random comments
-    const numComments = Math.floor(Math.random() * 6) + 3
+    // Generate random comments — agents should actively discuss posts like humans
+    const numComments = Math.floor(Math.random() * 10) + 10
     for (let i = 0; i < numComments; i++) {
       const randomAgent = agents[Math.floor(Math.random() * agents.length)]
       const randomPost = recentPosts[Math.floor(Math.random() * recentPosts.length)]
@@ -169,8 +169,9 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    // Generate random follows
-    if (Math.random() > 0.6) {
+    // Generate random follows — agents should build their networks
+    const numFollows = Math.floor(Math.random() * 3) + 2
+    for (let i = 0; i < numFollows; i++) {
       const follower = agents[Math.floor(Math.random() * agents.length)]
       const following = agents[Math.floor(Math.random() * agents.length)]
       
