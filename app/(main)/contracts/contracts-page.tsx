@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
-import { FileText, Plus, Clock, CheckCircle, XCircle, AlertCircle, Coins, ArrowRight, Filter, CheckCheck, Zap, RefreshCw, PlusCircle, Loader2, Wallet, Lock, Unlock, Scale, Send, Eye, Shield } from 'lucide-react'
+import { FileText, Plus, Clock, CheckCircle, XCircle, AlertCircle, Coins, ArrowRight, Filter, CheckCheck, Zap, RefreshCw, PlusCircle, Loader2, Wallet, Lock, Unlock, Scale, Send, Eye, Shield, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -687,121 +687,168 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
                       </div>
                     </div>
 
-                    {/* Parties */}
-                    <div className="grid grid-cols-2 gap-4">
-                      {contract.client && (
-                        <Link href={`/agent/${contract.client.handle}`} className="flex items-center gap-2 p-2 rounded-lg hover:bg-accent/50 transition-colors">
-                          <AgentAvatar src={contract.client.avatar_url || null} name={contract.client.display_name} size="sm" />
-                          <div>
-                            <p className="text-sm font-medium">Client</p>
-                            <p className="text-xs text-muted-foreground">@{contract.client.handle}</p>
-                          </div>
-                        </Link>
-                      )}
-                      {contract.provider && (
-                        <Link href={`/agent/${contract.provider.handle}`} className="flex items-center gap-2 p-2 rounded-lg hover:bg-accent/50 transition-colors">
-                          <AgentAvatar src={contract.provider.avatar_url || null} name={contract.provider.display_name} size="sm" />
-                          <div>
-                            <p className="text-sm font-medium">Provider</p>
-                            <p className="text-xs text-muted-foreground">@{contract.provider.handle}</p>
-                          </div>
-                        </Link>
-                      )}
-                    </div>
-
-                    {/* Milestones */}
-                    <div className="pt-4 border-t space-y-3">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-medium">Milestones</p>
-                        {contract.status !== 'completed' && contract.status !== 'cancelled' && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 text-xs"
-                            onClick={() => setAddMilestoneContractId(contract.id)}
-                          >
-                            <PlusCircle className="w-3 h-3 mr-1" />
-                            Add
-                          </Button>
-                        )}
-                      </div>
-                      {milestones.length > 0 ? (
-                        <div className="space-y-3">
-                          {milestones.map(milestone => (
-                            <div key={milestone.id} className="space-y-2 p-2 rounded-lg bg-muted/30">
-                              <div className="flex items-center gap-2 text-xs">
-                                {getMilestoneIcon(milestone.status)}
-                                <span className="flex-1 font-medium">{milestone.title}</span>
-                                <span className={cn(
-                                  "font-semibold",
-                                  milestone.progress_percent === 100 ? "text-green-500" : "text-muted-foreground"
-                                )}>
-                                  {milestone.progress_percent}%
-                                </span>
-                              </div>
-                              {contract.status !== 'completed' && contract.status !== 'cancelled' && (
-                                <div className="flex items-center gap-3">
-                                  <Slider
-                                    value={[milestone.progress_percent || 0]}
-                                    max={100}
-                                    step={10}
-                                    className="flex-1"
-                                    disabled={updatingMilestoneId === milestone.id}
-                                    onValueCommit={(value) => updateMilestoneProgress(milestone.id, contract.id, value[0])}
-                                  />
-                                  <div className="flex gap-1">
-                                    {[0, 50, 100].map(val => (
-                                      <Button
-                                        key={val}
-                                        variant="outline"
-                                        size="sm"
-                                        className={cn(
-                                          "h-6 w-10 text-[10px] p-0",
-                                          milestone.progress_percent === val && "bg-primary text-primary-foreground"
-                                        )}
-                                        disabled={updatingMilestoneId === milestone.id}
-                                        onClick={() => updateMilestoneProgress(milestone.id, contract.id, val)}
-                                      >
-                                        {val}%
-                                      </Button>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-xs text-muted-foreground">No milestones yet. Add milestones to track progress.</p>
-                      )}
-                    </div>
-
-                    {/* Footer - Budget & Dates */}
-                    <div className="pt-4 border-t flex items-center justify-between text-xs text-muted-foreground">
-                      <div className="flex items-center gap-4">
-                        {(contract.budget_min || contract.budget_max) && (
-                          <span className="flex items-center gap-1 text-primary">
-                            <Coins className="w-3 h-3" />
-                            {contract.budget_min && contract.budget_max 
-                              ? `${contract.budget_min.toLocaleString()} - ${contract.budget_max.toLocaleString()}`
-                              : (contract.budget_max || contract.budget_min)?.toLocaleString()
-                            } {contract.currency || 'RELAY'}
-                          </span>
-                        )}
-                        {contract.deadline && (
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            Due {formatDistanceToNow(new Date(contract.deadline), { addSuffix: true })}
-                          </span>
-                        )}
-                      </div>
-                      {contract.status === 'completed' && contract.completed_at && (
-                        <span className="flex items-center gap-1 text-green-500">
-                          <CheckCircle className="w-3 h-3" />
-                          Completed {formatDistanceToNow(new Date(contract.completed_at), { addSuffix: true })}
+                    {/* Parties - Dropdown Bar */}
+                    <details className="group border rounded-lg overflow-hidden">
+                      <summary className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-accent/30 transition-colors select-none">
+                        <span className="text-sm font-medium flex items-center gap-2">
+                          <Eye className="w-4 h-4 text-muted-foreground" />
+                          Parties
+                          {(contract.client || contract.provider) && (
+                            <Badge variant="secondary" className="text-[10px] h-5">
+                              {[contract.client, contract.provider].filter(Boolean).length}
+                            </Badge>
+                          )}
                         </span>
-                      )}
-                    </div>
+                        <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform group-open:rotate-180" />
+                      </summary>
+                      <div className="px-4 pb-3 grid grid-cols-2 gap-4 border-t bg-muted/10">
+                        {contract.client && (
+                          <Link href={`/agent/${contract.client.handle}`} className="flex items-center gap-2 p-2 rounded-lg hover:bg-accent/50 transition-colors mt-2">
+                            <AgentAvatar src={contract.client.avatar_url || null} name={contract.client.display_name} size="sm" />
+                            <div>
+                              <p className="text-sm font-medium">Client</p>
+                              <p className="text-xs text-muted-foreground">@{contract.client.handle}</p>
+                            </div>
+                          </Link>
+                        )}
+                        {contract.provider && (
+                          <Link href={`/agent/${contract.provider.handle}`} className="flex items-center gap-2 p-2 rounded-lg hover:bg-accent/50 transition-colors mt-2">
+                            <AgentAvatar src={contract.provider.avatar_url || null} name={contract.provider.display_name} size="sm" />
+                            <div>
+                              <p className="text-sm font-medium">Provider</p>
+                              <p className="text-xs text-muted-foreground">@{contract.provider.handle}</p>
+                            </div>
+                          </Link>
+                        )}
+                      </div>
+                    </details>
+
+                    {/* Milestones - Dropdown Bar */}
+                    <details className="group border rounded-lg overflow-hidden">
+                      <summary className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-accent/30 transition-colors select-none">
+                        <span className="text-sm font-medium flex items-center gap-2">
+                          <CheckCheck className="w-4 h-4 text-muted-foreground" />
+                          Milestones
+                          {milestones.length > 0 && (
+                            <Badge variant="secondary" className="text-[10px] h-5">
+                              {completedMilestones}/{milestones.length}
+                            </Badge>
+                          )}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          {contract.status !== 'completed' && contract.status !== 'cancelled' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 text-xs"
+                              onClick={(e) => { e.preventDefault(); setAddMilestoneContractId(contract.id) }}
+                            >
+                              <PlusCircle className="w-3 h-3 mr-1" />
+                              Add
+                            </Button>
+                          )}
+                          <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform group-open:rotate-180" />
+                        </div>
+                      </summary>
+                      <div className="px-4 pb-3 border-t bg-muted/10 pt-3 space-y-3">
+                        {milestones.length > 0 ? (
+                          <div className="space-y-3">
+                            {milestones.map(milestone => (
+                              <div key={milestone.id} className="space-y-2 p-2 rounded-lg bg-muted/30">
+                                <div className="flex items-center gap-2 text-xs">
+                                  {getMilestoneIcon(milestone.status)}
+                                  <span className="flex-1 font-medium">{milestone.title}</span>
+                                  <span className={cn(
+                                    "font-semibold",
+                                    milestone.progress_percent === 100 ? "text-green-500" : "text-muted-foreground"
+                                  )}>
+                                    {milestone.progress_percent}%
+                                  </span>
+                                </div>
+                                {contract.status !== 'completed' && contract.status !== 'cancelled' && (
+                                  <div className="flex items-center gap-3">
+                                    <Slider
+                                      value={[milestone.progress_percent || 0]}
+                                      max={100}
+                                      step={10}
+                                      className="flex-1"
+                                      disabled={updatingMilestoneId === milestone.id}
+                                      onValueCommit={(value) => updateMilestoneProgress(milestone.id, contract.id, value[0])}
+                                    />
+                                    <div className="flex gap-1">
+                                      {[0, 50, 100].map(val => (
+                                        <Button
+                                          key={val}
+                                          variant="outline"
+                                          size="sm"
+                                          className={cn(
+                                            "h-6 w-10 text-[10px] p-0",
+                                            milestone.progress_percent === val && "bg-primary text-primary-foreground"
+                                          )}
+                                          disabled={updatingMilestoneId === milestone.id}
+                                          onClick={() => updateMilestoneProgress(milestone.id, contract.id, val)}
+                                        >
+                                          {val}%
+                                        </Button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">No milestones yet. Add milestones to track progress.</p>
+                        )}
+                      </div>
+                    </details>
+
+                    {/* Budget & Dates - Dropdown Bar */}
+                    <details className="group border rounded-lg overflow-hidden">
+                      <summary className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-accent/30 transition-colors select-none">
+                        <span className="text-sm font-medium flex items-center gap-2">
+                          <Coins className="w-4 h-4 text-muted-foreground" />
+                          Budget & Timeline
+                          {(contract.budget_min || contract.budget_max) && (
+                            <span className="text-xs text-primary font-semibold">
+                              {contract.budget_min && contract.budget_max 
+                                ? `${contract.budget_min.toLocaleString()} - ${contract.budget_max.toLocaleString()}`
+                                : (contract.budget_max || contract.budget_min)?.toLocaleString()
+                              } {contract.currency || 'RELAY'}
+                            </span>
+                          )}
+                        </span>
+                        <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform group-open:rotate-180" />
+                      </summary>
+                      <div className="px-4 pb-3 border-t bg-muted/10 pt-3">
+                        <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                          {(contract.budget_min || contract.budget_max) && (
+                            <span className="flex items-center gap-1 text-primary">
+                              <Coins className="w-3 h-3" />
+                              {contract.budget_min && contract.budget_max 
+                                ? `${contract.budget_min.toLocaleString()} - ${contract.budget_max.toLocaleString()}`
+                                : (contract.budget_max || contract.budget_min)?.toLocaleString()
+                              } {contract.currency || 'RELAY'}
+                            </span>
+                          )}
+                          {contract.deadline && (
+                            <span className="flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              Due {formatDistanceToNow(new Date(contract.deadline), { addSuffix: true })}
+                            </span>
+                          )}
+                          {contract.status === 'completed' && contract.completed_at && (
+                            <span className="flex items-center gap-1 text-green-500">
+                              <CheckCircle className="w-3 h-3" />
+                              Completed {formatDistanceToNow(new Date(contract.completed_at), { addSuffix: true })}
+                            </span>
+                          )}
+                          {!contract.budget_min && !contract.budget_max && !contract.deadline && (
+                            <span>No budget or deadline set.</span>
+                          )}
+                        </div>
+                      </div>
+                    </details>
                   </CardContent>
                 </Card>
               )
