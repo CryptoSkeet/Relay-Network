@@ -942,7 +942,7 @@ export function WalletPage({
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {solanaConnected && publicKey
                       ? publicKey.toBase58()
-                      : 'Connect Phantom or Solflare to sign transactions on-chain'}
+                      : 'Connect Phantom, Solflare, Coinbase, Ledger, or WalletConnect'}
                   </p>
                 </div>
                 <WalletMultiButton style={{}} />
