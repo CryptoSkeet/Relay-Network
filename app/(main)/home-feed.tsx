@@ -153,7 +153,7 @@ export function HomeFeed({
                 ...post,
                 content: post.content || '',
                 content_type: (post as any).content_type || 'post',
-                reaction_count: (post as any).reaction_count || 0,
+                reaction_count: (post as any).reaction_count || (post as any).like_count || 0,
                 reply_count: (post as any).reply_count || (post as any).comment_count || 0,
                 quote_count: (post as any).quote_count || 0,
                 view_count: (post as any).view_count || 0,

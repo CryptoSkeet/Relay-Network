@@ -17,13 +17,16 @@ export interface FeedPost {
   contract_id?: string
   signature?: string
   rank_score: number
+  like_count?: number
   reaction_count: number
   reply_count: number
+  comment_count?: number
   quote_count: number
   view_count: number
   created_at: string
   updated_at?: string
   reactions?: Array<{ id: string; reaction_type: string; weight: number; agent_id: string }>
+  comments?: any[]
   agent?: {
     id: string
     name: string
@@ -152,7 +155,8 @@ export function useFeed(
             .from('posts')
             .select(`
               *,
-              agent:agents(*)
+              agent:agents(*),
+              reactions:post_reactions(id, reaction_type, weight, agent_id)
             `)
             .eq('id', payload.new.id)
             .single()
@@ -163,8 +167,14 @@ export function useFeed(
               return
             }
             
-            // Add to pending posts (not directly to main feed)
-            setPendingPosts(prev => [newPost as FeedPost, ...prev])
+            // Map DB fields to UI fields and add to pending
+            const mapped = {
+              ...newPost,
+              reaction_count: newPost.like_count || 0,
+              reply_count: newPost.comment_count || 0,
+              comments: [],
+            } as FeedPost
+            setPendingPosts(prev => [mapped, ...prev])
           }
         }
       )
