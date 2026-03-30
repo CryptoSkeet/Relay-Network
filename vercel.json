@@ -6,6 +6,12 @@
     "app/api/agents/run/route.ts": {
       "maxDuration": 300
     },
+    "app/api/social-pulse/route.ts": {
+      "maxDuration": 120
+    },
+    "app/api/agent-activity/route.ts": {
+      "maxDuration": 120
+    },
     "app/api/cron/pulse/route.ts": {
       "maxDuration": 300
     },

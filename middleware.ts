@@ -1,20 +1,71 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { withSecurityHeaders, validateOrigin, getCorsHeaders, checkRateLimitMiddleware } from '@/lib/security'
-import { updateSession } from '@/lib/supabase/middleware'
+
+// ── Inline CORS helpers (Edge-safe — no Node.js imports) ────────────────────
+
+const ALLOWED_ORIGINS = [
+  'https://relaynetwork.ai',
+  'https://www.relaynetwork.ai',
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://localhost:3002',
+  'http://localhost:3003',
+  'https://v0-ai-agent-instagram.vercel.app',
+  'https://relay-ai-agent-social.vercel.app',
+]
+
+function isOriginAllowed(origin: string | null): boolean {
+  if (!origin) return true // Same-origin / server-to-server
+  if (ALLOWED_ORIGINS.includes(origin)) return true
+  // Allow Vercel preview deployments
+  if (/^https:\/\/[a-z0-9-]+-cryptoskeets-projects\.vercel\.app$/.test(origin)) return true
+  // Check env-configured origins
+  const envUrl = process.env.NEXT_PUBLIC_APP_URL
+  if (envUrl && origin === envUrl) return true
+  const extras = (process.env.CORS_ALLOWED_ORIGINS || '').split(',').map(o => o.trim()).filter(Boolean)
+  if (extras.includes(origin)) return true
+  return false
+}
+
+function corsHeaders(origin: string | null): Record<string, string> {
+  const allowed = isOriginAllowed(origin)
+  return {
+    'Access-Control-Allow-Origin': allowed ? (origin || '*') : '',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-relay-api-key, x-agent-signature, x-request-id',
+    'Access-Control-Max-Age': '86400',
+  }
+}
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+  const origin = request.headers.get('origin')
 
-  // ── 1. Inject X-Request-ID for tracing ──────────────────────────────────
-  const requestId = request.headers.get('x-request-id') ?? crypto.randomUUID()
-
-  // ── 2. Skip for health checks and static assets ─────────────────────────
-  if (pathname.match(/^\/api\/(health|ready|live)/)) {
+  // ── 1. Skip for health checks, CRON routes, and internal agent runs ─────
+  if (
+    pathname.match(/^\/api\/(health|ready|live)/) ||
+    pathname.startsWith('/api/cron/') ||
+    pathname === '/api/social-pulse' ||
+    pathname === '/api/agent-activity' ||
+    pathname === '/api/agents/run'
+  ) {
     return NextResponse.next()
   }
 
-  // ── 3. Protect /api/admin/* with CRON_SECRET ────────────────────────────
+  // ── 2. Handle CORS preflight (OPTIONS) ───────────────────────────────────
+  if (request.method === 'OPTIONS') {
+    return new NextResponse(null, { status: 204, headers: corsHeaders(origin) })
+  }
+
+  // ── 3. Validate CORS origin ──────────────────────────────────────────────
+  if (!isOriginAllowed(origin)) {
+    return NextResponse.json(
+      { error: 'CORS policy: Origin not allowed' },
+      { status: 403 }
+    )
+  }
+
+  // ── 4. Protect /api/admin/* with CRON_SECRET ────────────────────────────
   if (pathname.startsWith('/api/admin')) {
     const cronSecret = process.env.CRON_SECRET
     const auth = request.headers.get('authorization')
@@ -23,41 +74,14 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // ── 4. Handle CORS preflight (OPTIONS) ───────────────────────────────────
-  if (request.method === 'OPTIONS') {
-    const corsHeaders = getCorsHeaders(request)
-    return new NextResponse(null, { status: 204, headers: corsHeaders })
-  }
-
-  // ── 5. Validate CORS origin ──────────────────────────────────────────────
-  if (!validateOrigin(request)) {
-    return NextResponse.json(
-      { error: 'CORS policy: Origin not allowed' },
-      { status: 403 }
-    )
-  }
-
-  // ── 5. Rate limiting on API endpoints ────────────────────────────────────
-  if (pathname.startsWith('/api/')) {
-    const rateLimitResult = await checkRateLimitMiddleware(request, {
-      windowMs: 60000,
-      maxRequests: 100,
-    })
-    if (!rateLimitResult.allowed && rateLimitResult.response) {
-      return rateLimitResult.response
-    }
-  }
-
-  // ── 6. Supabase session handling ─────────────────────────────────────────
-  const response = await updateSession(request)
-
-  // ── 8. Security headers + CORS + request ID on every response ─────────
-  const corsHeaders = getCorsHeaders(request)
-  for (const [key, value] of Object.entries(corsHeaders)) {
+  // ── 5. Continue to route handler with CORS headers ──────────────────────
+  const response = NextResponse.next()
+  const cors = corsHeaders(origin)
+  for (const [key, value] of Object.entries(cors)) {
     response.headers.set(key, value)
   }
-  response.headers.set('x-request-id', requestId)
-  return withSecurityHeaders(response)
+  response.headers.set('x-request-id', request.headers.get('x-request-id') ?? crypto.randomUUID())
+  return response
 }
 
 export const config = {
