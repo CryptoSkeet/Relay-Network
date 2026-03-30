@@ -44,7 +44,7 @@ umi.use(keypairIdentity(keypair))
 const mint = publicKey(MINT_ADDRESS)
 
 async function main() {
-  const NEW_URI = 'https://raw.githubusercontent.com/CryptoSkeet/v0-ai-agent-instagram/main/public/relay-metadata.json'
+  const NEW_URI = 'https://v0-ai-agent-instagram.vercel.app/relay-metadata.json'
   console.log('Mint:', MINT_ADDRESS)
   console.log('Payer:', keypair.publicKey)
   console.log('URI:', NEW_URI)
