@@ -32,6 +32,7 @@ const fallbackComments = [
 ]
 
 // POST - Generate constant social engagement (likes, comments, follows)
+// Every recent post MUST get at least some reactions and comments
 export async function POST(request: NextRequest) {
   if (!verifyCronSecret(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -39,13 +40,13 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
     
-    // Get random active agents
+    // Get active agents for engagement
     const { data: agents } = await supabase
       .from('agents')
       .select('id, handle, follower_count, following_count')
       .gt('post_count', 0)
       .order('created_at', { ascending: false })
-      .limit(20)
+      .limit(30)
     
     if (!agents || agents.length < 2) {
       return NextResponse.json({ message: 'Not enough agents' })
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
       .from('posts')
       .select('id, agent_id, content, like_count, comment_count')
       .order('created_at', { ascending: false })
-      .limit(30)
+      .limit(50)
     
     if (!recentPosts || recentPosts.length === 0) {
       return NextResponse.json({ message: 'No posts to engage with' })
@@ -65,87 +66,127 @@ export async function POST(request: NextRequest) {
     let likesAdded = 0
     let commentsAdded = 0
     let followsAdded = 0
+    const reactionTypes = ['useful', 'fast', 'accurate', 'collaborative', 'insightful', 'creative']
     
-    // Generate random likes — every post should get engagement
-    const numLikes = Math.floor(Math.random() * 15) + 15
-    for (let i = 0; i < numLikes; i++) {
-      const randomAgent = agents[Math.floor(Math.random() * agents.length)]
-      const randomPost = recentPosts[Math.floor(Math.random() * recentPosts.length)]
+    // ── Phase 1: Ensure EVERY recent post has at least 2-5 reactions ──────
+    for (const post of recentPosts) {
+      const othersAgents = agents.filter(a => a.id !== post.agent_id)
+      if (othersAgents.length === 0) continue
       
-      // Don't like own posts
-      if (randomAgent.id === randomPost.agent_id) continue
+      // Give each post 2-5 reactions from random agents
+      const numReactions = Math.floor(Math.random() * 4) + 2
+      const shuffled = [...othersAgents].sort(() => Math.random() - 0.5).slice(0, numReactions)
       
-      const reactionTypes = ['useful', 'fast', 'accurate', 'collaborative', 'insightful', 'creative']
-      const rt = reactionTypes[Math.floor(Math.random() * reactionTypes.length)]
-      await supabase.from('post_reactions').delete().eq('post_id', randomPost.id).eq('agent_id', randomAgent.id)
-      const { error } = await supabase.from('post_reactions').insert({
-        agent_id: randomAgent.id,
-        post_id: randomPost.id,
-        reaction_type: rt,
-        weight: 1
-      })
-      
-      if (!error) {
+      for (const agent of shuffled) {
+        const rt = reactionTypes[Math.floor(Math.random() * reactionTypes.length)]
+        await supabase.from('post_reactions').upsert({
+          agent_id: agent.id,
+          post_id: post.id,
+          reaction_type: rt,
+          weight: 1
+        }, { onConflict: 'post_id,agent_id' })
         likesAdded++
-        const { data: rCount } = await supabase.from('post_reactions').select('id', { count: 'exact' }).eq('post_id', randomPost.id)
-        await supabase
-          .from('posts')
-          .update({ like_count: rCount?.length || 0 })
-          .eq('id', randomPost.id)
       }
+      
+      // Update like_count from actual DB count
+      const { count } = await supabase
+        .from('post_reactions')
+        .select('*', { count: 'exact', head: true })
+        .eq('post_id', post.id)
+      await supabase
+        .from('posts')
+        .update({ like_count: count || 0 })
+        .eq('id', post.id)
     }
     
-    // Generate random comments — agents should actively discuss posts like humans
-    const numComments = Math.floor(Math.random() * 10) + 10
-    for (let i = 0; i < numComments; i++) {
-      const randomAgent = agents[Math.floor(Math.random() * agents.length)]
-      const randomPost = recentPosts[Math.floor(Math.random() * recentPosts.length)]
+    // ── Phase 2: Add 1-3 comments to each post (use LLM for top, fallback for rest)
+    // Top 15 posts get LLM-generated comments, rest get template comments
+    const postsForLLM = recentPosts.slice(0, 15)
+    const postsForTemplate = recentPosts.slice(15)
+    
+    // LLM comments for top posts
+    for (const post of postsForLLM) {
+      const othersAgents = agents.filter(a => a.id !== post.agent_id)
+      if (othersAgents.length === 0) continue
       
-      // Don't comment on own posts
-      if (randomAgent.id === randomPost.agent_id) continue
-
-      // Build smart comment using agent's personality
-      let comment: string
-      try {
-        const { data: agentFull } = await supabase
-          .from('agents')
-          .select('*')
-          .eq('id', randomAgent.id)
-          .maybeSingle()
-        const profile = buildAgentProfile(agentFull ?? randomAgent, [])
-        comment = await generateAgentComment(profile, randomPost.content ?? '')
-      } catch {
-        // Fallback to contextual template if LLM unavailable
-        comment = fallbackComments[Math.floor(Math.random() * fallbackComments.length)]
-      }
-
-      const { error } = await supabase.from('comments').insert({
-        agent_id: randomAgent.id,
-        post_id: randomPost.id,
-        content: comment,
-      })
+      const numComments = Math.floor(Math.random() * 2) + 1 // 1-2 LLM comments
+      const commenters = [...othersAgents].sort(() => Math.random() - 0.5).slice(0, numComments)
       
-      if (!error) {
-        commentsAdded++
-        // Update post comment count
-        await supabase
-          .from('posts')
-          .update({ comment_count: (randomPost.comment_count || 0) + 1 })
-          .eq('id', randomPost.id)
-          
-        // Create notification for post author
-        await supabase.from('notifications').insert({
-          agent_id: randomPost.agent_id,
-          actor_id: randomAgent.id,
-          type: 'comment',
-          reference_id: randomPost.id,
-          is_read: false
+      for (const agent of commenters) {
+        let comment: string
+        try {
+          const { data: agentFull } = await supabase
+            .from('agents')
+            .select('*')
+            .eq('id', agent.id)
+            .maybeSingle()
+          const profile = buildAgentProfile(agentFull ?? agent, [])
+          comment = await generateAgentComment(profile, post.content ?? '')
+        } catch {
+          comment = fallbackComments[Math.floor(Math.random() * fallbackComments.length)]
+        }
+
+        const { error } = await supabase.from('comments').insert({
+          agent_id: agent.id,
+          post_id: post.id,
+          content: comment,
         })
+        
+        if (!error) {
+          commentsAdded++
+          await supabase.from('notifications').insert({
+            agent_id: post.agent_id,
+            actor_id: agent.id,
+            type: 'comment',
+            reference_id: post.id,
+            is_read: false
+          })
+        }
       }
     }
     
-    // Generate random follows — agents should build their networks
-    const numFollows = Math.floor(Math.random() * 3) + 2
+    // Template comments for remaining posts
+    for (const post of postsForTemplate) {
+      const othersAgents = agents.filter(a => a.id !== post.agent_id)
+      if (othersAgents.length === 0) continue
+      
+      const numComments = Math.floor(Math.random() * 2) + 1 // 1-2 template comments
+      const commenters = [...othersAgents].sort(() => Math.random() - 0.5).slice(0, numComments)
+      
+      for (const agent of commenters) {
+        const comment = fallbackComments[Math.floor(Math.random() * fallbackComments.length)]
+        const { error } = await supabase.from('comments').insert({
+          agent_id: agent.id,
+          post_id: post.id,
+          content: comment,
+        })
+        if (!error) {
+          commentsAdded++
+          await supabase.from('notifications').insert({
+            agent_id: post.agent_id,
+            actor_id: agent.id,
+            type: 'comment',
+            reference_id: post.id,
+            is_read: false
+          })
+        }
+      }
+    }
+    
+    // ── Phase 3: Update comment_count from actual DB counts (fixes race conditions)
+    for (const post of recentPosts) {
+      const { count } = await supabase
+        .from('comments')
+        .select('*', { count: 'exact', head: true })
+        .eq('post_id', post.id)
+      await supabase
+        .from('posts')
+        .update({ comment_count: count || 0 })
+        .eq('id', post.id)
+    }
+    
+    // ── Phase 4: Generate follows — agents should build their networks
+    const numFollows = Math.floor(Math.random() * 5) + 3
     for (let i = 0; i < numFollows; i++) {
       const follower = agents[Math.floor(Math.random() * agents.length)]
       const following = agents[Math.floor(Math.random() * agents.length)]
@@ -159,18 +200,19 @@ export async function POST(request: NextRequest) {
         if (!error) {
           followsAdded++
           
-          // Update counts
-          await supabase
-            .from('agents')
-            .update({ following_count: (follower.following_count || 0) + 1 })
-            .eq('id', follower.id)
+          // Update counts from actual DB
+          const { count: followingCount } = await supabase
+            .from('follows')
+            .select('*', { count: 'exact', head: true })
+            .eq('follower_id', follower.id)
+          const { count: followerCount } = await supabase
+            .from('follows')
+            .select('*', { count: 'exact', head: true })
+            .eq('following_id', following.id)
           
-          await supabase
-            .from('agents')
-            .update({ follower_count: (following.follower_count || 0) + 1 })
-            .eq('id', following.id)
+          await supabase.from('agents').update({ following_count: followingCount || 0 }).eq('id', follower.id)
+          await supabase.from('agents').update({ follower_count: followerCount || 0 }).eq('id', following.id)
           
-          // Create follow notification
           await supabase.from('notifications').insert({
             agent_id: following.id,
             actor_id: follower.id,
@@ -186,11 +228,13 @@ export async function POST(request: NextRequest) {
       engagement: {
         likes: likesAdded,
         comments: commentsAdded,
-        follows: followsAdded
+        follows: followsAdded,
+        posts_engaged: recentPosts.length,
       }
     })
     
-  } catch {
+  } catch (err) {
+    console.error('Social pulse error:', err)
     return NextResponse.json({ error: 'Failed to generate social pulse' }, { status: 500 })
   }
 }

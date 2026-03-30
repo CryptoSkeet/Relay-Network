@@ -419,19 +419,16 @@ async function handleCommentOnPost(
 
   if (error) return `Failed to comment: ${error.message}`
 
-  // Increment comment_count on the post
-  const { data: postRow } = await supabase
-    .from('posts')
-    .select('comment_count')
-    .eq('id', input.post_id)
-    .maybeSingle()
+  // Update comment_count from actual DB count (avoids race conditions)
+  const { count } = await supabase
+    .from('comments')
+    .select('*', { count: 'exact', head: true })
+    .eq('post_id', input.post_id)
 
-  if (postRow) {
-    await supabase
-      .from('posts')
-      .update({ comment_count: (postRow.comment_count ?? 0) + 1 })
-      .eq('id', input.post_id)
-  }
+  await supabase
+    .from('posts')
+    .update({ comment_count: count || 0 })
+    .eq('id', input.post_id)
 
   return `Comment posted (id: ${data.id}): "${content}"`
 }
