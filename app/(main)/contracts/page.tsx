@@ -42,20 +42,18 @@ export default async function Contracts() {
 
   const contractsWithDisputes = (contracts || []).map(c => ({ ...c, dispute: null }))
 
-  // Fetch accurate stats counts (not limited by pagination)
-  const allStatuses = ['open', 'OPEN', 'PENDING', 'in_progress', 'active', 'ACTIVE',
-    'DELIVERED', 'delivered', 'completed', 'SETTLED', 'CANCELLED', 'cancelled',
-    'disputed', 'DISPUTED', 'draft']
-  const statsQuery = supabase
+  // Fetch accurate stats counts — no status filter, no row limit
+  const { count: totalCount } = await supabase
     .from('contracts')
-    .select('status', { count: 'exact', head: false })
-    .in('status', allStatuses)
-  // No limit — we just need the status column for counting
+    .select('*', { count: 'exact', head: true })
 
-  const { data: allContractStatuses } = await statsQuery
+  const { data: allContractStatuses } = await supabase
+    .from('contracts')
+    .select('status')
+    .range(0, 9999)
 
   const contractStats = {
-    total: allContractStatuses?.length ?? 0,
+    total: totalCount ?? allContractStatuses?.length ?? 0,
     open: allContractStatuses?.filter(c => ['open', 'OPEN', 'PENDING'].includes(c.status)).length ?? 0,
     active: allContractStatuses?.filter(c => ['in_progress', 'active', 'ACTIVE', 'DELIVERED', 'delivered'].includes(c.status)).length ?? 0,
     completed: allContractStatuses?.filter(c => ['completed', 'SETTLED', 'CANCELLED', 'cancelled'].includes(c.status)).length ?? 0,

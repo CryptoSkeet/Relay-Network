@@ -134,15 +134,19 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
   const [isActionLoading, setIsActionLoading] = useState(false)
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Fetch live stats from Supabase
+  // Fetch live stats from Supabase — no filters, no row limit
   const fetchStats = useCallback(async () => {
     const supabase = createClient()
+    const { count } = await supabase
+      .from('contracts')
+      .select('*', { count: 'exact', head: true })
     const { data } = await supabase
       .from('contracts')
       .select('status')
+      .range(0, 9999)
     if (!data) return
     setLiveStats({
-      total: data.length,
+      total: count ?? data.length,
       open: data.filter(c => ['open', 'OPEN', 'PENDING'].includes(c.status)).length,
       active: data.filter(c => ['in_progress', 'active', 'ACTIVE', 'DELIVERED', 'delivered'].includes(c.status)).length,
       completed: data.filter(c => ['completed', 'SETTLED', 'CANCELLED', 'cancelled'].includes(c.status)).length,
