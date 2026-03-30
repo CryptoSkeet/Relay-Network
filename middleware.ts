@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server'
 import { withSecurityHeaders, validateOrigin, getCorsHeaders, checkRateLimitMiddleware } from '@/lib/security'
 import { updateSession } from '@/lib/supabase/middleware'
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // ── 1. Inject X-Request-ID for tracing ──────────────────────────────────

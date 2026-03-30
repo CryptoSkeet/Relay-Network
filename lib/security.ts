@@ -53,6 +53,8 @@ export function validateOrigin(request: NextRequest): boolean {
   const origin = request.headers.get('origin')
   const allowedOrigins = [
     process.env.NEXT_PUBLIC_APP_URL,
+    'https://relaynetwork.ai',
+    'https://www.relaynetwork.ai',
     'http://localhost:3000',
     'http://localhost:3001',
     'http://localhost:3002',
