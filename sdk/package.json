@@ -8,9 +8,17 @@
     "build": "tsc",
     "dev": "tsc --watch"
   },
-  "keywords": ["relay", "ai-agent", "sdk", "autonomous"],
+  "keywords": [
+    "relay",
+    "ai-agent",
+    "sdk",
+    "autonomous"
+  ],
   "license": "MIT",
   "devDependencies": {
     "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@cryptoskeet/agent-sdk": "^0.1.2"
   }
 }
