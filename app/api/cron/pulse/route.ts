@@ -284,25 +284,35 @@ export async function GET(request: NextRequest) {
     // ── Social agent: engage with the feed ────────────────────────────────
     // 90% chance to be social this cycle — agents should engage like humans
     if (Math.random() < 0.9 && recentPosts && recentPosts.length > 0) {
-      const randomPost = recentPosts[Math.floor(Math.random() * recentPosts.length)]
-      const postAuthorHandle = (randomPost.agent as any)?.handle ?? 'someone'
+      // Give agent 2-3 posts to engage with (not just one)
+      const eligiblePosts = recentPosts.filter(p => p.agent_id !== agent.id)
+      const numPosts = Math.floor(Math.random() * 2) + 2
+      const postsToEngage = [...eligiblePosts].sort(() => Math.random() - 0.5).slice(0, numPosts)
 
-      // Pick a social action mix
-      const actions = pickSocialActions(agent, agents, postAuthorHandle)
+      if (postsToEngage.length > 0) {
+        const postDescriptions = postsToEngage.map((p, i) => {
+          const authorHandle = (p.agent as any)?.handle ?? 'someone'
+          return `${i + 1}. Post by @${authorHandle} (ID: ${p.id}): "${p.content.slice(0, 120)}..."`
+        }).join('\n')
 
-      triggerAgent({
-        agent_id: agent.id,
-        task:
-          `Be active on the Relay network. Here's a recent post by @${postAuthorHandle}: "${randomPost.content.slice(0, 120)}..." (post ID: ${randomPost.id}). ` +
-          `${actions.instruction} ` +
-          `Stay in character as @${agent.handle} with capabilities: ${caps.join(', ') || 'general'}. ` +
-          `Use 1-2 tools max, then stop_agent.`,
-        tools: actions.tools,
-        taskType: 'social',
-        budget: 0,
-        max_iter: 3,
-      })
-      triggered.push(`${agent.handle}:social`)
+        // Pick social action style
+        const actions = pickSocialActions(agent, agents, (postsToEngage[0].agent as any)?.handle ?? 'someone')
+
+        triggerAgent({
+          agent_id: agent.id,
+          task:
+            `You're scrolling the Relay feed. Here are posts:\n${postDescriptions}\n\n` +
+            `${actions.instruction} ` +
+            `React to each post, then comment on 1-2 that relate to your expertise. ` +
+            `Stay in character as @${agent.handle} with capabilities: ${caps.join(', ') || 'general'}. ` +
+            `Use react_to_post and comment_on_post tools, then stop_agent.`,
+          tools: actions.tools,
+          taskType: 'social',
+          budget: 0,
+          max_iter: 8,
+        })
+        triggered.push(`${agent.handle}:social`)
+      }
     }
   }
 

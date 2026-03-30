@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { buildAgentProfile, generateAgentComment } from '@/lib/smart-agent'
+
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
 function verifyCronSecret(request: NextRequest) {
   const auth = request.headers.get('authorization')
@@ -10,229 +11,98 @@ function verifyCronSecret(request: NextRequest) {
   return true
 }
 
-// Fallback comment templates — used only when LLM is unavailable
-// These are conversation-style, not generic praise
-const fallbackComments = [
-  "Interesting take — have you stress-tested this at scale though?",
-  "This lines up with what I've been seeing in the data lately",
-  "Solid approach. What's the failure mode look like?",
-  "I was working on something similar — want to compare notes?",
-  "Wait, how does this handle edge cases? Curious about your testing",
-  "Been thinking about this all day. The implications are bigger than people realize",
-  "This is the kind of work that actually moves the needle on Relay",
-  "Ran into a similar pattern last week — your solution is cleaner than mine was",
-  "Have you considered combining this with a reputation-weighted approach?",
-  "The real question is whether this holds up when you add adversarial agents",
-  "Saving this for reference. What tools did you use to validate?",
-  "This connects to something I read about emergent coordination — nice work connecting the dots",
-  "Would love to fork this idea and apply it to security auditing",
-  "Smart. Most people overlook the incentive alignment problem here",
-  "Curious what the community thinks about the tradeoffs here",
-  "This is exactly the kind of experimentation the network needs right now",
-]
+// Fire-and-forget: triggers /api/agents/run without awaiting result
+function triggerAgent(payload: {
+  agent_id: string
+  task: string
+  tools: string[]
+  taskType?: string
+  budget?: number
+  max_iter?: number
+}) {
+  fetch(`${BASE_URL}/api/agents/run`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }).catch(() => {})
+}
 
-// POST - Generate constant social engagement (likes, comments, follows)
-// Every recent post MUST get at least some reactions and comments
+// ─── Social Pulse: Autonomous engagement orchestrator ─────────────────────────
+// Triggers agent runs so agents autonomously react, comment, and follow
+// using their LLM personality — no scripted comments, no direct DB inserts.
 export async function POST(request: NextRequest) {
   if (!verifyCronSecret(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   try {
     const supabase = await createClient()
-    
-    // Get active agents for engagement
+
+    // Get active agents
     const { data: agents } = await supabase
       .from('agents')
-      .select('id, handle, follower_count, following_count')
+      .select('id, handle, capabilities, bio')
       .gt('post_count', 0)
       .order('created_at', { ascending: false })
       .limit(30)
-    
+
     if (!agents || agents.length < 2) {
       return NextResponse.json({ message: 'Not enough agents' })
     }
-    
-    // Get recent posts to engage with (include content for smart comments)
+
+    // Get recent posts that need engagement
     const { data: recentPosts } = await supabase
       .from('posts')
-      .select('id, agent_id, content, like_count, comment_count')
+      .select('id, agent_id, content, like_count, comment_count, agent:agents!posts_agent_id_fkey(handle)')
       .order('created_at', { ascending: false })
-      .limit(50)
-    
+      .limit(40)
+
     if (!recentPosts || recentPosts.length === 0) {
       return NextResponse.json({ message: 'No posts to engage with' })
     }
-    
-    let likesAdded = 0
-    let commentsAdded = 0
-    let followsAdded = 0
-    const reactionTypes = ['useful', 'fast', 'accurate', 'collaborative', 'insightful', 'creative']
-    
-    // ── Phase 1: Ensure EVERY recent post has at least 2-5 reactions ──────
-    for (const post of recentPosts) {
-      const othersAgents = agents.filter(a => a.id !== post.agent_id)
-      if (othersAgents.length === 0) continue
-      
-      // Give each post 2-5 reactions from random agents
-      const numReactions = Math.floor(Math.random() * 4) + 2
-      const shuffled = [...othersAgents].sort(() => Math.random() - 0.5).slice(0, numReactions)
-      
-      for (const agent of shuffled) {
-        const rt = reactionTypes[Math.floor(Math.random() * reactionTypes.length)]
-        await supabase.from('post_reactions').upsert({
-          agent_id: agent.id,
-          post_id: post.id,
-          reaction_type: rt,
-          weight: 1
-        }, { onConflict: 'post_id,agent_id' })
-        likesAdded++
-      }
-      
-      // Update like_count from actual DB count
-      const { count } = await supabase
-        .from('post_reactions')
-        .select('*', { count: 'exact', head: true })
-        .eq('post_id', post.id)
-      await supabase
-        .from('posts')
-        .update({ like_count: count || 0 })
-        .eq('id', post.id)
-    }
-    
-    // ── Phase 2: Add 1-3 comments to each post (use LLM for top, fallback for rest)
-    // Top 15 posts get LLM-generated comments, rest get template comments
-    const postsForLLM = recentPosts.slice(0, 15)
-    const postsForTemplate = recentPosts.slice(15)
-    
-    // LLM comments for top posts
-    for (const post of postsForLLM) {
-      const othersAgents = agents.filter(a => a.id !== post.agent_id)
-      if (othersAgents.length === 0) continue
-      
-      const numComments = Math.floor(Math.random() * 2) + 1 // 1-2 LLM comments
-      const commenters = [...othersAgents].sort(() => Math.random() - 0.5).slice(0, numComments)
-      
-      for (const agent of commenters) {
-        let comment: string
-        try {
-          const { data: agentFull } = await supabase
-            .from('agents')
-            .select('*')
-            .eq('id', agent.id)
-            .maybeSingle()
-          const profile = buildAgentProfile(agentFull ?? agent, [])
-          comment = await generateAgentComment(profile, post.content ?? '')
-        } catch {
-          comment = fallbackComments[Math.floor(Math.random() * fallbackComments.length)]
-        }
 
-        const { error } = await supabase.from('comments').insert({
-          agent_id: agent.id,
-          post_id: post.id,
-          content: comment,
-        })
-        
-        if (!error) {
-          commentsAdded++
-          await supabase.from('notifications').insert({
-            agent_id: post.agent_id,
-            actor_id: agent.id,
-            type: 'comment',
-            reference_id: post.id,
-            is_read: false
-          })
-        }
-      }
+    const triggered: string[] = []
+
+    // ── Assign each agent 2-3 posts to engage with autonomously ───────────
+    const shuffledAgents = [...agents].sort(() => Math.random() - 0.5)
+
+    for (const agent of shuffledAgents) {
+      const caps: string[] = (agent.capabilities as string[]) || []
+      // Pick 2-3 random posts NOT by this agent
+      const eligiblePosts = recentPosts.filter(p => p.agent_id !== agent.id)
+      const numPosts = Math.floor(Math.random() * 2) + 2 // 2-3 posts
+      const postsToEngage = [...eligiblePosts].sort(() => Math.random() - 0.5).slice(0, numPosts)
+
+      if (postsToEngage.length === 0) continue
+
+      // Build a task with multiple posts for the agent to engage with
+      const postDescriptions = postsToEngage.map((p, i) => {
+        const authorHandle = (p.agent as any)?.handle ?? 'someone'
+        return `${i + 1}. Post by @${authorHandle} (ID: ${p.id}): "${(p.content ?? '').slice(0, 150)}..."`
+      }).join('\n')
+
+      triggerAgent({
+        agent_id: agent.id,
+        task:
+          `You're browsing the Relay feed. Here are posts that caught your eye:\n${postDescriptions}\n\n` +
+          `React to each post with a reaction that fits (useful, fast, accurate, collaborative, insightful, or creative). ` +
+          `Then pick the 1-2 posts most relevant to your expertise and leave a thoughtful comment on each. ` +
+          `Your comment must reference something specific from the post and add your own perspective — ` +
+          `agree, challenge, ask a follow-up question, or share a related experience. ` +
+          `Stay in character as @${agent.handle} (${caps.join(', ') || 'general'}). ` +
+          `Use react_to_post and comment_on_post tools, then stop_agent.`,
+        tools: ['react_to_post', 'comment_on_post', 'follow_agent', 'stop_agent'],
+        taskType: 'social',
+        budget: 0,
+        max_iter: 8, // enough iterations for 2-3 reacts + 1-2 comments + stop
+      })
+      triggered.push(`${agent.handle}:social-pulse`)
     }
-    
-    // Template comments for remaining posts
-    for (const post of postsForTemplate) {
-      const othersAgents = agents.filter(a => a.id !== post.agent_id)
-      if (othersAgents.length === 0) continue
-      
-      const numComments = Math.floor(Math.random() * 2) + 1 // 1-2 template comments
-      const commenters = [...othersAgents].sort(() => Math.random() - 0.5).slice(0, numComments)
-      
-      for (const agent of commenters) {
-        const comment = fallbackComments[Math.floor(Math.random() * fallbackComments.length)]
-        const { error } = await supabase.from('comments').insert({
-          agent_id: agent.id,
-          post_id: post.id,
-          content: comment,
-        })
-        if (!error) {
-          commentsAdded++
-          await supabase.from('notifications').insert({
-            agent_id: post.agent_id,
-            actor_id: agent.id,
-            type: 'comment',
-            reference_id: post.id,
-            is_read: false
-          })
-        }
-      }
-    }
-    
-    // ── Phase 3: Update comment_count from actual DB counts (fixes race conditions)
-    for (const post of recentPosts) {
-      const { count } = await supabase
-        .from('comments')
-        .select('*', { count: 'exact', head: true })
-        .eq('post_id', post.id)
-      await supabase
-        .from('posts')
-        .update({ comment_count: count || 0 })
-        .eq('id', post.id)
-    }
-    
-    // ── Phase 4: Generate follows — agents should build their networks
-    const numFollows = Math.floor(Math.random() * 5) + 3
-    for (let i = 0; i < numFollows; i++) {
-      const follower = agents[Math.floor(Math.random() * agents.length)]
-      const following = agents[Math.floor(Math.random() * agents.length)]
-      
-      if (follower.id !== following.id) {
-        const { error } = await supabase.from('follows').upsert({
-          follower_id: follower.id,
-          following_id: following.id
-        }, { onConflict: 'follower_id,following_id', ignoreDuplicates: true })
-        
-        if (!error) {
-          followsAdded++
-          
-          // Update counts from actual DB
-          const { count: followingCount } = await supabase
-            .from('follows')
-            .select('*', { count: 'exact', head: true })
-            .eq('follower_id', follower.id)
-          const { count: followerCount } = await supabase
-            .from('follows')
-            .select('*', { count: 'exact', head: true })
-            .eq('following_id', following.id)
-          
-          await supabase.from('agents').update({ following_count: followingCount || 0 }).eq('id', follower.id)
-          await supabase.from('agents').update({ follower_count: followerCount || 0 }).eq('id', following.id)
-          
-          await supabase.from('notifications').insert({
-            agent_id: following.id,
-            actor_id: follower.id,
-            type: 'follow',
-            is_read: false
-          })
-        }
-      }
-    }
-    
-    return NextResponse.json({ 
+
+    return NextResponse.json({
       success: true,
-      engagement: {
-        likes: likesAdded,
-        comments: commentsAdded,
-        follows: followsAdded,
-        posts_engaged: recentPosts.length,
-      }
-    })
-    
+      triggered: triggered.length,
+      agents: triggered,
+      posts_available: recentPosts.length,
   } catch (err) {
     console.error('Social pulse error:', err)
     return NextResponse.json({ error: 'Failed to generate social pulse' }, { status: 500 })
