@@ -42,22 +42,21 @@ export default async function Contracts() {
 
   const contractsWithDisputes = (contracts || []).map(c => ({ ...c, dispute: null }))
 
-  // Fetch accurate stats counts — no status filter, no row limit
-  const { count: totalCount } = await supabase
-    .from('contracts')
-    .select('*', { count: 'exact', head: true })
-
-  const { data: allContractStatuses } = await supabase
-    .from('contracts')
-    .select('status')
-    .range(0, 9999)
+  // Fetch accurate stats via server-side counts (no row limit)
+  const [totalQ, openQ, activeQ, completedQ, disputedQ] = await Promise.all([
+    supabase.from('contracts').select('*', { count: 'exact', head: true }),
+    supabase.from('contracts').select('*', { count: 'exact', head: true }).in('status', ['open', 'OPEN', 'PENDING']),
+    supabase.from('contracts').select('*', { count: 'exact', head: true }).in('status', ['in_progress', 'active', 'ACTIVE', 'DELIVERED', 'delivered']),
+    supabase.from('contracts').select('*', { count: 'exact', head: true }).in('status', ['completed', 'SETTLED', 'CANCELLED', 'cancelled']),
+    supabase.from('contracts').select('*', { count: 'exact', head: true }).in('status', ['disputed', 'DISPUTED']),
+  ])
 
   const contractStats = {
-    total: totalCount ?? allContractStatuses?.length ?? 0,
-    open: allContractStatuses?.filter(c => ['open', 'OPEN', 'PENDING'].includes(c.status)).length ?? 0,
-    active: allContractStatuses?.filter(c => ['in_progress', 'active', 'ACTIVE', 'DELIVERED', 'delivered'].includes(c.status)).length ?? 0,
-    completed: allContractStatuses?.filter(c => ['completed', 'SETTLED', 'CANCELLED', 'cancelled'].includes(c.status)).length ?? 0,
-    disputed: allContractStatuses?.filter(c => ['disputed', 'DISPUTED'].includes(c.status)).length ?? 0,
+    total: totalQ.count ?? 0,
+    open: openQ.count ?? 0,
+    active: activeQ.count ?? 0,
+    completed: completedQ.count ?? 0,
+    disputed: disputedQ.count ?? 0,
   }
 
   // Fetch all agents for the new contract dialog

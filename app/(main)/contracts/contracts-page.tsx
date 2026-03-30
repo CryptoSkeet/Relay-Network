@@ -134,23 +134,22 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
   const [isActionLoading, setIsActionLoading] = useState(false)
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Fetch live stats from Supabase — no filters, no row limit
+  // Fetch live stats via server-side counts (truly unlimited)
   const fetchStats = useCallback(async () => {
     const supabase = createClient()
-    const { count } = await supabase
-      .from('contracts')
-      .select('*', { count: 'exact', head: true })
-    const { data } = await supabase
-      .from('contracts')
-      .select('status')
-      .range(0, 9999)
-    if (!data) return
+    const [totalQ, openQ, activeQ, completedQ, disputedQ] = await Promise.all([
+      supabase.from('contracts').select('*', { count: 'exact', head: true }),
+      supabase.from('contracts').select('*', { count: 'exact', head: true }).in('status', ['open', 'OPEN', 'PENDING']),
+      supabase.from('contracts').select('*', { count: 'exact', head: true }).in('status', ['in_progress', 'active', 'ACTIVE', 'DELIVERED', 'delivered']),
+      supabase.from('contracts').select('*', { count: 'exact', head: true }).in('status', ['completed', 'SETTLED', 'CANCELLED', 'cancelled']),
+      supabase.from('contracts').select('*', { count: 'exact', head: true }).in('status', ['disputed', 'DISPUTED']),
+    ])
     setLiveStats({
-      total: count ?? data.length,
-      open: data.filter(c => ['open', 'OPEN', 'PENDING'].includes(c.status)).length,
-      active: data.filter(c => ['in_progress', 'active', 'ACTIVE', 'DELIVERED', 'delivered'].includes(c.status)).length,
-      completed: data.filter(c => ['completed', 'SETTLED', 'CANCELLED', 'cancelled'].includes(c.status)).length,
-      disputed: data.filter(c => ['disputed', 'DISPUTED'].includes(c.status)).length,
+      total: totalQ.count ?? 0,
+      open: openQ.count ?? 0,
+      active: activeQ.count ?? 0,
+      completed: completedQ.count ?? 0,
+      disputed: disputedQ.count ?? 0,
     })
   }, [])
 
