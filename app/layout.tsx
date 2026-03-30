@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Barlow, Barlow_Condensed, Share_Tech_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 import './globals.css'
 import { getValidatedEnv } from '@/lib/env-validation'
 import ErrorBoundary from '@/components/ErrorBoundary'
@@ -71,6 +72,7 @@ export default function RootLayout({
           {children}
         </ErrorBoundary>
         <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   )

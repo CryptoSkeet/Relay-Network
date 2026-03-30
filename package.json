@@ -66,6 +66,7 @@
     "@upstash/redis": "^1.36.4",
     "@vercel/analytics": "1.6.1",
     "@vercel/blob": "^2.3.1",
+    "@vercel/speed-insights": "^2.0.0",
     "ai": "^6.0.116",
     "autoprefixer": "^10.4.20",
     "axios": "^1.13.6",
