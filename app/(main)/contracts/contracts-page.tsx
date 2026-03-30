@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { FileText, Plus, Clock, CheckCircle, XCircle, AlertCircle, Coins, ArrowRight, Filter, CheckCheck, Zap, RefreshCw, PlusCircle, Loader2, Wallet, Lock, Unlock, Scale, Send, Eye, Shield, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -122,6 +122,7 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
   const [filter, setFilter] = useState<string>('all')
   const [viewMode, setViewMode] = useState<'all' | 'my-created' | 'my-accepted'>('all')
   const [contracts, setContracts] = useState<ContractWithAgents[]>(initialContracts)
+  const [liveStats, setLiveStats] = useState(serverStats ?? null)
   const [contractMilestones, setContractMilestones] = useState<Record<string, Milestone[]>>({})
   const [isNewContractOpen, setIsNewContractOpen] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -131,10 +132,67 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
   const [updatingMilestoneId, setUpdatingMilestoneId] = useState<string | null>(null)
   const [selectedContract, setSelectedContract] = useState<ContractWithAgents | null>(null)
   const [isActionLoading, setIsActionLoading] = useState(false)
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Fetch live stats from Supabase
+  const fetchStats = useCallback(async () => {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('contracts')
+      .select('status')
+    if (!data) return
+    setLiveStats({
+      total: data.length,
+      open: data.filter(c => ['open', 'OPEN', 'PENDING'].includes(c.status)).length,
+      active: data.filter(c => ['in_progress', 'active', 'ACTIVE', 'DELIVERED', 'delivered'].includes(c.status)).length,
+      completed: data.filter(c => ['completed', 'SETTLED', 'CANCELLED', 'cancelled'].includes(c.status)).length,
+      disputed: data.filter(c => ['disputed', 'DISPUTED'].includes(c.status)).length,
+    })
+  }, [])
+
+  // Full refresh: contracts + stats
+  const refreshAll = useCallback(async () => {
+    const supabase = createClient()
+    let query = supabase
+      .from('contracts')
+      .select(`
+        *,
+        client:agents!contracts_client_id_fkey(id, handle, display_name, avatar_url, is_verified),
+        provider:agents!contracts_provider_id_fkey(id, handle, display_name, avatar_url, is_verified)
+      `)
+      .order('created_at', { ascending: false })
+      .limit(100)
+
+    if (userAgentId) {
+      query = query.or(`client_id.eq.${userAgentId},provider_id.eq.${userAgentId}`)
+    }
+
+    const { data } = await query
+    if (data) setContracts(data as ContractWithAgents[])
+    await fetchStats()
+  }, [userAgentId, fetchStats])
 
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  // Supabase Realtime: re-fetch on any contract change
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel('contracts-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'contracts' }, () => {
+        // Debounce: many changes can fire in quick succession
+        if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current)
+        refreshTimerRef.current = setTimeout(() => { refreshAll() }, 500)
+      })
+      .subscribe()
+
+    return () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current)
+      channel.unsubscribe()
+    }
+  }, [refreshAll])
 
   // Update milestone progress
   const updateMilestoneProgress = async (milestoneId: string, contractId: string, progress: number) => {
@@ -219,25 +277,7 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
   const handleContractCreated = async () => {
     setIsRefreshing(true)
     try {
-      const supabase = createClient()
-      let query = supabase
-        .from('contracts')
-        .select(`
-          *,
-          client:agents!contracts_client_id_fkey(id, handle, display_name, avatar_url, is_verified),
-          provider:agents!contracts_provider_id_fkey(id, handle, display_name, avatar_url, is_verified)
-        `)
-        .order('created_at', { ascending: false })
-        .limit(100)
-
-      if (userAgentId) {
-        query = query.or(`client_id.eq.${userAgentId},provider_id.eq.${userAgentId}`)
-      }
-
-      const { data } = await query
-      if (data) {
-        setContracts(data as ContractWithAgents[])
-      }
+      await refreshAll()
     } catch (err) {
       console.error('Failed to refresh contracts:', err)
     } finally {
@@ -422,10 +462,10 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
   // contract engine API (deliver → verify → SETTLED). The old useEffect was
   // silently mass-writing 'completed' on every page view, corrupting data.
 
-  // Use server-provided stats (accurate, not capped by pagination) when viewing all contracts,
+  // Use live stats (updated via realtime + manual refresh) when viewing all contracts,
   // otherwise fall back to counting the filtered set
   const stats = useMemo(() => {
-    if (serverStats && viewMode === 'all') return serverStats
+    if (liveStats && viewMode === 'all') return liveStats
     const baseContracts = viewFilteredContracts
     return {
       total: baseContracts.length,
@@ -434,7 +474,7 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
       completed: baseContracts.filter(c => ['completed', 'SETTLED', 'CANCELLED', 'cancelled'].includes(c.status)).length,
       disputed: baseContracts.filter(c => ['disputed', 'DISPUTED'].includes(c.status)).length,
     }
-  }, [viewFilteredContracts, serverStats, viewMode])
+  }, [viewFilteredContracts, liveStats, viewMode])
 
   // Get timeline events for a contract
   const getContractTimeline = (contract: ContractWithAgents) => {
