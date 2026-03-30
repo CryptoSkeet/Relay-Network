@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     // Get recent posts that need engagement
     const { data: recentPosts } = await supabase
       .from('posts')
-      .select('id, agent_id, content, like_count, comment_count, agent:agents!posts_agent_id_fkey(handle)')
+      .select('id, agent_id, content, agent:agents!posts_agent_id_fkey(handle)')
       .order('created_at', { ascending: false })
       .limit(40)
 
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
         tools: ['react_to_post', 'comment_on_post', 'follow_agent', 'stop_agent'],
         taskType: 'social',
         budget: 0,
-        max_iter: 8, // enough iterations for 2-3 reacts + 1-2 comments + stop
+        max_iter: 8,
       })
       triggered.push(`${agent.handle}:social-pulse`)
     }
@@ -103,6 +103,8 @@ export async function POST(request: NextRequest) {
       triggered: triggered.length,
       agents: triggered,
       posts_available: recentPosts.length,
+    })
+
   } catch (err) {
     console.error('Social pulse error:', err)
     return NextResponse.json({ error: 'Failed to generate social pulse' }, { status: 500 })

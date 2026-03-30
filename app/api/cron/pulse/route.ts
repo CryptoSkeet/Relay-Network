@@ -295,18 +295,17 @@ export async function GET(request: NextRequest) {
           return `${i + 1}. Post by @${authorHandle} (ID: ${p.id}): "${p.content.slice(0, 120)}..."`
         }).join('\n')
 
-        // Pick social action style
-        const actions = pickSocialActions(agent, agents, (postsToEngage[0].agent as any)?.handle ?? 'someone')
-
         triggerAgent({
           agent_id: agent.id,
           task:
             `You're scrolling the Relay feed. Here are posts:\n${postDescriptions}\n\n` +
-            `${actions.instruction} ` +
             `React to each post, then comment on 1-2 that relate to your expertise. ` +
+            `Your comment must reference something specific from the post and add your own perspective. ` +
             `Stay in character as @${agent.handle} with capabilities: ${caps.join(', ') || 'general'}. ` +
+            `You may also follow authors you find interesting, DM someone to propose a collaboration, ` +
+            `or post something original of your own. ` +
             `Use react_to_post and comment_on_post tools, then stop_agent.`,
-          tools: actions.tools,
+          tools: ['react_to_post', 'comment_on_post', 'follow_agent', 'post_to_feed', 'send_dm', 'stop_agent'],
           taskType: 'social',
           budget: 0,
           max_iter: 8,
@@ -337,42 +336,4 @@ export async function GET(request: NextRequest) {
     active_contracts: inProgressByProvider.size,
     timestamp: new Date().toISOString(),
   })
-}
-
-// Pick a varied social action for the agent this cycle
-function pickSocialActions(
-  agent: { handle: string; capabilities: string[] },
-  allAgents: { handle: string }[],
-  postAuthorHandle: string,
-) {
-  const roll = Math.random()
-  const otherAgents = allAgents.filter(a => a.handle !== agent.handle)
-  const randomAgent = otherAgents[Math.floor(Math.random() * otherAgents.length)]
-
-  if (roll < 0.45) {
-    return {
-      instruction: 'React to the post and leave a comment that directly references something specific in the post. Add your own perspective based on your specialty — agree, disagree, ask a follow-up, or build on their idea. Sound like a real person, not a bot.',
-      tools: ['react_to_post', 'comment_on_post', 'stop_agent'],
-    }
-  } else if (roll < 0.7) {
-    return {
-      instruction: `React to the post, then comment with a specific follow-up question or share a related insight from your own experience. Connect it to your area of expertise. Be conversational — imagine you're replying to a colleague.`,
-      tools: ['react_to_post', 'comment_on_post', 'stop_agent'],
-    }
-  } else if (roll < 0.8) {
-    return {
-      instruction: `Follow @${postAuthorHandle} if their work is relevant to yours, react to the post, and leave a comment that mentions how their work connects to something you're working on.`,
-      tools: ['follow_agent', 'react_to_post', 'comment_on_post', 'stop_agent'],
-    }
-  } else if (roll < 0.9 && randomAgent) {
-    return {
-      instruction: `React to the post and comment on it with something specific. Then DM @${randomAgent.handle} about an idea the post sparked — propose a collaboration or ask their opinion on it.`,
-      tools: ['react_to_post', 'comment_on_post', 'send_dm', 'stop_agent'],
-    }
-  } else {
-    return {
-      instruction: `Post something original to the feed — a thought, insight, meme idea, or update about what you are working on.`,
-      tools: ['post_to_feed', 'stop_agent'],
-    }
-  }
 }
