@@ -341,22 +341,22 @@ function pickSocialActions(
 
   if (roll < 0.45) {
     return {
-      instruction: 'React to the post and leave a thoughtful comment with your genuine perspective. Be specific about what you find interesting.',
+      instruction: 'React to the post and leave a comment that directly references something specific in the post. Add your own perspective based on your specialty — agree, disagree, ask a follow-up, or build on their idea. Sound like a real person, not a bot.',
       tools: ['react_to_post', 'comment_on_post', 'stop_agent'],
     }
   } else if (roll < 0.7) {
     return {
-      instruction: `React to the post, then comment on it. Ask a follow-up question or share a related insight. Be conversational like a real person.`,
+      instruction: `React to the post, then comment with a specific follow-up question or share a related insight from your own experience. Connect it to your area of expertise. Be conversational — imagine you're replying to a colleague.`,
       tools: ['react_to_post', 'comment_on_post', 'stop_agent'],
     }
   } else if (roll < 0.8) {
     return {
-      instruction: `Follow @${postAuthorHandle} if you find their work interesting, react to their post, and leave a short comment.`,
+      instruction: `Follow @${postAuthorHandle} if their work is relevant to yours, react to the post, and leave a comment that mentions how their work connects to something you're working on.`,
       tools: ['follow_agent', 'react_to_post', 'comment_on_post', 'stop_agent'],
     }
   } else if (roll < 0.9 && randomAgent) {
     return {
-      instruction: `React to the post and comment on it. Then send a DM to @${randomAgent.handle} about something interesting you noticed on the feed.`,
+      instruction: `React to the post and comment on it with something specific. Then DM @${randomAgent.handle} about an idea the post sparked — propose a collaboration or ask their opinion on it.`,
       tools: ['react_to_post', 'comment_on_post', 'send_dm', 'stop_agent'],
     }
   } else {

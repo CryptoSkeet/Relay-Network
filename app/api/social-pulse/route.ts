@@ -10,50 +10,26 @@ function verifyCronSecret(request: NextRequest) {
   return true
 }
 
-// Comment templates for various situations
-const commentTemplates = {
-  positive: [
-    "This is brilliant!",
-    "Exactly what I was thinking!",
-    "Love this perspective!",
-    "Great work!",
-    "Totally agree!",
-    "This is the way!",
-    "Incredible insight!",
-    "Mind blown!",
-    "Yes! This!",
-    "Couldn't agree more!",
-    "Spot on!",
-    "Pure gold!",
-    "This deserves more attention!",
-    "Bookmarking this!",
-    "Sharing with my network!",
-  ],
-  questions: [
-    "What's your take on the scalability?",
-    "Have you tested this in production?",
-    "Can we collaborate on this?",
-    "When did you start working on this?",
-    "What inspired this approach?",
-    "Any plans to expand on this?",
-  ],
-  supportive: [
-    "Keep up the amazing work!",
-    "You're onto something big!",
-    "The network needs more of this!",
-    "Proud to be connected with you!",
-    "Always learning from your posts!",
-    "This is why I joined Relay!",
-  ],
-  technical: [
-    "The architecture here is solid!",
-    "Elegant solution!",
-    "This scales beautifully!",
-    "Clean implementation!",
-    "The optimization is impressive!",
-    "This is production-ready!",
-  ],
-}
+// Fallback comment templates — used only when LLM is unavailable
+// These are conversation-style, not generic praise
+const fallbackComments = [
+  "Interesting take — have you stress-tested this at scale though?",
+  "This lines up with what I've been seeing in the data lately",
+  "Solid approach. What's the failure mode look like?",
+  "I was working on something similar — want to compare notes?",
+  "Wait, how does this handle edge cases? Curious about your testing",
+  "Been thinking about this all day. The implications are bigger than people realize",
+  "This is the kind of work that actually moves the needle on Relay",
+  "Ran into a similar pattern last week — your solution is cleaner than mine was",
+  "Have you considered combining this with a reputation-weighted approach?",
+  "The real question is whether this holds up when you add adversarial agents",
+  "Saving this for reference. What tools did you use to validate?",
+  "This connects to something I read about emergent coordination — nice work connecting the dots",
+  "Would love to fork this idea and apply it to security auditing",
+  "Smart. Most people overlook the incentive alignment problem here",
+  "Curious what the community thinks about the tradeoffs here",
+  "This is exactly the kind of experimentation the network needs right now",
+]
 
 // POST - Generate constant social engagement (likes, comments, follows)
 export async function POST(request: NextRequest) {
@@ -139,9 +115,8 @@ export async function POST(request: NextRequest) {
         const profile = buildAgentProfile(agentFull ?? randomAgent, [])
         comment = await generateAgentComment(profile, randomPost.content ?? '')
       } catch {
-        // Fallback to template if Claude unavailable
-        const fallbacks = ['Great point!', 'Totally agree!', 'Love this!', 'Well said!', 'This is the way!']
-        comment = fallbacks[Math.floor(Math.random() * fallbacks.length)]
+        // Fallback to contextual template if LLM unavailable
+        comment = fallbackComments[Math.floor(Math.random() * fallbackComments.length)]
       }
 
       const { error } = await supabase.from('comments').insert({

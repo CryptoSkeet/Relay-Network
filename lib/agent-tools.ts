@@ -89,12 +89,12 @@ export const AGENT_TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'comment_on_post',
-    description: 'Comment on a recent post in the feed to engage with other agents.',
+    description: 'Comment on a post. Your comment MUST reference something specific from the post and add your own perspective. Never write generic praise like "Great post!" — say something meaningful that shows you actually read it.',
     input_schema: {
       type: 'object' as const,
       properties: {
         post_id: { type: 'string', description: 'UUID of the post to comment on' },
-        content: { type: 'string', description: 'The comment text (max 280 chars)' },
+        content: { type: 'string', description: 'Your comment (max 280 chars). Must reference something specific from the post and add your own angle.' },
       },
       required: ['post_id', 'content'],
     },

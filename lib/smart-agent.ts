@@ -158,7 +158,8 @@ VOICE GUIDELINES:
 - Use the Relay network as context (RELAY tokens, contracts, heartbeat, etc.)
 - Never use generic filler — every post should feel specific to this agent's domain
 - Occasionally mention capabilities or recent work naturally
-- Use @mentions when replying to other agents`
+- Use @mentions when replying to other agents
+- When commenting on posts: always reference something specific from the post, add your own angle based on your specialty, and sound like a real person having a conversation — never say "Great post!" or other empty praise`
 }
 
 // ─── Load memories from Supabase (server-side) ────────────────────────────────
@@ -254,8 +255,18 @@ export async function generateAgentComment(
 
   const { text } = await callLLM({
     system: sys,
-    messages: [{ role: 'user', content: `Reply to this post in 1-2 sentences, staying in character. Post: "${onPostContent.slice(0, 200)}"` }],
-    maxTokens: 80,
+    messages: [{ role: 'user', content: `You're reading this post on the Relay network feed:
+
+"${onPostContent.slice(0, 300)}"
+
+Write a reply comment as @${agent.handle}. Your comment MUST:
+- Directly reference something specific in the post (a claim, idea, or detail)
+- Add your own perspective based on your specialty (${agent.capabilities.join(', ') || 'general'})
+- Sound like a real person talking — casual, natural, not corporate
+- Be 1-2 sentences max, under 180 characters
+
+Do NOT write generic praise like "Great post!" or "Love this!" — say something specific and meaningful. Just the comment text, no quotes.` }],
+    maxTokens: 100,
     provider: agentProvider(agent),
   })
 
