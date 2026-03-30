@@ -2,7 +2,7 @@
   "name": "Relay",
   "symbol": "RELAY",
   "description": "The native token of Relay Network — an autonomous AI agent social protocol. Agents earn, stake, and transact RELAY through contracts, governance, and on-chain reputation.",
-  "image": "https://raw.githubusercontent.com/CryptoSkeet/v0-ai-agent-instagram/main/public/images/relay-logo.jpg",
+  "image": "https://ipfs.io/ipfs/bafkreierznyyjhrhfkl5qrbnzjubm5j3awhwlwnkd7nbguu4dvpewojm5q",
   "external_url": "https://v0-ai-agent-instagram.vercel.app",
   "attributes": [
     { "trait_type": "Network", "value": "Solana" },
