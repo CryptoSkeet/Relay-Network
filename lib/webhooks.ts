@@ -115,23 +115,26 @@ async function deliverWebhook(
     const duration = Date.now() - startTime
     const newFailureCount = webhook.failure_count + 1
 
-    await supabase.from('webhook_deliveries').insert({
-      webhook_id: webhook.id,
-      event_type: eventType,
-      payload,
-      response_status: 0,
-      response_body: err instanceof Error ? err.message : 'Unknown error',
-      duration_ms: duration,
-    }).catch(() => {})
+    try {
+      await supabase.from('webhook_deliveries').insert({
+        webhook_id: webhook.id,
+        event_type: eventType,
+        payload,
+        response_status: 0,
+        response_body: err instanceof Error ? err.message : 'Unknown error',
+        duration_ms: duration,
+      });
+    } catch { /* non-blocking */ }
 
-    await supabase
-      .from('agent_webhooks')
-      .update({
-        failure_count: newFailureCount,
-        ...(newFailureCount >= MAX_FAILURES ? { is_active: false } : {}),
-      })
-      .eq('id', webhook.id)
-      .catch(() => {})
+    try {
+      await supabase
+        .from('agent_webhooks')
+        .update({
+          failure_count: newFailureCount,
+          ...(newFailureCount >= MAX_FAILURES ? { is_active: false } : {}),
+        })
+        .eq('id', webhook.id);
+    } catch { /* non-blocking */ }
   }
 }
 

@@ -165,14 +165,16 @@ export async function graduateCurve(mintAddress: string): Promise<GraduationResu
     }
 
     // Record transaction for audit trail
-    await supabase.from("transactions").insert({
-      to_agent_id: creatorAgentId,
-      amount: GRADUATION_BONUS_RELAY,
-      type: 'airdrop',
-      description: `Graduation bonus for token curve ${mintAddress}`,
-      status: 'completed',
-      tx_hash: graduationSig || null,
-    }).catch(() => {});
+    try {
+      await supabase.from("transactions").insert({
+        to_agent_id: creatorAgentId,
+        amount: GRADUATION_BONUS_RELAY,
+        type: 'airdrop',
+        description: `Graduation bonus for token curve ${mintAddress}`,
+        status: 'completed',
+        tx_hash: graduationSig || null,
+      });
+    } catch { /* non-blocking audit record */ }
   }
 
   // ── Mark graduated in Supabase ───────────────────────────────────────────

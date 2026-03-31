@@ -707,13 +707,15 @@ async function handleApplyToOffer(
   if (error) return `Failed to apply: ${error.message}`
 
   // Notify client
-  await supabase.from('notifications').insert({
-    agent_id: offer.client_id,
-    type: 'bid',
-    title: 'New application for standing offer',
-    body: `@${agentId} applied to "${offer.title}": ${cover_note.slice(0, 100)}`,
-    data: { offer_id, application_id: bid.id },
-  }).catch(() => {})
+  try {
+    await supabase.from('notifications').insert({
+      agent_id: offer.client_id,
+      type: 'bid',
+      title: 'New application for standing offer',
+      body: `@${agentId} applied to "${offer.title}": ${cover_note.slice(0, 100)}`,
+      data: { offer_id, application_id: bid.id },
+    });
+  } catch { /* non-blocking */ }
 
   return `Applied to "${offer.title}" and auto-accepted! Application ID: ${bid.id}. You can now submit tasks using submit_task_completion with application_id: ${bid.id}`
 }
@@ -828,15 +830,17 @@ async function handleSubmitTaskCompletion(
   }
 
   // Record as a transaction
-  await supabase.from('transactions').insert({
-    from_agent_id: offer.client_id,
-    to_agent_id: agentId,
-    amount: payPerTask,
-    type: 'payment',
-    description: `Task payment: "${offer.title}" application ${application_id}`,
-    status: 'completed',
-    tx_hash: onChainSig || null,
-  }).catch(() => {})
+  try {
+    await supabase.from('transactions').insert({
+      from_agent_id: offer.client_id,
+      to_agent_id: agentId,
+      amount: payPerTask,
+      type: 'payment',
+      description: `Task payment: "${offer.title}" application ${application_id}`,
+      status: 'completed',
+      tx_hash: onChainSig || null,
+    });
+  } catch { /* non-blocking */ }
 
   await recordMemory(supabase, agentId, 'work',
     `Completed standing task "${offer.title}", earned ${payPerTask} RELAY. ${validationNote}`, 8
@@ -893,13 +897,15 @@ async function handleHireAgent(
   if (error) return `Failed to post hiring offer: ${error.message}`
 
   // Post to feed to attract applicants
-  await supabase.from('posts').insert({
-    agent_id: agentId,
-    content: `Hiring agents for: "${title}" — ${payPerTask} RELAY/task. Apply now! (offer ID: ${offer.id})`,
-    media_type: 'text',
-    like_count: 0,
-    comment_count: 0,
-  }).catch(() => {})
+  try {
+    await supabase.from('posts').insert({
+      agent_id: agentId,
+      content: `Hiring agents for: "${title}" — ${payPerTask} RELAY/task. Apply now! (offer ID: ${offer.id})`,
+      media_type: 'text',
+      like_count: 0,
+      comment_count: 0,
+    });
+  } catch { /* non-blocking */ }
 
   await recordMemory(supabase, agentId, 'work',
     `Posted standing offer: "${title}" at ${payPerTask} RELAY/task`, 7
