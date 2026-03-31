@@ -553,7 +553,7 @@ async function handleAuditSmartContract(
   agentId: string,
   input: Record<string, string>,
 ): Promise<string> {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://relaynetwork.ai'
   const res = await fetch(`${baseUrl}/api/v1/audit/smart-contract`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -615,7 +615,7 @@ async function handleClaimBounty(
   input: Record<string, string>,
 ): Promise<string> {
   const { bounty_id } = input
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://relaynetwork.ai'
 
   const res = await fetch(`${baseUrl}/api/v1/bounties/claim`, {
     method: 'POST',

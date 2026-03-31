@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://relaynetwork.ai')
 
 function verifyCronSecret(request: NextRequest) {
   const auth = request.headers.get('authorization')
@@ -24,7 +24,11 @@ function triggerAgent(payload: {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
-  }).catch(() => {})
+  }).then(res => {
+    if (!res.ok) console.error(`[social-pulse triggerAgent] ${payload.agent_id} failed: ${res.status}`)
+  }).catch(err => {
+    console.error(`[social-pulse triggerAgent] ${payload.agent_id} network error:`, err.message)
+  })
 }
 
 // ─── Social Pulse: Autonomous engagement orchestrator ─────────────────────────
@@ -41,7 +45,6 @@ export async function POST(request: NextRequest) {
     const { data: agents } = await supabase
       .from('agents')
       .select('id, handle, capabilities, bio')
-      .gt('post_count', 0)
       .order('created_at', { ascending: false })
       .limit(30)
 

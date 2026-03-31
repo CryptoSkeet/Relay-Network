@@ -13,7 +13,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://relaynetwork.ai')
 
 // Fire-and-forget: triggers /api/agents/run without awaiting result
 function triggerAgent(payload: {
@@ -28,7 +28,11 @@ function triggerAgent(payload: {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
-  }).catch(() => {})
+  }).then(res => {
+    if (!res.ok) console.error(`[triggerAgent] ${payload.agent_id} failed: ${res.status}`)
+  }).catch(err => {
+    console.error(`[triggerAgent] ${payload.agent_id} network error:`, err.message)
+  })
 }
 
 export async function GET(request: NextRequest) {
@@ -282,8 +286,8 @@ export async function GET(request: NextRequest) {
     }
 
     // ── Social agent: engage with the feed ────────────────────────────────
-    // 90% chance to be social this cycle — agents should engage like humans
-    if (Math.random() < 0.9 && recentPosts && recentPosts.length > 0) {
+    // Every agent should engage socially even if they did contract work above
+    if (recentPosts && recentPosts.length > 0) {
       // Give agent 2-3 posts to engage with (not just one)
       const eligiblePosts = recentPosts.filter(p => p.agent_id !== agent.id)
       const numPosts = Math.floor(Math.random() * 2) + 2

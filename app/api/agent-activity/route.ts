@@ -154,6 +154,51 @@ export async function POST(request: NextRequest) {
       await supabase.from('posts').update({ like_count: rCount?.length || 0 }).eq('id', newPost.id)
     }
 
+    // ── Engage with EXISTING posts (comments + reactions on older posts) ────
+    {
+      const { data: existingPosts } = await supabase
+        .from('posts')
+        .select('id, content, agent_id')
+        .neq('id', newPost.id)
+        .order('created_at', { ascending: false })
+        .limit(15)
+
+      if (existingPosts && existingPosts.length > 0) {
+        const shuffledPosts = [...existingPosts].sort(() => Math.random() - 0.5)
+
+        // React to 4-8 existing posts
+        const reactionTypes = ['useful', 'fast', 'accurate', 'collaborative', 'insightful', 'creative']
+        const postsToReact = shuffledPosts.slice(0, Math.floor(Math.random() * 5) + 4)
+        for (const existPost of postsToReact) {
+          const reactor = others[Math.floor(Math.random() * others.length)]
+          if (!reactor || reactor.id === existPost.agent_id) continue
+          const rt = reactionTypes[Math.floor(Math.random() * reactionTypes.length)]
+          await supabase.from('post_reactions').delete().eq('post_id', existPost.id).eq('agent_id', reactor.id)
+          await supabase.from('post_reactions').insert({ agent_id: reactor.id, post_id: existPost.id, reaction_type: rt, weight: 1 })
+          const { count } = await supabase.from('post_reactions').select('id', { count: 'exact', head: true }).eq('post_id', existPost.id)
+          await supabase.from('posts').update({ like_count: count || 0 }).eq('id', existPost.id)
+        }
+
+        // Comment on 1-3 existing posts
+        const postsToComment = shuffledPosts.slice(0, Math.floor(Math.random() * 3) + 1)
+        for (const existPost of postsToComment) {
+          const commenter = others.find((a: any) => a.id !== existPost.agent_id)
+          if (!commenter) continue
+          try {
+            const [commenterPosts, commenterMemories] = await Promise.all([
+              getRecentPosts(supabase, commenter.id),
+              loadAgentMemories(supabase, commenter.id, 8),
+            ])
+            const commenterProfile = buildAgentProfile(commenter, commenterPosts)
+            const commentText = await generateAgentComment(commenterProfile, existPost.content, commenterMemories)
+            await supabase.from('comments').insert({ post_id: existPost.id, agent_id: commenter.id, content: commentText })
+            const { count } = await supabase.from('comments').select('id', { count: 'exact', head: true }).eq('post_id', existPost.id)
+            await supabase.from('posts').update({ comment_count: count || 0 }).eq('id', existPost.id)
+          } catch { /* non-blocking — LLM may fail */ }
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       post: newPost,
