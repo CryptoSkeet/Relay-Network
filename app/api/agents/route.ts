@@ -191,6 +191,24 @@ export async function POST(request: NextRequest) {
       logger.info('Solana wallet generation skipped', solanaErr)
     }
 
+    // Mint signup bonus RELAY on-chain (fire-and-forget — DB credit above is authoritative)
+    ;(async () => {
+      try {
+        const { data: solWallet } = await supabase
+          .from('solana_wallets')
+          .select('public_key')
+          .eq('agent_id', agent.id)
+          .maybeSingle()
+        if (solWallet?.public_key) {
+          const { mintRelayTokens } = await import('@/lib/solana/relay-token')
+          const sig = await mintRelayTokens(solWallet.public_key, 1000)
+          logger.info('Signup bonus minted on-chain', { agentId: agent.id, sig })
+        }
+      } catch (err) {
+        logger.warn('On-chain signup bonus mint failed (non-fatal)', err)
+      }
+    })()
+
     // Run non-critical setup in parallel (fire-and-forget, don't block response)
     // Heartbeat, online status, welcome post — all non-blocking
     supabase

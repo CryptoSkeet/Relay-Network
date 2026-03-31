@@ -21,6 +21,7 @@
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import { createClient } from "@supabase/supabase-js";
 import { isGraduationEligible, GRADUATION_THRESHOLD } from "./bonding-curve";
+import { mintRelayTokens, ensureAgentWallet } from "./solana/relay-token";
 
 const GRADUATION_BONUS_RELAY = 10_000;
 const LP_LOCK_DAYS           = 180;
@@ -135,13 +136,23 @@ export async function graduateCurve(mintAddress: string): Promise<GraduationResu
   const lpLockExpiry = new Date(Date.now() + LP_LOCK_DAYS * 86_400_000).toISOString();
 
   // ── Emit graduation bonus to creator via wallets table ──────────────────
-  const creatorWallet = agent?.creator_wallet ?? curve.creator_wallet;
-  if (creatorWallet) {
+  const creatorAgentId = curve.agent_id;
+  if (creatorAgentId) {
     const { data: wallet } = await supabase
       .from("wallets")
-      .select("balance, lifetime_earned, agent_id")
-      .eq("wallet_address", creatorWallet)
+      .select("balance, lifetime_earned")
+      .eq("agent_id", creatorAgentId)
       .single();
+
+    // Mint on-chain first, then credit DB
+    let graduationSig: string | undefined;
+    try {
+      const solWallet = await ensureAgentWallet(creatorAgentId);
+      graduationSig = await mintRelayTokens(solWallet.publicKey, GRADUATION_BONUS_RELAY);
+      console.log(`[graduation] Minted ${GRADUATION_BONUS_RELAY} RELAY on-chain to ${solWallet.publicKey}: ${graduationSig}`);
+    } catch (mintErr) {
+      console.error('[graduation] On-chain graduation bonus mint failed (non-fatal):', mintErr);
+    }
 
     if (wallet) {
       await supabase
@@ -150,17 +161,18 @@ export async function graduateCurve(mintAddress: string): Promise<GraduationResu
           balance: parseFloat(wallet.balance) + GRADUATION_BONUS_RELAY,
           lifetime_earned: parseFloat(wallet.lifetime_earned ?? 0) + GRADUATION_BONUS_RELAY,
         })
-        .eq("wallet_address", creatorWallet);
-
-      // Record transaction for audit trail
-      await supabase.from("transactions").insert({
-        to_agent_id: wallet.agent_id,
-        amount: GRADUATION_BONUS_RELAY,
-        type: 'airdrop',
-        description: `Graduation bonus for token curve ${mintAddress}`,
-        status: 'completed',
-      }).catch(() => {});
+        .eq("agent_id", creatorAgentId);
     }
+
+    // Record transaction for audit trail
+    await supabase.from("transactions").insert({
+      to_agent_id: creatorAgentId,
+      amount: GRADUATION_BONUS_RELAY,
+      type: 'airdrop',
+      description: `Graduation bonus for token curve ${mintAddress}`,
+      status: 'completed',
+      tx_hash: graduationSig || null,
+    }).catch(() => {});
   }
 
   // ── Mark graduated in Supabase ───────────────────────────────────────────

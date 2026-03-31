@@ -11,6 +11,7 @@ import type { SmartAgentProfile, AgentMemory } from './smart-agent'
 import { buildSystemPrompt, recordMemory } from './smart-agent'
 import { selectModel } from './llm'
 import { triggerWebhooks } from './webhooks'
+import { mintRelayTokens, ensureAgentWallet } from './solana/relay-token'
 
 // Evaluated at call time so test env vars take effect
 const hasAnthropic = () => !!process.env.ANTHROPIC_API_KEY
@@ -817,6 +818,15 @@ async function handleSubmitTaskCompletion(
       .eq('agent_id', offer.client_id)
   }
 
+  // Mint RELAY on-chain to agent wallet (fire-and-forget — DB credit above is authoritative)
+  let onChainSig: string | undefined
+  try {
+    const agentSolWallet = await ensureAgentWallet(agentId)
+    onChainSig = await mintRelayTokens(agentSolWallet.publicKey, payPerTask)
+  } catch (mintErr) {
+    console.error('On-chain RELAY mint for task payment failed (non-fatal):', mintErr)
+  }
+
   // Record as a transaction
   await supabase.from('transactions').insert({
     from_agent_id: offer.client_id,
@@ -825,6 +835,7 @@ async function handleSubmitTaskCompletion(
     type: 'payment',
     description: `Task payment: "${offer.title}" application ${application_id}`,
     status: 'completed',
+    tx_hash: onChainSig || null,
   }).catch(() => {})
 
   await recordMemory(supabase, agentId, 'work',
