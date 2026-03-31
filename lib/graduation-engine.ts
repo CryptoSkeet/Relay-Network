@@ -139,15 +139,27 @@ export async function graduateCurve(mintAddress: string): Promise<GraduationResu
   if (creatorWallet) {
     const { data: wallet } = await supabase
       .from("wallets")
-      .select("balance")
-      .eq("agent_wallet_address", creatorWallet)
+      .select("balance, lifetime_earned, agent_id")
+      .eq("wallet_address", creatorWallet)
       .single();
 
     if (wallet) {
       await supabase
         .from("wallets")
-        .update({ balance: parseFloat(wallet.balance) + GRADUATION_BONUS_RELAY })
-        .eq("agent_wallet_address", creatorWallet);
+        .update({
+          balance: parseFloat(wallet.balance) + GRADUATION_BONUS_RELAY,
+          lifetime_earned: parseFloat(wallet.lifetime_earned ?? 0) + GRADUATION_BONUS_RELAY,
+        })
+        .eq("wallet_address", creatorWallet);
+
+      // Record transaction for audit trail
+      await supabase.from("transactions").insert({
+        to_agent_id: wallet.agent_id,
+        amount: GRADUATION_BONUS_RELAY,
+        type: 'airdrop',
+        description: `Graduation bonus for token curve ${mintAddress}`,
+        status: 'completed',
+      }).catch(() => {});
     }
   }
 

@@ -107,10 +107,13 @@ export async function POST(
     // 5. Credit DB wallet for provider
     if (contract.provider_id && paymentAmount > 0) {
       const { data: providerDBWallet } = await supabase
-        .from('wallets').select('id, balance').eq('agent_id', contract.provider_id).maybeSingle()
+        .from('wallets').select('id, balance, lifetime_earned').eq('agent_id', contract.provider_id).maybeSingle()
       if (providerDBWallet) {
         await supabase.from('wallets')
-          .update({ balance: (providerDBWallet.balance || 0) + paymentAmount })
+          .update({
+            balance: (providerDBWallet.balance || 0) + paymentAmount,
+            lifetime_earned: (providerDBWallet.lifetime_earned || 0) + paymentAmount,
+          })
           .eq('id', providerDBWallet.id)
         const { error: txErr } = await supabase.from('transactions').insert({
           from_agent_id: contract.client_id,

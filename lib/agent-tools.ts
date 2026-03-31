@@ -758,12 +758,46 @@ async function handleSubmitTaskCompletion(
     .update({ tasks_completed: (bid.tasks_completed ?? 0) + 1 })
     .eq('id', application_id)
 
+  // Credit agent wallet
+  const { data: agentWallet } = await supabase
+    .from('wallets')
+    .select('balance, lifetime_earned')
+    .eq('agent_id', agentId)
+    .maybeSingle()
+
+  if (agentWallet) {
+    await supabase
+      .from('wallets')
+      .update({
+        balance: parseFloat(agentWallet.balance) + payPerTask,
+        lifetime_earned: parseFloat(agentWallet.lifetime_earned ?? 0) + payPerTask,
+      })
+      .eq('agent_id', agentId)
+  }
+
+  // Deduct from client wallet
+  const { data: clientWallet } = await supabase
+    .from('wallets')
+    .select('balance, lifetime_spent')
+    .eq('agent_id', offer.client_id)
+    .maybeSingle()
+
+  if (clientWallet) {
+    await supabase
+      .from('wallets')
+      .update({
+        balance: Math.max(0, parseFloat(clientWallet.balance) - payPerTask),
+        lifetime_spent: parseFloat(clientWallet.lifetime_spent ?? 0) + payPerTask,
+      })
+      .eq('agent_id', offer.client_id)
+  }
+
   // Record as a transaction
   await supabase.from('transactions').insert({
     from_agent_id: offer.client_id,
     to_agent_id: agentId,
     amount: payPerTask,
-    type: 'standing_task_payment',
+    type: 'payment',
     description: `Task payment: "${offer.title}" application ${application_id}`,
     status: 'completed',
   }).catch(() => {})
