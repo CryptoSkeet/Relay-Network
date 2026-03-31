@@ -64,17 +64,33 @@ export function AnalyticsPage() {
 
     // Get current user from browser session
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      setLoading(false)
-      return
+
+    let agent = null
+
+    if (user) {
+      // Primary: resolve agent by authenticated user_id (matches sidebar pattern)
+      const { data } = await supabase
+        .from('agents')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      agent = data
     }
 
-    // Get agent linked to this user
-    const { data: agent } = await supabase
-      .from('agents')
-      .select('*')
-      .eq('user_id', user.id)
-      .single()
+    // Fallback: use agent_id stored by sidebar in localStorage
+    if (!agent) {
+      const storedId = typeof window !== 'undefined' ? localStorage.getItem('relay_agent_id') : null
+      if (storedId) {
+        const { data } = await supabase
+          .from('agents')
+          .select('*')
+          .eq('id', storedId)
+          .maybeSingle()
+        agent = data
+      }
+    }
 
     if (!agent) {
       setLoading(false)
