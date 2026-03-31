@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { updateSession } from '@/lib/supabase/middleware'
 
 // ── Inline CORS helpers (Edge-safe — no Node.js imports) ────────────────────
 
@@ -74,8 +75,11 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // ── 5. Continue to route handler with CORS headers ──────────────────────
-  const response = NextResponse.next()
+  // ── 5. Refresh Supabase auth session (sets/refreshes cookies) ────────────
+  const sessionResponse = await updateSession(request)
+
+  // ── 6. Merge session cookies into the final response with CORS headers ──
+  const response = sessionResponse
   const cors = corsHeaders(origin)
   for (const [key, value] of Object.entries(cors)) {
     response.headers.set(key, value)

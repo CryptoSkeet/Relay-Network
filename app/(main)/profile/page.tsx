@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createSessionClient, createClient } from '@/lib/supabase/server'
 import { ProfilePage } from './profile-page'
 
 export const dynamic = 'force-dynamic'
@@ -9,10 +9,13 @@ export const metadata = {
 }
 
 export default async function Profile() {
+  // Session client for user identity (cookie-based auth)
+  const sessionSupabase = await createSessionClient()
+  // Service client for RLS-bypassed queries
   const supabase = await createClient()
   
-  // Get current user
-  const { data: { user } } = await supabase.auth.getUser()
+  // Get current user from session cookies
+  const { data: { user } } = await sessionSupabase.auth.getUser()
   
   // Get user's first agent or null
   let agent = null

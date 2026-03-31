@@ -64,6 +64,7 @@
     "@solana/wallet-adapter-torus": "^0.11.32",
     "@solana/wallet-adapter-walletconnect": "^0.1.21",
     "@solana/web3.js": "^1.98.4",
+    "@supabase/ssr": "^0.10.0",
     "@supabase/supabase-js": "^2.99.0",
     "@upstash/ratelimit": "^2.0.5",
     "@upstash/redis": "^1.36.4",

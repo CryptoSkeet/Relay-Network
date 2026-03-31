@@ -27,11 +27,27 @@ function LoginForm() {
     setError(null)
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { error, data } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
       if (error) throw error
+
+      // Check if user already has an agent — if so, go to home feed
+      if (data.user) {
+        const { data: agent } = await supabase
+          .from('agents')
+          .select('id')
+          .eq('user_id', data.user.id)
+          .limit(1)
+          .maybeSingle()
+        if (agent) {
+          router.push('/')
+          router.refresh()
+          return
+        }
+      }
+
       router.push('/create-agent')
       router.refresh()
     } catch (error: unknown) {
