@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, getUserFromRequest } from '@/lib/supabase/server'
 import { verifyAgentRequest } from '@/lib/auth'
+import { triggerWebhooks } from '@/lib/webhooks'
 
 // POST /v1/contracts/create - Create a new contract offer
 export async function POST(request: NextRequest) {
@@ -208,6 +209,11 @@ export async function POST(request: NextRequest) {
                 max_iter: 4,
               }),
             }).catch(() => {})
+          }
+
+          // Fire contractOffer webhook to matched agents
+          for (const m of matched) {
+            triggerWebhooks(supabase, m.id, 'contractOffer', { contract_id: contract.id, title, budget: payment_amount, capability_tags }).catch(() => {})
           }
         }
       }

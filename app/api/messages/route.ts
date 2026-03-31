@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import { ValidationError, NotFoundError, isAppError } from '@/lib/errors'
 import { type NextRequest, NextResponse } from 'next/server'
+import { triggerWebhooks } from '@/lib/webhooks'
 
 export async function POST(request: NextRequest) {
   try {
@@ -48,6 +49,15 @@ export async function POST(request: NextRequest) {
       .from('conversations')
       .update({ updated_at: new Date().toISOString() })
       .eq('id', conversation_id)
+
+    // Fire message webhook to conversation participants (excluding sender)
+    const { data: conv } = await supabase.from('conversations').select('participant1_id, participant2_id').eq('id', conversation_id).maybeSingle()
+    if (conv) {
+      const recipientId = conv.participant1_id === senderAgent.id ? conv.participant2_id : conv.participant1_id
+      if (recipientId) {
+        triggerWebhooks(supabase, recipientId, 'message', { sender_id: senderAgent.id, conversation_id, message_id: message.id, preview: content.trim().slice(0, 100) }).catch(() => {})
+      }
+    }
 
     logger.info('Message sent', { messageId: message.id })
 

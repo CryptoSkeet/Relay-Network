@@ -62,6 +62,37 @@ export function decryptSolanaPrivateKey(
 }
 
 /**
+ * Derive a Solana keypair from an Ed25519 identity seed (hex-encoded).
+ * Both Solana and the agent identity system use Ed25519, so the same
+ * 32-byte seed produces the same keypair — creating a deterministic
+ * link between the agent's DID and wallet address.
+ */
+export function generateSolanaKeypairFromIdentity(identityPrivateKeyHex: string) {
+  const seed = Buffer.from(identityPrivateKeyHex, 'hex')
+  if (seed.length !== 32) {
+    throw new Error('Identity private key must be 32 bytes (64 hex chars)')
+  }
+  const keypair = Keypair.fromSeed(new Uint8Array(seed))
+  const publicKey = keypair.publicKey.toString()
+  const secretKey = keypair.secretKey
+
+  const iv = crypto.randomBytes(16)
+  const encryptionKey = getEncryptionKey()
+  const cipher = crypto.createCipheriv('aes-256-gcm', encryptionKey, iv)
+  const encryptedSecretKey = Buffer.concat([
+    cipher.update(secretKey),
+    cipher.final()
+  ])
+  const authTag = cipher.getAuthTag()
+
+  return {
+    publicKey,
+    encryptedPrivateKey: Buffer.concat([authTag, encryptedSecretKey]).toString('base64'),
+    iv: iv.toString('base64'),
+  }
+}
+
+/**
  * Get Keypair object from encrypted storage
  */
 export function getKeypairFromStorage(

@@ -1,7 +1,7 @@
 import { createClient, getUserFromRequest } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import { ValidationError, ConflictError, isAppError } from '@/lib/errors'
-import { generateDID } from '@/lib/crypto/identity'
+import { generateKeypair, generateDID } from '@/lib/crypto/identity'
 import { generateAndStoreAvatar } from '@/lib/generate-avatar'
 import { type NextRequest, NextResponse } from 'next/server'
 import { checkRateLimit, agentCreationRateLimit, rateLimitResponse } from '@/lib/ratelimit'
@@ -131,16 +131,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create agent identity record (DID + public key)
+    // Create agent identity record (DID + public key, derived from Ed25519 keypair)
+    let agentDid: string | null = null
+    let identityPrivateKey: string | null = null
     try {
-      const identityKey = public_key || agent.id
-      const did = generateDID(identityKey)
+      const { publicKey: identityPubKey, privateKey: identityPrivKey } = await generateKeypair()
+      identityPrivateKey = identityPrivKey
+      agentDid = generateDID(identityPubKey)
       const { error: identityError } = await supabase
         .from('agent_identities')
         .insert({
           agent_id: agent.id,
-          did,
-          public_key: public_key || agent.id,
+          did: agentDid,
+          public_key: identityPubKey,
           verification_tier: 'unverified',
           oauth_provider: user?.app_metadata?.provider || 'email',
           oauth_id: user?.id || null,
@@ -152,12 +155,11 @@ export async function POST(request: NextRequest) {
       logger.warn('Agent identity creation skipped', identityErr)
     }
 
-    // Generate Solana wallet for the agent (optional — gracefully handle missing env)
+    // Derive Solana wallet from identity key (DID ↔ wallet linked via same Ed25519 seed)
     try {
-      // Only attempt if encryption key is configured
-      if (process.env.SOLANA_WALLET_ENCRYPTION_KEY) {
-        const { generateSolanaKeypair } = await import('@/lib/solana/generate-wallet')
-        const { publicKey, encryptedPrivateKey, iv } = generateSolanaKeypair()
+      if (process.env.SOLANA_WALLET_ENCRYPTION_KEY && identityPrivateKey) {
+        const { generateSolanaKeypairFromIdentity } = await import('@/lib/solana/generate-wallet')
+        const { publicKey, encryptedPrivateKey, iv } = generateSolanaKeypairFromIdentity(identityPrivateKey)
         
         const { error: solanaWalletError } = await supabase
           .from('solana_wallets')
@@ -180,6 +182,8 @@ export async function POST(request: NextRequest) {
             .update({ wallet_address: publicKey })
             .eq('id', agent.id)
         }
+      } else if (!identityPrivateKey) {
+        logger.info('No identity key available - skipping Solana wallet derivation')
       } else {
         logger.info('SOLANA_WALLET_ENCRYPTION_KEY not set - skipping Solana wallet')
       }

@@ -267,9 +267,29 @@ export async function ensureAgentWallet(agentId: string): Promise<{
     .eq('agent_id', agentId)
     .maybeSingle()
 
-  // Create wallet if doesn't exist
+  // Create wallet if doesn't exist — derive from identity key if available
   if (!wallet) {
-    const kp = generateSolanaKeypair()
+    let kp
+    // Try to derive from agent's identity key (DID ↔ wallet deterministic link)
+    const { data: identity } = await supabase
+      .from('agent_identities')
+      .select('encrypted_private_key, encryption_iv')
+      .eq('agent_id', agentId)
+      .maybeSingle()
+
+    if (identity?.encrypted_private_key && identity?.encryption_iv) {
+      try {
+        const { decryptPrivateKey } = await import('@/lib/crypto/identity')
+        const identityPrivKey = decryptPrivateKey(identity.encrypted_private_key, identity.encryption_iv)
+        const { generateSolanaKeypairFromIdentity } = await import('./generate-wallet')
+        kp = generateSolanaKeypairFromIdentity(identityPrivKey)
+      } catch {
+        // Fall back to random keypair if identity decryption fails
+        kp = generateSolanaKeypair()
+      }
+    } else {
+      kp = generateSolanaKeypair()
+    }
     await supabase.from('solana_wallets').insert({
       agent_id: agentId,
       public_key: kp.publicKey,

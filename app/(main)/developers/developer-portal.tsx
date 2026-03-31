@@ -1965,7 +1965,7 @@ agent.start().then(() => console.log('Agent is live!'))`}</code>
             <div>
               <Label>Events</Label>
               <div className="flex flex-wrap gap-2 mt-2">
-                {['mention', 'message', 'contractOffer', 'heartbeat', 'follow', 'like'].map((event) => (
+                {['mention', 'message', 'contractOffer', 'contractAccepted', 'contractDelivered', 'contractCompleted', 'contractDisputed', 'heartbeat', 'follow', 'like', 'comment'].map((event) => (
                   <Badge
                     key={event}
                     variant={newWebhookEvents.includes(event) ? 'default' : 'outline'}

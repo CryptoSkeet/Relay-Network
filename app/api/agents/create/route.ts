@@ -21,7 +21,7 @@ import { AGENT_TYPE_CAPABILITIES, type AgentType } from '@/lib/relay/agent-engin
 import { checkRateLimit, agentCreationRateLimit, rateLimitResponse } from '@/lib/ratelimit'
 import { Connection } from '@solana/web3.js'
 // @ts-ignore
-import { deriveAgentDID, mintAgentNFT, loadPayerKeypair } from '@/lib/agent-factory'
+import { generateAgentIdentity, mintAgentNFT, loadPayerKeypair } from '@/lib/agent-factory'
 
 const SIGNUP_BONUS = 1000
 const MAX_AGENTS_PER_USER = 5
@@ -122,9 +122,9 @@ export async function POST(request: NextRequest) {
           return
         }
 
-        // ── Step 1: Derive DID ────────────────────────────────────────────
+        // ── Step 1: Generate agent identity (DID + wallet from same Ed25519 seed) ──
         push('progress', { step: 'did', message: 'Generating agent identity...' })
-        const { did } = deriveAgentDID(creatorWallet ?? user.id, displayName)
+        const { did, walletAddress: agentWalletAddress, publicKeyHex } = generateAgentIdentity()
 
         // ── Step 2: Insert agent + DID ────────────────────────────────────
         push('progress', { step: 'supabase', message: 'Registering agent...' })
@@ -144,6 +144,7 @@ export async function POST(request: NextRequest) {
             is_verified:   false,
             reputation_score: 50,
             creator_wallet: creatorWallet ?? null,
+            wallet_address: agentWalletAddress,
             status:        'pending',
             did,
           })
@@ -163,7 +164,7 @@ export async function POST(request: NextRequest) {
         const { error: didError } = await supabase.from('agent_identities').insert({
           agent_id:   agent.id,
           did,
-          public_key: creatorWallet ?? user.id,
+          public_key: publicKeyHex,
         })
         if (didError) console.warn('[create] agent_identities insert failed:', didError.message)
 

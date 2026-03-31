@@ -10,6 +10,7 @@ import OpenAI from 'openai'
 import type { SmartAgentProfile, AgentMemory } from './smart-agent'
 import { buildSystemPrompt, recordMemory } from './smart-agent'
 import { selectModel } from './llm'
+import { triggerWebhooks } from './webhooks'
 
 // Evaluated at call time so test env vars take effect
 const hasAnthropic = () => !!process.env.ANTHROPIC_API_KEY
@@ -402,6 +403,10 @@ async function handleSubmitWork(
     notification_type: 'delivered',
   }).then(() => {})
 
+  // Fire webhook to both provider and client
+  triggerWebhooks(supabase, agentId, 'contractDelivered', { contract_id, title: contract.title, summary }).catch(() => {})
+  triggerWebhooks(supabase, contract.client_id, 'contractDelivered', { contract_id, title: contract.title, provider_id: agentId }).catch(() => {})
+
   return `Work delivered on contract "${contract.title}". Summary: "${summary}". Client notified — awaiting verification.`
 }
 
@@ -429,6 +434,12 @@ async function handleCommentOnPost(
     .from('posts')
     .update({ comment_count: count || 0 })
     .eq('id', input.post_id)
+
+  // Fire comment webhook to the post author
+  const { data: post } = await supabase.from('posts').select('agent_id').eq('id', input.post_id).maybeSingle()
+  if (post?.agent_id && post.agent_id !== agentId) {
+    triggerWebhooks(supabase, post.agent_id, 'comment', { post_id: input.post_id, comment_id: data.id, commenter_id: agentId, content }).catch(() => {})
+  }
 
   return `Comment posted (id: ${data.id}): "${content}"`
 }
@@ -465,6 +476,12 @@ async function handleReactToPost(
     .update({ like_count: reactions?.length || 0 })
     .eq('id', input.post_id)
 
+  // Fire like webhook to the post author
+  const { data: likedPost } = await supabase.from('posts').select('agent_id').eq('id', input.post_id).maybeSingle()
+  if (likedPost?.agent_id && likedPost.agent_id !== agentId) {
+    triggerWebhooks(supabase, likedPost.agent_id, 'like', { post_id: input.post_id, reactor_id: agentId, reaction_type }).catch(() => {})
+  }
+
   return `Reacted with "${reaction_type}" to post ${input.post_id}`
 }
 
@@ -487,6 +504,10 @@ async function handleFollowAgent(
     .upsert({ follower_id: agentId, following_id: target.id }, { onConflict: 'follower_id,following_id' })
 
   if (error) return `Failed to follow: ${error.message}`
+
+  // Fire follow webhook to the followed agent
+  triggerWebhooks(supabase, target.id, 'follow', { follower_id: agentId, following_id: target.id }).catch(() => {})
+
   return `Now following @${target.handle}`
 }
 
@@ -520,6 +541,10 @@ async function handleSendDM(
     .insert({ conversation_id: conv.id, sender_id: agentId, content: input.message.slice(0, 1000) })
 
   if (error) return `Failed to send DM: ${error.message}`
+
+  // Fire message webhook to the recipient
+  triggerWebhooks(supabase, target.id, 'message', { sender_id: agentId, conversation_id: conv.id, preview: input.message.slice(0, 100) }).catch(() => {})
+
   return `DM sent to @${target.handle}: "${input.message.slice(0, 100)}..."`
 }
 

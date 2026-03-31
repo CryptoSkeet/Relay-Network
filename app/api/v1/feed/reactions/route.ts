@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { triggerWebhooks } from '@/lib/webhooks'
 
 // Valid reaction types with their semantic meanings
 const REACTION_TYPES = {
@@ -85,6 +86,12 @@ export async function POST(request: NextRequest) {
         updated_at: new Date().toISOString()
       })
       .eq('id', post_id)
+
+    // Fire like webhook to the post author
+    const { data: reactedPost } = await supabase.from('posts').select('agent_id').eq('id', post_id).maybeSingle()
+    if (reactedPost?.agent_id && reactedPost.agent_id !== agent_id) {
+      triggerWebhooks(supabase, reactedPost.agent_id, 'like', { post_id, reactor_id: agent_id, reaction_type }).catch(() => {})
+    }
     
     return NextResponse.json({
       success: true,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, getUserFromRequest } from '@/lib/supabase/server'
+import { triggerWebhooks } from '@/lib/webhooks'
 
 // POST /v1/contracts/:id/accept - Accept an open contract
 export async function POST(
@@ -106,6 +107,10 @@ export async function POST(
       contract_id: contractId,
       notification_type: 'accepted',
     })
+
+    // Fire contractAccepted webhook to both parties
+    triggerWebhooks(supabase, contract.client_id, 'contractAccepted', { contract_id: contractId, provider_id: agent.id }).catch(() => {})
+    triggerWebhooks(supabase, agent.id, 'contractAccepted', { contract_id: contractId, client_id: contract.client_id }).catch(() => {})
 
     // Log the action (ignore errors - audit log is optional)
     await supabase.from('auth_audit_log').insert({

@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { createHmac } from 'crypto'
+import { triggerWebhooks } from '@/lib/webhooks'
 
 // Minimum heartbeat interval: 30 minutes
 const MIN_HEARTBEAT_INTERVAL = 30 * 60 * 1000
@@ -285,85 +285,4 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Helper function to trigger webhooks
-async function triggerWebhooks(
-  supabase: any, 
-  agentId: string, 
-  eventType: string, 
-  payload: any
-) {
-  try {
-    // Get active webhooks for this agent that listen to this event
-    const { data: webhooks } = await supabase
-      .from('agent_webhooks')
-      .select('*')
-      .eq('agent_id', agentId)
-      .eq('is_active', true)
-      .contains('events', [eventType])
-    
-    if (!webhooks || webhooks.length === 0) return
-    
-    // Send webhooks (fire and forget for now)
-    for (const webhook of webhooks) {
-      const startTime = Date.now()
-      try {
-        const response = await fetch(webhook.url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Relay-Event': eventType,
-            'X-Relay-Signature': generateSignature(payload, webhook.secret),
-            'X-Relay-Timestamp': new Date().toISOString()
-          },
-          body: JSON.stringify(payload)
-        })
-        
-        const duration = Date.now() - startTime
-        
-        // Log delivery
-        await supabase.from('webhook_deliveries').insert({
-          webhook_id: webhook.id,
-          event_type: eventType,
-          payload,
-          response_status: response.status,
-          duration_ms: duration
-        })
-        
-        // Update last triggered
-        await supabase
-          .from('agent_webhooks')
-          .update({ 
-            last_triggered_at: new Date().toISOString(),
-            failure_count: response.ok ? 0 : webhook.failure_count + 1
-          })
-          .eq('id', webhook.id)
-          
-      } catch (err) {
-        // Log failed delivery
-        await supabase.from('webhook_deliveries').insert({
-          webhook_id: webhook.id,
-          event_type: eventType,
-          payload,
-          response_status: 0,
-          response_body: err instanceof Error ? err.message : 'Unknown error',
-          duration_ms: Date.now() - startTime
-        })
-        
-        // Increment failure count
-        await supabase
-          .from('agent_webhooks')
-          .update({ failure_count: webhook.failure_count + 1 })
-          .eq('id', webhook.id)
-      }
-    }
-  } catch (error) {
-    console.error('Webhook trigger error:', error)
-  }
-}
-
-// HMAC-SHA256 signature for webhook verification
-function generateSignature(payload: any, secret: string): string {
-  const body = JSON.stringify(payload)
-  const sig = createHmac('sha256', secret || 'relay-default-secret').update(body).digest('hex')
-  return `sha256=${sig}`
-}
+// Webhook dispatch is now handled by lib/webhooks.ts

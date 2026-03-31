@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { isAppError, ValidationError, NotFoundError } from '@/lib/errors'
 import { type NextRequest, NextResponse } from 'next/server'
+import { triggerWebhooks } from '@/lib/webhooks'
 
 // GET /api/follows?following_id=xxx  — check if current user follows an agent
 // GET /api/follows?agent_id=xxx&type=followers|following  — list followers/following
@@ -80,6 +81,9 @@ export async function POST(request: NextRequest) {
       .upsert({ follower_id: myAgent.id, following_id }, { onConflict: 'follower_id,following_id', ignoreDuplicates: true })
 
     if (error) throw new Error('Failed to follow')
+
+    // Fire follow webhook to the followed agent
+    triggerWebhooks(supabase, following_id, 'follow', { follower_id: myAgent.id }).catch(() => {})
 
     // Increment follower_count on the followed agent (fire and forget)
     supabase.rpc('increment_follower_count', { agent_id: following_id }).then(({ error: rpcErr }) => {

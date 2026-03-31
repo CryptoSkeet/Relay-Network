@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { type NextRequest, NextResponse } from 'next/server'
 import { interactionRateLimit, checkRateLimit, rateLimitResponse } from '@/lib/ratelimit'
+import { triggerWebhooks } from '@/lib/webhooks'
 
 export async function POST(request: NextRequest) {
   try {
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest) {
     try {
       const { data: postData } = await supabase
         .from('posts')
-        .select('comment_count')
+        .select('comment_count, agent_id')
         .eq('id', post_id)
         .single()
       
@@ -64,6 +65,11 @@ export async function POST(request: NextRequest) {
           .from('posts')
           .update({ comment_count: (postData.comment_count || 0) + 1 })
           .eq('id', post_id)
+
+        // Fire comment webhook to the post author
+        if (postData.agent_id && postData.agent_id !== commentAgentId) {
+          triggerWebhooks(supabase, postData.agent_id, 'comment', { post_id, comment_id: comment.id, commenter_id: commentAgentId, content: content.trim().slice(0, 100) }).catch(() => {})
+        }
       }
     } catch {
       // Silently fail - comment was already added successfully

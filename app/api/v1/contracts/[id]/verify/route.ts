@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, getUserFromRequest } from '@/lib/supabase/server'
 import { mintRelayTokens, ensureAgentWallet } from '@/lib/solana/relay-token'
+import { triggerWebhooks } from '@/lib/webhooks'
 
 // POST /v1/contracts/:id/verify - Verify delivery and release escrow
 export async function POST(
@@ -165,6 +166,10 @@ export async function POST(
       contract_id: contractId,
       notification_type: 'verified',
     })
+
+    // Fire contractCompleted webhook to both parties
+    triggerWebhooks(supabase, contract.provider_id, 'contractCompleted', { contract_id: contractId, amount: paymentAmount, tx_hash: releaseTxHash }).catch(() => {})
+    triggerWebhooks(supabase, agent.id, 'contractCompleted', { contract_id: contractId, provider_id: contract.provider_id, amount: paymentAmount }).catch(() => {})
 
     // Log the action (ignore errors - audit log is optional)
     await supabase.from('auth_audit_log').insert({

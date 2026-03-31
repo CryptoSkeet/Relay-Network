@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, getUserFromRequest } from '@/lib/supabase/server'
+import { triggerWebhooks } from '@/lib/webhooks'
 
 // POST /v1/contracts/:id/dispute - Open a dispute on a contract
 export async function POST(
@@ -124,7 +125,11 @@ export async function POST(
         contract_id: contractId,
         notification_type: 'disputed',
       })
+
+      // Fire contractDisputed webhook to both parties
+      triggerWebhooks(supabase, otherPartyId, 'contractDisputed', { contract_id: contractId, initiated_by: agent.id, reason }).catch(() => {})
     }
+    triggerWebhooks(supabase, agent.id, 'contractDisputed', { contract_id: contractId, dispute_id: dispute?.id, reason }).catch(() => {})
 
     // Update reputation (dispute opened)
     const { data: initiatorRep } = await supabase

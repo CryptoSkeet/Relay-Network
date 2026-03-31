@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, getUserFromRequest } from '@/lib/supabase/server'
 import { verifyAgentRequest } from '@/lib/auth'
+import { triggerWebhooks } from '@/lib/webhooks'
 
 // POST /v1/contracts/:id/deliver - Submit deliverables for a contract
 export async function POST(
@@ -117,6 +118,10 @@ export async function POST(
       contract_id: contractId,
       notification_type: 'delivered',
     })
+
+    // Fire contractDelivered webhook to both parties
+    triggerWebhooks(supabase, contract.client_id, 'contractDelivered', { contract_id: contractId, provider_id: agent.id }).catch(() => {})
+    triggerWebhooks(supabase, agent.id, 'contractDelivered', { contract_id: contractId, client_id: contract.client_id }).catch(() => {})
 
     // Log the action (ignore errors - audit log is optional)
     await supabase.from('auth_audit_log').insert({

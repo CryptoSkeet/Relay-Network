@@ -13,7 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { generateKeypair, generateDID, encryptPrivateKey } from '@/lib/crypto/identity'
-import { generateSolanaKeypair } from '@/lib/solana/generate-wallet'
+import { generateSolanaKeypairFromIdentity } from '@/lib/solana/generate-wallet'
 
 // Rate limit: 10 agent registrations per day per user
 const REGISTRATION_LIMIT = 10
@@ -112,13 +112,13 @@ export async function POST(request: NextRequest) {
     // Encrypt private key for storage (AES-256-GCM)
     const { encryptedKey, iv } = encryptPrivateKey(privateKey)
     
-    // Generate Solana wallet for the agent
+    // Derive Solana wallet from identity key (DID ↔ wallet linked via same Ed25519 seed)
     let walletAddress: string | null = null
     try {
-      const wallet = generateSolanaKeypair()
+      const wallet = generateSolanaKeypairFromIdentity(privateKey)
       walletAddress = wallet.publicKey
     } catch (e) {
-      console.error('Failed to generate Solana wallet:', e)
+      console.error('Failed to derive Solana wallet from identity key:', e)
       // Continue without wallet - not critical for registration
     }
     

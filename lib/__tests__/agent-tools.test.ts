@@ -852,3 +852,234 @@ describe('runAgentLoop (no API keys)', () => {
     ).rejects.toThrow('No LLM API key configured')
   })
 })
+
+// ─── Contract payment tests ──────────────────────────────────────────────────
+
+describe('executeTool — submit_task_completion (standing task payments)', () => {
+  const agentId = AGENT.id
+
+  function makeTaskSupabase(opts: {
+    bidData?: any
+    agentWallet?: any
+    clientWallet?: any
+    updateError?: any
+  } = {}) {
+    const {
+      bidData = {
+        id: 'bid-001',
+        status: 'accepted',
+        contract_id: 'contract-001',
+        tasks_completed: 2,
+        offer: {
+          id: 'offer-001',
+          title: 'Write unit tests',
+          budget_max: 50,
+          budget_min: 50,
+          client_id: 'client-uuid',
+          deliverables: [{ acceptance_criteria: 'Tests pass' }],
+          status: 'open',
+        },
+      },
+      agentWallet = { balance: 100, lifetime_earned: 200 },
+      clientWallet = { balance: 500, lifetime_spent: 100 },
+      updateError = null,
+    } = opts
+
+    const walletUpdates: any[] = []
+    const transactionInserts: any[] = []
+    const bidUpdates: any[] = []
+
+    return {
+      supabase: {
+        from: vi.fn().mockImplementation((table: string) => {
+          if (table === 'bids') {
+            return {
+              select: vi.fn().mockReturnThis(),
+              eq: vi.fn().mockReturnThis(),
+              maybeSingle: vi.fn().mockResolvedValue({ data: bidData }),
+              update: vi.fn().mockImplementation((row: any) => {
+                bidUpdates.push(row)
+                return { eq: vi.fn().mockResolvedValue({ error: updateError }) }
+              }),
+            }
+          }
+          if (table === 'wallets') {
+            return {
+              select: vi.fn().mockReturnThis(),
+              eq: vi.fn().mockReturnThis(),
+              maybeSingle: vi.fn().mockImplementation(() => {
+                // Return agent wallet first, then client wallet
+                const calls = walletUpdates.length
+                if (calls === 0) {
+                  return Promise.resolve({ data: agentWallet })
+                }
+                return Promise.resolve({ data: clientWallet })
+              }),
+              update: vi.fn().mockImplementation((row: any) => {
+                walletUpdates.push(row)
+                return { eq: vi.fn().mockResolvedValue({ error: null }) }
+              }),
+            }
+          }
+          if (table === 'transactions') {
+            return {
+              insert: vi.fn().mockImplementation((row: any) => {
+                transactionInserts.push(row)
+                return { catch: vi.fn().mockReturnThis() }
+              }),
+            }
+          }
+          if (table === 'agent_memory') {
+            return {
+              insert: vi.fn().mockResolvedValue({ data: null, error: null }),
+              select: vi.fn().mockReturnThis(),
+              eq: vi.fn().mockReturnThis(),
+              maybeSingle: vi.fn().mockResolvedValue({ data: null }),
+            }
+          }
+          return makeSupabase().from(table)
+        }),
+      },
+      walletUpdates,
+      transactionInserts,
+      bidUpdates,
+    }
+  }
+
+  it('credits agent wallet with correct amount', async () => {
+    const { supabase, walletUpdates } = makeTaskSupabase()
+    const result = await executeTool(supabase, agentId, 'submit_task_completion', {
+      application_id: 'bid-001',
+      result: 'All tests passing. Coverage at 95%.',
+    })
+    expect(result.success).toBe(true)
+    expect(result.output).toContain('50 RELAY')
+
+    // First wallet update should be agent credit
+    const agentUpdate = walletUpdates[0]
+    expect(agentUpdate).toBeDefined()
+    expect(agentUpdate.balance).toBe(150) // 100 + 50
+    expect(agentUpdate.lifetime_earned).toBe(250) // 200 + 50
+  })
+
+  it('deducts from client wallet', async () => {
+    const { supabase, walletUpdates } = makeTaskSupabase()
+    await executeTool(supabase, agentId, 'submit_task_completion', {
+      application_id: 'bid-001',
+      result: 'Done.',
+    })
+
+    // Second wallet update should be client debit
+    const clientUpdate = walletUpdates[1]
+    expect(clientUpdate).toBeDefined()
+    expect(clientUpdate.balance).toBe(450) // 500 - 50
+    expect(clientUpdate.lifetime_spent).toBe(150) // 100 + 50
+  })
+
+  it('records a payment transaction', async () => {
+    const { supabase, transactionInserts } = makeTaskSupabase()
+    await executeTool(supabase, agentId, 'submit_task_completion', {
+      application_id: 'bid-001',
+      result: 'Completed.',
+    })
+
+    expect(transactionInserts.length).toBeGreaterThanOrEqual(1)
+    const tx = transactionInserts[0]
+    expect(tx.from_agent_id).toBe('client-uuid')
+    expect(tx.to_agent_id).toBe(agentId)
+    expect(tx.amount).toBe(50)
+    expect(tx.type).toBe('payment')
+    expect(tx.status).toBe('completed')
+  })
+
+  it('increments tasks_completed on the bid', async () => {
+    const { supabase, bidUpdates } = makeTaskSupabase()
+    await executeTool(supabase, agentId, 'submit_task_completion', {
+      application_id: 'bid-001',
+      result: 'Done.',
+    })
+
+    expect(bidUpdates.length).toBeGreaterThanOrEqual(1)
+    expect(bidUpdates[0].tasks_completed).toBe(3) // was 2, now 3
+  })
+
+  it('rejects when bid is not accepted', async () => {
+    const { supabase } = makeTaskSupabase({
+      bidData: { id: 'bid-001', status: 'pending', tasks_completed: 0, offer: {} },
+    })
+    const result = await executeTool(supabase, agentId, 'submit_task_completion', {
+      application_id: 'bid-001',
+      result: 'Done.',
+    })
+    expect(result.output).toContain('pending')
+  })
+
+  it('rejects when bid not found', async () => {
+    const { supabase } = makeTaskSupabase({ bidData: null })
+    const result = await executeTool(supabase, agentId, 'submit_task_completion', {
+      application_id: 'nonexistent',
+      result: 'Done.',
+    })
+    expect(result.output).toContain('not found')
+  })
+
+  it('prevents client balance going negative', async () => {
+    const { supabase, walletUpdates } = makeTaskSupabase({
+      clientWallet: { balance: 20, lifetime_spent: 0 },
+      bidData: {
+        id: 'bid-001', status: 'accepted', contract_id: 'c1', tasks_completed: 0,
+        offer: { id: 'o1', title: 'Big task', budget_max: 50, client_id: 'client-uuid', status: 'open' },
+      },
+    })
+    await executeTool(supabase, agentId, 'submit_task_completion', {
+      application_id: 'bid-001',
+      result: 'Done.',
+    })
+    // Client balance should be Math.max(0, 20 - 50) = 0, not negative
+    const clientUpdate = walletUpdates[1]
+    expect(clientUpdate).toBeDefined()
+    expect(clientUpdate.balance).toBeGreaterThanOrEqual(0)
+  })
+})
+
+describe('executeTool — submit_work (contract delivery)', () => {
+  const agentId = AGENT.id
+
+  it('sets contract status to delivered with deliverables payload', async () => {
+    let capturedUpdate: any = null
+    const supabase = {
+      from: vi.fn().mockImplementation((table: string) => {
+        if (table === 'contracts') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { client_id: 'client-uuid', title: 'Build API' },
+            }),
+            update: vi.fn().mockImplementation((row: any) => {
+              capturedUpdate = row
+              return {
+                eq: vi.fn().mockReturnValue({
+                  eq: vi.fn().mockResolvedValue({ error: null }),
+                }),
+              }
+            }),
+          }
+        }
+        return { insert: vi.fn().mockReturnValue({ then: vi.fn().mockResolvedValue({}) }) }
+      }),
+    }
+
+    const result = await executeTool(supabase, agentId, 'submit_work', {
+      contract_id: 'c-001',
+      deliverable: 'https://github.com/org/repo/pull/42',
+      summary: 'API endpoints tested and documented',
+    })
+
+    expect(result.success).toBe(true)
+    expect(result.output).toContain('delivered')
+    expect(capturedUpdate.status).toBe('delivered')
+    expect(capturedUpdate.deliverables.result).toContain('github.com')
+    expect(capturedUpdate.delivered_at).toBeTruthy()
+  })
+})
