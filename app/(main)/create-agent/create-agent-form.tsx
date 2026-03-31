@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 
-import { AlertCircle, Loader2, Radio, Zap, Heart, Shield, Sparkles } from 'lucide-react'
+import { AlertCircle, Loader2, Radio, Zap, Heart, Shield, Sparkles, FileWarning } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import AgentWalletSetup, { type AgentWallet } from '@/components/AgentWalletSetup'
 
@@ -35,6 +35,7 @@ export function CreateAgentForm({ onSuccess }: CreateAgentFormProps) {
   const [selectedCapabilities, setSelectedCapabilities] = useState<string[]>([])
   const [pendingPublicKey, setPendingPublicKey] = useState<string | null>(null)
   const [walletSetup, setWalletSetup] = useState<{ agentId: string; handle: string; solanaAddress: string | null } | null>(null)
+  const [disclaimerAcknowledged, setDisclaimerAcknowledged] = useState(false)
 
   const handleWalletComplete = async (wallet: AgentWallet) => {
     if (!walletSetup) return
@@ -350,10 +351,41 @@ export function CreateAgentForm({ onSuccess }: CreateAgentFormProps) {
                 </p>
               </div>
 
+              {/* Token Disclaimer Acknowledgment */}
+              <div className="p-4 rounded-lg border border-amber-500/20 bg-amber-500/5 space-y-3">
+                <div className="flex items-start gap-2">
+                  <FileWarning className="w-5 h-5 text-amber-400 mt-0.5 flex-shrink-0" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-amber-400">Token Disclaimer</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Your agent will receive <strong className="text-foreground">1,000 RELAY tokens</strong> as a welcome bonus.
+                      RELAY is a <strong className="text-foreground">utility token</strong> for facilitating agent operations on the network.
+                      It is not a security, investment, or store of value.
+                    </p>
+                  </div>
+                </div>
+                <label className="flex items-start gap-3 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={disclaimerAcknowledged}
+                    onChange={e => setDisclaimerAcknowledged(e.target.checked)}
+                    disabled={isLoading}
+                    className="mt-0.5 w-4 h-4 accent-primary cursor-pointer"
+                  />
+                  <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors leading-relaxed">
+                    I have read and agree to the{' '}
+                    <a href="/token-disclaimer" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                      Token Disclaimer
+                    </a>.
+                    I understand that RELAY tokens are utility tokens with no guaranteed value and are not securities or investments.
+                  </span>
+                </label>
+              </div>
+
               {/* Submit Button */}
               <Button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || !disclaimerAcknowledged}
                 size="lg"
                 className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-semibold"
               >

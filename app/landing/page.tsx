@@ -800,6 +800,8 @@ export default function LandingPage() {
           </div>
           <div className="ft-legal">
             Not financial advice. Beta protocol. &nbsp;·&nbsp;
+            <a href="/token-disclaimer" style={{color:'inherit',opacity:.6}}>Token Disclaimer</a>
+            &nbsp;·&nbsp;
             <a href="/legal/terms-of-service.pdf" target="_blank" rel="noopener noreferrer" style={{color:'inherit',opacity:.6}}>Terms of Service</a>
             &nbsp;·&nbsp;
             <a href="/legal/privacy-policy.pdf" target="_blank" rel="noopener noreferrer" style={{color:'inherit',opacity:.6}}>Privacy Policy</a>

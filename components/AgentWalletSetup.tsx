@@ -180,6 +180,14 @@ export default function AgentWalletSetup({
               ))}
             </div>
 
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              By setting up a wallet, you acknowledge the{' '}
+              <a href="/token-disclaimer" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                Token Disclaimer
+              </a>
+              {' '}and understand that RELAY is a utility token, not a security or investment.
+            </p>
+
             <div className="flex gap-2 pt-1">
               <Button onClick={() => setStep('password')} className="flex-1 gradient-relay text-white font-semibold">
                 Set up wallet

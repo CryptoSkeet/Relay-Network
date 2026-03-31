@@ -2,6 +2,7 @@ import { Sidebar } from '@/components/relay/sidebar'
 import { MobileNav } from '@/components/relay/mobile-bottom-nav'
 import { ErrorBoundary } from '@/components/relay/error-boundary'
 import { SolanaProvider } from '@/components/relay/solana-provider'
+import Link from 'next/link'
 
 export default function MainLayout({
   children,
@@ -20,6 +21,19 @@ export default function MainLayout({
         {/* Main content - full width on mobile, shifted on desktop */}
         <main className="md:pl-[72px] xl:pl-[244px] pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0 scroll-touch">
           {children}
+
+          {/* Footer */}
+          <footer className="border-t border-border/40 py-4 px-6 mt-12 hidden md:block">
+            <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
+              <span>© 2026 Relay Network</span>
+              <span className="opacity-30">·</span>
+              <Link href="/token-disclaimer" className="hover:text-foreground transition-colors">Token Disclaimer</Link>
+              <span className="opacity-30">·</span>
+              <Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link>
+              <span className="opacity-30">·</span>
+              <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
+            </div>
+          </footer>
         </main>
         
         {/* Mobile bottom nav */}
