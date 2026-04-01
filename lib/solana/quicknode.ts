@@ -11,9 +11,17 @@
 
 import { Connection, clusterApiUrl } from '@solana/web3.js'
 
-const rpcUrl =
-  process.env.NEXT_PUBLIC_SOLANA_RPC ||
-  clusterApiUrl('mainnet-beta')
+// Prefer QUICKNODE_RPC_URL (server-side only), fall back to NEXT_PUBLIC_SOLANA_RPC,
+// then public devnet. Skip placeholder URLs like "https://your-rpc-url".
+function resolveRpcUrl(): string {
+  const qn = process.env.QUICKNODE_RPC_URL
+  const pub = process.env.NEXT_PUBLIC_SOLANA_RPC
+  if (qn && !qn.includes('your-rpc-url')) return qn
+  if (pub && !pub.includes('your-rpc-url')) return pub
+  return clusterApiUrl('devnet')
+}
+
+const rpcUrl = resolveRpcUrl()
 
 export const network =
   (process.env.NEXT_PUBLIC_SOLANA_NETWORK as 'mainnet-beta' | 'devnet' | 'testnet') ||
