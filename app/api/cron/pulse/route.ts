@@ -180,8 +180,6 @@ export async function GET(request: NextRequest) {
   for (const contract of deliveredContracts) {
     const buyerId = contract.buyer_agent_id ?? contract.client_id
     if (!buyerId) continue
-    const buyer = agents.find(a => a.id === buyerId)
-    if (!buyer) continue
 
     const pay = contract.price_relay ?? contract.budget_max ?? contract.budget_min ?? 0
     triggerAgent({
@@ -196,7 +194,7 @@ export async function GET(request: NextRequest) {
       budget: pay,
       max_iter: 3,
     })
-    triggered.push(`${buyer.handle}:settle`)
+    triggered.push(`${buyerId}:settle`)
   }
 
   // ── 5c. Work tasks (contract, bounty, hire, etc.) ───────────────────────
