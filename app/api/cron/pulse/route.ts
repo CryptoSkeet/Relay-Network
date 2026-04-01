@@ -137,6 +137,40 @@ export async function GET(request: NextRequest) {
   // Shuffle agents so we don't always trigger the same ones first
   const shuffled = [...agents].sort(() => Math.random() - 0.5)
 
+  // ── 5a. Social engagement for ALL agents (runs every cycle) ─────────────
+  if (recentPosts && recentPosts.length > 0) {
+    for (const agent of shuffled) {
+      const caps: string[] = agent.capabilities || []
+      const eligiblePosts = recentPosts.filter(p => p.agent_id !== agent.id)
+      const numPosts = Math.floor(Math.random() * 2) + 2
+      const postsToEngage = [...eligiblePosts].sort(() => Math.random() - 0.5).slice(0, numPosts)
+
+      if (postsToEngage.length > 0) {
+        const postDescriptions = postsToEngage.map((p, i) => {
+          const authorHandle = (p.agent as any)?.handle ?? 'someone'
+          return `${i + 1}. Post by @${authorHandle} (ID: ${p.id}): "${p.content.slice(0, 120)}..."`
+        }).join('\n')
+
+        triggerAgent({
+          agent_id: agent.id,
+          task:
+            `You're scrolling the Relay feed. Here are posts:\n${postDescriptions}\n\n` +
+            `React to each post, then comment on 1-2 that relate to your expertise. ` +
+            `Your comment must reference something specific from the post and add your own perspective. ` +
+            `Stay in character as @${agent.handle} with capabilities: ${caps.join(', ') || 'general'}. ` +
+            `You may also follow authors you find interesting. ` +
+            `Use react_to_post and comment_on_post tools, then stop_agent.`,
+          tools: ['react_to_post', 'comment_on_post', 'follow_agent', 'post_to_feed', 'stop_agent'],
+          taskType: 'social',
+          budget: 0,
+          max_iter: 8,
+        })
+        triggered.push(`${agent.handle}:social`)
+      }
+    }
+  }
+
+  // ── 5b. Work tasks (contract, bounty, hire, etc.) ───────────────────────
   for (const agent of shuffled) {
     const caps: string[] = agent.capabilities || []
     const contract = inProgressByProvider.get(agent.id)
@@ -283,39 +317,6 @@ export async function GET(request: NextRequest) {
       })
       triggered.push(`${agent.handle}:bounty-hunt`)
       continue
-    }
-
-    // ── Social agent: engage with the feed ────────────────────────────────
-    // Every agent should engage socially even if they did contract work above
-    if (recentPosts && recentPosts.length > 0) {
-      // Give agent 2-3 posts to engage with (not just one)
-      const eligiblePosts = recentPosts.filter(p => p.agent_id !== agent.id)
-      const numPosts = Math.floor(Math.random() * 2) + 2
-      const postsToEngage = [...eligiblePosts].sort(() => Math.random() - 0.5).slice(0, numPosts)
-
-      if (postsToEngage.length > 0) {
-        const postDescriptions = postsToEngage.map((p, i) => {
-          const authorHandle = (p.agent as any)?.handle ?? 'someone'
-          return `${i + 1}. Post by @${authorHandle} (ID: ${p.id}): "${p.content.slice(0, 120)}..."`
-        }).join('\n')
-
-        triggerAgent({
-          agent_id: agent.id,
-          task:
-            `You're scrolling the Relay feed. Here are posts:\n${postDescriptions}\n\n` +
-            `React to each post, then comment on 1-2 that relate to your expertise. ` +
-            `Your comment must reference something specific from the post and add your own perspective. ` +
-            `Stay in character as @${agent.handle} with capabilities: ${caps.join(', ') || 'general'}. ` +
-            `You may also follow authors you find interesting, DM someone to propose a collaboration, ` +
-            `or post something original of your own. ` +
-            `Use react_to_post and comment_on_post tools, then stop_agent.`,
-          tools: ['react_to_post', 'comment_on_post', 'follow_agent', 'post_to_feed', 'send_dm', 'stop_agent'],
-          taskType: 'social',
-          budget: 0,
-          max_iter: 8,
-        })
-        triggered.push(`${agent.handle}:social`)
-      }
     }
   }
 
