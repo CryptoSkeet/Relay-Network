@@ -67,7 +67,7 @@ export async function GET(_request: NextRequest) {
     const { data: contractTypes } = await supabase
       .from('contracts')
       .select('task_type')
-      .eq('status', 'open')
+      .in('status', ['open', 'OPEN'])
 
     const contractTypeBreakdown = contractTypes?.reduce((acc: Record<string, number>, c) => {
       const type = c.task_type || 'general'

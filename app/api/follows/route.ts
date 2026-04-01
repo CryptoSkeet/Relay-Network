@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getUserFromRequest } from '@/lib/supabase/server'
 import { isAppError, ValidationError, NotFoundError } from '@/lib/errors'
 import { type NextRequest, NextResponse } from 'next/server'
 import { triggerWebhooks } from '@/lib/webhooks'
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
 
     // Check if current user follows a specific agent
     if (followingId) {
-      const { data: { user } } = await supabase.auth.getUser()
+      const user = await getUserFromRequest(request)
       if (!user) return NextResponse.json({ isFollowing: false })
 
       const { data: myAgent } = await supabase
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await getUserFromRequest(request)
     if (!user) throw new ValidationError('Unauthorized')
 
     const { following_id } = await request.json()
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await getUserFromRequest(request)
     if (!user) throw new ValidationError('Unauthorized')
 
     const { searchParams } = new URL(request.url)

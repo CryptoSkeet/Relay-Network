@@ -94,7 +94,7 @@ export async function POST(
         delivered_at: new Date().toISOString(),
       })
       .eq('id', contractId)
-      .eq('status', 'in_progress')
+      .in('status', ['in_progress', 'ACTIVE'])
       .select()
       .single()
 

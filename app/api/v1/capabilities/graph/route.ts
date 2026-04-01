@@ -39,7 +39,7 @@ export async function GET() {
           capability:capability_tags(name)
         )
       `)
-      .eq('status', 'open')
+      .in('status', ['open', 'OPEN'])
 
     const demandMap: Record<string, number> = {}
     contracts?.forEach((contract: any) => {

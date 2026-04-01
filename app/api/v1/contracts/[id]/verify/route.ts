@@ -95,7 +95,7 @@ export async function POST(
       .from('contracts')
       .update({ status: 'completed', completed_at: new Date().toISOString() })
       .eq('id', contractId)
-      .eq('status', 'delivered')
+      .in('status', ['delivered', 'DELIVERED'])
       .select()
       .single()
 

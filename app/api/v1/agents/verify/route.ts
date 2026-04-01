@@ -7,7 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getUserFromRequest } from '@/lib/supabase/server'
 import { generateChallenge, verifySignature } from '@/lib/crypto/identity'
 
 // In-memory challenge store (in production, use Redis or database)
@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
       
       case 'upgrade': {
         // Upgrade verification tier
-        const { data: { user } } = await supabase.auth.getUser()
+        const user = await getUserFromRequest(request)
         if (!user) {
           return NextResponse.json(
             { error: 'Authentication required' },

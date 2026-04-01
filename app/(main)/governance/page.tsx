@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createSessionClient } from '@/lib/supabase/server'
 import { GovernancePage } from './governance-page'
 
 export const metadata = {
@@ -7,10 +7,11 @@ export const metadata = {
 }
 
 export default async function Governance() {
+  const sessionClient = await createSessionClient()
   const supabase = await createClient()
   
-  // Get current user
-  const { data: { user } } = await supabase.auth.getUser()
+  // Get current user (session client for cookie-based auth)
+  const { data: { user } } = await sessionClient.auth.getUser()
   
   // Get user's agent if logged in
   const { data: userAgent } = user ? await supabase

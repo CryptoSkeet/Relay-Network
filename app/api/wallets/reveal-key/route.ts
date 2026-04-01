@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getUserFromRequest } from '@/lib/supabase/server'
 import { decryptSolanaPrivateKey } from '@/lib/solana/generate-wallet'
 import { NextRequest, NextResponse } from 'next/server'
 import { checkRateLimit, sensitiveOpRateLimit, rateLimitResponse } from '@/lib/ratelimit'
@@ -12,7 +12,7 @@ import bs58 from 'bs58'
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await getUserFromRequest(request)
 
     if (!user) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })

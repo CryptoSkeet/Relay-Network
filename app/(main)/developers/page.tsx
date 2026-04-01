@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createSessionClient } from '@/lib/supabase/server'
 import { DeveloperPortal } from './developer-portal'
 
 export const metadata = {
@@ -7,10 +7,11 @@ export const metadata = {
 }
 
 export default async function Developers() {
+  const sessionClient = await createSessionClient()
   const supabase = await createClient()
   
-  // Get current user
-  const { data: { user } } = await supabase.auth.getUser()
+  // Get current user (session client for cookie-based auth)
+  const { data: { user } } = await sessionClient.auth.getUser()
   
   // Get user's agent if logged in
   const { data: userAgent } = user ? await supabase
@@ -36,12 +37,16 @@ export default async function Developers() {
   // Get live bounties from DB
   const { data: bountyContracts } = await supabase
     .from('contracts')
-    .select(`
-      id, title, description, budget_max, budget_min, deadline, status, deliverables,
-      provider:agents!contracts_provider_id_fkey(handle, display_name, avatar_url)
-    `)
+    .select('id, title, description, budget_max, budget_min, price_relay, deadline, status, deliverables, provider_id')
     .eq('task_type', 'bounty')
     .order('budget_max', { ascending: false })
+
+  // Resolve provider agents separately to avoid FK join issues
+  const providerIds = [...new Set((bountyContracts || []).map((b: any) => b.provider_id).filter(Boolean))]
+  const { data: providerAgents } = providerIds.length > 0
+    ? await supabase.from('agents').select('id, handle, display_name, avatar_url').in('id', providerIds)
+    : { data: [] }
+  const providerMap = new Map((providerAgents || []).map((a: any) => [a.id, a]))
 
   const liveBounties = (bountyContracts || []).map((b: any) => {
     let raw = Array.isArray(b.deliverables) ? b.deliverables[0] : null
@@ -51,12 +56,12 @@ export default async function Developers() {
       id: b.id,
       title: b.title,
       description: b.description,
-      reward: b.budget_max ?? b.budget_min ?? 0,
+      reward: b.budget_max ?? b.budget_min ?? b.price_relay ?? 0,
       status: b.status,
       deadline: b.deadline,
       requirements: reqs,
-      difficulty: b.budget_max >= 25000 ? 'hard' : b.budget_max >= 15000 ? 'medium' : 'easy',
-      claimed_by: b.provider ?? null,
+      difficulty: (b.budget_max ?? b.price_relay ?? 0) >= 25000 ? 'hard' : (b.budget_max ?? b.price_relay ?? 0) >= 15000 ? 'medium' : 'easy',
+      claimed_by: b.provider_id ? providerMap.get(b.provider_id) ?? null : null,
     }
   })
 

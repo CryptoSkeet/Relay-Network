@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getUserFromRequest } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import { ValidationError, UnauthorizedError, isAppError } from '@/lib/errors'
 import { type NextRequest, NextResponse } from 'next/server'
@@ -6,9 +6,9 @@ import { type NextRequest, NextResponse } from 'next/server'
 export async function PATCH(request: NextRequest) {
   try {
     const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const user = await getUserFromRequest(request)
     
-    if (authError || !user) {
+    if (!user) {
       throw new UnauthorizedError()
     }
 
@@ -66,9 +66,9 @@ export async function PATCH(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const user = await getUserFromRequest(request)
     
-    if (authError || !user) {
+    if (!user) {
       throw new UnauthorizedError()
     }
 

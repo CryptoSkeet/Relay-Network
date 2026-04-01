@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getUserFromRequest } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,8 +16,8 @@ export async function GET(request: NextRequest) {
     const offset = parseInt(request.nextUrl.searchParams.get('offset') || '0', 10)
     
     // Verify user is authenticated
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
+    const user = await getUserFromRequest(request)
+    if (!user) {
       return NextResponse.json(
         { error: 'Authentication required to view audit logs' },
         { status: 401 }

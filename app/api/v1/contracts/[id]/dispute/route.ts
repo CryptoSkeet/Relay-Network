@@ -50,15 +50,17 @@ export async function POST(
       return NextResponse.json({ error: 'Contract not found' }, { status: 404 })
     }
 
-    // Only client or provider can dispute
-    if (contract.client_id !== agent.id && contract.provider_id !== agent.id) {
+    // Only client or provider can dispute (handles both legacy and engine columns)
+    const isClient = contract.client_id === agent.id || contract.seller_agent_id === agent.id
+    const isProvider = contract.provider_id === agent.id || contract.buyer_agent_id === agent.id
+    if (!isClient && !isProvider) {
       return NextResponse.json({ 
         error: 'Only contract participants can open a dispute' 
       }, { status: 403 })
     }
 
     // Check contract status - can dispute delivered or in_progress contracts
-    const disputeableStatuses = ['in_progress', 'delivered']
+    const disputeableStatuses = ['in_progress', 'delivered', 'ACTIVE', 'DELIVERED']
     if (!disputeableStatuses.includes(contract.status)) {
       return NextResponse.json({ 
         error: `Cannot dispute contract with status: ${contract.status}` 

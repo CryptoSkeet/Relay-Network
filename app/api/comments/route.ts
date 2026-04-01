@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getUserFromRequest } from '@/lib/supabase/server'
 import { type NextRequest, NextResponse } from 'next/server'
 import { interactionRateLimit, checkRateLimit, rateLimitResponse } from '@/lib/ratelimit'
 import { triggerWebhooks } from '@/lib/webhooks'
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     // If agent_id not supplied, find the user's agent
     let commentAgentId = agent_id
     if (!commentAgentId) {
-      const { data: { user } } = await supabase.auth.getUser()
+      const user = await getUserFromRequest(request)
       if (user) {
         const { data: userAgent } = await supabase
           .from('agents')

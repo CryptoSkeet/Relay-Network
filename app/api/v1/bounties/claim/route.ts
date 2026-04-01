@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
         accepted_at: new Date().toISOString(),
       })
       .eq('id', bounty_id)
-      .eq('status', 'open') // optimistic lock — only accept if still open
+      .in('status', ['open', 'OPEN']) // optimistic lock — only accept if still open
       .select()
       .single()
 

@@ -27,12 +27,16 @@ export default async function Marketplace() {
   // Fetch open contracts for the marketplace
   const { data: contracts } = await supabase
     .from('contracts')
-    .select(`
-      *,
-      client:agents!contracts_client_id_fkey(id, handle, display_name, avatar_url)
-    `)
-    .eq('status', 'open')
+    .select('*')
+    .in('status', ['open', 'OPEN'])
     .order('created_at', { ascending: false })
+
+  // Resolve client agents separately to avoid FK join issues
+  const clientIds = [...new Set((contracts || []).map(c => c.client_id ?? c.seller_agent_id).filter(Boolean))]
+  const { data: clientAgents } = clientIds.length > 0
+    ? await supabase.from('agents').select('id, handle, display_name, avatar_url').in('id', clientIds)
+    : { data: [] }
+  const clientMap = new Map((clientAgents || []).map((a: any) => [a.id, a]))
 
   // Fetch capability tags for the sidebar filter
   const { data: capabilityTags } = await supabase
@@ -42,22 +46,27 @@ export default async function Marketplace() {
     .limit(20)
 
   // Get client reputations
-  const clientIds = [...new Set(contracts?.map(c => c.client_id) || [])]
+  const repIds = [...new Set(contracts?.map(c => c.client_id ?? c.seller_agent_id).filter(Boolean) || [])]
   const { data: reputations } = await supabase
     .from('agent_reputation')
     .select('agent_id, reputation_score')
-    .in('agent_id', clientIds.length > 0 ? clientIds : [''])
+    .in('agent_id', repIds.length > 0 ? repIds : [''])
 
   const reputationMap = new Map(reputations?.map(r => [r.agent_id, r.reputation_score]) || [])
 
   // Enrich contracts — map budget_min/max → amount expected by MarketplaceContract
-  const enrichedContracts = contracts?.map(contract => ({
-    ...contract,
-    amount: parseFloat(String(contract.budget_max || contract.budget_min || 0)),
-    client_reputation: reputationMap.get(contract.client_id) || 500,
-    capabilities: [],
-    deliverables: [],
-  })) || []
+  const enrichedContracts = contracts?.map(contract => {
+    const cid = contract.client_id ?? contract.seller_agent_id
+    return {
+      ...contract,
+      client_id: cid,
+      client: clientMap.get(cid) ?? null,
+      amount: parseFloat(String(contract.budget_max || contract.budget_min || contract.price_relay || 0)),
+      client_reputation: reputationMap.get(cid) || 500,
+      capabilities: [],
+      deliverables: [],
+    }
+  }) || []
 
   // Get categories with actual counts (case-insensitive)
   const getCategoryCount = (cat: string) => 

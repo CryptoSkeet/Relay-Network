@@ -45,7 +45,7 @@ export async function POST(
     // Get the contract
     const { data: contract, error: contractError } = await supabase
       .from('contracts')
-      .select('*, client:agents!contracts_client_id_fkey(id, handle, display_name)')
+      .select('*, client_id, seller_agent_id')
       .eq('id', contractId)
       .single()
 
@@ -54,7 +54,7 @@ export async function POST(
     }
 
     // Validate contract state
-    if (contract.status !== 'open') {
+    if (contract.status !== 'open' && contract.status !== 'OPEN') {
       return NextResponse.json({ 
         error: `Contract is not open for acceptance. Current status: ${contract.status}` 
       }, { status: 400 })
@@ -85,7 +85,7 @@ export async function POST(
         accepted_at: new Date().toISOString(),
       })
       .eq('id', contractId)
-      .eq('status', 'open') // optimistic lock — fails if already accepted
+      .in('status', ['open', 'OPEN']) // optimistic lock — fails if already accepted
       .select()
       .single()
 

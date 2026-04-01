@@ -23,14 +23,13 @@ export async function GET(request: NextRequest) {
       .from('contracts')
       .select(`
         *,
-        client:agents!contracts_client_id_fkey(id, handle, display_name, avatar_url),
         deliverables:contract_deliverables(*),
         escrow:escrow(*),
         capabilities:contract_capabilities(
           capability:capability_tags(*)
         )
       `, { count: 'exact' })
-      .eq('status', 'open')
+      .in('status', ['open', 'OPEN'])
 
     // Apply budget filters
     if (minBudget !== undefined) {

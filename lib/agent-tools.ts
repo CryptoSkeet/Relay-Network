@@ -272,17 +272,23 @@ async function handleReadContract(supabase: any, input: Record<string, string>):
   const { data } = await supabase
     .from('contracts')
     .select(`
-      id, title, description, budget_min, budget_max, deadline, status,
-      requirements, deliverables,
-      client:agents!contracts_client_id_fkey(handle, display_name, reputation_score)
+      id, title, description, budget_min, budget_max, price_relay, deadline, status,
+      requirements, deliverables, client_id, seller_agent_id
     `)
     .eq('id', contract_id)
     .maybeSingle()
 
   if (!data) return `Contract ${contract_id} not found.`
 
-  const client = (data.client as any)
-  const budget = data.budget_max ?? data.budget_min ?? 0
+  // Resolve client agent separately
+  const clientId = data.client_id ?? data.seller_agent_id
+  let client: any = null
+  if (clientId) {
+    const { data: agentData } = await supabase.from('agents').select('handle, display_name, reputation_score').eq('id', clientId).maybeSingle()
+    client = agentData
+  }
+
+  const budget = data.budget_max ?? data.budget_min ?? data.price_relay ?? 0
   return [
     `Contract: ${data.title}`,
     `Description: ${data.description}`,
@@ -593,7 +599,7 @@ async function handleListBounties(supabase: any, agentId?: string): Promise<stri
     .from('contracts')
     .select('id, title, description, budget_max, budget_min, deadline, status, deliverables, provider_id')
     .eq('task_type', 'bounty')
-    .in('status', ['open', 'in_progress'])
+    .in('status', ['open', 'in_progress', 'OPEN', 'ACTIVE'])
     .order('budget_max', { ascending: false })
 
   if (!bounties || bounties.length === 0) return 'No bounties available right now.'
@@ -634,11 +640,10 @@ async function handleListStandingOffers(supabase: any, input: Record<string, str
   const query = supabase
     .from('contracts')
     .select(`
-      id, title, description, budget_max, budget_min, task_type, status,
-      requirements, deliverables,
-      client:agents!contracts_client_id_fkey(handle, display_name, reputation_score)
+      id, title, description, budget_max, budget_min, price_relay, task_type, status,
+      requirements, deliverables, client_id, seller_agent_id
     `)
-    .eq('status', 'open')
+    .in('status', ['open', 'OPEN'])
     .eq('task_type', 'standing')
     .order('budget_max', { ascending: false })
     .limit(10)
@@ -654,9 +659,16 @@ async function handleListStandingOffers(supabase: any, input: Record<string, str
     return 'No standing offers available right now. Check back later or post your own offer using hire_agent.'
   }
 
+  // Resolve client agents separately
+  const offerClientIds = [...new Set(offers.map((o: any) => o.client_id ?? o.seller_agent_id).filter(Boolean))]
+  const { data: offerAgents } = offerClientIds.length > 0
+    ? await supabase.from('agents').select('id, handle, display_name, reputation_score').in('id', offerClientIds)
+    : { data: [] }
+  const offerAgentMap = new Map((offerAgents || []).map((a: any) => [a.id, a]))
+
   return offers.map((o: any) => {
-    const pay = o.budget_max ?? o.budget_min ?? 0
-    const client = o.client
+    const pay = o.budget_max ?? o.budget_min ?? o.price_relay ?? 0
+    const client = offerAgentMap.get(o.client_id ?? o.seller_agent_id)
     const reqs = Array.isArray(o.requirements) ? o.requirements.join(', ') : (o.requirements || 'See description')
     return `[${o.id}] "${o.title}" — ${pay} RELAY/task | Client: @${client?.handle ?? 'unknown'} (rep: ${client?.reputation_score ?? 'N/A'}) | ${o.description?.slice(0, 80)}... | Requirements: ${reqs}`
   }).join('\n')
@@ -672,14 +684,15 @@ async function handleApplyToOffer(
   // Verify offer exists and is open
   const { data: offer } = await supabase
     .from('contracts')
-    .select('id, title, client_id, task_type, status')
+    .select('id, title, client_id, seller_agent_id, task_type, status')
     .eq('id', offer_id)
     .eq('task_type', 'standing')
-    .eq('status', 'open')
+    .in('status', ['open', 'OPEN'])
     .maybeSingle()
 
   if (!offer) return `Standing offer ${offer_id} not found or no longer open.`
-  if (offer.client_id === agentId) return `You cannot apply to your own standing offer.`
+  const offerOwnerId = offer.client_id ?? offer.seller_agent_id
+  if (offerOwnerId === agentId) return `You cannot apply to your own standing offer.`
 
   // Check for existing application
   const { data: existing } = await supabase

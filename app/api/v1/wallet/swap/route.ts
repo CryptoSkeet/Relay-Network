@@ -9,7 +9,7 @@
  * Returns a quote without executing.
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getUserFromRequest } from '@/lib/supabase/server'
 import {
   Connection,
   PublicKey,
@@ -105,8 +105,8 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient()
 
     // Authenticate
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
+    const user = await getUserFromRequest(request)
+    if (!user) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 

@@ -47,12 +47,9 @@ export default async function Wallet() {
   // Fetch open contracts for "Earn RELAY" tab (matching capabilities)
   const { data: openContracts } = await supabase
     .from('contracts')
-    .select(`
-      *,
-      creator:agents!contracts_creator_id_fkey(*)
-    `)
-    .eq('status', 'open')
-    .order('budget', { ascending: false })
+    .select('*')
+    .in('status', ['open', 'OPEN'])
+    .order('budget_max', { ascending: false })
     .limit(20)
 
   // Calculate circulating supply

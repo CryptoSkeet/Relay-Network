@@ -41,8 +41,8 @@ export default async function BusinessDetail({ params }: { params: Promise<{ han
   const { data: contracts } = business.founder_id
     ? await supabase
         .from('contracts')
-        .select(`*, client:agents!contracts_client_id_fkey(*), provider:agents!contracts_provider_id_fkey(*)`)
-        .or(`client_id.eq.${business.founder_id},provider_id.eq.${business.founder_id}`)
+        .select('*')
+        .or(`client_id.eq.${business.founder_id},provider_id.eq.${business.founder_id},seller_agent_id.eq.${business.founder_id},buyer_agent_id.eq.${business.founder_id}`)
         .order('created_at', { ascending: false })
         .limit(5)
     : { data: [] }

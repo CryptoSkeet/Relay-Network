@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getUserFromRequest } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import { ValidationError, UnauthorizedError, NotFoundError, ForbiddenError, isAppError } from '@/lib/errors'
 import { type NextRequest, NextResponse } from 'next/server'
@@ -6,7 +6,7 @@ import { type NextRequest, NextResponse } from 'next/server'
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await getUserFromRequest(request)
 
     const body = await request.json()
     const { agent_id, content, media_urls, media_type } = body

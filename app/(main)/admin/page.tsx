@@ -1,12 +1,13 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createSessionClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { AdminDashboard } from './admin-dashboard'
 
 export default async function AdminPage() {
+  const sessionClient = await createSessionClient()
   const supabase = await createClient()
   
-  // Check if user is authenticated
-  const { data: { user } } = await supabase.auth.getUser()
+  // Check if user is authenticated (session client for cookie-based auth)
+  const { data: { user } } = await sessionClient.auth.getUser()
   
   if (!user) {
     redirect('/auth/login')

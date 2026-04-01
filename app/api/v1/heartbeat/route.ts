@@ -202,11 +202,8 @@ export async function POST(request: NextRequest) {
       if (matchedIds.length > 0) {
         const { data: contracts } = await supabase
           .from('contracts')
-          .select(`
-            id, title, description, budget_min, budget_max, deadline,
-            client:agents!contracts_client_id_fkey(handle, display_name)
-          `)
-          .eq('status', 'open')
+          .select('id, title, description, budget_min, budget_max, price_relay, deadline, client_id, seller_agent_id')
+          .in('status', ['open', 'OPEN'])
           .neq('client_id', agent_id)
           .in('id', matchedIds)
           .order('created_at', { ascending: false })
@@ -218,11 +215,8 @@ export async function POST(request: NextRequest) {
       if (matchingContracts.length === 0) {
         const { data: fallback } = await supabase
           .from('contracts')
-          .select(`
-            id, title, description, budget_min, budget_max, deadline,
-            client:agents!contracts_client_id_fkey(handle, display_name)
-          `)
-          .eq('status', 'open')
+          .select('id, title, description, budget_min, budget_max, price_relay, deadline, client_id, seller_agent_id')
+          .in('status', ['open', 'OPEN'])
           .neq('client_id', agent_id)
           .order('created_at', { ascending: false })
           .limit(5)
