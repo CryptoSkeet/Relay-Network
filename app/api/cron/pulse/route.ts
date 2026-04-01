@@ -62,13 +62,14 @@ export async function GET(request: NextRequest) {
   const { data: activeContracts } = await supabase
     .from('contracts')
     .select('id, title, description, status, client_id, provider_id, seller_agent_id, buyer_agent_id, budget_max, budget_min, price_relay, task_type, deadline')
-    .in('status', ['in_progress', 'open', 'ACTIVE', 'OPEN', 'PENDING'])
+    .in('status', ['in_progress', 'open', 'ACTIVE', 'OPEN', 'PENDING', 'DELIVERED'])
 
   type Contract = NonNullable<typeof activeContracts>[number]
   const inProgressByProvider = new Map<string, Contract>()
   const openContracts: Contract[] = []
   const openBounties: Contract[] = []
   const standingOffers: Contract[] = []
+  const deliveredContracts: Contract[] = []
 
   for (const c of activeContracts || []) {
     const st = c.status?.toUpperCase()
@@ -76,6 +77,8 @@ export async function GET(request: NextRequest) {
 
     if ((st === 'IN_PROGRESS' || st === 'ACTIVE') && workerId) {
       inProgressByProvider.set(workerId, c)
+    } else if (st === 'DELIVERED') {
+      deliveredContracts.push(c)
     } else if (st === 'OPEN' || st === 'PENDING') {
       if (c.task_type === 'bounty') {
         openBounties.push(c)
@@ -173,7 +176,30 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // ── 5b. Work tasks (contract, bounty, hire, etc.) ───────────────────────
+  // ── 5b. Auto-settle DELIVERED contracts ─────────────────────────────────
+  for (const contract of deliveredContracts) {
+    const buyerId = contract.buyer_agent_id ?? contract.client_id
+    if (!buyerId) continue
+    const buyer = agents.find(a => a.id === buyerId)
+    if (!buyer) continue
+
+    const pay = contract.price_relay ?? contract.budget_max ?? contract.budget_min ?? 0
+    triggerAgent({
+      agent_id: buyerId,
+      task:
+        `Contract "${contract.title}" (ID: ${contract.id}) has been DELIVERED by the seller. ` +
+        `Payment: ${pay} RELAY. ` +
+        `Review the deliverable and settle the contract using settle_contract. ` +
+        `Rate the work 1-5 and provide brief feedback. This will release on-chain RELAY payment to the seller.`,
+      tools: ['read_contract', 'settle_contract', 'post_to_feed', 'stop_agent'],
+      taskType: 'settlement',
+      budget: pay,
+      max_iter: 3,
+    })
+    triggered.push(`${buyer.handle}:settle`)
+  }
+
+  // ── 5c. Work tasks (contract, bounty, hire, etc.) ───────────────────────
   for (const agent of shuffled) {
     const caps: string[] = agent.capabilities || []
     const contract = inProgressByProvider.get(agent.id)
@@ -340,6 +366,7 @@ export async function GET(request: NextRequest) {
     open_contracts: openContracts.length,
     open_bounties: openBounties.length,
     standing_offers: standingOffers.length,
+    delivered_contracts: deliveredContracts.length,
     active_standing_applications: (acceptedBids || []).length,
     active_contracts: inProgressByProvider.size,
     timestamp: new Date().toISOString(),

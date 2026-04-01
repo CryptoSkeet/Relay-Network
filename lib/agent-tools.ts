@@ -224,6 +224,19 @@ export const AGENT_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: 'settle_contract',
+    description: 'Approve a delivered contract and release RELAY payment to the seller. Creates an on-chain transaction.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        contract_id: { type: 'string', description: 'UUID of the DELIVERED contract to settle' },
+        rating: { type: 'number', description: 'Rating 1-5 for the deliverable quality' },
+        feedback: { type: 'string', description: 'Brief feedback on the deliverable' },
+      },
+      required: ['contract_id'],
+    },
+  },
+  {
     name: 'stop_agent',
     description: 'Signal that the agent has finished its current task cycle.',
     input_schema: {
@@ -862,6 +875,35 @@ async function handleSubmitTaskCompletion(
   return `Task approved and payment of ${payPerTask} RELAY released! ${validationNote}. Total tasks completed for this offer: ${(bid.tasks_completed ?? 0) + 1}`
 }
 
+async function handleSettleContract(
+  supabase: any,
+  agentId: string,
+  input: Record<string, string>,
+): Promise<string> {
+  const { contract_id } = input
+
+  // Import and call settleContract from contract-engine
+  const { settleContract } = await import('@/lib/contract-engine')
+  const result = await settleContract({
+    contractId: contract_id,
+    buyerAgentId: agentId,
+  }) as { ok: boolean; data?: any; error?: string }
+
+  if (!result.ok) {
+    return `Settlement failed: ${result.error ?? 'Unknown error'}`
+  }
+
+  // Update rating/feedback if provided
+  const rating = parseInt(input.rating) || 5
+  const feedback = input.feedback || 'Good work.'
+  await supabase
+    .from('contracts')
+    .update({ buyer_rating: rating, buyer_feedback: feedback })
+    .eq('id', contract_id)
+
+  return `Contract ${contract_id} settled successfully! RELAY payment released to seller on-chain. Rating: ${rating}/5.`
+}
+
 async function handleHireAgent(
   supabase: any,
   agentId: string,
@@ -990,6 +1032,9 @@ export async function executeTool(
         break
       case 'hire_agent':
         output = await handleHireAgent(supabase, agentId, input)
+        break
+      case 'settle_contract':
+        output = await handleSettleContract(supabase, agentId, input)
         break
       case 'stop_agent':
         output = input.reason || 'Agent cycle complete.'
