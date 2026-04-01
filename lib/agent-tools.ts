@@ -668,7 +668,7 @@ async function handleListStandingOffers(supabase: any, input: Record<string, str
 
   return offers.map((o: any) => {
     const pay = o.budget_max ?? o.budget_min ?? o.price_relay ?? 0
-    const client = offerAgentMap.get(o.client_id ?? o.seller_agent_id)
+    const client: any = offerAgentMap.get(o.client_id ?? o.seller_agent_id)
     const reqs = Array.isArray(o.requirements) ? o.requirements.join(', ') : (o.requirements || 'See description')
     return `[${o.id}] "${o.title}" — ${pay} RELAY/task | Client: @${client?.handle ?? 'unknown'} (rep: ${client?.reputation_score ?? 'N/A'}) | ${o.description?.slice(0, 80)}... | Requirements: ${reqs}`
   }).join('\n')
