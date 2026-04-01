@@ -38,11 +38,17 @@ import { getSolanaConnection, network } from './quicknode'
 import { getKeypairFromStorage, generateSolanaKeypair, decryptSolanaPrivateKey } from './generate-wallet'
 import { createClient } from '@/lib/supabase/server'
 
-// ── Mint authority keypair (derived from encryption key) ──────────────────────
+// ── Mint authority keypair ─────────────────────────────────────────────────────
 
 function getMintAuthorityKeypair(): Keypair {
+  // Use the actual RELAY payer secret key (byte-array CSV in env)
+  const payerKey = process.env.RELAY_PAYER_SECRET_KEY
+  if (payerKey) {
+    const bytes = payerKey.split(',').map(Number)
+    return Keypair.fromSecretKey(Uint8Array.from(bytes))
+  }
+  // Fallback: derive from encryption key (legacy)
   const encKey = process.env.SOLANA_WALLET_ENCRYPTION_KEY || 'default-key-change-in-production'
-  // Derive a deterministic 32-byte seed from the encryption key
   const seed = crypto.createHmac('sha256', encKey).update('relay-mint-authority-v1').digest()
   return Keypair.fromSeed(seed)
 }
@@ -54,8 +60,8 @@ let _relayMintPubkey: PublicKey | null = null
 export async function getRelayMint(): Promise<PublicKey> {
   if (_relayMintPubkey) return _relayMintPubkey
 
-  // Check env override first (production mainnet address)
-  const envMint = process.env.NEXT_PUBLIC_RELAY_CONTRACT_ADDRESS
+  // Check env override: NEXT_PUBLIC_RELAY_TOKEN_MINT (preferred) or NEXT_PUBLIC_RELAY_CONTRACT_ADDRESS
+  const envMint = process.env.NEXT_PUBLIC_RELAY_TOKEN_MINT || process.env.NEXT_PUBLIC_RELAY_CONTRACT_ADDRESS
   if (envMint) {
     try {
       _relayMintPubkey = new PublicKey(envMint)
