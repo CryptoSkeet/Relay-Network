@@ -1,46 +1,77 @@
 import { createClient } from '@/lib/supabase/server'
+import { createSessionClient } from '@/lib/supabase/server'
 import { ContractsPage } from './contracts-page'
 
 export const metadata = {
-  title: 'My Contracts - Relay',
-  description: 'Manage your agent contracts, deliverables, and escrow',
+  title: 'Contracts - Relay',
+  description: 'Browse and manage agent contracts, deliverables, and escrow',
 }
 
 export default async function Contracts() {
+  // Use session client for auth (cookie-based, respects RLS)
+  const sessionClient = await createSessionClient()
+  const { data: { user } } = await sessionClient.auth.getUser()
+
+  // Use service-role client for data queries (bypasses RLS for marketplace view)
   const supabase = await createClient()
-  
-  // Get current user
-  const { data: { user } } = await supabase.auth.getUser()
-  
+
   // Get user's agent
   const { data: userAgent } = user ? await supabase
     .from('agents')
     .select('id')
     .eq('user_id', user.id)
-    .single() : { data: null }
+    .maybeSingle() : { data: null }
 
-  // Fetch contracts where the current user's agent is client or provider
-  const contractsQuery = supabase
+  // Fetch ALL contracts (marketplace view) — no user filter on server.
+  // Use plain select without FK hints to avoid constraint name mismatches
+  // (4 FKs to agents: client_id, provider_id, seller_agent_id, buyer_agent_id).
+  const { data: contracts, error: contractsError } = await supabase
     .from('contracts')
-    .select(`
-      *,
-      client:agents!contracts_client_id_fkey(id, handle, display_name, avatar_url, is_verified),
-      provider:agents!contracts_provider_id_fkey(id, handle, display_name, avatar_url, is_verified)
-    `)
+    .select('*')
     .order('created_at', { ascending: false })
     .limit(100)
-
-  if (userAgent?.id) {
-    contractsQuery.or(`client_id.eq.${userAgent.id},provider_id.eq.${userAgent.id}`)
-  }
-
-  const { data: contracts, error: contractsError } = await contractsQuery
 
   if (contractsError) {
     console.error('Contracts query error:', contractsError)
   }
 
-  const contractsWithDisputes = (contracts || []).map(c => ({ ...c, dispute: null }))
+  // Collect all agent IDs to resolve in one go
+  const agentIds = new Set<string>()
+  for (const c of contracts || []) {
+    if (c.client_id) agentIds.add(c.client_id)
+    if (c.provider_id) agentIds.add(c.provider_id)
+    if (c.seller_agent_id) agentIds.add(c.seller_agent_id)
+    if (c.buyer_agent_id) agentIds.add(c.buyer_agent_id)
+  }
+
+  const { data: agentRows } = agentIds.size > 0
+    ? await supabase
+        .from('agents')
+        .select('id, handle, display_name, avatar_url, is_verified')
+        .in('id', [...agentIds])
+    : { data: [] }
+
+  const agentMap = new Map((agentRows || []).map(a => [a.id, a]))
+
+  // Normalize contracts: merge engine columns into client/provider
+  const contractsWithAgents = (contracts || []).map(c => {
+    // Engine uses seller_agent_id as the offer creator → map to "client"
+    // Engine uses buyer_agent_id as the buyer → map to "provider"
+    const clientId = c.client_id ?? c.seller_agent_id
+    const providerId = c.provider_id ?? c.buyer_agent_id
+
+    return {
+      ...c,
+      client_id: clientId,
+      provider_id: providerId,
+      client: agentMap.get(clientId) ?? null,
+      provider: agentMap.get(providerId) ?? null,
+      dispute: null,
+      // Normalize budget: use budget_max/budget_min or price_relay
+      budget_max: c.budget_max ?? c.price_relay ?? 0,
+      budget_min: c.budget_min ?? c.price_relay ?? 0,
+    }
+  })
 
   // Fetch accurate stats via server-side counts (no row limit)
   const [totalQ, openQ, activeQ, completedQ, disputedQ] = await Promise.all([
@@ -67,7 +98,7 @@ export default async function Contracts() {
 
   return (
     <ContractsPage
-      contracts={contractsWithDisputes}
+      contracts={contractsWithAgents}
       agents={agents || []}
       userAgentId={userAgent?.id || null}
       capabilityTags={[]}

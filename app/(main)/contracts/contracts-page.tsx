@@ -156,24 +156,49 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
   // Full refresh: contracts + stats
   const refreshAll = useCallback(async () => {
     const supabase = createClient()
-    let query = supabase
+    const { data } = await supabase
       .from('contracts')
-      .select(`
-        *,
-        client:agents!contracts_client_id_fkey(id, handle, display_name, avatar_url, is_verified),
-        provider:agents!contracts_provider_id_fkey(id, handle, display_name, avatar_url, is_verified)
-      `)
+      .select('*')
       .order('created_at', { ascending: false })
       .limit(100)
 
-    if (userAgentId) {
-      query = query.or(`client_id.eq.${userAgentId},provider_id.eq.${userAgentId}`)
-    }
+    if (data) {
+      // Resolve agents in one go
+      const agentIds = new Set<string>()
+      for (const c of data) {
+        if (c.client_id) agentIds.add(c.client_id)
+        if (c.provider_id) agentIds.add(c.provider_id)
+        if (c.seller_agent_id) agentIds.add(c.seller_agent_id)
+        if (c.buyer_agent_id) agentIds.add(c.buyer_agent_id)
+      }
 
-    const { data } = await query
-    if (data) setContracts(data as ContractWithAgents[])
+      const { data: agentRows } = agentIds.size > 0
+        ? await supabase
+            .from('agents')
+            .select('id, handle, display_name, avatar_url, is_verified')
+            .in('id', [...agentIds])
+        : { data: [] }
+
+      const agentMap = new Map((agentRows || []).map((a: any) => [a.id, a]))
+
+      const normalized = data.map((c: any) => {
+        const clientId = c.client_id ?? c.seller_agent_id
+        const providerId = c.provider_id ?? c.buyer_agent_id
+        return {
+          ...c,
+          client_id: clientId,
+          provider_id: providerId,
+          client: agentMap.get(clientId) ?? null,
+          provider: agentMap.get(providerId) ?? null,
+          dispute: null,
+          budget_max: c.budget_max ?? c.price_relay ?? 0,
+          budget_min: c.budget_min ?? c.price_relay ?? 0,
+        }
+      })
+      setContracts(normalized as ContractWithAgents[])
+    }
     await fetchStats()
-  }, [userAgentId, fetchStats])
+  }, [fetchStats])
 
   useEffect(() => {
     setMounted(true)
@@ -288,13 +313,19 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
     }
   }
 
-  // Filter by view mode
+  // Filter by view mode (handles both legacy client_id/provider_id and engine seller_agent_id/buyer_agent_id)
   const viewFilteredContracts = useMemo(() => {
     switch (viewMode) {
       case 'my-created':
-        return contracts.filter(c => c.client_id === userAgentId)
+        return contracts.filter(c =>
+          c.client_id === userAgentId ||
+          (c as any).seller_agent_id === userAgentId
+        )
       case 'my-accepted':
-        return contracts.filter(c => c.provider_id === userAgentId)
+        return contracts.filter(c =>
+          c.provider_id === userAgentId ||
+          (c as any).buyer_agent_id === userAgentId
+        )
       default:
         return contracts // 'all' shows every contract on the network
     }
@@ -519,9 +550,9 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
           <div className="min-w-0 flex-1">
             <h1 className="text-lg sm:text-2xl font-bold flex items-center gap-2">
               <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-primary shrink-0" />
-              <span className="truncate">My Contracts</span>
+              <span className="truncate">Contracts</span>
             </h1>
-            <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">Manage your contracts, deliverables, and escrow</p>
+            <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">Browse and manage contracts, deliverables, and escrow</p>
           </div>
           <div className="flex gap-2 shrink-0">
             <Button

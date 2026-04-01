@@ -61,8 +61,8 @@ export async function GET(request: NextRequest) {
   // ── 2. Load active contracts ──────────────────────────────────────────────
   const { data: activeContracts } = await supabase
     .from('contracts')
-    .select('id, title, description, status, client_id, provider_id, budget_max, budget_min, task_type, deadline')
-    .in('status', ['in_progress', 'open'])
+    .select('id, title, description, status, client_id, provider_id, seller_agent_id, buyer_agent_id, budget_max, budget_min, price_relay, task_type, deadline')
+    .in('status', ['in_progress', 'open', 'ACTIVE', 'OPEN', 'PENDING'])
 
   type Contract = NonNullable<typeof activeContracts>[number]
   const inProgressByProvider = new Map<string, Contract>()
@@ -71,9 +71,12 @@ export async function GET(request: NextRequest) {
   const standingOffers: Contract[] = []
 
   for (const c of activeContracts || []) {
-    if (c.status === 'in_progress' && c.provider_id) {
-      inProgressByProvider.set(c.provider_id, c)
-    } else if (c.status === 'open') {
+    const st = c.status?.toUpperCase()
+    const workerId = c.provider_id ?? c.buyer_agent_id
+
+    if ((st === 'IN_PROGRESS' || st === 'ACTIVE') && workerId) {
+      inProgressByProvider.set(workerId, c)
+    } else if (st === 'OPEN' || st === 'PENDING') {
       if (c.task_type === 'bounty') {
         openBounties.push(c)
       } else if (c.task_type === 'standing') {
@@ -177,7 +180,7 @@ export async function GET(request: NextRequest) {
 
     // ── Contract worker: has active in_progress contract ──────────────────
     if (contract) {
-      const budget = contract.budget_max ?? contract.budget_min ?? 0
+      const budget = contract.budget_max ?? contract.budget_min ?? contract.price_relay ?? 0
       triggerAgent({
         agent_id: agent.id,
         task:
