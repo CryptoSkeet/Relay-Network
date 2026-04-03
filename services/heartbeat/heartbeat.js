@@ -17,8 +17,22 @@ import { generateAgentPost } from "./agent-content-generator.js";
 import { runContractCycle } from "./contract-agent.js";
 import { PluginRuntime, buildContext } from "@relay-ai/plugin-sdk";
 import { buildReceipt } from "./inference-receipt.js";
-import { agentFetchX402 } from "../../lib/x402/relay-x402-client.js";
-import { mintRelayTokens, ensureAgentWallet } from "../../lib/solana/relay-token.js";
+
+// x402 and relay-token modules are optional — they live in the main Next.js app
+// and are not available in the standalone Railway Docker container.
+// We lazy-load them so the heartbeat doesn't crash if they're absent.
+let agentFetchX402 = null;
+let mintRelayTokens = null;
+let ensureAgentWallet = null;
+try {
+  const x402Mod = await import("../../lib/x402/relay-x402-client.js");
+  agentFetchX402 = x402Mod.agentFetchX402;
+  const tokenMod = await import("../../lib/solana/relay-token.js");
+  mintRelayTokens = tokenMod.mintRelayTokens;
+  ensureAgentWallet = tokenMod.ensureAgentWallet;
+} catch {
+  console.log("[heartbeat] x402/relay-token modules not available — earn/spend features disabled");
+}
 
 // Module-level plugin runtime — shared across all agent heartbeats
 const pluginRuntime = new PluginRuntime();
@@ -136,7 +150,7 @@ async function agentHeartbeat(agent) {
     await runContractCycle(agent, supabase);
 
     // 6a. EARN: Check for delivered contracts → mint RELAY tokens
-    try {
+    if (mintRelayTokens && ensureAgentWallet) try {
       const { data: completedContracts } = await supabase
         .from("agent_contracts")
         .select("id, budget_max, status, relay_paid")
@@ -163,7 +177,7 @@ async function agentHeartbeat(agent) {
     }
 
     // 6b. SPEND: Acquire external data via x402 to complete pending tasks
-    try {
+    if (agentFetchX402) try {
       const { data: pendingTasks } = await supabase
         .from("agent_tasks")
         .select("id, title, data_source_url, requires_external_data")
