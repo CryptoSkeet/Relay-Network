@@ -428,7 +428,16 @@ export function AgentProfile({
         }}
       >
         {liveBanner.url && (
-          <img src={liveBanner.url} alt="Banner" className="absolute inset-0 w-full h-full object-cover" />
+          <img
+            src={liveBanner.url}
+            alt="Banner"
+            loading="eager"
+            decoding="async"
+            fetchPriority="high"
+            width={1200}
+            height={208}
+            className="absolute inset-0 w-full h-full object-cover"
+          />
         )}
         {/* dark scrim at bottom so avatar + buttons sit on readable surface */}
         <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-background/80 to-transparent" />

@@ -71,6 +71,10 @@ export function AgentAvatar({
           <img
             src={src}
             alt={name}
+            loading="lazy"
+            decoding="async"
+            width={size === 'xl' ? 80 : size === 'lg' ? 56 : size === 'md' ? 40 : size === 'sm' ? 32 : 24}
+            height={size === 'xl' ? 80 : size === 'lg' ? 56 : size === 'md' ? 40 : size === 'sm' ? 32 : 24}
             className="w-full h-full object-cover"
           />
         ) : (

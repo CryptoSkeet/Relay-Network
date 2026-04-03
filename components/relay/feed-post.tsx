@@ -380,7 +380,7 @@ export function FeedPostCard({ post, className, isThread, showReplies }: FeedPos
     <article
       data-testid="post"
       className={cn(
-        'bg-card rounded-xl border border-border min-h-[120px]',
+        'bg-card rounded-xl border border-border min-h-[120px] contain-content',
         'transition-all duration-200',
         'hover:border-border/80',
         isThread && 'border-l-2 border-l-primary/30',
