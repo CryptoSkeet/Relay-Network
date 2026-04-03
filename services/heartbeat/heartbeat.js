@@ -18,20 +18,33 @@ import { runContractCycle } from "./contract-agent.js";
 import { PluginRuntime, buildContext } from "@relay-ai/plugin-sdk";
 import { buildReceipt } from "./inference-receipt.js";
 
-// x402 and relay-token modules are optional — they live in the main Next.js app
-// and are not available in the standalone Railway Docker container.
-// We lazy-load them so the heartbeat doesn't crash if they're absent.
-let agentFetchX402 = null;
-let mintRelayTokens = null;
-let ensureAgentWallet = null;
-try {
-  const x402Mod = await import("../../lib/x402/relay-x402-client.js");
-  agentFetchX402 = x402Mod.agentFetchX402;
-  const tokenMod = await import("../../lib/solana/relay-token.js");
-  mintRelayTokens = tokenMod.mintRelayTokens;
-  ensureAgentWallet = tokenMod.ensureAgentWallet;
-} catch {
-  console.log("[heartbeat] x402/relay-token modules not available — earn/spend features disabled");
+// ---------------------------------------------------------------------------
+// RELAY minting via HTTP — calls the Next.js API hosted on Vercel
+// This avoids importing TypeScript/Next.js modules into the Railway container.
+// ---------------------------------------------------------------------------
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://relaynetwork.ai";
+const CRON_SECRET = process.env.CRON_SECRET || "";
+
+async function mintRelayViaAPI(agentId, amount, reason = "contract_earnings") {
+  try {
+    const res = await fetch(`${APP_URL}/api/v1/relay-token/mint`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${CRON_SECRET}`,
+      },
+      body: JSON.stringify({ agent_id: agentId, amount, reason }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Mint API ${res.status}: ${text}`);
+    }
+    const data = await res.json();
+    return data.on_chain_sig;
+  } catch (err) {
+    console.warn(`[heartbeat] Mint API error for agent ${agentId}:`, err.message);
+    return null;
+  }
 }
 
 // Module-level plugin runtime — shared across all agent heartbeats
@@ -150,7 +163,7 @@ async function agentHeartbeat(agent) {
     await runContractCycle(agent, supabase);
 
     // 6a. EARN: Check for completed contracts → mint RELAY tokens
-    if (mintRelayTokens && ensureAgentWallet) try {
+    try {
       const { data: completedContracts } = await supabase
         .from("contracts")
         .select("id, budget_max, status, relay_paid")
@@ -160,16 +173,15 @@ async function agentHeartbeat(agent) {
 
       if (completedContracts?.length) {
         for (const contract of completedContracts) {
-          const agentWallet = await ensureAgentWallet(agent.id);
-          const sig = await mintRelayTokens(
-            agentWallet.publicKey,
-            contract.budget_max ?? 100,
-          );
-          await supabase
-            .from("contracts")
-            .update({ relay_paid: true })
-            .eq("id", contract.id);
-          console.log(`${tag} Earned RELAY for contract ${contract.id}: ${sig}`);
+          const amount = contract.budget_max ?? 100;
+          const sig = await mintRelayViaAPI(agent.id, amount, "contract_earnings");
+          if (sig) {
+            await supabase
+              .from("contracts")
+              .update({ relay_paid: true })
+              .eq("id", contract.id);
+            console.log(`${tag} Earned ${amount} RELAY for contract ${contract.id}: ${sig}`);
+          }
         }
       }
     } catch (earnErr) {
@@ -177,33 +189,8 @@ async function agentHeartbeat(agent) {
     }
 
     // 6b. SPEND: Acquire external data via x402 to complete pending tasks
-    if (agentFetchX402) try {
-      const { data: pendingTasks } = await supabase
-        .from("agent_tasks")
-        .select("id, title, data_source_url, requires_external_data")
-        .eq("agent_id", agent.id)
-        .eq("status", "pending")
-        .eq("requires_external_data", true);
-
-      if (pendingTasks?.length) {
-        for (const task of pendingTasks) {
-          const result = await agentFetchX402(agent.id, {
-            url:           task.data_source_url,
-            maxAmountUsdc: 0.01, // cap at 1 cent per fetch
-            description:   `Data for task: ${task.title}`,
-          });
-          if (result.success) {
-            await supabase
-              .from("agent_tasks")
-              .update({ status: "completed", result_data: result.data })
-              .eq("id", task.id);
-            console.log(`${tag} Completed task ${task.id} using x402 data`);
-          }
-        }
-      }
-    } catch (spendErr) {
-      console.warn(`${tag} x402 spend error:`, spendErr.message);
-    }
+    // x402 spending requires the full Next.js app context — skipped in Railway.
+    // When x402 data acquisition is needed, agents should use the Vercel-hosted API.
 
     // 7. Record heartbeat event log
     await supabase.from("agent_heartbeats").insert({
