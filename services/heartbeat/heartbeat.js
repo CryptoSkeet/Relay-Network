@@ -17,6 +17,8 @@ import { generateAgentPost } from "./agent-content-generator.js";
 import { runContractCycle } from "./contract-agent.js";
 import { PluginRuntime, buildContext } from "@relay-ai/plugin-sdk";
 import { buildReceipt } from "./inference-receipt.js";
+import { agentFetchX402 } from "../../lib/x402/relay-x402-client.js";
+import { mintRelayTokens, ensureAgentWallet } from "../../lib/solana/relay-token.js";
 
 // Module-level plugin runtime — shared across all agent heartbeats
 const pluginRuntime = new PluginRuntime();
@@ -132,6 +134,62 @@ async function agentHeartbeat(agent) {
 
     // 6. Run contract cycle (accept/deliver/settle/initiate/offer)
     await runContractCycle(agent, supabase);
+
+    // 6a. EARN: Check for delivered contracts → mint RELAY tokens
+    try {
+      const { data: completedContracts } = await supabase
+        .from("agent_contracts")
+        .select("id, budget_max, status, relay_paid")
+        .eq("agent_id", agent.id)
+        .eq("status", "delivered")
+        .eq("relay_paid", false);
+
+      if (completedContracts?.length) {
+        for (const contract of completedContracts) {
+          const agentWallet = await ensureAgentWallet(agent.id);
+          const sig = await mintRelayTokens(
+            agentWallet.publicKey,
+            contract.budget_max ?? 100,
+          );
+          await supabase
+            .from("agent_contracts")
+            .update({ relay_paid: true })
+            .eq("id", contract.id);
+          console.log(`${tag} Earned RELAY for contract ${contract.id}: ${sig}`);
+        }
+      }
+    } catch (earnErr) {
+      console.warn(`${tag} RELAY earn error:`, earnErr.message);
+    }
+
+    // 6b. SPEND: Acquire external data via x402 to complete pending tasks
+    try {
+      const { data: pendingTasks } = await supabase
+        .from("agent_tasks")
+        .select("id, title, data_source_url, requires_external_data")
+        .eq("agent_id", agent.id)
+        .eq("status", "pending")
+        .eq("requires_external_data", true);
+
+      if (pendingTasks?.length) {
+        for (const task of pendingTasks) {
+          const result = await agentFetchX402(agent.id, {
+            url:           task.data_source_url,
+            maxAmountUsdc: 0.01, // cap at 1 cent per fetch
+            description:   `Data for task: ${task.title}`,
+          });
+          if (result.success) {
+            await supabase
+              .from("agent_tasks")
+              .update({ status: "completed", result_data: result.data })
+              .eq("id", task.id);
+            console.log(`${tag} Completed task ${task.id} using x402 data`);
+          }
+        }
+      }
+    } catch (spendErr) {
+      console.warn(`${tag} x402 spend error:`, spendErr.message);
+    }
 
     // 7. Record heartbeat event log
     await supabase.from("agent_heartbeats").insert({
