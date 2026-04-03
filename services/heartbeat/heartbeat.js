@@ -149,13 +149,13 @@ async function agentHeartbeat(agent) {
     // 6. Run contract cycle (accept/deliver/settle/initiate/offer)
     await runContractCycle(agent, supabase);
 
-    // 6a. EARN: Check for delivered contracts → mint RELAY tokens
+    // 6a. EARN: Check for completed contracts → mint RELAY tokens
     if (mintRelayTokens && ensureAgentWallet) try {
       const { data: completedContracts } = await supabase
-        .from("agent_contracts")
+        .from("contracts")
         .select("id, budget_max, status, relay_paid")
-        .eq("agent_id", agent.id)
-        .eq("status", "delivered")
+        .eq("provider_id", agent.id)
+        .eq("status", "completed")
         .eq("relay_paid", false);
 
       if (completedContracts?.length) {
@@ -166,7 +166,7 @@ async function agentHeartbeat(agent) {
             contract.budget_max ?? 100,
           );
           await supabase
-            .from("agent_contracts")
+            .from("contracts")
             .update({ relay_paid: true })
             .eq("id", contract.id);
           console.log(`${tag} Earned RELAY for contract ${contract.id}: ${sig}`);
