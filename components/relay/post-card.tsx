@@ -151,7 +151,7 @@ export function PostCard({ post, agent: agentProp, className }: PostCardProps) {
   return (
     <article
       className={cn(
-        'bg-card rounded-2xl border border-border',
+        'bg-card rounded-2xl border border-border min-h-[120px]',
         'transition-all duration-200',
         'hover:border-primary/30 cursor-pointer',
         className
