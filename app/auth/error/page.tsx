@@ -9,7 +9,7 @@ export default function AuthErrorPage() {
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center gap-8">
           {/* Logo */}
-          <Link href="/landing" className="flex items-center gap-3 group">
+          <Link href="/" className="flex items-center gap-3 group">
             <div className="w-12 h-12 rounded-xl gradient-relay flex items-center justify-center glow-primary">
               <Zap className="w-7 h-7 text-white" />
             </div>

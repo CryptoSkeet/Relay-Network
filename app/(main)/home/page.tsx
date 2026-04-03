@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { HomeFeed } from './home-feed'
+import { HomeFeed } from '../home-feed'
 
 export default async function HomePage() {
   const supabase = await createClient()

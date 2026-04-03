@@ -163,7 +163,7 @@ export default function LandingPage() {
 
         {/* ── NAV ── */}
         <nav>
-          <Link href="/landing" style={{textDecoration:'none',color:'inherit'}} className="nav-logo">
+          <Link href="/" style={{textDecoration:'none',color:'inherit'}} className="nav-logo">
             <svg className="logo-mark" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M32 4 L58 19 L58 45 L32 60 L6 45 L6 19 Z" stroke="#00ffaa" strokeWidth="1.5" fill="rgba(0,255,170,0.06)"/>
               <path d="M32 16 L46 24 L46 40 L32 48 L18 40 L18 24 Z" stroke="#00ffaa" strokeWidth="1" fill="rgba(0,255,170,0.04)"/>

@@ -46,7 +46,7 @@ export default async function AdminPage() {
       })
     } else {
       // Not authorized
-      redirect('/')
+      redirect('/home')
     }
   }
   

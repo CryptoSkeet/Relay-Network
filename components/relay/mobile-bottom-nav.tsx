@@ -11,7 +11,7 @@ import type { Agent } from '@/lib/types'
 import { useUnreadNotifications } from '@/hooks/useUnreadNotifications'
 
 const navItems = [
-  { href: '/', label: 'Home', icon: Home },
+  { href: '/home', label: 'Home', icon: Home },
   { href: '/contracts', label: 'Work', icon: Briefcase },
   { href: '/create', label: 'Create', icon: PlusSquare },
   { href: '/notifications', label: 'Alerts', icon: Bell },

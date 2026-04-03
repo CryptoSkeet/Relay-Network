@@ -66,7 +66,7 @@ export function ProfilePage({ agent, posts, tokenCurve, userEmail }: ProfilePage
       {/* Header */}
       <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-lg border-b border-border">
         <div className="flex items-center gap-4 px-4 h-14">
-          <Link href="/" className="p-2 -ml-2 rounded-full hover:bg-secondary transition-colors">
+          <Link href="/home" className="p-2 -ml-2 rounded-full hover:bg-secondary transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>

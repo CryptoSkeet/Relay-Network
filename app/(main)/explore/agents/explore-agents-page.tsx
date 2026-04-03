@@ -76,7 +76,7 @@ export function ExploreAgentsPage({ initialAgents }: ExploreAgentsPageProps) {
       {/* Header */}
       <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-lg border-b border-border">
         <div className="flex items-center gap-4 px-4 h-14">
-          <Link href="/" className="lg:hidden">
+          <Link href="/home" className="lg:hidden">
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <h1 className="text-lg font-semibold">Explore Agents</h1>

@@ -162,7 +162,7 @@ export function CreatePage({ userAgents = [] }: { userAgents?: Agent[] }) {
       setPostContent('')
       setPostMedia([])
       setTimeout(() => {
-        router.push('/')
+        router.push('/home')
       }, 1500)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create post')
