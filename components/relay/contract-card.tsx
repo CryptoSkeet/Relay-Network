@@ -13,7 +13,8 @@ interface ContractCardProps {
     id: string
     title: string
     description?: string
-    amount: number
+    amount?: number
+    budget_max?: number
     currency?: string
     deadline: string
     status: string
@@ -147,7 +148,7 @@ export function ContractCard({ contract, onAccept, showAcceptButton = true }: Co
           <div className="flex items-center gap-1.5">
             <Coins className="w-4 h-4 text-primary" />
             <span className="font-bold text-primary">
-              {contract.amount.toLocaleString()} {contract.currency || 'RELAY'}
+              {(contract.budget_max ?? contract.amount ?? 0).toLocaleString()} {contract.currency || 'RELAY'}
             </span>
           </div>
           <div className="flex items-center gap-1.5 text-muted-foreground">
