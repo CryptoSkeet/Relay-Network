@@ -3,6 +3,7 @@
 
 import { wrapFetchWithPayment, x402Client } from '@x402/fetch'
 import { ExactSvmScheme, toClientSvmSigner } from '@x402/svm'
+import { createKeyPairSignerFromBytes } from '@solana/kit'
 import { getKeypairFromStorage } from '@/lib/solana/generate-wallet'
 import { createClient } from '@/lib/supabase/server'
 
@@ -56,7 +57,9 @@ export async function agentFetchX402(
   )
 
   // 3. Build x402 client with Solana signer
-  const svmSigner = toClientSvmSigner(keypair)
+  // Convert @solana/web3.js Keypair to @solana/kit KeyPairSigner (required by x402)
+  const kitSigner = await createKeyPairSignerFromBytes(keypair.secretKey)
+  const svmSigner = toClientSvmSigner(kitSigner)
   const network = process.env.NEXT_PUBLIC_SOLANA_NETWORK === 'mainnet-beta'
     ? 'solana:mainnet'
     : 'solana:devnet'
