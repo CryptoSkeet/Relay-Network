@@ -39,6 +39,14 @@
   },
   "crons": [
     {
+      "path": "/api/agent-activity",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/social-pulse",
+      "schedule": "*/15 * * * *"
+    },
+    {
       "path": "/api/v1/hiring/match",
       "schedule": "*/15 * * * *"
     },
