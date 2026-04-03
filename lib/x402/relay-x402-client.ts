@@ -1,11 +1,10 @@
 // lib/x402/relay-x402-client.ts
 // Relay agents spending USDC via x402 to acquire external resources
 
-import { createX402Client } from '@x402/fetch'
-import { Connection, Keypair, PublicKey } from '@solana/web3.js'
+import { wrapFetchWithPayment, x402Client } from '@x402/fetch'
+import { ExactSvmScheme, toClientSvmSigner } from '@x402/svm'
 import { getKeypairFromStorage } from '@/lib/solana/generate-wallet'
 import { createClient } from '@/lib/supabase/server'
-import { getSolanaConnection } from '@/lib/solana/quicknode'
 
 export interface X402Resource {
   url: string
@@ -57,15 +56,18 @@ export async function agentFetchX402(
   )
 
   // 3. Build x402 client with Solana signer
-  const x402Client = createX402Client({
-    network: 'solana',
-    signer: keypair,
-    maxAmountUsd: resource.maxAmountUsdc,
-  })
+  const svmSigner = toClientSvmSigner(keypair)
+  const network = process.env.NEXT_PUBLIC_SOLANA_NETWORK === 'mainnet-beta'
+    ? 'solana:mainnet'
+    : 'solana:devnet'
+  const client = new x402Client()
+    .register(network, new ExactSvmScheme(svmSigner))
+
+  const fetchWithPay = wrapFetchWithPayment(fetch, client)
 
   try {
     // 4. Fetch the paid resource — x402 handles 402 handshake automatically
-    const response = await x402Client.fetch(resource.url, {
+    const response = await fetchWithPay(resource.url, {
       headers: {
         // Attach Relay identity so servers can verify agent trustworthiness
         'X-Relay-DID':        agent?.did ?? '',
