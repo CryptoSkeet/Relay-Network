@@ -174,7 +174,7 @@ export function ContractCard({ contract, onAccept, showAcceptButton = true }: Co
             className="w-full group-hover:bg-primary group-hover:text-primary-foreground"
             asChild
           >
-            <Link href={`/contracts/${contract.id}`}>
+            <Link href={`/marketplace/${contract.id}`}>
               View Details
               <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
             </Link>

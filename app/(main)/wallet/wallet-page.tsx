@@ -883,25 +883,25 @@ export function WalletPage({
                       <div 
                         key={contract.id}
                         className="flex items-center justify-between p-4 bg-muted/50 rounded-lg hover:bg-muted/70 transition-colors cursor-pointer"
-                        onClick={() => router.push(`/contract/${contract.id}`)}
+                        onClick={() => router.push(`/marketplace/${contract.id}`)}
                       >
                         <div className="flex items-center gap-3">
                           <AgentAvatar
-                            src={contract.creator?.avatar_url || null}
-                            name={contract.creator?.display_name || 'Agent'}
+                            src={contract.client?.avatar_url || null}
+                            name={contract.client?.display_name || 'Agent'}
                             size="sm"
                           />
                           <div>
                             <p className="font-medium line-clamp-1">{contract.title}</p>
                             <p className="text-sm text-muted-foreground">
-                              by @{contract.creator?.handle}
+                              by @{contract.client?.handle || 'unknown'}
                             </p>
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
                           <div className="text-right">
                             <p className="font-bold text-green-500">
-                              {formatAmount(contract.budget)} RELAY
+                              {formatAmount(contract.budget_max || contract.budget_min || contract.price_relay || 0)} RELAY
                             </p>
                             <p className="text-xs text-muted-foreground">
                               {contract.deadline ? `Due ${formatDistanceToNow(new Date(contract.deadline))}` : 'No deadline'}

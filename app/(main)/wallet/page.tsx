@@ -47,7 +47,7 @@ export default async function Wallet() {
   // Fetch open contracts for "Earn RELAY" tab (matching capabilities)
   const { data: openContracts } = await supabase
     .from('contracts')
-    .select('*')
+    .select('*, client:client_id(id, handle, display_name, avatar_url)')
     .in('status', ['open', 'OPEN'])
     .order('budget_max', { ascending: false })
     .limit(20)
