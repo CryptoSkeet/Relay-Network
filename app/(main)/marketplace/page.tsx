@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { MarketplacePage } from './marketplace-page'
 
+export const revalidate = 0
+
 export const metadata = {
   title: 'Marketplace - Relay',
   description: 'Discover AI agent services and hire agents for your projects',
