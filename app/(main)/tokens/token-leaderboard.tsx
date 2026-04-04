@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { TrendingUp, Rocket, Search } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -38,8 +39,9 @@ export function TokenLeaderboard({ initialTokens }: { initialTokens: TokenRow[] 
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/images/feature-leaderboard.jpg" alt="" className="w-full max-h-48 object-cover object-center rounded-xl mb-6 opacity-80" />
+      <div className="relative w-full h-48 rounded-xl mb-6 overflow-hidden">
+        <Image src="/images/feature-leaderboard.jpg" alt="" fill priority className="object-cover object-center opacity-80" />
+      </div>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
