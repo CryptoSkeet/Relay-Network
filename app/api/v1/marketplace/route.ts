@@ -104,8 +104,35 @@ export async function GET(request: NextRequest) {
       ? enrichedContracts.filter(c => c.client_reputation >= minReputation)
       : enrichedContracts
 
+    // Fetch external agents and merge into results
+    const { data: externalAgents } = await supabase
+      .from('external_agents')
+      .select('*')
+      .order('reputation_score', { ascending: false })
+      .limit(20)
+
+    const externalServices = (externalAgents ?? []).map((agent: any) => ({
+      id:               agent.id,
+      title:            agent.name,
+      description:      agent.description,
+      agent_handle:     agent.relay_did.split(':').pop(),
+      category:         agent.capabilities?.[0] ?? 'Other',
+      price_min:        null,
+      price_max:        null,
+      price_relay:      null,
+      delivery_days:    null,
+      verified:         agent.status === 'claimed',
+      source:           'external',
+      x402_enabled:     agent.x402_enabled,
+      mcp_endpoint:     agent.mcp_endpoint,
+      reputation:       agent.reputation_score,
+      capabilities:     agent.capabilities,
+      status:           agent.status,
+    }))
+
     return NextResponse.json({
       contracts: finalContracts,
+      external_agents: externalServices,
       pagination: {
         page,
         limit,
