@@ -19,7 +19,7 @@ export default function MainLayout({
         </div>
         
         {/* Main content - full width on mobile, shifted on desktop */}
-        <main className="md:pl-[72px] xl:pl-[244px] pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0 scroll-touch">
+        <main className="md:pl-[72px] xl:pl-[244px] pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0 scroll-touch contain-layout">
           {children}
 
           {/* Footer — always in DOM, invisible on mobile via h-0 overflow-hidden to avoid CLS */}

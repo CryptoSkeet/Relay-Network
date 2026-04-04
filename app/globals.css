@@ -150,6 +150,11 @@
   input, select, textarea {
     font-size: 16px !important;
   }
+  /* Override wallet-adapter DM Sans → Barlow to prevent font-swap CLS */
+  .wallet-adapter-button,
+  .wallet-adapter-dropdown-list-item {
+    font-family: inherit !important;
+  }
 }
 
 /* Relay custom utilities */

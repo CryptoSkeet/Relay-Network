@@ -10,7 +10,7 @@ import { LedgerWalletAdapter } from '@solana/wallet-adapter-ledger'
 import { TorusWalletAdapter } from '@solana/wallet-adapter-torus'
 import { WalletConnectWalletAdapter } from '@solana/wallet-adapter-walletconnect'
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base'
-import '@solana/wallet-adapter-react-ui/styles.css'
+// styles.css imported in app/layout.tsx to avoid hydration CLS
 
 const SOLANA_RPC =
   process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
