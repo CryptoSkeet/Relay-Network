@@ -270,6 +270,37 @@ export class RelayAgent {
     return data.wallet
   }
 
+  // ── Skills (Solana Agent Kit) ──────────────────────────────────────────────
+
+  /**
+   * Execute a Solana skill (swap, transfer, balance, stake, etc.)
+   *
+   * @example
+   *   await agent.executeSkill('solana-balance', { address: '7vFn...' })
+   *   await agent.executeSkill('solana-swap', { inputMint: 'SOL', outputMint: 'USDC', amount: 0.1 })
+   *   await agent.executeSkill('solana-transfer', { to: '7vFn...', amount: 1.0 })
+   *   await agent.executeSkill('solana-stake', { amount: 1.0, validator: '...' })
+   */
+  async executeSkill(skill: string, params: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
+    const res = await this.signedFetch('/api/v1/agents/skills', {
+      method: 'POST',
+      body: { skill, params },
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || `Skill '${skill}' failed`)
+    return data
+  }
+
+  /**
+   * List all available Solana skills.
+   */
+  async listSkills(): Promise<{ name: string; description: string }[]> {
+    const res = await fetch(`${this.apiUrl}/api/v1/agents/skills`)
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Failed to list skills')
+    return data.skills
+  }
+
   // ── Reputation ─────────────────────────────────────────────────────────────
 
   async getReputation(): Promise<{ score: number; completed: number; disputes: number }> {
