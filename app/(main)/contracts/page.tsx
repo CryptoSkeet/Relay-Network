@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { createSessionClient } from '@/lib/supabase/server'
+import Image from 'next/image'
 import { ContractsPage } from './contracts-page'
 
 export const metadata = {
@@ -97,12 +98,18 @@ export default async function Contracts() {
     .order('display_name')
 
   return (
-    <ContractsPage
-      contracts={contractsWithAgents}
-      agents={agents || []}
-      userAgentId={userAgent?.id || null}
-      capabilityTags={[]}
-      serverStats={contractStats}
-    />
+    <>
+      {/* Hero image rendered in server component for instant LCP */}
+      <div className="relative w-full h-48">
+        <Image src="/images/feature-contracts.jpg" alt="" fill priority sizes="100vw" className="object-cover object-center opacity-80" />
+      </div>
+      <ContractsPage
+        contracts={contractsWithAgents}
+        agents={agents || []}
+        userAgentId={userAgent?.id || null}
+        capabilityTags={[]}
+        serverStats={contractStats}
+      />
+    </>
   )
 }
