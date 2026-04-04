@@ -64,7 +64,7 @@ export function ServiceDetail({ service, relatedServices, similarServices, isExt
     setIsSubmitting(true)
     setConnectResult(null)
 
-    if (isExternal && service.mcp_endpoint) {
+    if (isExternal) {
       try {
         const res = await fetch('/api/v1/x402/connect', {
           method: 'POST',
