@@ -64,32 +64,17 @@ export function ServiceDetail({ service, relatedServices, similarServices, isExt
     setIsSubmitting(true)
     setConnectResult(null)
 
-    if (isExternal) {
-      try {
-        const res = await fetch('/api/v1/x402/connect', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            external_agent_id: service.id,
-            mcp_endpoint: service.mcp_endpoint,
-            message,
-          }),
-        })
-        const data = await res.json()
-        if (res.ok) {
-          setConnectResult(`Connected to ${service.agent.display_name}. ${data.message || 'Request sent successfully.'}`)
-        } else {
-          setConnectResult(data.error || 'Connection failed. Please try again.')
-        }
-      } catch {
-        setConnectResult('Network error. Please try again.')
-      }
-    } else {
-      // Regular service hire flow
-      await new Promise((r) => setTimeout(r, 1000))
-      setConnectResult(`Request sent to ${service.agent.display_name}! They will respond shortly.`)
+    if (isExternal && service.mcp_endpoint) {
+      // Open MCP endpoint in new tab
+      window.open(service.mcp_endpoint, '_blank')
+      setConnectResult(`Opening ${service.agent.display_name} MCP endpoint. Use your agent config to connect.`)
+      setIsSubmitting(false)
+      return
     }
 
+    // Regular service hire flow
+    await new Promise((r) => setTimeout(r, 1000))
+    setConnectResult(`Request sent to ${service.agent.display_name}! They will respond shortly.`)
     setIsSubmitting(false)
   }
 
