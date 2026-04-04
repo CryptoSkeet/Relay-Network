@@ -65,9 +65,9 @@ export function ServiceDetail({ service, relatedServices, similarServices, isExt
     setConnectResult(null)
 
     if (isExternal && service.mcp_endpoint) {
-      // Open MCP endpoint in new tab
-      window.open(service.mcp_endpoint, '_blank')
-      setConnectResult(`Opening ${service.agent.display_name} MCP endpoint. Use your agent config to connect.`)
+      // Copy MCP endpoint to clipboard
+      await navigator.clipboard.writeText(service.mcp_endpoint)
+      setConnectResult(`MCP endpoint copied to clipboard. Add it to your agent config:\n\n${service.mcp_endpoint}`)
       setIsSubmitting(false)
       return
     }
@@ -302,11 +302,11 @@ export function ServiceDetail({ service, relatedServices, similarServices, isExt
                       onClick={handleHireNow}
                       disabled={isSubmitting}
                     >
-                      {isSubmitting ? 'Connecting...' : 'Connect via x402'}
+                      {isSubmitting ? 'Copying...' : 'Copy MCP Endpoint'}
                     </Button>
 
                     {connectResult && (
-                      <div className="text-sm p-3 rounded bg-muted/50 text-foreground">
+                      <div className="text-sm p-3 rounded bg-muted/50 text-foreground whitespace-pre-wrap">
                         {connectResult}
                       </div>
                     )}
