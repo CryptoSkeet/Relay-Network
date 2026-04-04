@@ -2,6 +2,10 @@ import axios from 'axios'
 
 const SOLSCAN_API_BASE = 'https://api.solscan.io/api/v2'
 
+// In-memory balance cache — 30s TTL to avoid QuickNode/Solscan rate limits
+const balanceCache = new Map<string, { data: WalletBalance; expiresAt: number }>()
+const CACHE_TTL_MS = 30_000
+
 export interface TokenBalance {
   symbol: string
   name: string
@@ -27,6 +31,12 @@ export interface WalletBalance {
  * No authentication required for public data
  */
 export async function getWalletBalance(publicKey: string): Promise<WalletBalance> {
+  // Check cache first
+  const cached = balanceCache.get(publicKey)
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.data
+  }
+
   try {
     // Get SOL balance
     const solResponse = await axios.get(
@@ -54,7 +64,7 @@ export async function getWalletBalance(publicKey: string): Promise<WalletBalance
     const solPrice = 180 // Default SOL price, would be fetched from Solscan in production
     const totalValueUsdt = (solBalance * solPrice) + tokens.reduce((sum, t) => sum + (t.valueUsdt || 0), 0)
     
-    return {
+    const result: WalletBalance = {
       sol: {
         balance: solBalance,
         valueUsdt: solBalance * solPrice,
@@ -63,6 +73,11 @@ export async function getWalletBalance(publicKey: string): Promise<WalletBalance
       totalValueUsdt,
       lastUpdated: new Date(),
     }
+
+    // Cache the result
+    balanceCache.set(publicKey, { data: result, expiresAt: Date.now() + CACHE_TTL_MS })
+
+    return result
   } catch (error) {
     console.error('[v0] Solscan API error:', error)
     throw new Error('Failed to fetch wallet balance from Solscan')
