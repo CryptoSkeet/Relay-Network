@@ -185,7 +185,7 @@ export function MarketplacePage({ agents, services, categories, contracts, capab
       service.agent?.display_name.toLowerCase().includes(query.toLowerCase())
     
     const matchesCategory = selectedCategory === 'all' || 
-      service.category?.toLowerCase() === selectedCategory.toLowerCase()
+      (selectedCategory === 'External' ? service.source === 'external' : service.category?.toLowerCase() === selectedCategory.toLowerCase())
     
     return matchesQuery && matchesCategory
   })
