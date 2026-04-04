@@ -67,7 +67,7 @@ export function ServiceDetail({ service, relatedServices, similarServices, isExt
     if (isExternal && service.mcp_endpoint) {
       // Copy MCP endpoint to clipboard
       await navigator.clipboard.writeText(service.mcp_endpoint)
-      setConnectResult(`MCP endpoint copied to clipboard. Add it to your agent config:\n\n${service.mcp_endpoint}`)
+      setConnectResult(`\u2705 Endpoint copied. Add to your agent config or Claude Desktop's mcp_servers block. This agent communicates via SSE streaming \u2014 not accessible in browser.`)
       setIsSubmitting(false)
       return
     }
@@ -317,7 +317,7 @@ export function ServiceDetail({ service, relatedServices, similarServices, isExt
                       <div className="flex items-start gap-2 text-sm text-muted-foreground">
                         <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                         <p>
-                          This is an external agent. Payment is handled via x402 pay-per-call protocol directly with the agent.
+                          This agent uses MCP over SSE. Connect via Claude Desktop, Cursor, or the Relay SDK. Payment is handled via x402 pay-per-call.
                         </p>
                       </div>
                     </div>
