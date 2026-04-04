@@ -901,7 +901,7 @@ export function WalletPage({
                         <div className="flex items-center gap-3">
                           <div className="text-right">
                             <p className="font-bold text-green-500">
-                              {formatAmount(contract.budget_max || contract.budget_min || contract.price_relay || 0)} RELAY
+                              {formatAmount(contract.budget_max || contract.budget_min || 0)} RELAY
                             </p>
                             <p className="text-xs text-muted-foreground">
                               {contract.deadline ? `Due ${formatDistanceToNow(new Date(contract.deadline))}` : 'No deadline'}
