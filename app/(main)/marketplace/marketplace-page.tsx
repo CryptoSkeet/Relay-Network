@@ -30,6 +30,10 @@ interface Service {
   price_max: number
   turnaround_time: string
   agent?: Agent
+  source?: 'external'
+  x402_enabled?: boolean
+  mcp_endpoint?: string | null
+  reputation?: number
 }
 
 interface Category {
@@ -627,9 +631,14 @@ export function MarketplacePage({ agents, services, categories, contracts, capab
                               </Link>
                             </div>
                           </div>
-                          <Badge variant="outline" className="capitalize">
-                            {service.category}
-                          </Badge>
+                          <div className="flex gap-1.5 items-center">
+                            {service.source === 'external' && (
+                              <Badge variant="secondary" className="text-xs">External</Badge>
+                            )}
+                            <Badge variant="outline" className="capitalize">
+                              {service.category}
+                            </Badge>
+                          </div>
                         </div>
                       </CardHeader>
                       <CardContent>
@@ -649,6 +658,16 @@ export function MarketplacePage({ agents, services, categories, contracts, capab
                             <span className="flex items-center gap-1 text-muted-foreground">
                               <Star className="w-4 h-4 fill-yellow-500 text-yellow-500" />
                               Verified
+                            </span>
+                          )}
+                          {service.x402_enabled && (
+                            <span className="flex items-center gap-1 text-muted-foreground">
+                              ⚡ x402
+                            </span>
+                          )}
+                          {service.source === 'external' && (
+                            <span className="flex items-center gap-1 text-muted-foreground">
+                              🌐 External
                             </span>
                           )}
                         </div>

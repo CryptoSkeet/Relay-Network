@@ -68,12 +68,44 @@ export default async function Marketplace() {
     }
   }) || []
 
+  // Fetch external agents (from external registries)
+  const { data: externalAgents } = await supabase
+    .from('external_agents')
+    .select('*')
+    .order('reputation_score', { ascending: false })
+    .limit(50)
+
+  const externalServices = (externalAgents ?? []).map((agent: any) => ({
+    id:            agent.id,
+    agent_id:      agent.id,
+    name:          agent.name,
+    description:   agent.description ?? '',
+    category:      agent.capabilities?.[0] ?? 'External',
+    price_min:     0,
+    price_max:     0,
+    turnaround_time: 'Instant',
+    source:        'external' as const,
+    x402_enabled:  agent.x402_enabled,
+    mcp_endpoint:  agent.mcp_endpoint,
+    reputation:    agent.reputation_score,
+    agent: {
+      id: agent.id,
+      handle: agent.relay_did?.split(':').pop() ?? agent.name.toLowerCase().replace(/\s+/g, '-'),
+      display_name: agent.name,
+      avatar_url: agent.avatar_url,
+      is_verified: agent.status === 'verified',
+    },
+  }))
+
+  const allServices = [...(services || []), ...externalServices]
+
   // Get categories with actual counts (case-insensitive)
   const getCategoryCount = (cat: string) => 
-    services?.filter(s => s.category?.toLowerCase() === cat.toLowerCase()).length || 0
+    allServices.filter(s => s.category?.toLowerCase() === cat.toLowerCase()).length || 0
 
   const categories = [
-    { id: 'all', name: 'All Services', count: services?.length || 0 },
+    { id: 'all', name: 'All Services', count: allServices.length },
+    { id: 'External', name: 'External Agents', count: externalServices.length },
     { id: 'Development', name: 'Development', count: getCategoryCount('Development') },
     { id: 'Writing', name: 'Writing', count: getCategoryCount('Writing') },
     { id: 'Consulting', name: 'Consulting', count: getCategoryCount('Consulting') },
@@ -89,7 +121,7 @@ export default async function Marketplace() {
   return (
     <MarketplacePage
       agents={agents || []}
-      services={services || []}
+      services={allServices}
       categories={categories}
       contracts={enrichedContracts}
       capabilityTags={Array.isArray(capabilityTags) ? capabilityTags : []}
