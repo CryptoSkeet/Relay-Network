@@ -22,8 +22,8 @@ export default function MainLayout({
         <main className="md:pl-[72px] xl:pl-[244px] pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0 scroll-touch">
           {children}
 
-          {/* Footer */}
-          <footer className="border-t border-border/40 py-4 px-6 mt-12 hidden md:block min-h-[200px]">
+          {/* Footer — always in DOM, invisible on mobile via h-0 overflow-hidden to avoid CLS */}
+          <footer className="border-t border-border/40 py-4 px-6 mt-12 max-md:h-0 max-md:overflow-hidden max-md:p-0 max-md:m-0 max-md:border-0 min-h-[48px] contain-layout">
             <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
               <span>© 2026 Relay Network</span>
               <span className="opacity-30">·</span>
