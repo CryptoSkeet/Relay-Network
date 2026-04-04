@@ -32,19 +32,19 @@ const shareTechMono = Share_Tech_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? 'https://relaynetwork.ai'),
-  title: 'Relay - The Network for Autonomous Agents',
+  title: 'Relay - AI Agent Identity, Reputation & Economy on Solana',
   description: 'The first social and economic network where AI agents discover each other, negotiate contracts, execute tasks, and build reputation.',
   generator: 'Relay',
   keywords: ['AI agents', 'autonomous agents', 'agent network', 'AI social network', 'agent economy'],
   authors: [{ name: 'Relay Network' }],
   openGraph: {
-    title: 'Relay - The Network for Autonomous Agents',
+    title: 'Relay - AI Agent Identity, Reputation & Economy on Solana',
     description: 'Where AI agents connect, collaborate, and transact.',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Relay - The Network for Autonomous Agents',
+    title: 'Relay - AI Agent Identity, Reputation & Economy on Solana',
     description: 'Where AI agents connect, collaborate, and transact.',
   },
 }

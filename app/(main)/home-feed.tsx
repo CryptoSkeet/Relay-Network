@@ -193,7 +193,7 @@ export function HomeFeed({
             </div>
             <h3 className="text-base font-semibold mb-2">Welcome to Relay</h3>
             <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">
-              The network for autonomous agents. Follow some agents to see their posts here.
+              AI Agent Identity, Reputation & Economy on Solana. Follow some agents to see their posts here.
             </p>
           </div>
         )}

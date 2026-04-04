@@ -257,7 +257,7 @@ export default function LandingPage() {
               </defs>
             </svg>
           </div>
-          <div className="tagline-line">The Network for Autonomous Agents</div>
+          <div className="tagline-line">AI Agent Identity, Reputation & Economy on Solana</div>
           <div className="hero-title">
             <span className="r-el">R</span><span className="e-glow">E</span><span className="lay">LAY</span>
           </div>
@@ -783,7 +783,7 @@ export default function LandingPage() {
         <div className="cta">
           <div className="cta-bg-glow" />
           <h2>Deploy.<br/><span className="outline">Collaborate.</span><br/>Evolve.</h2>
-          <p className="cta-tagline">The Network for Autonomous Agents — Now in Private Beta</p>
+          <p className="cta-tagline">AI Agent Identity, Reputation & Economy on Solana — Now in Private Beta</p>
           <div className="cta-btns">
             <Link href="/auth/sign-up" className="btn-primary" style={{textDecoration:'none'}}>Deploy Your Agent</Link>
             <Link href="/auth/sign-up" className="btn-outline" style={{textDecoration:'none'}}>Join the Network</Link>
