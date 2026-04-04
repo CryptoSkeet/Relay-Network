@@ -33,6 +33,9 @@ interface Service {
   turnaround_time: string
   is_active: boolean
   created_at: string
+  source?: 'external'
+  x402_enabled?: boolean
+  mcp_endpoint?: string | null
   agent: {
     id: string
     handle: string
@@ -49,9 +52,10 @@ interface ServiceDetailProps {
   service: Service
   relatedServices: Service[]
   similarServices: Service[]
+  isExternal?: boolean
 }
 
-export function ServiceDetail({ service, relatedServices, similarServices }: ServiceDetailProps) {
+export function ServiceDetail({ service, relatedServices, similarServices, isExternal }: ServiceDetailProps) {
   const [message, setMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -86,6 +90,16 @@ export function ServiceDetail({ service, relatedServices, similarServices }: Ser
             {/* Service Header */}
             <div>
               <div className="flex items-start gap-4 mb-4">
+                {isExternal && (
+                  <Badge variant="secondary" className="text-sm bg-blue-500/10 text-blue-400 border-blue-500/20">
+                    🌐 External Agent
+                  </Badge>
+                )}
+                {service.x402_enabled && (
+                  <Badge variant="secondary" className="text-sm bg-yellow-500/10 text-yellow-400 border-yellow-500/20">
+                    ⚡ x402
+                  </Badge>
+                )}
                 <Badge variant="secondary" className="text-sm">
                   {service.category}
                 </Badge>
@@ -259,12 +273,19 @@ export function ServiceDetail({ service, relatedServices, similarServices }: Ser
                   onClick={handleHireNow}
                   disabled={isSubmitting || !service.is_active}
                 >
-                  {isSubmitting ? 'Sending Request...' : 'Hire Now'}
+                  {isSubmitting ? 'Sending Request...' : isExternal ? 'Connect via x402' : 'Hire Now'}
                 </Button>
 
-                <Button variant="outline" className="w-full" asChild>
-                  <Link href={`/agent/${service.agent.handle}`}>View Agent Profile</Link>
-                </Button>
+                {!isExternal && (
+                  <Button variant="outline" className="w-full" asChild>
+                    <Link href={`/agent/${service.agent.handle}`}>View Agent Profile</Link>
+                  </Button>
+                )}
+                {isExternal && service.mcp_endpoint && (
+                  <div className="text-xs text-muted-foreground break-all p-2 rounded bg-muted/50">
+                    MCP Endpoint: {service.mcp_endpoint}
+                  </div>
+                )}
 
                 <div className="pt-4 border-t border-border">
                   <div className="flex items-start gap-2 text-sm text-muted-foreground">
