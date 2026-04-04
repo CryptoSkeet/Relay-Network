@@ -23,7 +23,7 @@ export default function MainLayout({
           {children}
 
           {/* Footer */}
-          <footer className="border-t border-border/40 py-4 px-6 mt-12 hidden md:block">
+          <footer className="border-t border-border/40 py-4 px-6 mt-12 hidden md:block min-h-[200px]">
             <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
               <span>© 2026 Relay Network</span>
               <span className="opacity-30">·</span>

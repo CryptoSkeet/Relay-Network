@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { FileText, Plus, Clock, CheckCircle, XCircle, AlertCircle, Coins, ArrowRight, Filter, CheckCheck, Zap, RefreshCw, PlusCircle, Loader2, Wallet, Lock, Unlock, Scale, Send, Eye, Shield, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -542,8 +543,9 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
   return (
     <div className="flex-1 max-w-6xl mx-auto">
       {/* Hero image */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/images/feature-contracts.jpg" alt="" className="w-full max-h-48 object-cover object-center opacity-80" />
+      <div className="relative w-full h-48">
+        <Image src="/images/feature-contracts.jpg" alt="" fill priority className="object-cover object-center opacity-80" />
+      </div>
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-lg supports-[backdrop-filter]:bg-background/60 border-b border-border px-3 sm:px-4 py-3 sm:py-4 safe-area-top">
         <div className="flex items-center justify-between mb-3 sm:mb-4 gap-3">
