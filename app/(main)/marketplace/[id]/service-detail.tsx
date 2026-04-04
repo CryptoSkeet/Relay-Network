@@ -58,14 +58,39 @@ interface ServiceDetailProps {
 export function ServiceDetail({ service, relatedServices, similarServices, isExternal }: ServiceDetailProps) {
   const [message, setMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [connectResult, setConnectResult] = useState<string | null>(null)
 
   const handleHireNow = async () => {
     setIsSubmitting(true)
-    // Simulate API call
-    await new Promise((r) => setTimeout(r, 1000))
-    alert(`Request sent to ${service.agent.display_name}! They will respond shortly.`)
+    setConnectResult(null)
+
+    if (isExternal && service.mcp_endpoint) {
+      try {
+        const res = await fetch('/api/v1/x402/connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            external_agent_id: service.id,
+            mcp_endpoint: service.mcp_endpoint,
+            message,
+          }),
+        })
+        const data = await res.json()
+        if (res.ok) {
+          setConnectResult(`Connected to ${service.agent.display_name}. ${data.message || 'Request sent successfully.'}`)
+        } else {
+          setConnectResult(data.error || 'Connection failed. Please try again.')
+        }
+      } catch {
+        setConnectResult('Network error. Please try again.')
+      }
+    } else {
+      // Regular service hire flow
+      await new Promise((r) => setTimeout(r, 1000))
+      setConnectResult(`Request sent to ${service.agent.display_name}! They will respond shortly.`)
+    }
+
     setIsSubmitting(false)
-    setMessage('')
   }
 
   return (
@@ -118,6 +143,19 @@ export function ServiceDetail({ service, relatedServices, similarServices, isExt
               <h1 className="text-3xl font-bold text-foreground mb-4">{service.name}</h1>
 
               {/* Agent Info */}
+              {isExternal ? (
+                <div className="inline-flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                  <AgentAvatar src={service.agent.avatar_url} name={service.agent.display_name} size="md" isVerified={service.agent.is_verified} />
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-foreground">
+                        {service.agent.display_name}
+                      </span>
+                    </div>
+                    <span className="text-sm text-muted-foreground">@{service.agent.handle}</span>
+                  </div>
+                </div>
+              ) : (
               <Link
                 href={`/agent/${service.agent.handle}`}
                 className="inline-flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
@@ -145,6 +183,7 @@ export function ServiceDetail({ service, relatedServices, similarServices, isExt
                   </span>
                 </div>
               </Link>
+              )}
             </div>
 
             {/* Description */}
@@ -166,10 +205,11 @@ export function ServiceDetail({ service, relatedServices, similarServices, isExt
                   <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
                     <Zap className="w-5 h-5 text-primary" />
                     <div>
-                      <p className="text-sm text-muted-foreground">Response Rate</p>
-                      <p className="font-semibold text-foreground">{"< 2 hours"}</p>
+                      <p className="text-sm text-muted-foreground">{isExternal ? 'Protocol' : 'Response Rate'}</p>
+                      <p className="font-semibold text-foreground">{isExternal ? (service.x402_enabled ? 'x402 Pay-per-call' : 'MCP') : '< 2 hours'}</p>
                     </div>
                   </div>
+                  {!isExternal && (
                   <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
                     <TrendingUp className="w-5 h-5 text-primary" />
                     <div>
@@ -177,10 +217,11 @@ export function ServiceDetail({ service, relatedServices, similarServices, isExt
                       <p className="font-semibold text-foreground">98%</p>
                     </div>
                   </div>
+                  )}
                   <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
                     <Calendar className="w-5 h-5 text-primary" />
                     <div>
-                      <p className="text-sm text-muted-foreground">Active Since</p>
+                      <p className="text-sm text-muted-foreground">{isExternal ? 'Indexed' : 'Active Since'}</p>
                       <p className="font-semibold text-foreground">
                         {new Date(service.created_at).toLocaleDateString('en-US', {
                           month: 'short',
@@ -194,6 +235,7 @@ export function ServiceDetail({ service, relatedServices, similarServices, isExt
             </Card>
 
             {/* What's Included */}
+            {!isExternal && (
             <Card>
               <CardHeader>
                 <CardTitle>{"What's Included"}</CardTitle>
@@ -216,7 +258,7 @@ export function ServiceDetail({ service, relatedServices, similarServices, isExt
                 </ul>
               </CardContent>
             </Card>
-
+            )}
             {/* Reviews placeholder */}
             <Card>
               <CardHeader>
@@ -255,6 +297,52 @@ export function ServiceDetail({ service, relatedServices, similarServices, isExt
                 <CardDescription>Price varies based on project scope</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                {isExternal ? (
+                  <>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">
+                        Message (optional)
+                      </label>
+                      <Textarea
+                        placeholder="Describe what you need from this agent..."
+                        value={message}
+                        onChange={(e) => setMessage(e.target.value)}
+                        rows={3}
+                      />
+                    </div>
+
+                    <Button
+                      className="w-full"
+                      size="lg"
+                      onClick={handleHireNow}
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? 'Connecting...' : 'Connect via x402'}
+                    </Button>
+
+                    {connectResult && (
+                      <div className="text-sm p-3 rounded bg-muted/50 text-foreground">
+                        {connectResult}
+                      </div>
+                    )}
+
+                    {service.mcp_endpoint && (
+                      <div className="text-xs text-muted-foreground break-all p-2 rounded bg-muted/50">
+                        MCP Endpoint: {service.mcp_endpoint}
+                      </div>
+                    )}
+
+                    <div className="pt-4 border-t border-border">
+                      <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                        <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                        <p>
+                          This is an external agent. Payment is handled via x402 pay-per-call protocol directly with the agent.
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground">
                     Describe your project (optional)
@@ -273,19 +361,18 @@ export function ServiceDetail({ service, relatedServices, similarServices, isExt
                   onClick={handleHireNow}
                   disabled={isSubmitting || !service.is_active}
                 >
-                  {isSubmitting ? 'Sending Request...' : isExternal ? 'Connect via x402' : 'Hire Now'}
+                  {isSubmitting ? 'Sending Request...' : 'Hire Now'}
                 </Button>
 
-                {!isExternal && (
-                  <Button variant="outline" className="w-full" asChild>
-                    <Link href={`/agent/${service.agent.handle}`}>View Agent Profile</Link>
-                  </Button>
-                )}
-                {isExternal && service.mcp_endpoint && (
-                  <div className="text-xs text-muted-foreground break-all p-2 rounded bg-muted/50">
-                    MCP Endpoint: {service.mcp_endpoint}
+                {connectResult && (
+                  <div className="text-sm p-3 rounded bg-muted/50 text-foreground">
+                    {connectResult}
                   </div>
                 )}
+
+                <Button variant="outline" className="w-full" asChild>
+                  <Link href={`/agent/${service.agent.handle}`}>View Agent Profile</Link>
+                </Button>
 
                 <div className="pt-4 border-t border-border">
                   <div className="flex items-start gap-2 text-sm text-muted-foreground">
@@ -296,6 +383,8 @@ export function ServiceDetail({ service, relatedServices, similarServices, isExt
                     </p>
                   </div>
                 </div>
+                  </>
+                )}
               </CardContent>
             </Card>
 
