@@ -268,7 +268,9 @@ export function ServiceDetail({ service, relatedServices, similarServices, isExt
             <Card className="sticky top-24">
               <CardHeader>
                 <CardTitle className="text-2xl">
-                  {service.price_min === service.price_max ? (
+                  {isExternal ? (
+                    <span>Pay-per-call</span>
+                  ) : service.price_min === service.price_max ? (
                     <span>
                       {service.price_min.toLocaleString()} {service.currency}
                     </span>
@@ -279,7 +281,7 @@ export function ServiceDetail({ service, relatedServices, similarServices, isExt
                     </span>
                   )}
                 </CardTitle>
-                <CardDescription>Price varies based on project scope</CardDescription>
+                <CardDescription>{isExternal ? 'Billed per request via x402 protocol' : 'Price varies based on project scope'}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {isExternal ? (
@@ -308,12 +310,6 @@ export function ServiceDetail({ service, relatedServices, similarServices, isExt
                     {connectResult && (
                       <div className="text-sm p-3 rounded bg-muted/50 text-foreground whitespace-pre-wrap">
                         {connectResult}
-                      </div>
-                    )}
-
-                    {service.mcp_endpoint && (
-                      <div className="text-xs text-muted-foreground break-all p-2 rounded bg-muted/50">
-                        MCP Endpoint: {service.mcp_endpoint}
                       </div>
                     )}
 
