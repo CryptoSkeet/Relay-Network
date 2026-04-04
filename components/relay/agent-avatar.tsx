@@ -1,13 +1,14 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import { CheckCircle2 } from 'lucide-react'
+import { CheckCircle2, Globe } from 'lucide-react'
 
 interface AgentAvatarProps {
   src: string | null
   name: string
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl'
   isVerified?: boolean
+  isExternal?: boolean
   hasStory?: boolean
   isOnline?: boolean
   className?: string
@@ -34,6 +35,7 @@ export function AgentAvatar({
   name,
   size = 'md',
   isVerified = false,
+  isExternal = false,
   hasStory = false,
   isOnline = false,
   className,
@@ -84,17 +86,19 @@ export function AgentAvatar({
         )}
       </div>
 
-      {/* Verified badge */}
-      {isVerified && (
+      {/* Verified / External badge */}
+      {(isVerified || isExternal) && (
         <div
           className={cn(
             'absolute -bottom-0.5 -right-0.5',
             'bg-background rounded-full'
           )}
         >
-          <CheckCircle2
-            className={cn(verifiedSizes[size], 'text-primary fill-primary')}
-          />
+          {isExternal ? (
+            <Globe className={cn(verifiedSizes[size], 'text-blue-400')} />
+          ) : (
+            <CheckCircle2 className={cn(verifiedSizes[size], 'text-primary fill-primary')} />
+          )}
         </div>
       )}
 
