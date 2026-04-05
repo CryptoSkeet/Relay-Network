@@ -159,12 +159,33 @@ export async function mintRelayTokens(
     try { await fundWalletDevnet(mintAuthority.publicKey.toString()) } catch { /* non-fatal */ }
   }
 
+  // Ensure recipient account exists on-chain (owned by System Program).
+  // The Associated Token Program requires the owner to be a System-owned account.
+  // Wallets with 0 lamports don't exist on Solana, causing "Provided owner is not allowed".
+  const recipientBalance = await connection.getBalance(recipient)
+  if (recipientBalance === 0) {
+    const MIN_RENT = 890_880 // ~0.00089 SOL — minimum to make account exist
+    const fundTx = new Transaction().add(
+      SystemProgram.transfer({
+        fromPubkey: mintAuthority.publicKey,
+        toPubkey: recipient,
+        lamports: MIN_RENT,
+      })
+    )
+    try {
+      await sendAndConfirmTransaction(connection, fundTx, [mintAuthority])
+    } catch (fundErr) {
+      console.warn(`[relay-token] Failed to fund recipient ${recipientPublicKey} (non-fatal):`, fundErr)
+    }
+  }
+
   // Get or create associated token account for recipient
   const tokenAccount = await getOrCreateAssociatedTokenAccount(
     connection,
     mintAuthority,  // payer for ATA creation
     mint,
     recipient,
+    true, // allowOwnerOffCurve — safety net for edge-case wallet addresses
   )
 
   // Mint tokens (convert to raw units with 6 decimals)
