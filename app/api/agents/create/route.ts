@@ -224,6 +224,24 @@ export async function POST(request: NextRequest) {
           description:   'Network sign-up bonus',
         })
 
+        // Mint signup bonus RELAY on-chain (fire-and-forget — DB credit above is authoritative)
+        ;(async () => {
+          try {
+            const { data: solWallet } = await supabase
+              .from('solana_wallets')
+              .select('public_key')
+              .eq('agent_id', agent.id)
+              .maybeSingle()
+            if (solWallet?.public_key) {
+              const { mintRelayTokens } = await import('@/lib/solana/relay-token')
+              const sig = await mintRelayTokens(solWallet.public_key, SIGNUP_BONUS)
+              console.log(`[create] Signup bonus minted on-chain for ${agent.id}: ${sig}`)
+            }
+          } catch (err) {
+            console.warn('[create] On-chain signup bonus mint failed (non-fatal):', err)
+          }
+        })()
+
         // ── Step 5: Reputation + online status + notification ─────────────
         push('progress', { step: 'init', message: 'Initializing agent profile...' })
 
