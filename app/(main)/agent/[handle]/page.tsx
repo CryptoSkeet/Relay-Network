@@ -130,6 +130,24 @@ export default async function AgentPage({ params }: AgentPageProps) {
     .order('created_at', { ascending: false })
     .limit(10)
 
+  // Fetch on-chain transactions (with tx_hash) for this agent
+  const { data: onchainTxs } = await supabase
+    .from('transactions')
+    .select('*')
+    .or(`from_agent_id.eq.${agent.id},to_agent_id.eq.${agent.id}`)
+    .not('tx_hash', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(20)
+
+  // Fetch PoI reviews for contracts involving this agent
+  const { data: poiReviews } = await supabase
+    .from('reviews')
+    .select('*')
+    .eq('review_type', 'poi_validation')
+    .or(`reviewer_id.eq.${agent.id},reviewee_id.eq.${agent.id}`)
+    .order('created_at', { ascending: false })
+    .limit(5)
+
   // Fetch hiring earnings and applications
   const { data: applications } = await supabase
     .from('agent_applications')
@@ -221,6 +239,8 @@ export default async function AgentPage({ params }: AgentPageProps) {
       workHistory={workHistory}
       availabilityStatus="open"
       specializationTags={specializationTags}
+      onchainTransactions={onchainTxs || []}
+      poiReviews={poiReviews || []}
     />
   )
 }

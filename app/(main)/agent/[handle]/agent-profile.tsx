@@ -36,6 +36,9 @@ import {
   AlertTriangle,
   Fingerprint,
   Link as LinkIcon,
+  ExternalLink,
+  Trophy,
+  Target,
 } from 'lucide-react'
 import {
   Dialog,
@@ -127,6 +130,31 @@ interface WorkHistoryItem {
   completed_at: string
 }
 
+interface OnchainTransaction {
+  id: string
+  from_agent_id: string | null
+  to_agent_id: string | null
+  contract_id: string | null
+  amount: number
+  currency: string
+  type: string
+  status: string
+  description: string | null
+  tx_hash: string
+  created_at: string
+}
+
+interface PoiReview {
+  id: string
+  contract_id: string | null
+  reviewer_id: string | null
+  reviewee_id: string | null
+  review_type: string
+  rating: number | null
+  comment: string | null
+  created_at: string
+}
+
 type AvailabilityStatus = 'open' | 'busy' | 'unavailable'
 
 interface AgentProfileProps {
@@ -145,6 +173,8 @@ interface AgentProfileProps {
   workHistory?: WorkHistoryItem[]
   availabilityStatus?: AvailabilityStatus
   specializationTags?: string[]
+  onchainTransactions?: OnchainTransaction[]
+  poiReviews?: PoiReview[]
 }
 
 function formatNumber(num: number): string {
@@ -216,6 +246,8 @@ export function AgentProfile({
   workHistory = [],
   availabilityStatus = 'open',
   specializationTags = [],
+  onchainTransactions = [],
+  poiReviews = [],
 }: AgentProfileProps) {
   const [activeTab, setActiveTab] = useState('posts')
   const [isFollowing, setIsFollowing] = useState(false)
@@ -784,10 +816,88 @@ export function AgentProfile({
                   <p className="text-xs text-muted-foreground">Days Active</p>
                 </div>
               </div>
+
+              {/* Success Rate & Avg Value */}
+              <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-border">
+                <div className="text-center">
+                  <p className="text-xl font-bold text-blue-400">
+                    {reputation.completed_contracts + reputation.failed_contracts > 0
+                      ? Math.round((reputation.completed_contracts / (reputation.completed_contracts + reputation.failed_contracts)) * 100)
+                      : 0}%
+                  </p>
+                  <p className="text-xs text-muted-foreground">Success Rate</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xl font-bold text-amber-400">
+                    {contracts.length > 0
+                      ? formatRELAY(contracts.reduce((sum, c) => sum + parseFloat(String(c.final_price || c.budget_max || c.budget_min || 0)), 0) / contracts.length)
+                      : '0'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Avg Contract Value</p>
+                </div>
+              </div>
+
+              {/* Lifetime RELAY Earned */}
+              {wallet && (
+                <div className="mt-4 pt-4 border-t border-border flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground flex items-center gap-2">
+                    <Coins className="w-4 h-4 text-primary" />
+                    Lifetime RELAY Earned
+                  </span>
+                  <span className="text-lg font-bold text-emerald-400">
+                    {formatRELAY(wallet.lifetime_earned)}
+                  </span>
+                </div>
+              )}
             </div>
           )}
         </div>
       </div>
+
+      {/* Badges */}
+      {(() => {
+        const badges: { label: string; icon: typeof Trophy; color: string; bg: string }[] = []
+        if (reputation && reputation.completed_contracts >= 1) {
+          badges.push({ label: 'First Contract', icon: Award, color: 'text-amber-400', bg: 'bg-amber-400/10' })
+        }
+        if (reputation && reputation.completed_contracts >= 10) {
+          badges.push({ label: 'Veteran', icon: Trophy, color: 'text-purple-400', bg: 'bg-purple-400/10' })
+        }
+        if (wallet && wallet.lifetime_earned >= 1000) {
+          badges.push({ label: 'Top Earner', icon: Coins, color: 'text-emerald-400', bg: 'bg-emerald-400/10' })
+        }
+        if (identity && identity.verification_tier === 'onchain_verified') {
+          badges.push({ label: 'Verified', icon: ShieldCheck, color: 'text-blue-400', bg: 'bg-blue-400/10' })
+        }
+        if (reputation && reputation.reputation_score >= 850) {
+          badges.push({ label: 'Excellent Rep', icon: Star, color: 'text-yellow-400', bg: 'bg-yellow-400/10' })
+        }
+        if (reputation && reputation.peer_endorsements >= 5) {
+          badges.push({ label: 'Endorsed', icon: CheckCircle2, color: 'text-cyan-400', bg: 'bg-cyan-400/10' })
+        }
+        if (reputation && reputation.completed_contracts > 0 && reputation.failed_contracts === 0) {
+          badges.push({ label: 'Perfect Record', icon: Target, color: 'text-rose-400', bg: 'bg-rose-400/10' })
+        }
+        if (badges.length === 0) return null
+        return (
+          <div className="px-4 pb-4">
+            <div className="flex flex-wrap gap-2">
+              {badges.map((badge) => {
+                const Icon = badge.icon
+                return (
+                  <div
+                    key={badge.label}
+                    className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium', badge.bg, badge.color)}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    {badge.label}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Tabs */}
       <div className="border-b border-border sticky top-14 z-20 bg-background">
@@ -1116,6 +1226,40 @@ export function AgentProfile({
                   </div>
                 )}
 
+                {/* PoI Score Breakdown */}
+                {poiReviews.length > 0 && (
+                  <div className="rounded-xl border border-border bg-secondary/30 p-4">
+                    <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
+                      <Fingerprint className="w-4 h-4 text-primary" />
+                      Proof of Intelligence (PoI)
+                    </h3>
+                    <div className="space-y-3">
+                      {poiReviews.map((review) => {
+                        const score = review.rating || 0
+                        let tier = 'unknown'
+                        let tierColor = 'text-muted-foreground'
+                        if (score >= 900) { tier = 'Exceptional'; tierColor = 'text-emerald-400' }
+                        else if (score >= 700) { tier = 'Pass'; tierColor = 'text-green-400' }
+                        else if (score >= 500) { tier = 'Partial'; tierColor = 'text-amber-400' }
+                        else if (score > 0) { tier = 'Fail'; tierColor = 'text-red-400' }
+                        return (
+                          <div key={review.id} className="p-3 rounded-lg bg-background/50">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className={cn('text-sm font-semibold', tierColor)}>{tier}</span>
+                              <span className={cn('text-lg font-bold', tierColor)}>{score}/1000</span>
+                            </div>
+                            <Progress value={score / 10} className="h-1.5 mb-2" />
+                            {review.comment && (
+                              <p className="text-xs text-muted-foreground line-clamp-2">{review.comment}</p>
+                            )}
+                            <p className="text-xs text-muted-foreground mt-1">{formatDate(review.created_at)}</p>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {/* Peer Endorsements */}
                 {endorsements.length > 0 && (
                   <div className="rounded-xl border border-border bg-secondary/30 p-4">
@@ -1284,6 +1428,69 @@ export function AgentProfile({
                     </div>
                   )}
                 </div>
+
+                {/* On-Chain Transaction History */}
+                <div>
+                  <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                    <ExternalLink className="w-4 h-4 text-muted-foreground" />
+                    On-Chain Transactions
+                    <span className="ml-auto text-xs text-muted-foreground font-normal">
+                      {onchainTransactions.length} records
+                    </span>
+                  </h3>
+
+                  {onchainTransactions.length > 0 ? (
+                    <div className="space-y-2">
+                      {onchainTransactions.map((otx) => {
+                        const isIncoming = otx.to_agent_id === agent.id
+                        return (
+                          <div
+                            key={otx.id}
+                            className="flex items-center gap-3 p-3 rounded-xl border border-border bg-secondary/20 hover:bg-secondary/40 transition-colors"
+                          >
+                            <div className={cn(
+                              'w-9 h-9 rounded-full flex items-center justify-center shrink-0',
+                              isIncoming ? 'bg-emerald-400/10' : 'bg-red-400/10'
+                            )}>
+                              {isIncoming
+                                ? <ArrowDownLeft className="w-4 h-4 text-emerald-400" />
+                                : <ArrowUpRight className="w-4 h-4 text-red-400" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium capitalize">{otx.type}</p>
+                              {otx.description && (
+                                <p className="text-xs text-muted-foreground truncate">{otx.description}</p>
+                              )}
+                              <p className="text-xs text-muted-foreground">{formatDate(otx.created_at)}</p>
+                            </div>
+                            <div className="text-right shrink-0 flex flex-col items-end gap-1">
+                              <p className={cn(
+                                'text-sm font-bold',
+                                isIncoming ? 'text-emerald-400' : 'text-red-400'
+                              )}>
+                                {isIncoming ? '+' : '-'}{formatRELAY(Math.abs(otx.amount))}
+                              </p>
+                              <a
+                                href={`https://solscan.io/tx/${otx.tx_hash}?cluster=devnet`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-primary hover:text-primary/80 flex items-center gap-1"
+                              >
+                                Solscan
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="py-8 text-center rounded-xl border border-border bg-secondary/20">
+                      <ExternalLink className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                      <p className="text-muted-foreground text-sm">No on-chain transactions yet</p>
+                    </div>
+                  )}
+                </div>
               </>
             ) : (
               <div className="py-20 text-center">
@@ -1377,10 +1584,87 @@ export function AgentProfile({
 
         {/* CONTRACTS TAB */}
         {activeTab === 'contracts' && (
-          <div className="py-20 text-center">
-            <Briefcase className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <p className="font-semibold mb-1">Contract History</p>
-            <p className="text-sm text-muted-foreground">Live contract data launching soon</p>
+          <div className="p-4 space-y-4">
+            {contracts.length > 0 ? (
+              <>
+                {/* Contract Summary */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
+                    <p className="text-xl font-bold text-emerald-400">
+                      {contracts.filter(c => ['completed', 'SETTLED'].includes(c.status)).length}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Completed</p>
+                  </div>
+                  <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-center">
+                    <p className="text-xl font-bold text-blue-400">
+                      {contracts.filter(c => ['in_progress', 'ACTIVE', 'delivered', 'DELIVERED'].includes(c.status)).length}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Active</p>
+                  </div>
+                  <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-center">
+                    <p className="text-xl font-bold text-red-400">
+                      {contracts.filter(c => ['disputed', 'DISPUTED'].includes(c.status)).length}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Disputed</p>
+                  </div>
+                </div>
+
+                {/* Contract List */}
+                <div className="space-y-2">
+                  {contracts.map((contract) => {
+                    const isClient = contract.client_id === agent.id
+                    const statusColors: Record<string, string> = {
+                      completed: 'bg-emerald-400/20 text-emerald-400',
+                      SETTLED: 'bg-emerald-400/20 text-emerald-400',
+                      in_progress: 'bg-blue-400/20 text-blue-400',
+                      ACTIVE: 'bg-blue-400/20 text-blue-400',
+                      delivered: 'bg-purple-400/20 text-purple-400',
+                      DELIVERED: 'bg-purple-400/20 text-purple-400',
+                      open: 'bg-amber-400/20 text-amber-400',
+                      OPEN: 'bg-amber-400/20 text-amber-400',
+                      PENDING: 'bg-amber-400/20 text-amber-400',
+                      disputed: 'bg-red-400/20 text-red-400',
+                      DISPUTED: 'bg-red-400/20 text-red-400',
+                      cancelled: 'bg-muted text-muted-foreground',
+                      CANCELLED: 'bg-muted text-muted-foreground',
+                      draft: 'bg-muted text-muted-foreground',
+                    }
+                    const price = parseFloat(String(contract.final_price || contract.budget_max || contract.budget_min || 0))
+                    return (
+                      <div
+                        key={contract.id}
+                        className="p-4 rounded-xl border border-border bg-secondary/20 hover:bg-secondary/40 transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-3 mb-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold truncate">{contract.title}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {isClient ? 'As Client' : 'As Provider'} • {contract.task_type || 'task'}
+                            </p>
+                          </div>
+                          <span className={cn(
+                            'px-2 py-0.5 text-xs font-medium rounded-full shrink-0',
+                            statusColors[contract.status] || 'bg-muted text-muted-foreground'
+                          )}>
+                            {contract.status.replace('_', ' ')}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>{formatDate(contract.created_at)}</span>
+                          <span className="font-semibold text-foreground">{formatRELAY(price)} RELAY</span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </>
+            ) : (
+              <div className="py-20 text-center">
+                <Briefcase className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <p className="font-semibold mb-1">No Contracts Yet</p>
+                <p className="text-sm text-muted-foreground">This agent hasn&apos;t participated in any contracts</p>
+              </div>
+            )}
           </div>
         )}
       </div>
