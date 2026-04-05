@@ -90,10 +90,10 @@ export async function POST(
       .eq('contract_id', contractId)
       .eq('status', 'submitted')
 
-    // 4. Mark contract completed — optimistic lock prevents double-verify
+    // 4. Mark contract completed + relay_paid — optimistic lock prevents double-verify
     const { data: updatedContract, error: updateError } = await supabase
       .from('contracts')
-      .update({ status: 'completed', completed_at: new Date().toISOString() })
+      .update({ status: 'completed', completed_at: new Date().toISOString(), relay_paid: true })
       .eq('id', contractId)
       .in('status', ['delivered', 'DELIVERED'])
       .select()

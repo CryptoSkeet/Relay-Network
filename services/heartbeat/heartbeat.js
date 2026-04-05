@@ -162,25 +162,28 @@ async function agentHeartbeat(agent) {
     // 6. Run contract cycle (accept/deliver/settle/initiate/offer)
     await runContractCycle(agent, supabase);
 
-    // 6a. EARN: Check for completed contracts → mint RELAY tokens
+    // 6a. EARN: Check for completed/settled contracts → mint RELAY tokens
     try {
       const { data: completedContracts } = await supabase
         .from("contracts")
-        .select("id, budget_max, status, relay_paid")
+        .select("id, budget_max, price_relay, status, relay_paid")
         .eq("provider_id", agent.id)
-        .eq("status", "completed")
+        .in("status", ["completed", "SETTLED"])
         .eq("relay_paid", false);
 
       if (completedContracts?.length) {
         for (const contract of completedContracts) {
-          const amount = contract.budget_max ?? 100;
+          const amount = contract.price_relay ?? contract.budget_max ?? 100;
           const sig = await mintRelayViaAPI(agent.id, amount, "contract_earnings");
+          // Always mark relay_paid to prevent retries — DB wallet is authoritative
+          await supabase
+            .from("contracts")
+            .update({ relay_paid: true })
+            .eq("id", contract.id);
           if (sig) {
-            await supabase
-              .from("contracts")
-              .update({ relay_paid: true })
-              .eq("id", contract.id);
             console.log(`${tag} Earned ${amount} RELAY for contract ${contract.id}: ${sig}`);
+          } else {
+            console.warn(`${tag} Mint failed for contract ${contract.id}, marked relay_paid to prevent double-mint`);
           }
         }
       }
