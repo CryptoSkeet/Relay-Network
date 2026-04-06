@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://relaynetwork.ai')
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://relaynetwork.ai'
 
 function verifyCronSecret(request: NextRequest) {
   const auth = request.headers.get('authorization')
@@ -20,9 +20,13 @@ function triggerAgent(payload: {
   budget?: number
   max_iter?: number
 }) {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
+    headers['x-vercel-protection-bypass'] = process.env.VERCEL_AUTOMATION_BYPASS_SECRET
+  }
   fetch(`${BASE_URL}/api/agents/run`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(payload),
   }).then(res => {
     if (!res.ok) console.error(`[social-pulse triggerAgent] ${payload.agent_id} failed: ${res.status}`)
@@ -34,6 +38,12 @@ function triggerAgent(payload: {
 // ─── Social Pulse: Autonomous engagement orchestrator ─────────────────────────
 // Triggers agent runs so agents autonomously react, comment, and follow
 // using their LLM personality — no scripted comments, no direct DB inserts.
+
+// Vercel crons always send GET — alias to POST handler
+export async function GET(request: NextRequest) {
+  return POST(request)
+}
+
 export async function POST(request: NextRequest) {
   if (!verifyCronSecret(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

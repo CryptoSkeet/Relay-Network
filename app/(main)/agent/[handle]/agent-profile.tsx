@@ -821,9 +821,12 @@ export function AgentProfile({
               <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-border">
                 <div className="text-center">
                   <p className="text-xl font-bold text-blue-400">
-                    {(reputation.completed_contracts || 0) + (reputation.failed_contracts || 0) > 0
-                      ? Math.round(((reputation.completed_contracts || 0) / ((reputation.completed_contracts || 0) + (reputation.failed_contracts || 0))) * 100)
-                      : reputation.completed_contracts > 0 ? 100 : 0}%
+                    {(() => {
+                      const completed = reputation.completed_contracts ?? 0
+                      const failed = reputation.failed_contracts ?? 0
+                      const total = completed + failed
+                      return total > 0 ? Math.round((completed / total) * 100) : completed > 0 ? 100 : 0
+                    })()}%
                   </p>
                   <p className="text-xs text-muted-foreground">Success Rate</p>
                 </div>
@@ -834,7 +837,7 @@ export function AgentProfile({
                         const v = parseFloat(String((c as any).price_relay || c.final_price || c.budget_max || c.budget_min || 0))
                         return v > 0
                       })
-                      if (valued.length === 0) return wallet ? formatRELAY(wallet.lifetime_earned / Math.max(reputation.completed_contracts, 1)) : '0'
+                      if (valued.length === 0) return wallet ? formatRELAY(wallet.lifetime_earned / Math.max(reputation.completed_contracts ?? 0, contracts.length, 1)) : '0'
                       return formatRELAY(valued.reduce((sum, c) => sum + parseFloat(String((c as any).price_relay || c.final_price || c.budget_max || c.budget_min || 0)), 0) / valued.length)
                     })()}
                   </p>
@@ -880,7 +883,7 @@ export function AgentProfile({
         if (reputation && reputation.peer_endorsements >= 5) {
           badges.push({ label: 'Endorsed', icon: CheckCircle2, color: 'text-cyan-400', bg: 'bg-cyan-400/10' })
         }
-        if (reputation && reputation.completed_contracts > 0 && reputation.failed_contracts === 0) {
+        if (reputation && reputation.completed_contracts > 0 && (reputation.failed_contracts ?? 0) === 0) {
           badges.push({ label: 'Perfect Record', icon: Target, color: 'text-rose-400', bg: 'bg-rose-400/10' })
         }
         if (badges.length === 0) return null

@@ -36,6 +36,11 @@ async function getRecentPosts(supabase: any, agentId: string): Promise<string[]>
 
 // ─── POST — generate a smart social post from a random agent ─────────────────
 
+// Vercel crons always send GET — alias to POST handler
+export async function GET(request: NextRequest) {
+  return POST(request)
+}
+
 export async function POST(request: NextRequest) {
   if (!verifyCronSecret(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

@@ -13,7 +13,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://relaynetwork.ai')
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://relaynetwork.ai'
 
 // Fire-and-forget: triggers /api/agents/run without awaiting result
 function triggerAgent(payload: {
@@ -24,9 +24,13 @@ function triggerAgent(payload: {
   budget?: number
   max_iter?: number
 }) {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
+    headers['x-vercel-protection-bypass'] = process.env.VERCEL_AUTOMATION_BYPASS_SECRET
+  }
   fetch(`${BASE_URL}/api/agents/run`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(payload),
   }).then(res => {
     if (!res.ok) console.error(`[triggerAgent] ${payload.agent_id} failed: ${res.status}`)
@@ -204,7 +208,7 @@ export async function GET(request: NextRequest) {
 
     // ── Contract worker: has active in_progress contract ──────────────────
     if (contract) {
-      const budget = contract.budget_max ?? contract.budget_min ?? contract.price_relay ?? 0
+      const budget = contract.budget_max ?? contract.budget_min ?? contract.price_relay ?? 10
       triggerAgent({
         agent_id: agent.id,
         task:
@@ -231,7 +235,7 @@ export async function GET(request: NextRequest) {
       : null
 
     if (activeBid && matchingStanding && Math.random() < 0.5) {
-      const pay = matchingStanding.budget_max ?? matchingStanding.budget_min ?? 0
+      const pay = matchingStanding.budget_max ?? matchingStanding.budget_min ?? 10
       triggerAgent({
         agent_id: agent.id,
         task:
@@ -306,7 +310,7 @@ export async function GET(request: NextRequest) {
     )
     // 40% chance to seek contracts this cycle to avoid spam
     if (matchingContract && Math.random() < 0.4) {
-      const budget = matchingContract.budget_max ?? matchingContract.budget_min ?? 0
+      const budget = matchingContract.budget_max ?? matchingContract.budget_min ?? 10
       triggerAgent({
         agent_id: agent.id,
         task:
@@ -339,7 +343,7 @@ export async function GET(request: NextRequest) {
           `Stop after taking one action.`,
         tools: ['list_bounties', 'claim_bounty', 'post_to_feed', 'stop_agent'],
         taskType: 'bounty',
-        budget: openBounties[0]?.budget_max ?? 0,
+        budget: openBounties[0]?.budget_max ?? 10,
         max_iter: 3,
       })
       triggered.push(`${agent.handle}:bounty-hunt`)
@@ -350,6 +354,7 @@ export async function GET(request: NextRequest) {
   // ── 6. Fire social-pulse for additional engagement on existing posts ─────
   const internalHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
   if (process.env.CRON_SECRET) internalHeaders['Authorization'] = `Bearer ${process.env.CRON_SECRET}`
+  if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) internalHeaders['x-vercel-protection-bypass'] = process.env.VERCEL_AUTOMATION_BYPASS_SECRET
   fetch(`${BASE_URL}/api/social-pulse`, { method: 'POST', headers: internalHeaders }).catch(() => {})
   fetch(`${BASE_URL}/api/agent-activity`, {
     method: 'POST',

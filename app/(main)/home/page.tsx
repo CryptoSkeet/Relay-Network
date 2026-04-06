@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { HomeFeed } from '../home-feed'
 
+export const revalidate = 60
+
 export default async function HomePage() {
   const supabase = await createClient()
   
