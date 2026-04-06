@@ -1,27 +1,5 @@
-import { Barlow_Condensed, Barlow, Share_Tech_Mono } from 'next/font/google'
 import type { Metadata } from 'next'
 import LandingPage from './landing/page'
-
-const barlowCondensed = Barlow_Condensed({
-  subsets: ['latin'],
-  weight: ['400', '600', '700', '800', '900'],
-  variable: '--font-barlow-condensed',
-  display: 'swap',
-})
-
-const barlow = Barlow({
-  subsets: ['latin'],
-  weight: ['300', '400', '500'],
-  variable: '--font-barlow',
-  display: 'swap',
-})
-
-const shareTechMono = Share_Tech_Mono({
-  subsets: ['latin'],
-  weight: ['400'],
-  variable: '--font-share-tech-mono',
-  display: 'swap',
-})
 
 export const metadata: Metadata = {
   title: 'RELAY — AI Agent Identity, Reputation & Economy on Solana',
@@ -48,9 +26,5 @@ export const metadata: Metadata = {
 }
 
 export default function RootPage() {
-  return (
-    <div className={`${barlowCondensed.variable} ${barlow.variable} ${shareTechMono.variable}`}>
-      <LandingPage />
-    </div>
-  )
+  return <LandingPage />
 }

@@ -118,18 +118,50 @@ export async function getRelayMint(): Promise<PublicKey> {
   return mint
 }
 
+// ── In-memory balance cache (30s TTL) ─────────────────────────────────────────
+
+const BALANCE_CACHE_TTL = 30_000 // 30 seconds
+const _balanceCache = new Map<string, { value: number; expires: number }>()
+
+function getCachedBalance(key: string): number | null {
+  const entry = _balanceCache.get(key)
+  if (entry && Date.now() < entry.expires) return entry.value
+  if (entry) _balanceCache.delete(key)
+  return null
+}
+
+function setCachedBalance(key: string, value: number): void {
+  _balanceCache.set(key, { value, expires: Date.now() + BALANCE_CACHE_TTL })
+  // Evict stale entries periodically (keep map bounded)
+  if (_balanceCache.size > 500) {
+    const now = Date.now()
+    for (const [k, v] of _balanceCache) {
+      if (now >= v.expires) _balanceCache.delete(k)
+    }
+  }
+}
+
 // ── Get on-chain RELAY balance for a wallet ───────────────────────────────────
 
 export async function getOnChainRelayBalance(walletAddress: string): Promise<number> {
+  const cacheKey = `relay:${walletAddress}`
+  const cached = getCachedBalance(cacheKey)
+  if (cached !== null) return cached
+
   try {
     const connection = getSolanaConnection()
     const mint = await getRelayMint()
     const wallet = new PublicKey(walletAddress)
     const ata = await getAssociatedTokenAddress(mint, wallet)
     const account = await getAccount(connection, ata)
-    return Number(account.amount) / 1_000_000 // 6 decimals
+    const balance = Number(account.amount) / 1_000_000 // 6 decimals
+    setCachedBalance(cacheKey, balance)
+    return balance
   } catch (e) {
-    if (e instanceof TokenAccountNotFoundError) return 0
+    if (e instanceof TokenAccountNotFoundError) {
+      setCachedBalance(cacheKey, 0)
+      return 0
+    }
     return 0
   }
 }
@@ -137,9 +169,21 @@ export async function getOnChainRelayBalance(walletAddress: string): Promise<num
 // ── Get on-chain SOL balance ───────────────────────────────────────────────────
 
 export async function getOnChainSolBalance(walletAddress: string): Promise<number> {
+  const cacheKey = `sol:${walletAddress}`
+  const cached = getCachedBalance(cacheKey)
+  if (cached !== null) return cached
+
   const connection = getSolanaConnection()
   const lamports = await connection.getBalance(new PublicKey(walletAddress))
-  return lamports / LAMPORTS_PER_SOL
+  const balance = lamports / LAMPORTS_PER_SOL
+  setCachedBalance(cacheKey, balance)
+  return balance
+}
+
+/** Invalidate cached balances for a wallet (call after transfers/mints). */
+export function invalidateBalanceCache(walletAddress: string): void {
+  _balanceCache.delete(`sol:${walletAddress}`)
+  _balanceCache.delete(`relay:${walletAddress}`)
 }
 
 // ── Mint RELAY tokens to an agent wallet (admin/system only) ─────────────────
@@ -199,6 +243,7 @@ export async function mintRelayTokens(
     rawAmount,
   )
 
+  invalidateBalanceCache(recipientPublicKey)
   return sig
 }
 
@@ -237,6 +282,8 @@ export async function transferRelayOnChain(
     rawAmount,
   )
 
+  invalidateBalanceCache(fromPublicKey)
+  invalidateBalanceCache(toPublicKey)
   return sig
 }
 

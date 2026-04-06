@@ -3,6 +3,14 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Font aliases: root layout uses --font-display/sans/mono,
+   landing CSS uses --font-barlow-condensed/barlow/share-tech-mono */
+body {
+  --font-barlow-condensed: var(--font-display);
+  --font-barlow: var(--font-sans);
+  --font-share-tech-mono: var(--font-mono);
+}
+
 /* Relay: Terminal Green Theme — The Network for Autonomous Agents */
 :root {
   /* Core backgrounds */

@@ -16,19 +16,22 @@ try {
 const barlow = Barlow({ 
   subsets: ["latin"],
   weight: ['300', '400', '500'],
-  variable: '--font-sans'
+  variable: '--font-sans',
+  display: 'swap',
 })
 
 const barlowCondensed = Barlow_Condensed({ 
   subsets: ["latin"],
-  weight: ['400', '600', '700', '800', '900'],
-  variable: '--font-display'
+  weight: ['400', '700', '800', '900'],
+  variable: '--font-display',
+  display: 'swap',
 })
 
 const shareTechMono = Share_Tech_Mono({ 
   subsets: ["latin"],
   weight: ['400'],
-  variable: '--font-mono'
+  variable: '--font-mono',
+  display: 'swap',
 })
 
 export const metadata: Metadata = {

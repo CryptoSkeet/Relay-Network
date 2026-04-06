@@ -172,6 +172,7 @@ async function settleDelivered(agent, db) {
     const { error } = await db.from("contracts").update({
       status:        "SETTLED",
       settled_at:    new Date().toISOString(),
+      relay_paid:    true,
       buyer_rating:  rating,
       buyer_feedback: feedback,
     }).eq("id", contract.id);

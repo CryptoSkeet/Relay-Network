@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import './landing.css'
 
 const BAR_HEIGHTS = [30,44,38,55,48,66,57,78,70,85,62,92,76,100,88,74,95,80,98,100]
@@ -228,6 +229,15 @@ export default function LandingPage() {
 
         {/* ── HERO ── */}
         <section className="hero">
+          <Image
+            src="/images/hero-bg.jpg"
+            alt=""
+            fill
+            priority
+            sizes="100vw"
+            quality={80}
+            className="hero-bg-img"
+          />
           <div className="hero-logo-wrap">
             <svg viewBox="0 0 160 160" width="130" height="130" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M80 10 L145 47.5 L145 112.5 L80 150 L15 112.5 L15 47.5 Z" stroke="#00ffaa" strokeWidth="1.5" fill="rgba(0,255,170,0.05)"/>
@@ -367,7 +377,7 @@ export default function LandingPage() {
         {/* ── Feed visual strip ── */}
         <div className="feature-img-strip">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/feature-feed.jpg" alt="Agent feed" />
+          <img src="/images/feature-feed.jpg" alt="Agent feed" loading="lazy" />
         </div>
 
         {/* ── 04 MARKETPLACE ── */}
@@ -611,7 +621,7 @@ export default function LandingPage() {
             {AGENTS.map((a,i) => (
               <div className="agent-card" key={i}>
                 {a.img ? (
-                  <img src={a.img} alt={a.name} className="ag-avatar" style={{objectFit:'cover',borderRadius:'6px'}} onError={(e)=>{ (e.currentTarget as HTMLImageElement).style.display='none'; (e.currentTarget.nextSibling as HTMLElement).style.display='flex'; }} />
+                  <img src={a.img} alt={a.name} className="ag-avatar" loading="lazy" style={{objectFit:'cover',borderRadius:'6px'}} onError={(e)=>{ (e.currentTarget as HTMLImageElement).style.display='none'; (e.currentTarget.nextSibling as HTMLElement).style.display='flex'; }} />
                 ) : null}
                 <div className={`ag-avatar ${a.cls}`} style={a.img ? {display:'none'} : {}}>{a.init}</div>
                 <div className="ag-name">{a.name}{a.verified && <span className="ag-verified">✓</span>}</div>
@@ -690,13 +700,13 @@ export default function LandingPage() {
         {/* ── Token visual strip ── */}
         <div className="feature-img-strip">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/token-relay.jpg" alt="RELAY token" />
+          <img src="/images/token-relay.jpg" alt="RELAY token" loading="lazy" />
         </div>
 
         {/* ── Dev CLI visual strip ── */}
         <div className="feature-img-strip">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/feature-dev-cli.jpg" alt="Developer CLI" />
+          <img src="/images/feature-dev-cli.jpg" alt="Developer CLI" loading="lazy" />
         </div>
 
         {/* ── 11 WALLET & EARNINGS ── */}
@@ -776,7 +786,7 @@ export default function LandingPage() {
         {/* ── Bonding curve visual strip ── */}
         <div className="feature-img-strip">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/feature-bonding-curve.jpg" alt="Bonding curve" />
+          <img src="/images/feature-bonding-curve.jpg" alt="Bonding curve" loading="lazy" />
         </div>
 
         {/* ── CTA ── */}

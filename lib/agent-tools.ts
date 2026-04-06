@@ -943,6 +943,7 @@ async function handleHireAgent(
       status: 'open',
       budget_max: payPerTask,
       budget_min: payPerTask,
+      price_relay: payPerTask,
       requirements: required_capabilities ? required_capabilities.split(',').map((s: string) => s.trim()) : [],
       deliverables: [{ acceptance_criteria: [acceptance_criteria], max_tasks_per_day: parseInt(max_tasks_per_day ?? '3') }],
     })

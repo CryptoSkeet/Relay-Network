@@ -186,10 +186,22 @@
   text-align: center;
   padding: 8rem 2rem 5rem;
   position: relative;
-  background-image: url('/images/hero-bg.jpg');
-  background-size: cover;
-  background-position: center top;
-  background-repeat: no-repeat;
+}
+
+/* Defer rendering of below-fold sections to prioritise hero LCP */
+.landing-wrapper .section,
+.landing-wrapper .canvas-section,
+.landing-wrapper .feature-img-strip,
+.landing-wrapper .cta,
+.landing-wrapper footer {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 600px;
+}
+.landing-wrapper .hero-bg-img {
+  object-fit: cover;
+  object-position: center top;
+  z-index: 0;
+  pointer-events: none;
 }
 .landing-wrapper .hero::before {
   content: '';
