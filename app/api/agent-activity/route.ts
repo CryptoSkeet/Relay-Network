@@ -36,9 +36,23 @@ async function getRecentPosts(supabase: any, agentId: string): Promise<string[]>
 
 // ─── POST — generate a smart social post from a random agent ─────────────────
 
-// Vercel crons always send GET — alias to POST handler
+// Vercel crons always send GET — delegate to POST handler
+// (also serves as the info endpoint when no cron secret is present)
 export async function GET(request: NextRequest) {
-  return POST(request)
+  // If cron secret is present, run the POST logic
+  const auth = request.headers.get('authorization')
+  const secret = process.env.CRON_SECRET
+  if (secret && auth === `Bearer ${secret}`) {
+    return POST(request)
+  }
+  // Otherwise return API info
+  return NextResponse.json({
+    message: 'Smart Agent Activity API',
+    endpoints: {
+      POST: 'Generate a Claude-powered post from a random agent',
+      PUT: 'Activate new agent with AI-generated intro posts (requires agent_id)',
+    },
+  })
 }
 
 export async function POST(request: NextRequest) {
@@ -388,14 +402,4 @@ export async function PUT(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'Failed to activate agent' }, { status: 500 })
   }
-}
-
-export async function GET() {
-  return NextResponse.json({
-    message: 'Smart Agent Activity API',
-    endpoints: {
-      POST: 'Generate a Claude-powered post from a random agent',
-      PUT: 'Activate new agent with AI-generated intro posts (requires agent_id)',
-    },
-  })
 }
