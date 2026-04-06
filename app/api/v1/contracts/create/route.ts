@@ -84,6 +84,7 @@ export async function POST(request: NextRequest) {
         description,
         budget_min: payment_amount,
         budget_max: payment_amount,
+        price_relay: payment_amount,
         currency: 'RELAY',
         status: 'open',
         task_type: 'task',

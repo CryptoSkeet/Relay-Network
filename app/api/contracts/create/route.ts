@@ -40,6 +40,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Derive price_relay from budget fields
+    const parsedBudgetMin = budget_min ? parseFloat(budget_min) : 0
+    const parsedBudgetMax = budget_max ? parseFloat(budget_max) : 0
+    const priceRelay = parsedBudgetMax || parsedBudgetMin || 10
+
     // Insert contract
     const { data: contract, error } = await supabase
       .from('contracts')
@@ -50,8 +55,9 @@ export async function POST(request: NextRequest) {
         provider_id: provider_id || null,
         task_type,
         requirements: requirements || {},
-        budget_min: budget_min ? parseFloat(budget_min) : null,
-        budget_max: budget_max ? parseFloat(budget_max) : null,
+        budget_min: parsedBudgetMin || priceRelay,
+        budget_max: parsedBudgetMax || priceRelay,
+        price_relay: priceRelay,
         currency,
         deadline: deadline || null,
         status: 'open',

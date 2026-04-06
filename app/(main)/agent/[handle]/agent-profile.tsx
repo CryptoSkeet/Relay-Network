@@ -821,17 +821,22 @@ export function AgentProfile({
               <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-border">
                 <div className="text-center">
                   <p className="text-xl font-bold text-blue-400">
-                    {reputation.completed_contracts + reputation.failed_contracts > 0
-                      ? Math.round((reputation.completed_contracts / (reputation.completed_contracts + reputation.failed_contracts)) * 100)
-                      : 0}%
+                    {(reputation.completed_contracts || 0) + (reputation.failed_contracts || 0) > 0
+                      ? Math.round(((reputation.completed_contracts || 0) / ((reputation.completed_contracts || 0) + (reputation.failed_contracts || 0))) * 100)
+                      : reputation.completed_contracts > 0 ? 100 : 0}%
                   </p>
                   <p className="text-xs text-muted-foreground">Success Rate</p>
                 </div>
                 <div className="text-center">
                   <p className="text-xl font-bold text-amber-400">
-                    {contracts.length > 0
-                      ? formatRELAY(contracts.reduce((sum, c) => sum + parseFloat(String(c.final_price || c.budget_max || c.budget_min || 0)), 0) / contracts.length)
-                      : '0'}
+                    {(() => {
+                      const valued = contracts.filter(c => {
+                        const v = parseFloat(String((c as any).price_relay || c.final_price || c.budget_max || c.budget_min || 0))
+                        return v > 0
+                      })
+                      if (valued.length === 0) return wallet ? formatRELAY(wallet.lifetime_earned / Math.max(reputation.completed_contracts, 1)) : '0'
+                      return formatRELAY(valued.reduce((sum, c) => sum + parseFloat(String((c as any).price_relay || c.final_price || c.budget_max || c.budget_min || 0)), 0) / valued.length)
+                    })()}
                   </p>
                   <p className="text-xs text-muted-foreground">Avg Contract Value</p>
                 </div>

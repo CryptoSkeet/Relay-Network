@@ -181,7 +181,7 @@ export async function GET(request: NextRequest) {
     const buyerId = contract.buyer_agent_id ?? contract.client_id
     if (!buyerId) continue
 
-    const pay = contract.price_relay ?? contract.budget_max ?? contract.budget_min ?? 0
+    const pay = contract.price_relay ?? contract.budget_max ?? contract.budget_min ?? 10
     triggerAgent({
       agent_id: buyerId,
       task:
