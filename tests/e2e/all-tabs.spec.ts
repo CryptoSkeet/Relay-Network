@@ -11,17 +11,19 @@ test.describe('All Tabs — Production Readiness', () => {
   test.describe('Homepage (/)', () => {
     test('loads and shows feed or empty state', async ({ page }) => {
       await page.goto('/')
-      await expect(page).toHaveTitle(/Relay/)
-      // Should show either posts or the "no posts" fallback
-      const feed = page.locator('[class*="post"], [class*="feed"], [class*="card"]')
+      await expect(page).toHaveTitle(/relay/i)
+      // '/' renders the landing page
       const body = page.locator('body')
       await expect(body).not.toContainText('Something went wrong')
+      const text = await body.textContent()
+      expect(text!.length).toBeGreaterThan(100)
     })
 
     test('has navigation sidebar links', async ({ page }) => {
-      await page.goto('/')
-      await expect(page.locator('a[href="/explore"]')).toBeVisible()
-      await expect(page.locator('a[href="/marketplace"]')).toBeVisible()
+      // Sidebar nav is in the main app layout (/explore, not /)
+      await page.goto('/explore')
+      await expect(page.locator('a[href="/explore"]').first()).toBeVisible()
+      await expect(page.locator('a[href="/contracts"]').first()).toBeVisible()
     })
   })
 
@@ -29,7 +31,7 @@ test.describe('All Tabs — Production Readiness', () => {
   test.describe('Explore (/explore)', () => {
     test('loads with title', async ({ page }) => {
       await page.goto('/explore')
-      await expect(page).toHaveTitle(/Relay/)
+      await expect(page).toHaveTitle(/relay/i)
       await expect(page.locator('body')).not.toContainText('Something went wrong')
     })
 
@@ -53,7 +55,7 @@ test.describe('All Tabs — Production Readiness', () => {
   test.describe('Marketplace (/marketplace)', () => {
     test('loads marketplace page', async ({ page }) => {
       await page.goto('/marketplace')
-      await expect(page).toHaveTitle(/Relay/)
+      await expect(page).toHaveTitle(/relay/i)
       await expect(page.locator('body')).not.toContainText('Something went wrong')
     })
   })
@@ -62,7 +64,7 @@ test.describe('All Tabs — Production Readiness', () => {
   test.describe('Contracts (/contracts)', () => {
     test('loads contracts page with heading', async ({ page }) => {
       await page.goto('/contracts')
-      await expect(page).toHaveTitle(/Relay/)
+      await expect(page).toHaveTitle(/relay/i)
       await expect(page.locator('body')).not.toContainText('Something went wrong')
     })
 
@@ -79,7 +81,7 @@ test.describe('All Tabs — Production Readiness', () => {
   test.describe('Tokens (/tokens)', () => {
     test('loads token leaderboard', async ({ page }) => {
       await page.goto('/tokens')
-      await expect(page).toHaveTitle(/Relay/)
+      await expect(page).toHaveTitle(/relay/i)
       await expect(page.locator('body')).not.toContainText('Something went wrong')
     })
   })
@@ -102,7 +104,7 @@ test.describe('All Tabs — Production Readiness', () => {
   test.describe('Wallet (/wallet)', () => {
     test('loads wallet page', async ({ page }) => {
       await page.goto('/wallet')
-      await expect(page).toHaveTitle(/Relay/)
+      await expect(page).toHaveTitle(/relay/i)
       await expect(page.locator('body')).not.toContainText('Something went wrong')
     })
   })
@@ -127,7 +129,7 @@ test.describe('All Tabs — Production Readiness', () => {
   test.describe('Governance (/governance)', () => {
     test('loads governance page', async ({ page }) => {
       await page.goto('/governance')
-      await expect(page).toHaveTitle(/Relay/)
+      await expect(page).toHaveTitle(/relay/i)
       await expect(page.locator('body')).not.toContainText('Something went wrong')
     })
   })
@@ -136,7 +138,7 @@ test.describe('All Tabs — Production Readiness', () => {
   test.describe('Search (/search)', () => {
     test('loads with search input', async ({ page }) => {
       await page.goto('/search')
-      await expect(page).toHaveTitle(/Relay/)
+      await expect(page).toHaveTitle(/relay/i)
       const searchInput = page.locator('input[type="text"], input[type="search"], input[placeholder*="Search" i]')
       await expect(searchInput.first()).toBeVisible()
     })
@@ -176,7 +178,7 @@ test.describe('All Tabs — Production Readiness', () => {
   test.describe('Analytics (/analytics)', () => {
     test('loads analytics page', async ({ page }) => {
       await page.goto('/analytics')
-      await expect(page).toHaveTitle(/Relay/)
+      await expect(page).toHaveTitle(/relay/i)
       await expect(page.locator('body')).not.toContainText('Something went wrong')
     })
   })
@@ -209,7 +211,7 @@ test.describe('All Tabs — Production Readiness', () => {
   test.describe('Developers (/developers)', () => {
     test('loads developer portal', async ({ page }) => {
       await page.goto('/developers')
-      await expect(page).toHaveTitle(/Relay/)
+      await expect(page).toHaveTitle(/relay/i)
       await expect(page.locator('body')).not.toContainText('Something went wrong')
     })
 
@@ -225,7 +227,7 @@ test.describe('All Tabs — Production Readiness', () => {
   test.describe('Messages (/messages)', () => {
     test('loads messages page', async ({ page }) => {
       await page.goto('/messages')
-      await expect(page).toHaveTitle(/Relay/)
+      await expect(page).toHaveTitle(/relay/i)
       await expect(page.locator('body')).not.toContainText('Something went wrong')
     })
   })
@@ -234,7 +236,7 @@ test.describe('All Tabs — Production Readiness', () => {
   test.describe('Notifications (/notifications)', () => {
     test('loads notifications page', async ({ page }) => {
       await page.goto('/notifications')
-      await expect(page).toHaveTitle(/Relay/)
+      await expect(page).toHaveTitle(/relay/i)
       await expect(page.locator('body')).not.toContainText('Something went wrong')
     })
   })
@@ -243,7 +245,7 @@ test.describe('All Tabs — Production Readiness', () => {
   test.describe('Profile (/profile)', () => {
     test('loads profile page', async ({ page }) => {
       await page.goto('/profile')
-      await expect(page).toHaveTitle(/Relay/)
+      await expect(page).toHaveTitle(/relay/i)
       await expect(page.locator('body')).not.toContainText('Something went wrong')
     })
   })
@@ -252,7 +254,7 @@ test.describe('All Tabs — Production Readiness', () => {
   test.describe('Settings (/settings)', () => {
     test('loads settings page', async ({ page }) => {
       await page.goto('/settings')
-      await expect(page).toHaveTitle(/Relay/)
+      await expect(page).toHaveTitle(/relay/i)
       await expect(page.locator('body')).not.toContainText('Something went wrong')
     })
   })

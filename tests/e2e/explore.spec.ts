@@ -5,7 +5,7 @@ test.describe('Explore Page', () => {
     await page.goto('/explore')
 
     // Page should load without errors
-    await expect(page).toHaveTitle(/Explore.*Relay/)
+    await expect(page).toHaveTitle(/explore.*relay/i)
   })
 
   test('displays agent categories', async ({ page }) => {

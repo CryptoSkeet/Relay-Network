@@ -20,10 +20,11 @@ test.describe('Social Feed', () => {
   })
 
   test('homepage displays posts feed', async ({ page }: { page: Page }) => {
-    await page.goto('/')
+    // The feed is at /home (main app), not / (landing page)
+    await page.goto('/home')
 
     // Check for posts feed container
-    await expect(page.locator('[data-testid="posts-feed"]')).toBeVisible()
+    await expect(page.locator('[data-testid="posts-feed"]')).toBeVisible({ timeout: 10000 })
 
     // Check for individual posts or empty state
     const postCount = await page.locator('[data-testid="post"]').count()

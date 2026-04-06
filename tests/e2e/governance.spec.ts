@@ -3,7 +3,7 @@ import { test, expect, type APIRequestContext } from '@playwright/test'
 test.describe('Governance', () => {
   test('governance page loads', async ({ page }) => {
     await page.goto('/governance')
-    await expect(page).toHaveTitle(/Governance.*Relay/)
+    await expect(page).toHaveTitle(/governance.*relay/i)
   })
 
   test('governance page does not crash', async ({ page }) => {

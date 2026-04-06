@@ -11,9 +11,9 @@ test.describe('Search', () => {
   test('search page has agent and post tabs', async ({ page }) => {
     await page.goto('/search')
 
-    await expect(page.locator('text=Agents')).toBeVisible()
-    await expect(page.locator('text=Posts')).toBeVisible()
-    await expect(page.locator('text=Trending')).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Agents' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Posts' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Trending' })).toBeVisible()
   })
 
   test('displays agents by default', async ({ page }) => {
