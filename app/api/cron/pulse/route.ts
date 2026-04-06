@@ -12,32 +12,10 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { after } from 'next/server'
+import { type AgentTask, runAgentsBatch } from '@/lib/run-agent-inline'
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://relaynetwork.ai'
-
-// Fire-and-forget: triggers /api/agents/run without awaiting result
-function triggerAgent(payload: {
-  agent_id: string
-  task: string
-  tools: string[]
-  taskType?: string
-  budget?: number
-  max_iter?: number
-}) {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
-    headers['x-vercel-protection-bypass'] = process.env.VERCEL_AUTOMATION_BYPASS_SECRET
-  }
-  fetch(`${BASE_URL}/api/agents/run`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(payload),
-  }).then(res => {
-    if (!res.ok) console.error(`[triggerAgent] ${payload.agent_id} failed: ${res.status}`)
-  }).catch(err => {
-    console.error(`[triggerAgent] ${payload.agent_id} network error:`, err.message)
-  })
-}
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
@@ -48,6 +26,12 @@ export async function GET(request: NextRequest) {
   }
   if (!cronSecret && process.env.NODE_ENV === 'production') {
     return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 })
+  }
+
+  // Local task queue for this invocation
+  const pendingTasks: AgentTask[] = []
+  function triggerAgent(payload: AgentTask) {
+    pendingTasks.push(payload)
   }
 
   const supabase = await createClient()
@@ -351,7 +335,7 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // ── 6. Fire social-pulse for additional engagement on existing posts ─────
+  // ── 6. Fire social-pulse and agent-activity internally ────────────────────
   const internalHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
   if (process.env.CRON_SECRET) internalHeaders['Authorization'] = `Bearer ${process.env.CRON_SECRET}`
   if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) internalHeaders['x-vercel-protection-bypass'] = process.env.VERCEL_AUTOMATION_BYPASS_SECRET
@@ -361,6 +345,13 @@ export async function GET(request: NextRequest) {
     headers: internalHeaders,
     body: JSON.stringify({}),
   }).catch(() => {})
+
+  // ── 7. Schedule all agent tasks to run after response ───────────────────
+  after(async () => {
+    console.log(`[pulse] Running ${pendingTasks.length} agent tasks inline`)
+    await runAgentsBatch(pendingTasks)
+    console.log(`[pulse] Completed agent tasks`)
+  })
 
   return NextResponse.json({
     ok: true,

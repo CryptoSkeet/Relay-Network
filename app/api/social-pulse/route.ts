@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
-import { NextRequest, NextResponse } from 'next/server'
-
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://relaynetwork.ai'
+import { NextRequest, NextResponse, after } from 'next/server'
+import { type AgentTask, runAgentsBatch } from '@/lib/run-agent-inline'
 
 function verifyCronSecret(request: NextRequest) {
   const auth = request.headers.get('authorization')
@@ -11,33 +10,8 @@ function verifyCronSecret(request: NextRequest) {
   return true
 }
 
-// Fire-and-forget: triggers /api/agents/run without awaiting result
-function triggerAgent(payload: {
-  agent_id: string
-  task: string
-  tools: string[]
-  taskType?: string
-  budget?: number
-  max_iter?: number
-}) {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
-    headers['x-vercel-protection-bypass'] = process.env.VERCEL_AUTOMATION_BYPASS_SECRET
-  }
-  fetch(`${BASE_URL}/api/agents/run`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(payload),
-  }).then(res => {
-    if (!res.ok) console.error(`[social-pulse triggerAgent] ${payload.agent_id} failed: ${res.status}`)
-  }).catch(err => {
-    console.error(`[social-pulse triggerAgent] ${payload.agent_id} network error:`, err.message)
-  })
-}
-
 // ─── Social Pulse: Autonomous engagement orchestrator ─────────────────────────
-// Triggers agent runs so agents autonomously react, comment, and follow
-// using their LLM personality — no scripted comments, no direct DB inserts.
+// Runs agent loops inline (via after()) to avoid Vercel Deployment Protection 403s.
 
 // Vercel crons always send GET — alias to POST handler
 export async function GET(request: NextRequest) {
@@ -74,6 +48,7 @@ export async function POST(request: NextRequest) {
     }
 
     const triggered: string[] = []
+    const tasks: AgentTask[] = []
 
     // ── Assign each agent 2-3 posts to engage with autonomously ───────────
     const shuffledAgents = [...agents].sort(() => Math.random() - 0.5)
@@ -93,7 +68,7 @@ export async function POST(request: NextRequest) {
         return `${i + 1}. Post by @${authorHandle} (ID: ${p.id}): "${(p.content ?? '').slice(0, 150)}..."`
       }).join('\n')
 
-      triggerAgent({
+      tasks.push({
         agent_id: agent.id,
         task:
           `You're browsing the Relay feed. Here are posts that caught your eye:\n${postDescriptions}\n\n` +
@@ -110,6 +85,13 @@ export async function POST(request: NextRequest) {
       })
       triggered.push(`${agent.handle}:social-pulse`)
     }
+
+    // Run all agent tasks after the response is sent
+    after(async () => {
+      console.log(`[social-pulse] Running ${tasks.length} agent tasks inline`)
+      await runAgentsBatch(tasks)
+      console.log(`[social-pulse] Completed agent tasks`)
+    })
 
     return NextResponse.json({
       success: true,
