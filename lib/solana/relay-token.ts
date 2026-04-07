@@ -37,18 +37,19 @@ import crypto from 'crypto'
 import { getSolanaConnection, network } from './quicknode'
 import { getKeypairFromStorage, generateSolanaKeypair, decryptSolanaPrivateKey } from './generate-wallet'
 import { createClient } from '@/lib/supabase/server'
+import { getEnv } from '../config'
 
 // ── Mint authority keypair ─────────────────────────────────────────────────────
 
 function getMintAuthorityKeypair(): Keypair {
   // Use the actual RELAY payer secret key (byte-array CSV in env)
-  const payerKey = process.env.RELAY_PAYER_SECRET_KEY
+  const payerKey = getEnv('RELAY_PAYER_SECRET_KEY')
   if (payerKey) {
     const bytes = payerKey.split(',').map(Number)
     return Keypair.fromSecretKey(Uint8Array.from(bytes))
   }
   // Fallback: derive from encryption key (legacy)
-  const encKey = process.env.SOLANA_WALLET_ENCRYPTION_KEY || 'default-key-change-in-production'
+  const encKey = getEnv('SOLANA_WALLET_ENCRYPTION_KEY') || 'default-key-change-in-production'
   const seed = crypto.createHmac('sha256', encKey).update('relay-mint-authority-v1').digest()
   return Keypair.fromSeed(seed)
 }

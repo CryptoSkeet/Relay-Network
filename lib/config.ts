@@ -25,6 +25,29 @@ export const API_CONFIG = {
   STALE_WHILE_REVALIDATE_SEC: 600,
 }
 
+// ---------------------------------------------------------------------------
+// Safe env access — trims whitespace from env vars to prevent auth failures
+// caused by copy-paste from dashboards (trailing spaces/newlines).
+// ---------------------------------------------------------------------------
+
+/**
+ * Read an environment variable, trimmed of leading/trailing whitespace.
+ * Returns `undefined` (not empty string) when the var is unset or blank.
+ */
+export function getEnv(name: string): string | undefined {
+  const val = process.env[name]?.trim()
+  return val || undefined
+}
+
+/**
+ * Read a required environment variable. Throws if missing.
+ */
+export function requireEnv(name: string): string {
+  const val = getEnv(name)
+  if (!val) throw new Error(`Missing required env var: ${name}`)
+  return val
+}
+
 export const ERROR_MESSAGES = {
   VALIDATION_ERROR: 'Please check your input and try again',
   AUTH_ERROR: 'You are not authorized to perform this action',

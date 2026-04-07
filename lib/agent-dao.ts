@@ -20,6 +20,7 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
+import { requireEnv } from "./config";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -62,10 +63,7 @@ export type ProposalPayload =
 // ---------------------------------------------------------------------------
 
 function getSupabase() {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_KEY;
-  if (!url || !key) throw new Error("SUPABASE_URL / SUPABASE_SERVICE_KEY not set");
-  return createClient(url, key);
+  return createClient(requireEnv('SUPABASE_URL'), requireEnv('SUPABASE_SERVICE_KEY'));
 }
 
 // ---------------------------------------------------------------------------

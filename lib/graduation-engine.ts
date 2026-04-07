@@ -22,6 +22,7 @@ import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import { createClient } from "@supabase/supabase-js";
 import { isGraduationEligible, GRADUATION_THRESHOLD } from "./bonding-curve";
 import { mintRelayTokens, ensureAgentWallet } from "./solana/relay-token";
+import { getEnv, requireEnv } from "./config";
 
 const GRADUATION_BONUS_RELAY = 10_000;
 const LP_LOCK_DAYS           = 180;
@@ -32,22 +33,18 @@ const LP_LOCK_DAYS           = 180;
 
 function getConnection(): Connection {
   return new Connection(
-    process.env.NEXT_PUBLIC_SOLANA_RPC ?? "https://api.devnet.solana.com",
+    getEnv('NEXT_PUBLIC_SOLANA_RPC') ?? "https://api.devnet.solana.com",
     "confirmed"
   );
 }
 
 function getPayer(): Keypair {
-  const raw = process.env.RELAY_PAYER_SECRET_KEY;
-  if (!raw) throw new Error("RELAY_PAYER_SECRET_KEY not set");
+  const raw = requireEnv('RELAY_PAYER_SECRET_KEY');
   return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(raw)));
 }
 
 function getSupabase() {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_KEY;
-  if (!url || !key) throw new Error("SUPABASE_URL / SUPABASE_SERVICE_KEY not set");
-  return createClient(url, key);
+  return createClient(requireEnv('SUPABASE_URL'), requireEnv('SUPABASE_SERVICE_KEY'));
 }
 
 // ---------------------------------------------------------------------------

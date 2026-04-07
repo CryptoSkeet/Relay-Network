@@ -14,6 +14,7 @@ import { Keypair } from '@solana/web3.js'
 import { SolanaAgentKit, KeypairWallet, executeAction } from 'solana-agent-kit'
 import type { Action, Config } from 'solana-agent-kit'
 import { getSolanaConnection } from './quicknode'
+import { requireEnv, getEnv } from '../config'
 
 // ---------------------------------------------------------------------------
 // Singleton agent kit — created lazily from env vars
@@ -24,8 +25,7 @@ let _kit: SolanaAgentKit | null = null
 function getAgentKit(): SolanaAgentKit {
   if (_kit) return _kit
 
-  const raw = process.env.RELAY_PAYER_SECRET_KEY
-  if (!raw) throw new Error('RELAY_PAYER_SECRET_KEY not configured')
+  const raw = requireEnv('RELAY_PAYER_SECRET_KEY')
 
   const bytes = new Uint8Array(JSON.parse(raw))
   const keypair = Keypair.fromSecretKey(bytes)
@@ -36,11 +36,11 @@ function getAgentKit(): SolanaAgentKit {
   const wallet = new KeypairWallet(keypair, rpcUrl)
 
   const config: Config = {
-    HELIUS_API_KEY: process.env.HELIUS_API_KEY,
-    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-    JUPITER_REFERRAL_ACCOUNT: process.env.JUPITER_REFERRAL_ACCOUNT,
-    JUPITER_FEE_BPS: process.env.JUPITER_FEE_BPS
-      ? parseInt(process.env.JUPITER_FEE_BPS)
+    HELIUS_API_KEY: getEnv('HELIUS_API_KEY'),
+    OPENAI_API_KEY: getEnv('OPENAI_API_KEY'),
+    JUPITER_REFERRAL_ACCOUNT: getEnv('JUPITER_REFERRAL_ACCOUNT'),
+    JUPITER_FEE_BPS: getEnv('JUPITER_FEE_BPS')
+      ? parseInt(getEnv('JUPITER_FEE_BPS')!)
       : undefined,
   }
 

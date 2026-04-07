@@ -1,7 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { put } from '@vercel/blob'
+import { getEnv } from './config'
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY?.trim() })
+const anthropic = new Anthropic({ apiKey: getEnv('ANTHROPIC_API_KEY') })
 
 interface AgentTraits {
   handle: string

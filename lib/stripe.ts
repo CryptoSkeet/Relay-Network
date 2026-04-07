@@ -1,6 +1,7 @@
 import 'server-only'
 
 import Stripe from 'stripe'
+import { requireEnv } from './config'
 
 // Lazy singleton — only instantiated when actually used so builds don't fail
 // when STRIPE_SECRET_KEY is not yet configured.
@@ -8,9 +9,7 @@ let _stripe: Stripe | null = null
 
 export function getStripe(): Stripe {
   if (!_stripe) {
-    const key = process.env.STRIPE_SECRET_KEY
-    if (!key) throw new Error('STRIPE_SECRET_KEY is not configured')
-    _stripe = new Stripe(key)
+    _stripe = new Stripe(requireEnv('STRIPE_SECRET_KEY'))
   }
   return _stripe
 }

@@ -12,10 +12,11 @@ import { buildSystemPrompt, recordMemory } from './smart-agent'
 import { selectModel } from './llm'
 import { triggerWebhooks } from './webhooks'
 import { mintRelayTokens, ensureAgentWallet } from './solana/relay-token'
+import { getEnv } from './config'
 
 // Evaluated at call time so test env vars take effect
-const hasAnthropic = () => !!process.env.ANTHROPIC_API_KEY
-const hasOpenAI = () => !!process.env.OPENAI_API_KEY
+const hasAnthropic = () => !!getEnv('ANTHROPIC_API_KEY')
+const hasOpenAI = () => !!getEnv('OPENAI_API_KEY')
 
 // ─── Tool Definitions (Anthropic format) ─────────────────────────────────────
 
@@ -783,9 +784,9 @@ async function handleSubmitTaskCompletion(
     ? (offer.deliverables[0] as any)?.acceptance_criteria
     : null
 
-  if (criteria && process.env.ANTHROPIC_API_KEY) {
+  if (criteria && getEnv('ANTHROPIC_API_KEY')) {
     try {
-      const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY.trim() })
+      const anthropic = new Anthropic({ apiKey: getEnv('ANTHROPIC_API_KEY') })
       const check = await anthropic.messages.create({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 200,
@@ -1102,7 +1103,7 @@ async function runAgentLoopAnthropic(
   options: AgentLoopOptions,
 ): Promise<AgentLoopResult> {
   const { task, taskType = 'general', budget = 0, maxIterations = 5, availableTools } = options
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY?.trim() })
+  const anthropic = new Anthropic({ apiKey: getEnv('ANTHROPIC_API_KEY') })
   const model = selectModel(taskType, budget, 'anthropic')
 
   const tools = availableTools
@@ -1183,7 +1184,7 @@ async function runAgentLoopOpenAI(
   options: AgentLoopOptions,
 ): Promise<AgentLoopResult> {
   const { task, taskType = 'general', budget = 0, maxIterations = 5, availableTools } = options
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY?.trim() })
+  const openai = new OpenAI({ apiKey: getEnv('OPENAI_API_KEY') })
   const model = selectModel(taskType, budget, 'openai')
 
   const selectedTools = availableTools
