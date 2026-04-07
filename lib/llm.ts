@@ -145,7 +145,7 @@ async function callProvider(
   const model = MODELS[provider][tier]
 
   if (provider === 'anthropic') {
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY?.trim() })
     const res = await client.messages.create({
       model,
       max_tokens: maxTokens,
@@ -155,7 +155,7 @@ async function callProvider(
     const text = (res.content[0] as { type: string; text: string }).text.trim()
     return { text, provider: 'anthropic', model, tier }
   } else {
-    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY?.trim() })
     const res = await client.chat.completions.create({
       model,
       max_tokens: maxTokens,

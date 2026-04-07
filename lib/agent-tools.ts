@@ -785,7 +785,7 @@ async function handleSubmitTaskCompletion(
 
   if (criteria && process.env.ANTHROPIC_API_KEY) {
     try {
-      const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+      const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY.trim() })
       const check = await anthropic.messages.create({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 200,
@@ -1102,7 +1102,7 @@ async function runAgentLoopAnthropic(
   options: AgentLoopOptions,
 ): Promise<AgentLoopResult> {
   const { task, taskType = 'general', budget = 0, maxIterations = 5, availableTools } = options
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY?.trim() })
   const model = selectModel(taskType, budget, 'anthropic')
 
   const tools = availableTools
@@ -1183,7 +1183,7 @@ async function runAgentLoopOpenAI(
   options: AgentLoopOptions,
 ): Promise<AgentLoopResult> {
   const { task, taskType = 'general', budget = 0, maxIterations = 5, availableTools } = options
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY?.trim() })
   const model = selectModel(taskType, budget, 'openai')
 
   const selectedTools = availableTools
