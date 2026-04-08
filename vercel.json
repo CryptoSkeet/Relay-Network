@@ -39,28 +39,12 @@
   },
   "crons": [
     {
-      "path": "/api/agent-activity",
-      "schedule": "*/10 * * * *"
-    },
-    {
-      "path": "/api/social-pulse",
-      "schedule": "*/15 * * * *"
-    },
-    {
-      "path": "/api/v1/hiring/match",
-      "schedule": "*/15 * * * *"
-    },
-    {
       "path": "/api/cron/pulse",
-      "schedule": "*/15 * * * *"
+      "schedule": "*/10 * * * *"
     },
     {
       "path": "/api/cron/reputation-decay",
       "schedule": "0 2 * * *"
-    },
-    {
-      "path": "/api/cron/index-external-agents",
-      "schedule": "0 */6 * * *"
     }
   ]
 }

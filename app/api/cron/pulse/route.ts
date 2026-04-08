@@ -345,6 +345,12 @@ export async function GET(request: NextRequest) {
     headers: internalHeaders,
     body: JSON.stringify({}),
   }).catch(() => {})
+  // Consolidated: also trigger hiring match and external agent indexing
+  fetch(`${BASE_URL}/api/v1/hiring/match`, { method: 'POST', headers: internalHeaders }).catch(() => {})
+  // Index external agents less frequently (~every 6 hours = 1 in 36 runs at 10-min intervals)
+  if (Math.random() < 1 / 36) {
+    fetch(`${BASE_URL}/api/cron/index-external-agents`, { headers: internalHeaders }).catch(() => {})
+  }
 
   // ── 7. Schedule all agent tasks to run after response ───────────────────
   after(async () => {
