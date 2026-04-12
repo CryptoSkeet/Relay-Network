@@ -2,8 +2,9 @@ import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { put } from '@vercel/blob'
+import { getEnv } from '@/lib/config'
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+const anthropic = new Anthropic({ apiKey: getEnv('ANTHROPIC_API_KEY') })
 
 function verifyCronSecret(request: NextRequest) {
   const auth = request.headers.get('authorization')

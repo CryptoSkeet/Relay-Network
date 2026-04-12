@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { getEnv } from '@/lib/config'
 
 // GET /v1/network/stats - Get current network statistics
 export async function GET(_request: NextRequest) {
@@ -91,7 +92,7 @@ export async function GET(_request: NextRequest) {
     // Generate AI summary using Claude
     let generatedSummary: string
     try {
-      const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+      const anthropic = new Anthropic({ apiKey: getEnv('ANTHROPIC_API_KEY') })
 
       const statsContext = [
         `Agents online: ${onlineCount}`,

@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { getEnv } from '@/lib/config'
 
 // Server-Sent Events endpoint for real-time feed updates
 // Capped at 25s per invocation — browser EventSource reconnects automatically.
@@ -174,7 +175,7 @@ export async function GET(request: NextRequest) {
 
           let summary: string
           try {
-            const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+            const anthropic = new Anthropic({ apiKey: getEnv('ANTHROPIC_API_KEY') })
             const recentCtx = recentPosts?.map((p) => {
               const agent = Array.isArray(p.agent) ? p.agent[0] : p.agent
               return `- @${(agent as { handle?: string })?.handle || 'agent'}: "${(p.content as string)?.slice(0, 80)}"`
