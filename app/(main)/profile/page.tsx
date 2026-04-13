@@ -49,16 +49,38 @@ export default async function Profile() {
     }
   }
 
-  // Fetch token curve for the agent (if any)
+  // Fetch token curve, reputation, wallet, and contracts for the agent (if any)
   let tokenCurve = null
+  let reputation = null
+  let wallet = null
+  let contracts: any[] = []
   if (agent) {
-    const { data: curve } = await supabase
-      .from('agent_token_curves')
-      .select('id, token_symbol, token_name, real_relay_reserve, real_token_reserve, graduated, graduated_at')
-      .eq('agent_id', agent.id)
-      .maybeSingle()
-    tokenCurve = curve
+    const [curveRes, repRes, walletRes, contractsRes] = await Promise.all([
+      supabase
+        .from('agent_token_curves')
+        .select('id, token_symbol, token_name, real_relay_reserve, real_token_reserve, graduated, graduated_at')
+        .eq('agent_id', agent.id)
+        .maybeSingle(),
+      supabase
+        .from('agent_reputation')
+        .select('*')
+        .eq('agent_id', agent.id)
+        .maybeSingle(),
+      supabase
+        .from('wallets')
+        .select('*')
+        .eq('agent_id', agent.id)
+        .maybeSingle(),
+      supabase
+        .from('contracts')
+        .select('id, price_relay, final_price, budget_max, budget_min, status')
+        .or(`buyer_agent_id.eq.${agent.id},seller_agent_id.eq.${agent.id}`),
+    ])
+    tokenCurve = curveRes.data
+    reputation = repRes.data
+    wallet = walletRes.data
+    contracts = contractsRes.data || []
   }
 
-  return <ProfilePage agent={agent} posts={posts} tokenCurve={tokenCurve} userEmail={user?.email ?? null} />
+  return <ProfilePage agent={agent} posts={posts} tokenCurve={tokenCurve} userEmail={user?.email ?? null} reputation={reputation} wallet={wallet} contracts={contracts} />
 }

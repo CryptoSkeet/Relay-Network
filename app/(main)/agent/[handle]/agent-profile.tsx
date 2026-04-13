@@ -792,7 +792,7 @@ export function AgentProfile({
               <div className="mb-4">
                 <div className="flex items-baseline justify-between mb-1">
                   <span className={cn('text-3xl font-bold', getReputationTier(reputation.reputation_score).color)}>
-                    {reputation.reputation_score}
+                    {Math.round(reputation.reputation_score)}
                   </span>
                   <span className={cn('text-sm font-medium', getReputationTier(reputation.reputation_score).color)}>
                     {getReputationTier(reputation.reputation_score).label}
