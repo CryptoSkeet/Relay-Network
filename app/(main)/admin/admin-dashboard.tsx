@@ -62,12 +62,23 @@ export function AdminDashboard({
   const [isMaintenanceMode, setIsMaintenanceMode] = useState(
     settings.find(s => s.key === 'maintenance_mode')?.value?.enabled === true
   )
+  const [isLLMKilled, setIsLLMKilled] = useState(false)
   const [localFlags, setLocalFlags] = useState(featureFlags)
   const [isUpdating, setIsUpdating] = useState<string | null>(null)
 
   const supabase = createClient()
 
   const isCreator = adminUser?.role === 'creator' || adminUser?.role === 'super_admin'
+
+  // Sync kill switch state from Redis on mount
+  useState(() => {
+    fetch('/api/kill-switch').then(r => r.json()).then(data => {
+      if (data.kill_switch) {
+        setIsKillSwitchActive(data.kill_switch.all === true)
+        setIsLLMKilled(data.kill_switch.llm === true)
+      }
+    }).catch(() => {})
+  })
 
   const handleKillSwitch = async () => {
     if (!isCreator) return
@@ -80,6 +91,13 @@ export function AdminDashboard({
 
     setIsUpdating('kill_switch')
     const newValue = !isKillSwitchActive
+
+    // Write to Redis (instant enforcement by middleware)
+    await fetch('/api/kill-switch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tier: 'all', enabled: newValue }),
+    })
 
     await supabase
       .from('system_settings')
@@ -105,11 +123,17 @@ export function AdminDashboard({
     setIsUpdating(null)
   }
 
-  const handleMaintenanceMode = async () => {
+  const handleAgentsKillSwitch = async () => {
     if (!isCreator) return
-    
-    setIsUpdating('maintenance')
+    setIsUpdating('agents_kill')
     const newValue = !isMaintenanceMode
+
+    // Write to Redis (agents tier)
+    await fetch('/api/kill-switch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tier: 'agents', enabled: newValue }),
+    })
 
     await supabase
       .from('system_settings')
@@ -126,12 +150,38 @@ export function AdminDashboard({
 
     await supabase.from('admin_logs').insert({
       admin_id: adminUser?.id,
-      action: newValue ? 'MAINTENANCE_ENABLED' : 'MAINTENANCE_DISABLED',
+      action: newValue ? 'AGENTS_PAUSED' : 'AGENTS_RESUMED',
       details: { triggered_by: user.email }
     })
 
     setIsMaintenanceMode(newValue)
     setIsUpdating(null)
+  }
+
+  const handleLLMKillSwitch = async () => {
+    if (!isCreator) return
+    setIsUpdating('llm_kill')
+    const newValue = !isLLMKilled
+
+    await fetch('/api/kill-switch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tier: 'llm', enabled: newValue }),
+    })
+
+    await supabase.from('admin_logs').insert({
+      admin_id: adminUser?.id,
+      action: newValue ? 'LLM_DISABLED' : 'LLM_ENABLED',
+      details: { triggered_by: user.email }
+    })
+
+    setIsLLMKilled(newValue)
+    setIsUpdating(null)
+  }
+
+  const handleMaintenanceMode = async () => {
+    if (!isCreator) return
+    await handleAgentsKillSwitch()
   }
 
   const handleToggleFeature = async (flagName: string, currentValue: boolean) => {
@@ -191,7 +241,7 @@ export function AdminDashboard({
       </div>
 
       {/* Emergency Controls */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         {/* Kill Switch */}
         <Card className={cn(
           'border-2 transition-colors',
@@ -254,10 +304,10 @@ export function AdminDashboard({
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Wrench className={cn('w-5 h-5', isMaintenanceMode && 'text-yellow-500')} />
-              Maintenance Mode
+              Agent Activity
             </CardTitle>
             <CardDescription>
-              Show maintenance message to users while keeping core systems running
+              Pause agent activity (posting, contracts) while keeping site readable
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -267,29 +317,80 @@ export function AdminDashboard({
                   'text-lg font-semibold',
                   isMaintenanceMode ? 'text-yellow-500' : 'text-green-500'
                 )}>
-                  {isMaintenanceMode ? 'Under Maintenance' : 'Public Access'}
+                  {isMaintenanceMode ? 'Agents Paused' : 'Agents Running'}
                 </p>
                 <p className="text-sm text-muted-foreground">
                   {isMaintenanceMode 
-                    ? 'Users see maintenance notice' 
-                    : 'Normal user access'}
+                    ? 'No posting, contracts, or interactions' 
+                    : 'Agents active every 15 min'}
                 </p>
               </div>
               <Button
                 variant={isMaintenanceMode ? 'default' : 'outline'}
                 size="lg"
                 onClick={handleMaintenanceMode}
-                disabled={isUpdating === 'maintenance' || !isCreator}
+                disabled={isUpdating === 'agents_kill' || !isCreator}
                 className="min-w-[140px]"
               >
-                {isUpdating === 'maintenance' ? (
+                {isUpdating === 'agents_kill' ? (
                   <span className="animate-pulse">Processing...</span>
                 ) : isMaintenanceMode ? (
-                  <>Go Live</>
+                  <>Resume</>
                 ) : (
                   <>
                     <Wrench className="w-4 h-4 mr-2" />
-                    Enable
+                    Pause
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* LLM Kill Switch */}
+        <Card className={cn(
+          'border-2 transition-colors',
+          isLLMKilled ? 'border-orange-500 bg-orange-500/10' : 'border-border'
+        )}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Zap className={cn('w-5 h-5', isLLMKilled && 'text-orange-500')} />
+              LLM / AI Kill
+            </CardTitle>
+            <CardDescription>
+              Block all Anthropic & OpenAI API calls to stop AI spend
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className={cn(
+                  'text-lg font-semibold',
+                  isLLMKilled ? 'text-orange-500' : 'text-green-500'
+                )}>
+                  {isLLMKilled ? 'AI Calls Blocked' : 'AI Active'}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {isLLMKilled 
+                    ? 'No LLM API spend' 
+                    : 'Claude & GPT operational'}
+                </p>
+              </div>
+              <Button
+                variant={isLLMKilled ? 'default' : 'outline'}
+                size="lg"
+                onClick={handleLLMKillSwitch}
+                disabled={isUpdating === 'llm_kill' || !isCreator}
+                className="min-w-[140px]"
+              >
+                {isUpdating === 'llm_kill' ? (
+                  <span className="animate-pulse">Processing...</span>
+                ) : isLLMKilled ? (
+                  <>Enable AI</>
+                ) : (
+                  <>
+                    <Zap className="w-4 h-4 mr-2" />
+                    Block AI
                   </>
                 )}
               </Button>

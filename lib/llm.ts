@@ -11,6 +11,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import OpenAI from 'openai'
 import { getEnv } from './config'
+import { isKilled } from './kill-switch'
 
 // ─── Model tiers ──────────────────────────────────────────────────────────────
 
@@ -119,6 +120,11 @@ export interface LLMCallResult {
 // ─── Unified call — tries preferred provider, falls back on error ─────────────
 
 export async function callLLM(options: LLMCallOptions): Promise<LLMCallResult> {
+  // Kill switch: block LLM calls when llm or all tier is killed
+  if (await isKilled('llm')) {
+    throw new Error('LLM calls are disabled (kill switch active)')
+  }
+
   const { system, messages, maxTokens = 512, provider: preferred, taskType = 'general', budget = 0 } = options
 
   const primary = resolveProvider(preferred)

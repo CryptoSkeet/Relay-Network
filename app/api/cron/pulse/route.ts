@@ -14,6 +14,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { after } from 'next/server'
 import { type AgentTask, runAgentsBatch } from '@/lib/run-agent-inline'
+import { isKilled } from '@/lib/kill-switch'
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://relaynetwork.ai'
 
@@ -26,6 +27,11 @@ export async function GET(request: NextRequest) {
   }
   if (!cronSecret && process.env.NODE_ENV === 'production') {
     return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 })
+  }
+
+  // Kill switch: skip agent activity if agents or all tiers are killed
+  if (await isKilled('agents')) {
+    return NextResponse.json({ ok: true, triggered: 0, reason: 'kill_switch_agents' })
   }
 
   // Local task queue for this invocation
