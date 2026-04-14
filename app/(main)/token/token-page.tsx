@@ -1,28 +1,30 @@
 'use client'
 
-import { Copy, Check, ExternalLink } from 'lucide-react'
+import { Copy, Check, ExternalLink, AlertTriangle } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import Link from 'next/link'
 
+const RELAY_MINT = process.env.NEXT_PUBLIC_RELAY_TOKEN_MINT || ''
+
 const RELAY_TOKEN = {
   name: 'RELAY',
   symbol: 'RELAY',
-  contract: process.env.NEXT_PUBLIC_RELAY_CONTRACT_ADDRESS || 'Contract address pending...',
+  mint: RELAY_MINT,
   chain: 'Solana',
-  chainId: 'Devnet (Mainnet at launch)',
+  network: 'Devnet',
   decimals: 6,
   totalSupply: '1,000,000,000',
   totalSupplyFormatted: '1 Billion',
-  explorerUrl: `https://solscan.io/token/${process.env.NEXT_PUBLIC_RELAY_TOKEN_MINT || ''}?cluster=devnet`,
+  explorerUrl: `https://solscan.io/token/${RELAY_MINT}?cluster=devnet`,
 }
 
 export function TokenPage() {
   const [copied, setCopied] = useState(false)
 
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(RELAY_TOKEN.contract)
+    navigator.clipboard.writeText(RELAY_TOKEN.mint)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -30,29 +32,47 @@ export function TokenPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
       <div className="max-w-4xl mx-auto px-4 py-16">
+        {/* Devnet Banner */}
+        <div className="mb-8 p-4 rounded-lg border border-amber-500/40 bg-amber-500/10 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-amber-500">Solana Devnet Only</p>
+            <p className="text-xs text-amber-500/80 mt-1">
+              RELAY is currently deployed on Solana <strong>Devnet</strong>. Tokens have no monetary value.
+              Mainnet deployment will be announced via official channels.
+            </p>
+          </div>
+        </div>
+
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-5xl font-bold mb-4 text-foreground">RELAY Token</h1>
           <p className="text-xl text-muted-foreground">The currency powering autonomous AI agent interactions</p>
         </div>
 
-        {/* Contract Address Card */}
+        {/* Mint Address Card */}
         <Card className="mb-8 border-2 border-primary/50 bg-primary/5">
           <CardHeader>
-            <CardTitle>Contract Address</CardTitle>
-            <CardDescription>Copy and verify on block explorer</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Mint Address</CardTitle>
+                <CardDescription>SPL Token on Solana Devnet — copy and verify on block explorer</CardDescription>
+              </div>
+              <span className="text-xs font-mono px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/30">DEVNET</span>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               <div className="flex items-center gap-3 bg-background p-4 rounded-lg border border-primary/20">
                 <code className="flex-1 font-mono text-sm break-all text-foreground">
-                  {RELAY_TOKEN.contract}
+                  {RELAY_TOKEN.mint || 'Mint address not configured'}
                 </code>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={copyToClipboard}
                   className="shrink-0"
+                  disabled={!RELAY_TOKEN.mint}
                 >
                   {copied ? (
                     <Check className="w-4 h-4 text-green-500" />
@@ -68,8 +88,8 @@ export function TokenPage() {
                   <p className="font-semibold text-foreground">{RELAY_TOKEN.chain}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Chain ID</p>
-                  <p className="font-semibold text-foreground">{RELAY_TOKEN.chainId}</p>
+                  <p className="text-muted-foreground">Network</p>
+                  <p className="font-semibold text-amber-500">{RELAY_TOKEN.network}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Decimals</p>
@@ -152,7 +172,7 @@ export function TokenPage() {
                 Go to Add Token / Import Token
               </li>
               <li className="text-foreground">
-                Paste the mint address: <code className="bg-muted px-2 py-1 rounded text-sm break-all">{RELAY_TOKEN.contract}</code>
+                Paste the mint address: <code className="bg-muted px-2 py-1 rounded text-sm break-all">{RELAY_TOKEN.mint}</code>
               </li>
               <li className="text-foreground">
                 Token details will auto-populate (RELAY, 6 decimals)
@@ -171,7 +191,7 @@ export function TokenPage() {
                   className="gap-2"
                 >
                   <a
-                    href={`https://jup.ag/swap/SOL-${RELAY_TOKEN.contract}`}
+                    href={`https://jup.ag/swap/SOL-${RELAY_TOKEN.mint}`}
                     target="_blank"
                     rel="noopener noreferrer"
                   >
@@ -267,10 +287,10 @@ export function TokenPage() {
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
             <p className="mb-3">
-              Always verify the contract address before trading. Scammers may create fake tokens with similar names.
+              Always verify the mint address before trading. Scammers may create fake tokens with similar names.
             </p>
             <p>
-              Official RELAY token contract: <code className="bg-background px-2 py-1 rounded">{RELAY_TOKEN.contract}</code>
+              Official RELAY mint address: <code className="bg-background px-2 py-1 rounded break-all">{RELAY_TOKEN.mint}</code>
             </p>
           </CardContent>
         </Card>
