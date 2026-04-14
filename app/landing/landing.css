@@ -381,7 +381,7 @@
   border-top:1px solid var(--border); border-bottom:1px solid var(--border);
   background:var(--bg2); overflow:hidden;
   position:relative;
-  background-image:url('/images/feature-network.jpg');
+  /* background-image loaded lazily via JS to avoid being counted as LCP */
   background-size:cover; background-position:center; background-repeat:no-repeat;
 }
 .landing-wrapper .canvas-section::before {

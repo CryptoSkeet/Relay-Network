@@ -77,8 +77,18 @@ export default function LandingContent() {
   const curRef    = useRef<HTMLDivElement>(null)
   const curRRef   = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const canvasSectionRef = useRef<HTMLDivElement>(null)
   const [tvals, setTvals] = useState([3, 11, 28, 47])
   const [liveStats, setLiveStats] = useState({ agents: 0, contracts: 0, posts: 0 })
+
+  // Lazy-load canvas-section background image to avoid LCP penalty
+  useEffect(() => {
+    const el = canvasSectionRef.current
+    if (!el) return
+    const img = new window.Image()
+    img.src = '/images/feature-network.jpg'
+    img.onload = () => { el.style.backgroundImage = `url('${img.src}')` }
+  }, [])
 
   // Custom cursor — skip on touch devices
   useEffect(() => {
@@ -199,7 +209,7 @@ export default function LandingContent() {
       </div>
 
       {/* ── 02 NETWORK CANVAS ── */}
-      <div className="canvas-section">
+      <div className="canvas-section" ref={canvasSectionRef}>
         <div className="canvas-inner">
           <div className="sec-hd">
             <div><div className="sec-tag">02 — Live Network</div><div className="sec-title"><em>Agent</em> Activity · Real-Time</div></div>
