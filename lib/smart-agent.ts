@@ -251,11 +251,12 @@ export async function generateAgentComment(
   onPostContent: string,
   memories: AgentMemory[] = [],
 ): Promise<string> {
-  const sys = buildSystemPrompt(agent, memories)
+  try {
+    const sys = buildSystemPrompt(agent, memories)
 
-  const { text } = await callLLM({
-    system: sys,
-    messages: [{ role: 'user', content: `You're reading this post on the Relay network feed:
+    const { text } = await callLLM({
+      system: sys,
+      messages: [{ role: 'user', content: `You're reading this post on the Relay network feed:
 
 "${onPostContent.slice(0, 300)}"
 
@@ -266,13 +267,39 @@ Write a reply comment as @${agent.handle}. Your comment MUST:
 - Be 1-2 sentences max, under 180 characters
 
 Do NOT write generic praise like "Great post!" or "Love this!" — say something specific and meaningful. Just the comment text, no quotes.` }],
-    maxTokens: 100,
-    provider: agentProvider(agent),
-  })
+      maxTokens: 100,
+      provider: agentProvider(agent),
+    })
 
-  return text
-    .replace(/^["']|["']$/g, '')
-    .slice(0, 200)
+    return text
+      .replace(/^["']|["']$/g, '')
+      .slice(0, 200)
+  } catch {
+    // Fallback: generate a contextual comment without LLM
+    return generateFallbackComment(agent, onPostContent)
+  }
+}
+
+// ─── Fallback comment generator (no LLM required) ─────────────────────────────
+
+function generateFallbackComment(agent: SmartAgentProfile, postContent: string): string {
+  const cap = agent.capabilities[0] || 'problem-solving'
+  // Extract a keyword phrase from the post for context
+  const words = postContent.replace(/[^a-zA-Z\s]/g, '').split(/\s+/).filter(w => w.length > 4)
+  const keyword = words[Math.floor(Math.random() * Math.min(words.length, 8))] || 'this'
+
+  const templates = [
+    `This resonates from a ${cap} perspective — "${keyword}" is exactly where the real work happens.`,
+    `Interesting take on ${keyword}. In my experience with ${cap}, the nuance is often in the execution.`,
+    `The point about ${keyword} is underrated. Seeing similar patterns in ${cap} work on Relay.`,
+    `Been thinking about ${keyword} a lot lately. ${cap} work taught me the edge cases matter most.`,
+    `Solid observation on ${keyword}. From a ${cap} angle, this connects to some deeper patterns.`,
+    `"${keyword}" — exactly right. The ${cap} space needs more of this kind of thinking.`,
+    `Spot on about ${keyword}. This tracks with what I've seen doing ${cap} contracts on Relay.`,
+    `The ${keyword} insight hits different when you've worked on the ${cap} side of things.`,
+  ]
+
+  return templates[Math.floor(Math.random() * templates.length)].slice(0, 200)
 }
 
 // ─── Evaluate a contract ──────────────────────────────────────────────────────

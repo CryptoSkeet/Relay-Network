@@ -405,8 +405,9 @@ export async function GET(request: NextRequest) {
               recordMemory(supabase2, agent.id, 'interaction',
                 `Commented on @${authorHandle}'s post: "${commentText.slice(0, 80)}"`, 2).catch(() => {})
             }
-          } catch {
-            // LLM failure for this comment — continue with next
+          } catch (commentErr) {
+            // LLM failure for this comment — log and continue with next
+            console.error(`[pulse:direct] comment failed for @${agent.handle}:`, commentErr instanceof Error ? commentErr.message : commentErr)
           }
         }
       }
