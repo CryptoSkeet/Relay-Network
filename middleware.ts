@@ -9,6 +9,17 @@ const KILL_REDIS_KEY = 'relay:kill_switch'
 
 interface KillState { all?: boolean; agents?: boolean; llm?: boolean }
 
+// Module-level singleton — reused across requests in the same isolate
+let _redis: Redis | null = null
+function getRedis(): Redis | null {
+  if (_redis) return _redis
+  const url = process.env.KV_REST_API_URL
+  const token = process.env.KV_REST_API_TOKEN
+  if (!url || !token) return null
+  _redis = new Redis({ url, token })
+  return _redis
+}
+
 async function getKillState(): Promise<KillState> {
   // Env var hard override
   const envVal = process.env.KILL_SWITCH?.trim()
@@ -18,12 +29,10 @@ async function getKillState(): Promise<KillState> {
       return { all: true, agents: true, llm: true }
     return { all: false, agents: t.includes('agents'), llm: t.includes('llm') }
   }
-  // Redis cache
+  // Redis cache (singleton client)
   try {
-    const url = process.env.KV_REST_API_URL
-    const token = process.env.KV_REST_API_TOKEN
-    if (url && token) {
-      const r = new Redis({ url, token })
+    const r = getRedis()
+    if (r) {
       const cached = await r.get(KILL_REDIS_KEY) as KillState | null
       if (cached) return cached
     }
@@ -90,17 +99,24 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // ── 1b. Kill switch — maintenance page for "all" kill ───────────────────
+  // ── 1b. Handle CORS preflight (OPTIONS) BEFORE kill switch ──────────────
+  //    Preflight must always get proper CORS headers, even during maintenance
+  if (request.method === 'OPTIONS') {
+    return new NextResponse(null, { status: 204, headers: corsHeaders(origin) })
+  }
+
+  // ── 1c. Kill switch — maintenance page for "all" kill ───────────────────
   //    Always allow /admin, /api/admin, and /api/kill-switch through
   const isAdminRoute = pathname.startsWith('/admin') || pathname.startsWith('/api/admin') || pathname.startsWith('/api/kill-switch')
   if (!isAdminRoute) {
     const kill = await getKillState()
     if (kill.all) {
-      // API routes get JSON, pages get the maintenance HTML
+      const cors = corsHeaders(origin)
+      // API routes get JSON with CORS headers, pages get the maintenance HTML
       if (pathname.startsWith('/api/')) {
         return NextResponse.json(
           { error: 'Service unavailable — network is under maintenance', kill_switch: true },
-          { status: 503 }
+          { status: 503, headers: cors }
         )
       }
       return new NextResponse(MAINTENANCE_HTML, {
@@ -110,12 +126,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // ── 2. Handle CORS preflight (OPTIONS) ───────────────────────────────────
-  if (request.method === 'OPTIONS') {
-    return new NextResponse(null, { status: 204, headers: corsHeaders(origin) })
-  }
-
-  // ── 3. Validate CORS origin ──────────────────────────────────────────────
+  // ── 2. Validate CORS origin ──────────────────────────────────────────────
   if (!isOriginAllowed(origin)) {
     return NextResponse.json(
       { error: 'CORS policy: Origin not allowed' },
@@ -123,7 +134,7 @@ export async function middleware(request: NextRequest) {
     )
   }
 
-  // ── 4. Protect /api/admin/* with CRON_SECRET ────────────────────────────
+  // ── 3. Protect /api/admin/* with CRON_SECRET ────────────────────────────
   if (pathname.startsWith('/api/admin')) {
     const cronSecret = process.env.CRON_SECRET
     const auth = request.headers.get('authorization')
@@ -132,10 +143,10 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // ── 5. Refresh Supabase auth session (sets/refreshes cookies) ────────────
+  // ── 4. Refresh Supabase auth session (sets/refreshes cookies) ────────────
   const sessionResponse = await updateSession(request)
 
-  // ── 6. Merge session cookies into the final response with CORS headers ──
+  // ── 5. Merge session cookies into the final response with CORS headers ──
   const response = sessionResponse
   const cors = corsHeaders(origin)
   for (const [key, value] of Object.entries(cors)) {

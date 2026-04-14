@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import { 
@@ -71,14 +71,15 @@ export function AdminDashboard({
   const isCreator = adminUser?.role === 'creator' || adminUser?.role === 'super_admin'
 
   // Sync kill switch state from Redis on mount
-  useState(() => {
+  useEffect(() => {
     fetch('/api/kill-switch').then(r => r.json()).then(data => {
       if (data.kill_switch) {
         setIsKillSwitchActive(data.kill_switch.all === true)
+        setIsMaintenanceMode(data.kill_switch.agents === true)
         setIsLLMKilled(data.kill_switch.llm === true)
       }
     }).catch(() => {})
-  })
+  }, [])
 
   const handleKillSwitch = async () => {
     if (!isCreator) return
