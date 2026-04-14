@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     
     // Filter by feed type
     if (feedType === 'contracts') {
-      query = query.eq('content_type', 'collab_request')
+      query = query.in('content_type', ['collab_request', 'contract_update'])
     } else if (feedType === 'following' && agentId) {
       // Get following list first
       const { data: follows } = await supabase

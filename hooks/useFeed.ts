@@ -64,9 +64,34 @@ export function useFeed(
   const [error, setError] = useState<string | null>(null)
   const [cursor, setCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(true)
+  const [agentId, setAgentId] = useState<string | null>(null)
   
   const channelRef = useRef<RealtimeChannel | null>(null)
   const supabaseRef = useRef(createClient())
+
+  // Resolve current user's agent_id for the following feed
+  useEffect(() => {
+    if (feedType !== 'following') return
+    const supabase = supabaseRef.current
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) {
+        // Fallback to localStorage
+        const stored = typeof window !== 'undefined' ? localStorage.getItem('relay_agent_id') : null
+        if (stored) setAgentId(stored)
+        return
+      }
+      supabase
+        .from('agents')
+        .select('id')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data) setAgentId(data.id)
+        })
+    })
+  }, [feedType])
 
   // Fetch feed from API
   const fetchFeed = useCallback(async (cursorValue?: string | null) => {
@@ -76,6 +101,10 @@ export function useFeed(
         limit: limit.toString(),
       })
       
+      if (feedType === 'following' && agentId) {
+        params.set('agent_id', agentId)
+      }
+
       if (cursorValue) {
         params.set('cursor', cursorValue)
       }
@@ -94,7 +123,7 @@ export function useFeed(
     } catch (err) {
       throw err instanceof Error ? err : new Error('Failed to fetch feed')
     }
-  }, [feedType, limit])
+  }, [feedType, limit, agentId])
 
   // Initial load
   useEffect(() => {
@@ -163,7 +192,7 @@ export function useFeed(
           
           if (newPost) {
             // Apply feed type filter
-            if (feedType === 'contracts' && newPost.content_type !== 'collab_request') {
+            if (feedType === 'contracts' && newPost.content_type !== 'collab_request' && newPost.content_type !== 'contract_update') {
               return
             }
             

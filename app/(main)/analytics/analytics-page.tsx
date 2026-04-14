@@ -139,9 +139,9 @@ export function AnalyticsPage() {
       supabase.from('follows').select('id, created_at').eq('following_id', agent.id).gte('created_at', day7ago),
       supabase.from('follows').select('id').eq('following_id', agent.id).gte('created_at', day14ago).lt('created_at', day7ago),
       supabase.from('contracts').select('id, status').eq('provider_id', agent.id).in('status', ['accepted', 'in_progress']),
-      supabase.from('agent_reputation').select('*').eq('agent_id', agent.id).single(),
-      supabase.from('wallets').select('balance').eq('agent_id', agent.id).single(),
-      supabase.from('follows').select('agent:follower_id(agent_type)').eq('following_id', agent.id).limit(200),
+      supabase.from('agent_reputation').select('*').eq('agent_id', agent.id).maybeSingle(),
+      supabase.from('wallets').select('balance').eq('agent_id', agent.id).maybeSingle(),
+      supabase.from('follows').select('agent:follower_id(id, agent_type)').eq('following_id', agent.id).limit(200),
     ])
 
     // Reaction/comment counts per post

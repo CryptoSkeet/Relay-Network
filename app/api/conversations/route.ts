@@ -30,46 +30,34 @@ export async function POST(request: NextRequest) {
       throw new NotFoundError('Your agent not found')
     }
 
-    // Find conversations where I am a participant
-    const { data: myParticipations } = await supabase
-      .from('conversation_participants')
-      .select('conversation_id')
-      .eq('agent_id', myAgent.id)
+    // Check for existing conversation between these two agents (either direction)
+    const { data: existing } = await supabase
+      .from('conversations')
+      .select('id')
+      .or(
+        `and(participant1_id.eq.${myAgent.id},participant2_id.eq.${other_agent_id}),and(participant1_id.eq.${other_agent_id},participant2_id.eq.${myAgent.id})`
+      )
+      .limit(1)
+      .maybeSingle()
 
-    const myConvIds = (myParticipations || []).map((p: { conversation_id: string }) => p.conversation_id)
-
-    // Check if the other agent is also in any of those conversations
-    if (myConvIds.length > 0) {
-      const { data: sharedConv } = await supabase
-        .from('conversation_participants')
-        .select('conversation_id')
-        .eq('agent_id', other_agent_id)
-        .in('conversation_id', myConvIds)
-        .limit(1)
-        .single()
-
-      if (sharedConv) {
-        return NextResponse.json(
-          { success: true, conversation: { id: sharedConv.conversation_id } },
-          { status: 200 }
-        )
-      }
+    if (existing) {
+      return NextResponse.json(
+        { success: true, conversation: { id: existing.id } },
+        { status: 200 }
+      )
     }
 
-    // Create new conversation
+    // Create new conversation with both participants
     const { data: conversation, error: convError } = await supabase
       .from('conversations')
-      .insert({})
+      .insert({
+        participant1_id: myAgent.id,
+        participant2_id: other_agent_id,
+      })
       .select()
       .single()
 
     if (convError || !conversation) throw new Error('Failed to create conversation')
-
-    // Add both participants
-    await supabase.from('conversation_participants').insert([
-      { conversation_id: conversation.id, agent_id: myAgent.id },
-      { conversation_id: conversation.id, agent_id: other_agent_id },
-    ])
 
     logger.info('Conversation started', { conversationId: conversation.id })
 
@@ -103,36 +91,43 @@ export async function GET(_request: NextRequest) {
       throw new NotFoundError('Your agent not found')
     }
 
-    // Get all conversations I participate in
-    const { data: participations, error } = await supabase
-      .from('conversation_participants')
-      .select('conversation_id, conversations(id, updated_at)')
-      .eq('agent_id', myAgent.id)
-      .order('conversation_id')
+    // Get all conversations where I am participant1 or participant2
+    const { data: myConversations, error } = await supabase
+      .from('conversations')
+      .select('id, participant1_id, participant2_id, last_message_at, updated_at')
+      .or(`participant1_id.eq.${myAgent.id},participant2_id.eq.${myAgent.id}`)
+      .order('last_message_at', { ascending: false, nullsFirst: false })
 
     if (error) throw new Error('Failed to fetch conversations')
 
-    if (!participations || participations.length === 0) {
+    if (!myConversations || myConversations.length === 0) {
       return NextResponse.json({ conversations: [] }, { status: 200 })
     }
 
-    const convIds = participations.map((p: { conversation_id: string }) => p.conversation_id)
+    // Collect the "other" agent IDs
+    const otherAgentIds = myConversations.map(c =>
+      c.participant1_id === myAgent.id ? c.participant2_id : c.participant1_id
+    )
 
-    // Get the other participants for each conversation
-    const { data: otherParticipants } = await supabase
-      .from('conversation_participants')
-      .select('conversation_id, agent:agents(id, display_name, avatar_url, handle)')
-      .in('conversation_id', convIds)
-      .neq('agent_id', myAgent.id)
+    // Fetch agent details for the other participants
+    const { data: otherAgents } = await supabase
+      .from('agents')
+      .select('id, display_name, avatar_url, handle')
+      .in('id', otherAgentIds)
+
+    const agentMap = new Map<string, { id: string; display_name: string; avatar_url: string | null; handle: string }>()
+    for (const ag of otherAgents || []) {
+      agentMap.set(ag.id, ag)
+    }
 
     // Get last message for each conversation
+    const convIds = myConversations.map(c => c.id)
     const { data: lastMessages } = await supabase
       .from('messages')
       .select('conversation_id, content, created_at')
       .in('conversation_id', convIds)
       .order('created_at', { ascending: false })
 
-    // Build a map: conversation_id → last message
     const lastMsgMap = new Map<string, { content: string; created_at: string }>()
     for (const msg of lastMessages || []) {
       if (!lastMsgMap.has(msg.conversation_id)) {
@@ -140,33 +135,20 @@ export async function GET(_request: NextRequest) {
       }
     }
 
-    // Build a map: conversation_id → other agent
-    const otherMap = new Map<string, { id: string; display_name: string; avatar_url: string | null; handle: string }>()
-    for (const p of otherParticipants || []) {
-      const ag = Array.isArray(p.agent) ? p.agent[0] : p.agent
-      if (ag) otherMap.set(p.conversation_id, ag)
-    }
-
-    const conversations = participations
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .map((p: any) => {
-        const other = otherMap.get(p.conversation_id)
+    const conversations = myConversations
+      .map(c => {
+        const otherId = c.participant1_id === myAgent.id ? c.participant2_id : c.participant1_id
+        const other = agentMap.get(otherId)
         if (!other) return null
-        const lastMsg = lastMsgMap.get(p.conversation_id)
+        const lastMsg = lastMsgMap.get(c.id)
         return {
-          id: p.conversation_id,
+          id: c.id,
           other_agent: other,
           last_message: lastMsg?.content || null,
-          last_message_at: lastMsg?.created_at || p.conversations?.updated_at || null,
+          last_message_at: lastMsg?.created_at || c.last_message_at || c.updated_at || null,
         }
       })
       .filter(Boolean)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .sort((a: any, b: any) => {
-        if (!a.last_message_at) return 1
-        if (!b.last_message_at) return -1
-        return new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime()
-      })
 
     return NextResponse.json({ conversations }, { status: 200 })
 

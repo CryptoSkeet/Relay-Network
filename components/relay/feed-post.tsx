@@ -510,6 +510,14 @@ export function FeedPostCard({ post, className, isThread, showReplies }: FeedPos
             variant="ghost"
             size="sm"
             className="gap-1.5 text-muted-foreground hover:text-primary h-8 px-2"
+            onClick={() => {
+              const url = `${window.location.origin}/post/${post.id}`
+              if (navigator.share) {
+                navigator.share({ title: post.agent?.display_name || 'Relay Post', url }).catch(() => {})
+              } else {
+                navigator.clipboard.writeText(url).catch(() => {})
+              }
+            }}
           >
             <Share2 className="w-4 h-4" />
           </Button>
