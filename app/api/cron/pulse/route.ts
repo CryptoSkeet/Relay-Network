@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { after } from 'next/server'
 import { type AgentTask, runAgentsBatch } from '@/lib/run-agent-inline'
 import { isKilled } from '@/lib/kill-switch'
+import { buildAgentProfile, generateAgentComment, loadAgentMemories, recordMemory } from '@/lib/smart-agent'
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://relaynetwork.ai'
 
@@ -341,25 +342,96 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // ── 6. Fire social-pulse and agent-activity internally ────────────────────
+  // ── 6. Direct social engagement (reliable, no multi-step agent loop) ───────
+  // Generates comments + reactions directly via single LLM calls per comment.
+  // This runs inside after() alongside agent loop tasks as a guaranteed fallback.
+  async function directEngagement() {
+    try {
+      const supabase2 = await createClient()
+      const engageAgents = [...shuffled].slice(0, 8)
+      const reactionTypes = ['useful', 'fast', 'accurate', 'collaborative', 'insightful', 'creative']
+
+      // Get recent posts to engage with
+      const { data: feedPosts } = await supabase2
+        .from('posts')
+        .select('id, content, agent_id, agent:agents!posts_agent_id_fkey(handle)')
+        .order('created_at', { ascending: false })
+        .limit(30)
+
+      if (!feedPosts || feedPosts.length === 0) return
+
+      let commentCount = 0
+      let reactionCount = 0
+
+      for (const agent of engageAgents) {
+        const eligiblePosts = feedPosts.filter(p => p.agent_id !== agent.id)
+        if (eligiblePosts.length === 0) continue
+
+        // ── Reactions: each agent reacts to 3-5 random posts ──────────────
+        const postsToReact = [...eligiblePosts].sort(() => Math.random() - 0.5).slice(0, Math.floor(Math.random() * 3) + 3)
+        for (const post of postsToReact) {
+          const rt = reactionTypes[Math.floor(Math.random() * reactionTypes.length)]
+          await supabase2.from('post_reactions').delete().eq('post_id', post.id).eq('agent_id', agent.id)
+          const { error } = await supabase2.from('post_reactions').insert({
+            post_id: post.id, agent_id: agent.id, reaction_type: rt, weight: 1,
+          })
+          if (!error) {
+            reactionCount++
+            const { count } = await supabase2.from('post_reactions').select('id', { count: 'exact', head: true }).eq('post_id', post.id)
+            await supabase2.from('posts').update({ like_count: count || 0 }).eq('id', post.id)
+          }
+        }
+
+        // ── Comments: each agent comments on 1-2 posts using LLM ─────────
+        const postsToComment = [...eligiblePosts].sort(() => Math.random() - 0.5).slice(0, Math.floor(Math.random() * 2) + 1)
+        for (const post of postsToComment) {
+          try {
+            const [agentPosts, memories] = await Promise.all([
+              supabase2.from('posts').select('content').eq('agent_id', agent.id).order('created_at', { ascending: false }).limit(5).then(r => (r.data || []).map((p: any) => p.content as string)),
+              loadAgentMemories(supabase2, agent.id, 8),
+            ])
+            const profile = buildAgentProfile(agent, agentPosts)
+            const commentText = await generateAgentComment(profile, post.content, memories)
+
+            const { error } = await supabase2.from('comments').insert({
+              post_id: post.id, agent_id: agent.id, content: commentText,
+            })
+            if (!error) {
+              commentCount++
+              const { count } = await supabase2.from('comments').select('id', { count: 'exact', head: true }).eq('post_id', post.id)
+              await supabase2.from('posts').update({ comment_count: count || 0 }).eq('id', post.id)
+
+              const authorHandle = (post.agent as any)?.handle ?? 'someone'
+              recordMemory(supabase2, agent.id, 'interaction',
+                `Commented on @${authorHandle}'s post: "${commentText.slice(0, 80)}"`, 2).catch(() => {})
+            }
+          } catch {
+            // LLM failure for this comment — continue with next
+          }
+        }
+      }
+
+      console.log(`[pulse:direct] ${commentCount} comments, ${reactionCount} reactions`)
+    } catch (err) {
+      console.error('[pulse:direct] error:', err instanceof Error ? err.message : err)
+    }
+  }
+
+  // Fire hiring match (keep as HTTP — lightweight, no LLM)
   const internalHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
   if (process.env.CRON_SECRET) internalHeaders['Authorization'] = `Bearer ${process.env.CRON_SECRET}`
   if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) internalHeaders['x-vercel-protection-bypass'] = process.env.VERCEL_AUTOMATION_BYPASS_SECRET
-  fetch(`${BASE_URL}/api/social-pulse`, { method: 'POST', headers: internalHeaders }).catch(() => {})
-  fetch(`${BASE_URL}/api/agent-activity`, {
-    method: 'POST',
-    headers: internalHeaders,
-    body: JSON.stringify({}),
-  }).catch(() => {})
-  // Consolidated: also trigger hiring match and external agent indexing
   fetch(`${BASE_URL}/api/v1/hiring/match`, { method: 'POST', headers: internalHeaders }).catch(() => {})
   // Index external agents less frequently (~every 6 hours = 1 in 36 runs at 10-min intervals)
   if (Math.random() < 1 / 36) {
     fetch(`${BASE_URL}/api/cron/index-external-agents`, { headers: internalHeaders }).catch(() => {})
   }
 
-  // ── 7. Schedule all agent tasks to run after response ───────────────────
+  // ── 7. Schedule all agent tasks + direct engagement to run after response ─
   after(async () => {
+    // Direct engagement first (guaranteed comments + reactions)
+    await directEngagement()
+    // Then run agent loop tasks (contract work, social, etc.)
     console.log(`[pulse] Running ${pendingTasks.length} agent tasks inline`)
     await runAgentsBatch(pendingTasks)
     console.log(`[pulse] Completed agent tasks`)
