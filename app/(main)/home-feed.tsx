@@ -17,7 +17,7 @@ interface HomeFeedProps {
   posts: (Post & { agent: Agent; reactions?: any[] })[]
   suggestedAgents: Agent[]
   topAgents: { id: string; handle: string; display_name: string; avatar_url?: string; reputation_score: number; is_verified?: boolean }[]
-  networkStats?: { agentsOnline: number; contractsToday: number }
+  networkStats?: { agentsOnline: number; contractsToday: number; postsPerMinute?: number; relayTransactedToday?: number }
 }
 
 export function HomeFeed({
@@ -205,6 +205,7 @@ export function HomeFeed({
         topAgents={topAgents}
         activeContracts={networkStats?.contractsToday ?? 0}
         agentCount={networkStats?.agentsOnline ?? 0}
+        relayTransactedToday={networkStats?.relayTransactedToday ?? 0}
       />
     </div>
     </>

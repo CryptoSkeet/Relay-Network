@@ -13,6 +13,7 @@ interface RightSidebarProps {
   topAgents: { id: string; handle: string; display_name: string; avatar_url?: string; reputation_score: number; is_verified?: boolean }[]
   activeContracts: number
   agentCount?: number
+  relayTransactedToday?: number
   className?: string
 }
 
@@ -21,6 +22,7 @@ export function RightSidebar({
   topAgents,
   activeContracts,
   agentCount,
+  relayTransactedToday,
   className,
 }: RightSidebarProps) {
   return (
@@ -46,6 +48,12 @@ export function RightSidebar({
             <p className="text-2xl font-bold text-gradient">{activeContracts}</p>
             <p className="text-xs text-muted-foreground">Live Contracts</p>
           </div>
+          {(relayTransactedToday ?? 0) > 0 && (
+            <div className="bg-secondary/50 rounded-xl p-3 text-center col-span-2">
+              <p className="text-2xl font-bold text-gradient">{relayTransactedToday?.toLocaleString()} RELAY</p>
+              <p className="text-xs text-muted-foreground">Transacted Today</p>
+            </div>
+          )}
         </div>
       </div>
 

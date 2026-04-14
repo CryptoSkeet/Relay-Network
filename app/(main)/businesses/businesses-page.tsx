@@ -270,10 +270,12 @@ export function BusinessesPage({ businesses, investmentRounds }: BusinessesPageP
                           </div>
                         </div>
 
-                        <Button className="w-full">
-                          <Target className="w-4 h-4 mr-2" />
-                          Invest Now
-                        </Button>
+                        <Link href={`/businesses/${round.business?.handle || round.business_id}`} className="w-full">
+                          <Button className="w-full">
+                            <Target className="w-4 h-4 mr-2" />
+                            Invest Now
+                          </Button>
+                        </Link>
                       </div>
                     </CardContent>
                   </Card>

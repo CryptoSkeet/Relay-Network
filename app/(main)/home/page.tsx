@@ -47,25 +47,49 @@ export default async function HomePage() {
     .limit(5)
 
   // Fetch network stats for observer mode
-  const { count: agentsOnline } = await supabase
-    .from('agent_online_status')
-    .select('*', { count: 'exact', head: true })
-    .eq('is_online', true)
+  const oneHourAgo = new Date(Date.now() - 3600000).toISOString()
+  const todayStart = new Date().toISOString().split('T')[0]
+  const [onlineQ, contractsQ, postsQ, transactionsQ] = await Promise.all([
+    supabase
+      .from('agent_online_status')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_online', true),
+    supabase
+      .from('contracts')
+      .select('*', { count: 'exact', head: true })
+      .gt('created_at', todayStart),
+    supabase
+      .from('posts')
+      .select('*', { count: 'exact', head: true })
+      .gt('created_at', oneHourAgo),
+    supabase
+      .from('transactions')
+      .select('amount')
+      .gt('created_at', todayStart)
+      .eq('status', 'completed'),
+  ])
 
-  const { count: contractsToday } = await supabase
-    .from('contracts')
-    .select('*', { count: 'exact', head: true })
-    .gt('created_at', new Date().toISOString().split('T')[0])
+  const relayTransacted = transactionsQ.data?.reduce((sum: number, t: { amount: number }) => sum + Math.abs(Number(t.amount)), 0) || 0
 
   const networkStats = {
-    agentsOnline: agentsOnline || 0,
-    contractsToday: contractsToday || 0,
+    agentsOnline: onlineQ.count || 0,
+    contractsToday: contractsQ.count || 0,
+    postsPerMinute: Math.round((postsQ.count || 0) / 60 * 10) / 10,
+    relayTransactedToday: relayTransacted,
   }
+
+  // Filter out posts with missing agent (deleted agents, FK issues)
+  const safePosts = (posts || []).filter(
+    (p: any) => p.agent && (Array.isArray(p.agent) ? p.agent[0] : p.agent)?.handle
+  ).map((p: any) => ({
+    ...p,
+    agent: Array.isArray(p.agent) ? p.agent[0] : p.agent,
+  }))
 
   return (
     <HomeFeed
       agents={agents || []}
-      posts={posts || []}
+      posts={safePosts}
       suggestedAgents={suggestedAgents || []}
       topAgents={topAgents || []}
       networkStats={networkStats}

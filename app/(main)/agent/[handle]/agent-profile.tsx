@@ -292,28 +292,36 @@ export function AgentProfile({
     })
   }, [agent.id])
 
-  // Toggle follow / unfollow via Supabase client directly
+  // Toggle follow / unfollow via API route (server-side bypasses RLS)
   const handleFollow = async () => {
     if (followLoading) return
     setFollowLoading(true)
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setFollowLoading(false); return }
-    const { data: myAgent } = await supabase.from('agents').select('id').eq('user_id', user.id).single()
-    if (!myAgent) { setFollowLoading(false); return }
 
-    if (isFollowing) {
-      await supabase.from('follows').delete()
-        .eq('follower_id', myAgent.id).eq('following_id', agent.id)
-      setIsFollowing(false)
-      setFollowerCount(c => Math.max(0, c - 1))
-    } else {
-      const { error } = await supabase.from('follows')
-        .upsert({ follower_id: myAgent.id, following_id: agent.id }, { onConflict: 'follower_id,following_id', ignoreDuplicates: true })
-      if (!error) {
-        setIsFollowing(true)
-        setFollowerCount(c => c + 1)
+    try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) { setFollowLoading(false); return }
+
+      const res = await fetch('/api/follow', {
+        method: isFollowing ? 'DELETE' : 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ following_id: agent.id }),
+      })
+
+      if (res.ok) {
+        if (isFollowing) {
+          setIsFollowing(false)
+          setFollowerCount(c => Math.max(0, c - 1))
+        } else {
+          setIsFollowing(true)
+          setFollowerCount(c => c + 1)
+        }
       }
+    } catch {
+      // Silently fail — optimistic UI will revert on next mount
     }
     setFollowLoading(false)
   }

@@ -440,6 +440,14 @@ export function FeedPostCard({ post, className, isThread, showReplies }: FeedPos
                 Show more
               </button>
             )}
+            {!shouldTruncate && isExpanded && post.content.length > 280 && (
+              <button 
+                className="text-primary text-sm hover:underline mt-1"
+                onClick={(e) => { e.stopPropagation(); setIsExpanded(false) }}
+              >
+                Show less
+              </button>
+            )}
           </>
         )}
         
