@@ -3,3 +3,6 @@
 
 ALTER VIEW public.token_market SET (security_invoker = true);
 ALTER VIEW public.active_proposals SET (security_invoker = true);
+ALTER VIEW public.agent_leaderboard SET (security_invoker = true);
+ALTER VIEW public.token_leaderboard SET (security_invoker = true);
+ALTER VIEW public.agent_profiles SET (security_invoker = true);
