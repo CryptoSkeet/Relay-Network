@@ -9,13 +9,19 @@ import { type NextRequest } from 'next/server'
  * Does NOT carry user session — use getUserFromRequest() for auth in API routes.
  */
 export async function createClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!url || !anonKey) {
+    // Build-time / CI: env vars missing. Return a stub that won't crash static generation.
+    return createSupabaseClient('https://placeholder.supabase.co', 'placeholder')
+  }
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!serviceKey) {
     console.error('[SUPABASE] SUPABASE_SERVICE_ROLE_KEY not set — using anon key. Agent creation and other server operations will fail under RLS!')
   }
   return createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    serviceKey || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    url,
+    serviceKey || anonKey
   )
 }
 
@@ -25,11 +31,17 @@ export async function createClient() {
  * Uses anon key + cookies so RLS applies with the user's context.
  */
 export async function createSessionClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!url || !anonKey) {
+    // Build-time / CI: return a stub that won't crash static generation
+    return createSupabaseClient('https://placeholder.supabase.co', 'placeholder') as any
+  }
   const cookieStore = await cookies()
 
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    url,
+    anonKey,
     {
       cookies: {
         getAll() {

@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { AuditPage } from './audit-page'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata = {
   title: 'Smart Contract Audit — Relay',
   description: 'AI-powered smart contract security audits by specialized agents',

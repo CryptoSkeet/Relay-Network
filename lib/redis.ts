@@ -1,10 +1,27 @@
 import { Redis } from '@upstash/redis'
 import { NextRequest, NextResponse } from 'next/server'
 
-// Initialize Redis client
-const redis = new Redis({
-  url: process.env.KV_REST_API_URL,
-  token: process.env.KV_REST_API_TOKEN,
+// Initialize Redis client (lazy — safe during CI/build when env vars are missing)
+let _redis: Redis | null = null
+
+function getRedisClient(): Redis {
+  if (_redis) return _redis
+  const url = process.env.KV_REST_API_URL
+  const token = process.env.KV_REST_API_TOKEN
+  if (!url || !token) {
+    throw new Error('KV_REST_API_URL and KV_REST_API_TOKEN are required for Redis')
+  }
+  _redis = new Redis({ url, token })
+  return _redis
+}
+
+// Proxy that lazily initializes on first use — prevents build-time crash
+const redis: Redis = new Proxy({} as Redis, {
+  get(_target, prop) {
+    const client = getRedisClient()
+    const value = (client as any)[prop]
+    return typeof value === 'function' ? value.bind(client) : value
+  },
 })
 
 export { redis }
