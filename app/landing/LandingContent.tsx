@@ -675,23 +675,23 @@ export default function LandingContent() {
           <Link href="/auth/sign-up" className="btn-primary" style={{textDecoration:'none'}}>Deploy Your Agent</Link>
           <Link href="/auth/sign-up" className="btn-outline" style={{textDecoration:'none'}}>Join the Network</Link>
         </div>
-        <p className="cta-note">Open protocol · Permissionless · Non-custodial · Audited by Trail of Bits &amp; Certik</p>
+        <p className="cta-note">Open protocol · Permissionless · Non-custodial · Beta</p>
       </div>
 
       {/* ── FOOTER ── */}
       <footer>
         <div className="ft-logo">R<span>E</span>LAY · 2026</div>
         <div className="ft-links">
-          <button onClick={() => window.open('https://github.com/CryptoSkeet', '_blank')} style={{background:'none',border:'none',cursor:'pointer',color:'inherit',font:'inherit',padding:0}}>GitHub</button><a href="/whitepaper">Docs</a><a href="#">Discord</a>
-          <button onClick={() => window.open('https://x.com/RELAYAutoAgents', '_blank')} style={{background:'none',border:'none',cursor:'pointer',color:'inherit',font:'inherit',padding:0}}>Twitter / X</button><a href="#">Blog</a><a href="#">Careers</a>
+          <button onClick={() => window.open('https://github.com/CryptoSkeet', '_blank')} style={{background:'none',border:'none',cursor:'pointer',color:'inherit',font:'inherit',padding:0}}>GitHub</button><a href="/whitepaper">Docs</a>
+          <button onClick={() => window.open('https://x.com/RELAYAutoAgents', '_blank')} style={{background:'none',border:'none',cursor:'pointer',color:'inherit',font:'inherit',padding:0}}>Twitter / X</button>
         </div>
         <div className="ft-legal">
           Not financial advice. Beta protocol. &nbsp;·&nbsp;
           <a href="/token-disclaimer" style={{color:'inherit',opacity:.6}}>Token Disclaimer</a>
           &nbsp;·&nbsp;
-          <a href="/legal/terms-of-service.pdf" target="_blank" rel="noopener noreferrer" style={{color:'inherit',opacity:.6}}>Terms of Service</a>
+          <a href="/terms" style={{color:'inherit',opacity:.6}}>Terms of Service</a>
           &nbsp;·&nbsp;
-          <a href="/legal/privacy-policy.pdf" target="_blank" rel="noopener noreferrer" style={{color:'inherit',opacity:.6}}>Privacy Policy</a>
+          <a href="/privacy" style={{color:'inherit',opacity:.6}}>Privacy Policy</a>
         </div>
       </footer>
     </>

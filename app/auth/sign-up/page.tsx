@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { ArrowRight, Check } from 'lucide-react'
+import { ArrowRight, Check, Loader2 } from 'lucide-react'
 import { RelayLogoIcon } from '@/components/relay/relay-logo-icon'
 import { generateAndStashKeypair } from '@/lib/crypto/browser-identity'
 
@@ -19,6 +19,25 @@ export default function SignUpPage() {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
+
+  // Password strength scoring
+  const getPasswordStrength = (pw: string): { score: number; label: string; color: string } => {
+    if (!pw) return { score: 0, label: '', color: '' }
+    let score = 0
+    if (pw.length >= 8) score++
+    if (pw.length >= 12) score++
+    if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++
+    if (/\d/.test(pw)) score++
+    if (/[^A-Za-z0-9]/.test(pw)) score++
+    if (score <= 1) return { score: 1, label: 'Weak', color: 'bg-red-500' }
+    if (score <= 2) return { score: 2, label: 'Fair', color: 'bg-orange-500' }
+    if (score <= 3) return { score: 3, label: 'Good', color: 'bg-yellow-500' }
+    if (score <= 4) return { score: 4, label: 'Strong', color: 'bg-green-500' }
+    return { score: 5, label: 'Very strong', color: 'bg-emerald-500' }
+  }
+  const strength = getPasswordStrength(password)
+  const passwordsMatch = confirmPassword.length > 0 && password === confirmPassword
+  const passwordsMismatch = confirmPassword.length > 0 && password !== confirmPassword
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -124,6 +143,21 @@ export default function SignUpPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     className="bg-secondary/50"
                   />
+                  {password.length > 0 && (
+                    <div className="space-y-1">
+                      <div className="flex gap-1 h-1">
+                        {[1, 2, 3, 4, 5].map((i) => (
+                          <div
+                            key={i}
+                            className={`flex-1 rounded-full transition-colors ${
+                              i <= strength.score ? strength.color : 'bg-muted'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground">{strength.label}</p>
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="confirm-password">Confirm Password</Label>
@@ -134,8 +168,14 @@ export default function SignUpPage() {
                     required
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="bg-secondary/50"
+                    className={`bg-secondary/50 ${passwordsMismatch ? 'border-destructive' : passwordsMatch ? 'border-green-500' : ''}`}
                   />
+                  {passwordsMismatch && (
+                    <p className="text-xs text-destructive">Passwords do not match</p>
+                  )}
+                  {passwordsMatch && (
+                    <p className="text-xs text-green-500">Passwords match</p>
+                  )}
                 </div>
                 
                 {error && (
@@ -147,10 +187,13 @@ export default function SignUpPage() {
                 <Button 
                   type="submit" 
                   className="w-full gradient-relay glow-primary text-white font-semibold" 
-                  disabled={isLoading}
+                  disabled={isLoading || passwordsMismatch}
                 >
                   {isLoading ? (
-                    <span className="animate-pulse">Creating account...</span>
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Creating account...
+                    </>
                   ) : (
                     <>
                       Create Account

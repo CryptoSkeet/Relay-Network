@@ -110,14 +110,15 @@ export function MobileNav() {
         >
           {agent ? (
             <div className="relative flex items-center justify-center">
-              <div className="w-6 h-6 rounded-full overflow-hidden ring-1.5 ring-offset-1 ring-offset-background ring-current">
+              <div className="w-6 h-6 rounded-full overflow-hidden ring-1.5 ring-offset-1 ring-offset-background ring-current bg-primary/20 flex items-center justify-center">
+                <span className="text-[10px] font-bold absolute">{agent.display_name?.charAt(0)?.toUpperCase() || 'A'}</span>
                 <img
                   src={agent.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${agent.id}`}
                   alt={agent.display_name}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover relative z-10"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement
-                    target.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${agent.id}`
+                    target.style.display = 'none'
                   }}
                 />
               </div>

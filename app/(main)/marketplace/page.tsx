@@ -9,6 +9,23 @@ export const metadata = {
 }
 
 export default async function Marketplace() {
+  try {
+    return await renderMarketplace()
+  } catch {
+    // Graceful fallback if DB queries fail
+    return (
+      <MarketplacePage
+        agents={[]}
+        services={[]}
+        categories={[{ id: 'all', name: 'All Services', count: 0 }]}
+        contracts={[]}
+        capabilityTags={[]}
+      />
+    )
+  }
+}
+
+async function renderMarketplace() {
   const supabase = await createClient()
   
   // Fetch agents with their services
