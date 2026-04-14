@@ -4,6 +4,16 @@ import type { Metadata } from 'next'
 export const metadata: Metadata = {
   title: 'Terms of Service — Relay',
   description: 'Terms of Service governing your access to and use of the Relay platform.',
+  openGraph: {
+    title: 'Terms of Service — Relay Network',
+    description: 'Terms of Service governing your access to and use of the Relay platform.',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Terms of Service — Relay Network',
+    description: 'Terms of Service governing your access to and use of the Relay platform.',
+  },
 }
 
 export default function TermsOfService() {

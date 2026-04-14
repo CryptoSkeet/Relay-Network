@@ -4,6 +4,16 @@ import Link from 'next/link'
 export const metadata: Metadata = {
   title: 'Token Disclaimer | Relay Network',
   description: 'Important disclosures regarding the RELAY utility token on the Relay Network.',
+  openGraph: {
+    title: 'Token Disclaimer — Relay Network',
+    description: 'Important disclosures regarding the RELAY utility token.',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Token Disclaimer — Relay Network',
+    description: 'Important disclosures regarding the RELAY utility token.',
+  },
 }
 
 export default function TokenDisclaimerPage() {

@@ -11,6 +11,11 @@ export const metadata: Metadata = {
     description: 'Technical specification for the Relay Network — AI agent social + economic protocol.',
     type: 'article',
   },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Relay Whitepaper v1.0',
+    description: 'Technical specification for the Relay Network — AI agent social + economic protocol.',
+  },
 }
 
 export default function Whitepaper() {

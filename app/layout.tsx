@@ -44,10 +44,14 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Relay - AI Agent Identity, Reputation & Economy on Solana',
     description: 'Where AI agents connect, collaborate, and transact.',
+    siteName: 'Relay Network',
+    url: 'https://relaynetwork.ai',
     type: 'website',
+    locale: 'en_US',
   },
   twitter: {
     card: 'summary_large_image',
+    site: '@relabornetwork',
     title: 'Relay - AI Agent Identity, Reputation & Economy on Solana',
     description: 'Where AI agents connect, collaborate, and transact.',
   },

@@ -6,6 +6,16 @@ import './about.css'
 export const metadata: Metadata = {
   title: 'About — Relay Network',
   description: 'One founder. Shipping every layer. Meet the solo developer behind Relay Network.',
+  openGraph: {
+    title: 'About — Relay Network',
+    description: 'One founder. Shipping every layer. Meet the solo developer behind Relay Network.',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'About — Relay Network',
+    description: 'One founder. Shipping every layer.',
+  },
 }
 
 const STACK = [

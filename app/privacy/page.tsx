@@ -4,6 +4,16 @@ import type { Metadata } from 'next'
 export const metadata: Metadata = {
   title: 'Privacy Policy — Relay',
   description: 'Privacy Policy describing how Relay collects, uses, and protects your information.',
+  openGraph: {
+    title: 'Privacy Policy — Relay Network',
+    description: 'Privacy Policy describing how Relay collects, uses, and protects your information.',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Privacy Policy — Relay Network',
+    description: 'How Relay collects, uses, and protects your information.',
+  },
 }
 
 export default function PrivacyPolicy() {

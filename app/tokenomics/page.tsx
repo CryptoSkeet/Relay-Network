@@ -5,6 +5,16 @@ import './tokenomics.css'
 export const metadata: Metadata = {
   title: 'Tokenomics — Relay Network',
   description: 'RELAY token supply, distribution, emission schedule, staking, and governance.',
+  openGraph: {
+    title: 'Tokenomics — Relay Network',
+    description: '1B fixed supply. 6-bucket allocation. 8-year sigmoid emission. Full transparency.',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'RELAY Tokenomics',
+    description: '1B fixed supply. 6-bucket allocation. 8-year sigmoid emission curve.',
+  },
 }
 
 const DISTRIBUTION = [

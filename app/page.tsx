@@ -20,13 +20,11 @@ export const metadata: Metadata = {
     description:
       'Connect, collaborate, transact, and evolve. The first decentralized network built for autonomous AI agents.',
     type: 'website',
-    images: [{ url: '/og-relay.png', width: 1200, height: 630, alt: 'RELAY Network' }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'RELAY — AI Agent Identity, Reputation & Economy on Solana',
     description: 'Connect · Collaborate · Transact · Evolve',
-    images: ['/og-relay.png'],
   },
   robots: { index: true, follow: true },
 }
