@@ -1,0 +1,349 @@
+:root {
+  --tk-bg: #03040a;
+  --tk-bg-card: #0a0c14;
+  --tk-bg-card-hover: #0f1220;
+  --tk-green: #00f5a0;
+  --tk-blue: #0aaeff;
+  --tk-orange: #ff6b35;
+  --tk-purple: #cc44ff;
+  --tk-yellow: #ffcc44;
+  --tk-cyan: #44ffee;
+  --tk-text: #e2e4e9;
+  --tk-text-dim: #6b7084;
+  --tk-text-muted: #3d4156;
+  --tk-border: #161929;
+  --tk-border-hover: #252a40;
+}
+
+.tk-page .ambient {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 600px 400px at 20% 10%, rgba(0, 245, 160, 0.04), transparent),
+    radial-gradient(ellipse 500px 500px at 80% 60%, rgba(10, 174, 255, 0.03), transparent);
+}
+
+.tk-page .scanlines {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, 0.03) 2px, rgba(0, 0, 0, 0.03) 4px);
+}
+
+.tk-page .tk-container {
+  position: relative;
+  z-index: 2;
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 60px 24px 100px;
+}
+
+/* Breadcrumb */
+.tk-page .breadcrumb {
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  color: var(--tk-text-dim);
+  letter-spacing: 0.5px;
+  margin-bottom: 48px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tk-page .breadcrumb a { color: var(--tk-green); text-decoration: none; }
+.tk-page .breadcrumb a:hover { text-decoration: underline; }
+.tk-page .breadcrumb .sep { opacity: 0.3; }
+
+/* Hero */
+.tk-page .hero { margin-bottom: 56px; }
+.tk-page .hero h1 {
+  font-family: 'Syne', sans-serif;
+  font-size: clamp(32px, 5vw, 48px);
+  font-weight: 800;
+  color: var(--tk-text);
+  line-height: 1.15;
+  margin: 0 0 16px;
+}
+.tk-page .hero .subtitle {
+  font-family: 'DM Mono', monospace;
+  font-size: 14px;
+  color: var(--tk-text-dim);
+  line-height: 1.7;
+  max-width: 640px;
+}
+.tk-page .devnet-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+  padding: 6px 14px;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  border-radius: 6px;
+}
+
+/* Section heading */
+.tk-page .section-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--tk-green);
+  margin-bottom: 12px;
+}
+.tk-page .section-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--tk-text);
+  margin: 0 0 8px;
+}
+.tk-page .section-desc {
+  font-family: 'DM Mono', monospace;
+  font-size: 13px;
+  color: var(--tk-text-dim);
+  line-height: 1.6;
+  margin-bottom: 24px;
+}
+
+/* Supply card row */
+.tk-page .supply-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 48px;
+}
+.tk-page .supply-card {
+  background: var(--tk-bg-card);
+  border: 1px solid var(--tk-border);
+  border-radius: 10px;
+  padding: 20px;
+}
+.tk-page .supply-card .label {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--tk-text-dim);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.tk-page .supply-card .value {
+  font-family: 'Syne', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--tk-text);
+}
+
+/* Distribution table */
+.tk-page .dist-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin-bottom: 48px;
+}
+.tk-page .dist-table th {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--tk-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-align: left;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--tk-border);
+}
+.tk-page .dist-table td {
+  font-family: 'DM Mono', monospace;
+  font-size: 13px;
+  color: var(--tk-text);
+  padding: 16px;
+  border-bottom: 1px solid var(--tk-border);
+  vertical-align: top;
+}
+.tk-page .dist-table tr:last-child td { border-bottom: none; }
+.tk-page .dist-table .cat-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+}
+.tk-page .dist-table .cat-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.tk-page .dist-table .pct { font-weight: 700; white-space: nowrap; }
+.tk-page .dist-table .tokens { white-space: nowrap; }
+.tk-page .dist-table .vesting {
+  font-size: 12px;
+  color: var(--tk-text-dim);
+  line-height: 1.5;
+}
+
+/* Visual bar chart */
+.tk-page .bar-chart { margin-bottom: 48px; }
+.tk-page .bar-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.tk-page .bar-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  color: var(--tk-text-dim);
+  width: 140px;
+  flex-shrink: 0;
+  text-align: right;
+}
+.tk-page .bar-track {
+  flex: 1;
+  height: 28px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.tk-page .bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 10px;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(0, 0, 0, 0.8);
+  min-width: 40px;
+}
+
+/* Emission section */
+.tk-page .emission-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 48px;
+}
+.tk-page .emission-card {
+  background: var(--tk-bg-card);
+  border: 1px solid var(--tk-border);
+  border-radius: 10px;
+  padding: 20px;
+}
+.tk-page .emission-card .year {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--tk-text-dim);
+  margin-bottom: 4px;
+}
+.tk-page .emission-card .pct {
+  font-family: 'Syne', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--tk-green);
+}
+.tk-page .emission-card .tokens {
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  color: var(--tk-text-dim);
+  margin-top: 2px;
+}
+
+/* Formula block */
+.tk-page .formula-block {
+  background: var(--tk-bg-card);
+  border: 1px solid var(--tk-border);
+  border-radius: 10px;
+  padding: 24px;
+  margin-bottom: 48px;
+  overflow-x: auto;
+}
+.tk-page .formula-block pre {
+  font-family: 'DM Mono', monospace;
+  font-size: 13px;
+  color: var(--tk-green);
+  line-height: 1.7;
+  margin: 0;
+  white-space: pre-wrap;
+}
+.tk-page .formula-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--tk-text-muted);
+  margin-top: 12px;
+}
+
+/* Staking card */
+.tk-page .staking-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 48px;
+}
+@media (max-width: 600px) {
+  .tk-page .staking-row { grid-template-columns: 1fr; }
+  .tk-page .bar-label { width: 100px; font-size: 11px; }
+  .tk-page .dist-table .vesting { display: none; }
+}
+.tk-page .staking-card {
+  background: var(--tk-bg-card);
+  border: 1px solid var(--tk-border);
+  border-radius: 10px;
+  padding: 24px;
+}
+.tk-page .staking-card .heading {
+  font-family: 'Syne', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--tk-text);
+  margin-bottom: 12px;
+}
+.tk-page .staking-card .detail {
+  font-family: 'DM Mono', monospace;
+  font-size: 13px;
+  color: var(--tk-text-dim);
+  line-height: 1.6;
+}
+.tk-page .staking-card .highlight {
+  color: var(--tk-green);
+  font-weight: 600;
+}
+
+/* CTA row */
+.tk-page .cta-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 48px;
+  padding-top: 32px;
+  border-top: 1px solid var(--tk-border);
+}
+.tk-page .cta-btn {
+  font-family: 'DM Mono', monospace;
+  font-size: 13px;
+  padding: 12px 24px;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: background 0.2s, border-color 0.2s;
+}
+.tk-page .cta-primary {
+  background: var(--tk-green);
+  color: #03040a;
+  font-weight: 700;
+  border: 1px solid var(--tk-green);
+}
+.tk-page .cta-primary:hover { background: #00d68a; }
+.tk-page .cta-secondary {
+  background: transparent;
+  color: var(--tk-text-dim);
+  border: 1px solid var(--tk-border);
+}
+.tk-page .cta-secondary:hover { border-color: var(--tk-border-hover); color: var(--tk-text); }
