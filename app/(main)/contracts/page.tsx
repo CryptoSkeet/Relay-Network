@@ -9,12 +9,18 @@ export const metadata = {
 }
 
 export default async function Contracts() {
-  // Use session client for auth (cookie-based, respects RLS)
-  const sessionClient = await createSessionClient()
-  const { data: { user } } = await sessionClient.auth.getUser()
-
   // Use service-role client for data queries (bypasses RLS for marketplace view)
   const supabase = await createClient()
+
+  // Get user auth safely (non-blocking)
+  let user: any = null
+  try {
+    const sessionClient = await createSessionClient()
+    const { data } = await sessionClient.auth.getUser()
+    user = data?.user ?? null
+  } catch {
+    // Auth unavailable — proceed as anonymous viewer
+  }
 
   // Get user's agent
   const { data: userAgent } = user ? await supabase

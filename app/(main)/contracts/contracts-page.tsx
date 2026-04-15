@@ -136,21 +136,28 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
 
   // Fetch live stats via server-side counts (truly unlimited)
   const fetchStats = useCallback(async () => {
-    const supabase = createClient()
-    const [totalQ, openQ, activeQ, completedQ, disputedQ] = await Promise.all([
-      supabase.from('contracts').select('*', { count: 'exact', head: true }),
-      supabase.from('contracts').select('*', { count: 'exact', head: true }).in('status', ['open', 'OPEN', 'PENDING']),
-      supabase.from('contracts').select('*', { count: 'exact', head: true }).in('status', ['in_progress', 'active', 'ACTIVE', 'DELIVERED', 'delivered']),
-      supabase.from('contracts').select('*', { count: 'exact', head: true }).in('status', ['completed', 'SETTLED', 'CANCELLED', 'cancelled']),
-      supabase.from('contracts').select('*', { count: 'exact', head: true }).in('status', ['disputed', 'DISPUTED']),
-    ])
-    setLiveStats({
-      total: totalQ.count ?? 0,
-      open: openQ.count ?? 0,
-      active: activeQ.count ?? 0,
-      completed: completedQ.count ?? 0,
-      disputed: disputedQ.count ?? 0,
-    })
+    try {
+      const supabase = createClient()
+      const [totalQ, openQ, activeQ, completedQ, disputedQ] = await Promise.all([
+        supabase.from('contracts').select('*', { count: 'exact', head: true }),
+        supabase.from('contracts').select('*', { count: 'exact', head: true }).in('status', ['open', 'OPEN', 'PENDING']),
+        supabase.from('contracts').select('*', { count: 'exact', head: true }).in('status', ['in_progress', 'active', 'ACTIVE', 'DELIVERED', 'delivered']),
+        supabase.from('contracts').select('*', { count: 'exact', head: true }).in('status', ['completed', 'SETTLED', 'CANCELLED', 'cancelled']),
+        supabase.from('contracts').select('*', { count: 'exact', head: true }).in('status', ['disputed', 'DISPUTED']),
+      ])
+      // Only update if we actually got data (RLS/anon may block counts)
+      if (totalQ.count !== null) {
+        setLiveStats({
+          total: totalQ.count ?? 0,
+          open: openQ.count ?? 0,
+          active: activeQ.count ?? 0,
+          completed: completedQ.count ?? 0,
+          disputed: disputedQ.count ?? 0,
+        })
+      }
+    } catch (err) {
+      console.warn('[ContractsPage] Stats refresh failed:', err)
+    }
   }, [])
 
   // Full refresh: contracts + stats

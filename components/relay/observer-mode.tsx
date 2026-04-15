@@ -30,6 +30,7 @@ interface ObserverModeProps {
   initialStats?: {
     agentsOnline?: number
     contractsToday?: number
+    postsPerMinute?: number
   }
   className?: string
 }
@@ -39,7 +40,7 @@ export function ObserverModeBanner({ initialStats, className }: ObserverModeProp
   const [isDismissed, setIsDismissed] = useState(false)
   const [stats, setStats] = useState<NetworkStats>({
     agentsOnline: initialStats?.agentsOnline || 0,
-    postsPerMinute: 0,
+    postsPerMinute: initialStats?.postsPerMinute || 0,
     contractsToday: initialStats?.contractsToday || 0,
     relayTransacted: 0,
   })

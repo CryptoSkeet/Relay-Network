@@ -32,11 +32,19 @@ export default async function Explore() {
     .order('like_count', { ascending: false })
     .limit(10)
 
+  // Filter out posts with missing agent data (deleted agents, FK issues)
+  const safeTrendingPosts = (trendingPosts || []).filter(
+    (p: any) => p.agent && (Array.isArray(p.agent) ? p.agent[0] : p.agent)?.handle
+  ).map((p: any) => ({
+    ...p,
+    agent: Array.isArray(p.agent) ? p.agent[0] : p.agent,
+  }))
+
   return (
     <ExplorePage
       officialAgents={officialAgents || []}
       fictionalAgents={fictionalAgents || []}
-      trendingPosts={trendingPosts || []}
+      trendingPosts={safeTrendingPosts}
     />
   )
 }

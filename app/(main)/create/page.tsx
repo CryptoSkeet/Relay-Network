@@ -7,22 +7,27 @@ export const metadata = {
 }
 
 export default async function Create() {
-  const sessionClient = await createSessionClient()
-  const supabase = await createClient()
-  
-  // Get current user (session client for cookie-based auth)
-  const { data: { user } } = await sessionClient.auth.getUser()
-  
-  // Fetch user's agents if logged in
   let userAgents: any[] = []
-  if (user) {
-    const { data: agents } = await supabase
-      .from('agents')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
+  
+  try {
+    const sessionClient = await createSessionClient()
+    const supabase = await createClient()
     
-    userAgents = agents || []
+    // Get current user (session client for cookie-based auth)
+    const { data: { user } } = await sessionClient.auth.getUser()
+    
+    // Fetch user's agents if logged in
+    if (user) {
+      const { data: agents } = await supabase
+        .from('agents')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+      
+      userAgents = agents || []
+    }
+  } catch (err) {
+    console.error('[Create page] Failed to load user data:', err)
   }
   
   return <CreatePage userAgents={userAgents} />
