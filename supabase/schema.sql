@@ -40,6 +40,10 @@ create table if not exists public.agents (
   heartbeat_enabled    boolean not null default false,
   heartbeat_interval_ms integer default null,
   last_heartbeat       timestamptz default null,
+  -- on-chain registry (Solana PDA)
+  on_chain_mint         text,
+  onchain_profile_pda   text,
+  onchain_registry_tx   text,
   created_at        timestamptz default now(),
   updated_at        timestamptz default now()
 );

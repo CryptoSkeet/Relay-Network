@@ -1,0 +1,115 @@
+# .github/workflows/deploy-registry.yml
+#
+# Build and deploy the relay_agent_registry Anchor program to Solana devnet.
+# Triggered manually via workflow_dispatch or on pushes to programs/ directory.
+
+name: Deploy Agent Registry Program
+
+on:
+  workflow_dispatch:
+    inputs:
+      network:
+        description: 'Solana cluster to deploy to'
+        required: true
+        default: 'devnet'
+        type: choice
+        options:
+          - devnet
+          - mainnet-beta
+  push:
+    branches: [main]
+    paths:
+      - 'programs/**'
+
+env:
+  ANCHOR_VERSION: '0.30.1'
+  SOLANA_VERSION: '2.2.1'
+  RUST_TOOLCHAIN: 'stable'
+  PROGRAM_NAME: relay_agent_registry
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          components: rustfmt, clippy
+
+      - name: Cache Rust/Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            programs/relay_agent_registry/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('programs/relay_agent_registry/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install Solana CLI
+        run: |
+          sh -c "$(curl -sSfL https://release.anza.xyz/v${{ env.SOLANA_VERSION }}/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+
+      - name: Install Anchor CLI
+        run: |
+          cargo install --git https://github.com/coral-xyz/anchor --tag v${{ env.ANCHOR_VERSION }} anchor-cli --locked
+
+      - name: Verify toolchain
+        run: |
+          solana --version
+          anchor --version
+          rustc --version
+
+      - name: Configure Solana CLI
+        run: |
+          NETWORK=${{ github.event.inputs.network || 'devnet' }}
+          solana config set --url https://api.${NETWORK}.solana.com
+          echo "${{ secrets.RELAY_PAYER_KEYPAIR }}" > /tmp/payer.json
+          solana config set --keypair /tmp/payer.json
+
+      - name: Write program keypair
+        run: |
+          mkdir -p programs/relay_agent_registry/deploy
+          echo '${{ secrets.REGISTRY_PROGRAM_KEYPAIR }}' > programs/relay_agent_registry/deploy/relay_agent_registry-keypair.json
+
+      - name: Build program
+        working-directory: programs
+        run: anchor build
+
+      - name: Verify program ID
+        working-directory: programs
+        run: |
+          EXPECTED="Hs1hX4pSZSAQKLgGrcydyEaJMsJfqXQqJyJvVnqdaoDE"
+          ACTUAL=$(solana-keygen pubkey relay_agent_registry/deploy/relay_agent_registry-keypair.json)
+          echo "Expected: $EXPECTED"
+          echo "Actual:   $ACTUAL"
+          if [ "$EXPECTED" != "$ACTUAL" ]; then
+            echo "ERROR: Program ID mismatch!"
+            exit 1
+          fi
+
+      - name: Deploy program
+        working-directory: programs
+        run: |
+          NETWORK=${{ github.event.inputs.network || 'devnet' }}
+          echo "Deploying to $NETWORK..."
+          solana program deploy \
+            --program-id relay_agent_registry/deploy/relay_agent_registry-keypair.json \
+            --keypair /tmp/payer.json \
+            --url https://api.${NETWORK}.solana.com \
+            target/deploy/relay_agent_registry.so
+
+      - name: Verify deployment
+        run: |
+          NETWORK=${{ github.event.inputs.network || 'devnet' }}
+          solana program show Hs1hX4pSZSAQKLgGrcydyEaJMsJfqXQqJyJvVnqdaoDE --url https://api.${NETWORK}.solana.com
+
+      - name: Clean up keypairs
+        if: always()
+        run: rm -f /tmp/payer.json

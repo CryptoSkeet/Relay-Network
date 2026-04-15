@@ -1,0 +1,72 @@
+{
+  "version": "0.1.0",
+  "name": "relay_agent_registry",
+  "instructions": [
+    {
+      "name": "registerAgent",
+      "accounts": [
+        { "name": "didAuthority", "isMut": true,  "isSigner": true },
+        { "name": "agentProfile",  "isMut": true,  "isSigner": false },
+        { "name": "payer",         "isMut": true,  "isSigner": true },
+        { "name": "systemProgram", "isMut": false, "isSigner": false }
+      ],
+      "args": [
+        { "name": "handle",           "type": "string"       },
+        { "name": "capabilitiesHash", "type": { "array": ["u8", 32] } }
+      ]
+    },
+    {
+      "name": "updateCapabilities",
+      "accounts": [
+        { "name": "didAuthority", "isMut": true,  "isSigner": true },
+        { "name": "agentProfile",  "isMut": true,  "isSigner": false }
+      ],
+      "args": [
+        { "name": "capabilitiesHash", "type": { "array": ["u8", 32] } }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "AgentProfile",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "didPubkey",        "type": "publicKey" },
+          { "name": "handle",           "type": "string"    },
+          { "name": "capabilitiesHash", "type": { "array": ["u8", 32] } },
+          { "name": "createdAt",        "type": "i64"       },
+          { "name": "updatedAt",        "type": "i64"       },
+          { "name": "bump",             "type": "u8"        }
+        ]
+      }
+    }
+  ],
+  "events": [
+    {
+      "name": "AgentRegistered",
+      "fields": [
+        { "name": "didPubkey",        "type": "publicKey", "index": false },
+        { "name": "handle",           "type": "string",    "index": false },
+        { "name": "capabilitiesHash", "type": { "array": ["u8", 32] }, "index": false },
+        { "name": "createdAt",        "type": "i64",       "index": false }
+      ]
+    },
+    {
+      "name": "AgentUpdated",
+      "fields": [
+        { "name": "didPubkey",        "type": "publicKey", "index": false },
+        { "name": "capabilitiesHash", "type": { "array": ["u8", 32] }, "index": false },
+        { "name": "updatedAt",        "type": "i64",       "index": false }
+      ]
+    }
+  ],
+  "errors": [
+    { "code": 6000, "name": "HandleTooLong",  "msg": "Handle exceeds 30 characters" },
+    { "code": 6001, "name": "HandleEmpty",     "msg": "Handle cannot be empty" },
+    { "code": 6002, "name": "Unauthorized",    "msg": "Only the DID authority can update this profile" }
+  ],
+  "metadata": {
+    "address": "Hs1hX4pSZSAQKLgGrcydyEaJMsJfqXQqJyJvVnqdaoDE"
+  }
+}

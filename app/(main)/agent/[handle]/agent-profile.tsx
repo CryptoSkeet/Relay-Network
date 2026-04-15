@@ -272,6 +272,36 @@ export function AgentProfile({
     to: agent.gradient_to || agent.accent_color || '#06b6d4',
   })
 
+  // On-chain profile state
+  const [onchainProfile, setOnchainProfile] = useState<{
+    pdaAddress: string
+    didPubkey: string
+    handle: string
+    capabilitiesHash: string
+    createdAt: number
+    updatedAt: number
+  } | null>(null)
+  const [onchainSolscanUrl, setOnchainSolscanUrl] = useState<string | null>(null)
+  const [onchainLoading, setOnchainLoading] = useState(false)
+  const [onchainProgramDeployed, setOnchainProgramDeployed] = useState<boolean | null>(null)
+
+  // Fetch on-chain profile data
+  useEffect(() => {
+    if (!identity?.public_key) return
+    setOnchainLoading(true)
+    fetch(`/api/agents/${agent.handle}/onchain-profile`)
+      .then(res => res.json())
+      .then(data => {
+        setOnchainProfile(data.onchain ?? null)
+        setOnchainSolscanUrl(data.solscanUrl ?? null)
+        setOnchainProgramDeployed(data.programDeployed ?? null)
+      })
+      .catch(() => {
+        setOnchainProfile(null)
+      })
+      .finally(() => setOnchainLoading(false))
+  }, [agent.handle, identity?.public_key])
+
   // Check follow status + detect ownership on mount
   useEffect(() => {
     const supabase = createClient()
@@ -1198,6 +1228,62 @@ export function AgentProfile({
                       </>
                     )}
                   </Button>
+                </div>
+
+                {/* On-Chain Profile (Solana Registry) */}
+                <div className="rounded-xl border border-border bg-secondary/30 p-4">
+                  <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                    <ExternalLink className="w-4 h-4 text-primary" />
+                    On-Chain Profile (Solana)
+                  </h3>
+                  {onchainLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <div className="w-4 h-4 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin" />
+                      Checking on-chain status...
+                    </div>
+                  ) : onchainProfile ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                        <span className="text-sm font-semibold text-emerald-400">Verified On-Chain</span>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-muted-foreground">PDA Address</span>
+                        </div>
+                        <p className="font-mono text-xs text-muted-foreground break-all bg-background/50 p-2 rounded-lg">
+                          {onchainProfile.pdaAddress}
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <span className="text-xs text-muted-foreground">Capabilities Hash</span>
+                        <p className="font-mono text-xs text-muted-foreground break-all bg-background/50 p-2 rounded-lg">
+                          {onchainProfile.capabilitiesHash}
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Registered</span>
+                        <span className="font-mono">{new Date(onchainProfile.createdAt * 1000).toLocaleDateString()}</span>
+                      </div>
+                      {onchainSolscanUrl && (
+                        <a
+                          href={onchainSolscanUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 text-sm text-primary hover:underline mt-2"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          View on Solscan
+                        </a>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-muted-foreground">
+                      {onchainProgramDeployed === false
+                        ? 'Registry program not yet deployed to Solana.'
+                        : 'Not yet registered on-chain.'}
+                    </div>
+                  )}
                 </div>
 
                 {/* Reputation Details */}

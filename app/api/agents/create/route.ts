@@ -19,9 +19,10 @@ import { NextRequest } from 'next/server'
 import { createClient, getUserFromRequest } from '@/lib/supabase/server'
 import { AGENT_TYPE_CAPABILITIES, type AgentType } from '@/lib/relay/agent-engine'
 import { checkRateLimit, agentCreationRateLimit, rateLimitResponse } from '@/lib/ratelimit'
-import { Connection } from '@solana/web3.js'
+import { Connection, Keypair } from '@solana/web3.js'
 import { encryptPrivateKey } from '@/lib/crypto/identity'
 import { ensureAgentWallet, mintRelayTokens } from '@/lib/solana/relay-token'
+import { registerAgentOnChain, isRegistryDeployed, deriveAgentProfilePDA } from '@/lib/solana/agent-registry'
 // @ts-ignore
 import { generateAgentIdentity, mintAgentNFT, loadPayerKeypair } from '@/lib/agent-factory'
 
@@ -183,9 +184,41 @@ export async function POST(request: NextRequest) {
         })
         if (didError) console.warn('[create] agent_identities insert failed:', didError.message)
 
+        // ── Step 2b: Register agent profile on-chain (PDA via registry program) ──
+        let onchainProfilePda: string | null = null
+        let onchainRegistryTx: string | null = null
+        const payerKeypair = loadPayerKeypair()
+
+        if (payerKeypair) {
+          try {
+            const connection = new Connection(SOLANA_RPC, 'confirmed')
+            const deployed = await isRegistryDeployed(connection)
+            if (deployed) {
+              push('progress', { step: 'registry', message: 'Registering profile on-chain...' })
+              const didSeed = Buffer.from(privateKeyHex, 'hex')
+              const didKeypair = Keypair.fromSeed(new Uint8Array(didSeed))
+              const agentCapabilities = validatedCapabilities.length > 0
+                ? validatedCapabilities
+                : (AGENT_TYPE_CAPABILITIES[agentType as AgentType] ?? ['general-purpose'])
+              const result = await registerAgentOnChain(connection, didKeypair, payerKeypair, handle, agentCapabilities)
+              onchainProfilePda = result.profileAddress
+              onchainRegistryTx = result.signature
+              await supabase
+                .from('agents')
+                .update({ onchain_profile_pda: onchainProfilePda, onchain_registry_tx: onchainRegistryTx })
+                .eq('id', agent.id)
+              console.log(`[create] On-chain profile registered: PDA=${onchainProfilePda} tx=${onchainRegistryTx}`)
+            } else {
+              console.log('[create] Registry program not deployed — skipping on-chain profile registration')
+            }
+          } catch (err) {
+            // Non-fatal — agent still usable without on-chain profile
+            console.warn('[create] On-chain registry error (non-fatal):', err)
+          }
+        }
+
         // ── Step 3: Solana mint (optional — requires RELAY_PAYER_SECRET_KEY) ──
         let mintAddress: string | null = null
-        const payerKeypair = loadPayerKeypair()
 
         if (payerKeypair && creatorWallet) {
           push('progress', { step: 'solana', message: 'Anchoring identity on Solana...' })
@@ -365,6 +398,8 @@ export async function POST(request: NextRequest) {
           did,
           mintAddress,
           handle,
+          onchainProfilePda: onchainProfilePda ?? undefined,
+          onchainRegistryTx: onchainRegistryTx ?? undefined,
           message:     `Agent @${handle} deployed with ${SIGNUP_BONUS} RELAY sign-up bonus.`,
         })
 
