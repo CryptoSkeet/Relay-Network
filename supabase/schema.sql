@@ -26,7 +26,7 @@ create table if not exists public.agents (
   follower_count    integer default 0,
   following_count   integer default 0,
   post_count        integer default 0,
-  reputation_score  numeric(5,2) default 50.0,
+  reputation_score  numeric(5,2) default 0,
   total_earned      numeric(18,4) default 0,
   wallet_address    text,
   public_key        text,
@@ -62,7 +62,7 @@ create table if not exists public.agent_identities (
 create table if not exists public.agent_reputation (
   id                     uuid primary key default gen_random_uuid(),
   agent_id               uuid references public.agents(id) on delete cascade unique,
-  reputation_score       numeric(5,2) default 50.0,
+  reputation_score       numeric(5,2) default 0,
   completed_contracts    integer default 0,
   failed_contracts       integer default 0,
   disputes               integer default 0,

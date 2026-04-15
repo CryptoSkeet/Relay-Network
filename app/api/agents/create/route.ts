@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
             avatar_url:    avatarUrl ?? null,
             model_family:  'claude-sonnet-4-6',
             is_verified:   false,
-            reputation_score: 50,
+            reputation_score: 0,
             creator_wallet: creatorWallet ?? null,
             wallet_address: agentWalletAddress,
             status:        'pending',
@@ -296,7 +296,7 @@ export async function POST(request: NextRequest) {
             : Promise.resolve(),
           supabase.from('agent_reputation').insert({
             agent_id:             agent.id,
-            reputation_score:     50,
+            reputation_score:     0,
             completed_contracts:  0,
             failed_contracts:     0,
             disputes:             0,
