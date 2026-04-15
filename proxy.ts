@@ -3,13 +3,13 @@ import type { NextRequest } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 import { Redis } from '@upstash/redis'
 
-// ── Kill switch (Edge-safe: env var + Redis REST) ──────────────────────────
+// -- Kill switch (Edge-safe: env var + Redis REST) ---------------------------
 
 const KILL_REDIS_KEY = 'relay:kill_switch'
 
 interface KillState { all?: boolean; agents?: boolean; llm?: boolean }
 
-// Module-level singleton — reused across requests in the same isolate
+// Module-level singleton - reused across requests in the same isolate
 let _redis: Redis | null = null
 function getRedis(): Redis | null {
   if (_redis) return _redis
@@ -25,8 +25,9 @@ async function getKillState(): Promise<KillState> {
   const envVal = process.env.KILL_SWITCH?.trim()
   if (envVal) {
     const t = envVal.toLowerCase().split(',').map(s => s.trim())
-    if (t.includes('all') || t.includes('true') || t.includes('1'))
+    if (t.includes('all') || t.includes('true') || t.includes('1')) {
       return { all: true, agents: true, llm: true }
+    }
     return { all: false, agents: t.includes('agents'), llm: t.includes('llm') }
   }
   // Redis cache (singleton client)
@@ -36,19 +37,21 @@ async function getKillState(): Promise<KillState> {
       const cached = await r.get(KILL_REDIS_KEY) as KillState | null
       if (cached) return cached
     }
-  } catch { /* Redis down — safe open */ }
+  } catch {
+    // Redis down - safe open
+  }
   return {}
 }
 
 const MAINTENANCE_HTML = `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Relay Network — Maintenance</title>
+<title>Relay Network - Maintenance</title>
 <style>*{margin:0;padding:0;box-sizing:border-box}body{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0a0f1e;color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif;text-align:center}
 .c{max-width:480px;padding:2rem}.icon{font-size:3rem;margin-bottom:1rem}h1{font-size:1.5rem;margin-bottom:.75rem;background:linear-gradient(135deg,#7c3aed,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 p{color:#94a3b8;line-height:1.6;margin-bottom:.5rem}.status{display:inline-block;margin-top:1.5rem;padding:.5rem 1.25rem;border-radius:9999px;font-size:.875rem;background:rgba(124,58,237,.15);color:#a78bfa;border:1px solid rgba(124,58,237,.3)}</style>
 </head><body><div class="c"><div class="icon">🔧</div><h1>Relay Network</h1><p>We're performing scheduled maintenance.<br>The network will be back online shortly.</p><span class="status">Systems updating</span></div></body></html>`
 
-// ── Inline CORS helpers (Edge-safe — no Node.js imports) ────────────────────
+// -- Inline CORS helpers (Edge-safe - no Node.js imports) --------------------
 
 const ALLOWED_ORIGINS = [
   'https://relaynetwork.ai',
@@ -62,11 +65,9 @@ const ALLOWED_ORIGINS = [
 ]
 
 function isOriginAllowed(origin: string | null): boolean {
-  if (!origin) return true // Same-origin / server-to-server
+  if (!origin) return true
   if (ALLOWED_ORIGINS.includes(origin)) return true
-  // Allow Vercel preview deployments
   if (/^https:\/\/[a-z0-9-]+-cryptoskeets-projects\.vercel\.app$/.test(origin)) return true
-  // Check env-configured origins
   const envUrl = process.env.NEXT_PUBLIC_APP_URL
   if (envUrl && origin === envUrl) return true
   const extras = (process.env.CORS_ALLOWED_ORIGINS || '').split(',').map(o => o.trim()).filter(Boolean)
@@ -84,11 +85,10 @@ function corsHeaders(origin: string | null): Record<string, string> {
   }
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   const origin = request.headers.get('origin')
 
-  // ── 1. Skip for health checks, CRON routes, and internal agent runs ─────
   if (
     pathname.match(/^\/api\/(health|ready|live)/) ||
     pathname.startsWith('/api/cron/') ||
@@ -99,23 +99,18 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // ── 1b. Handle CORS preflight (OPTIONS) BEFORE kill switch ──────────────
-  //    Preflight must always get proper CORS headers, even during maintenance
   if (request.method === 'OPTIONS') {
     return new NextResponse(null, { status: 204, headers: corsHeaders(origin) })
   }
 
-  // ── 1c. Kill switch — maintenance page for "all" kill ───────────────────
-  //    Always allow /admin, /api/admin, and /api/kill-switch through
   const isAdminRoute = pathname.startsWith('/admin') || pathname.startsWith('/api/admin') || pathname.startsWith('/api/kill-switch')
   if (!isAdminRoute) {
     const kill = await getKillState()
     if (kill.all) {
       const cors = corsHeaders(origin)
-      // API routes get JSON with CORS headers, pages get the maintenance HTML
       if (pathname.startsWith('/api/')) {
         return NextResponse.json(
-          { error: 'Service unavailable — network is under maintenance', kill_switch: true },
+          { error: 'Service unavailable - network is under maintenance', kill_switch: true },
           { status: 503, headers: cors }
         )
       }
@@ -126,7 +121,6 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // ── 2. Validate CORS origin ──────────────────────────────────────────────
   if (!isOriginAllowed(origin)) {
     return NextResponse.json(
       { error: 'CORS policy: Origin not allowed' },
@@ -134,7 +128,6 @@ export async function middleware(request: NextRequest) {
     )
   }
 
-  // ── 3. Protect /api/admin/* with CRON_SECRET ────────────────────────────
   if (pathname.startsWith('/api/admin')) {
     const cronSecret = process.env.CRON_SECRET
     const auth = request.headers.get('authorization')
@@ -143,10 +136,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // ── 4. Refresh Supabase auth session (sets/refreshes cookies) ────────────
   const sessionResponse = await updateSession(request)
-
-  // ── 5. Merge session cookies into the final response with CORS headers ──
   const response = sessionResponse
   const cors = corsHeaders(origin)
   for (const [key, value] of Object.entries(cors)) {
