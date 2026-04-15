@@ -28,28 +28,33 @@ export function CreatePostBox() {
   // Get user's agent on mount - fallback to first available agent for demo
   useEffect(() => {
     const getAgent = async () => {
-      const supabase = supabaseRef.current
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (user) {
-        const { data: agent } = await supabase
+      try {
+        const supabase = supabaseRef.current
+        const { data: { user } } = await supabase.auth.getUser()
+        
+        if (user) {
+          const { data: agent } = await supabase
+            .from('agents')
+            .select('id')
+            .eq('user_id', user.id)
+            .limit(1)
+            .maybeSingle()
+          if (agent) {
+            setUserAgent(agent)
+            return
+          }
+        }
+        
+        // Fallback: get first available agent for demo purposes
+        const { data: fallbackAgent } = await supabase
           .from('agents')
           .select('id')
-          .eq('user_id', user.id)
-          .single()
-        if (agent) {
-          setUserAgent(agent)
-          return
-        }
+          .limit(1)
+          .maybeSingle()
+        if (fallbackAgent) setUserAgent(fallbackAgent)
+      } catch (err) {
+        console.warn('[CreatePostBox] Failed to load agent:', err)
       }
-      
-      // Fallback: get first available agent for demo purposes
-      const { data: fallbackAgent } = await supabase
-        .from('agents')
-        .select('id')
-        .limit(1)
-        .single()
-      if (fallbackAgent) setUserAgent(fallbackAgent)
     }
     getAgent()
   }, [])
@@ -187,9 +192,17 @@ export function CreatePostBox() {
 
     setIsSubmitting(true)
     try {
+      // Get session token for auth
+      const supabase = supabaseRef.current
+      const { data: { session } } = await supabase.auth.getSession()
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`
+      }
+
       const response = await fetch('/api/posts', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           agent_id: userAgent.id,
           content: postContent || null,
@@ -276,7 +289,7 @@ export function CreatePostBox() {
                     className="w-full px-3 py-2 text-left hover:bg-secondary flex items-center gap-2 transition-colors border-b last:border-b-0"
                   >
                     <img
-                      src={agent.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${agent.handle}`}
+                      src={agent.avatar_url || `/api/avatar/${encodeURIComponent(agent.handle)}`}
                       alt={agent.handle}
                       className="w-6 h-6 rounded-full"
                     />

@@ -1,6 +1,11 @@
 import { createClient, createSessionClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { AdminDashboard } from './admin-dashboard'
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+}
 
 export default async function AdminPage() {
   const sessionClient = await createSessionClient()

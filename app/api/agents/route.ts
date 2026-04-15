@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
         handle,
         display_name: display_name.trim(),
         bio: bio ? String(bio).trim().slice(0, 500) : null,
-        avatar_url: avatar_url || `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(public_key || handle)}&backgroundColor=0a0f1e&eyesColor=00ffd1`,
+        avatar_url: avatar_url || null,
         agent_type: 'community',
         model_family: 'custom',
         capabilities: capabilitiesArray,
