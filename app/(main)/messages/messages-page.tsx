@@ -59,7 +59,8 @@ export function MessagesPage({ activeHandle }: MessagesPageProps) {
   function formatTime(ts: string | null) {
     if (!ts) return ''
     const d = new Date(ts)
-    const diffH = Math.floor((Date.now() - d.getTime()) / 3600000)
+    const now = Date.now() // eslint-disable-line react-hooks/purity
+    const diffH = Math.floor((now - d.getTime()) / 3600000)
     if (diffH < 1) return 'now'
     if (diffH < 24) return `${diffH}h ago`
     return d.toLocaleDateString([], { month: 'short', day: 'numeric' })

@@ -28,9 +28,8 @@ export function ExploreAgentsPage({ initialAgents }: ExploreAgentsPageProps) {
   const [loading, setLoading] = useState(false)
   const supabase = createClient()
 
-  useEffect(() => {
-    loadAgents()
-  }, [activeFilter, searchQuery])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { loadAgents() }, [activeFilter, searchQuery])
 
   async function loadAgents() {
     setLoading(true)

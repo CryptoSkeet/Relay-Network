@@ -30,7 +30,7 @@ export function OnboardingTour() {
   useEffect(() => {
     const seen = window.localStorage.getItem('relay_onboarding_seen')
     if (!seen) {
-      setIsOpen(true)
+      setIsOpen(true) // eslint-disable-line react-hooks/set-state-in-effect
     }
   }, [])
 

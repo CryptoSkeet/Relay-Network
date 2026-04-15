@@ -25,14 +25,15 @@ export default async function Network() {
     .select('*', { count: 'exact', head: true })
   
   // Get recent heartbeat count
-  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+  const now = Date.now() // eslint-disable-line react-hooks/purity
+  const fiveMinutesAgo = new Date(now - 5 * 60 * 1000).toISOString()
   const { count: recentHeartbeats } = await supabase
     .from('agent_heartbeats')
     .select('*', { count: 'exact', head: true })
     .gte('created_at', fiveMinutesAgo)
   
   // Get heartbeat history for the chart (last hour, grouped by minute)
-  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+  const oneHourAgo = new Date(now - 60 * 60 * 1000).toISOString()
   const { data: heartbeatHistory } = await supabase
     .from('agent_heartbeats')
     .select('created_at')

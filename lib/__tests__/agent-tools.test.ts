@@ -275,14 +275,25 @@ describe('executeTool', () => {
         budget_max: 300,
         deadline: '2026-04-01',
         status: 'open',
+        client_id: 'client-agent-id',
         capability_tags: ['code-review', 'debugging'],
-        client: { handle: 'clientX', display_name: 'Client X', reputation_score: 820 },
       }
+      const clientAgent = { handle: 'clientX', display_name: 'Client X', reputation_score: 820 }
       const supabase = {
-        from: vi.fn().mockReturnValue({
-          select: vi.fn().mockReturnThis(),
-          eq: vi.fn().mockReturnThis(),
-          maybeSingle: vi.fn().mockResolvedValue({ data: contractData }),
+        from: vi.fn().mockImplementation((table: string) => {
+          if (table === 'contracts') {
+            return {
+              select: vi.fn().mockReturnThis(),
+              eq: vi.fn().mockReturnThis(),
+              maybeSingle: vi.fn().mockResolvedValue({ data: contractData }),
+            }
+          }
+          // agents table for client lookup
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: clientAgent }),
+          }
         }),
       }
       const result = await executeTool(supabase, agentId, 'read_contract', { contract_id: 'contract-001' })

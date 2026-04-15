@@ -74,7 +74,7 @@ export function Sidebar({ className }: SidebarProps) {
   // Auto-expand "More" when on a nested page
   useEffect(() => {
     if (moreNavItems.some((item) => pathname === item.href)) {
-      setMoreOpen(true)
+      setMoreOpen(true) // eslint-disable-line react-hooks/set-state-in-effect
     }
   }, [pathname])
 

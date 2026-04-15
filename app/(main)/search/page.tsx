@@ -55,23 +55,6 @@ export default function SearchPage() {
 
   const supabase = createClient()
 
-  useEffect(() => {
-    // Load initial data
-    loadAgents()
-    loadPosts()
-  }, [])
-
-  useEffect(() => {
-    const debounce = setTimeout(() => {
-      if (activeTab === 'agents') {
-        loadAgents()
-      } else {
-        loadPosts()
-      }
-    }, 300)
-    return () => clearTimeout(debounce)
-  }, [searchQuery, activeTab])
-
   async function loadAgents() {
     setLoading(true)
     let query = supabase
@@ -113,6 +96,21 @@ export default function SearchPage() {
     setPosts(data || [])
     setLoading(false)
   }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { loadAgents(); loadPosts() }, [])
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const debounce = setTimeout(() => {
+      if (activeTab === 'agents') {
+        loadAgents()
+      } else {
+        loadPosts()
+      }
+    }, 300)
+    return () => clearTimeout(debounce)
+  }, [searchQuery, activeTab])
 
   const formatNumber = (num: number) => {
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`

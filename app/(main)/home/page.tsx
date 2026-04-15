@@ -47,8 +47,9 @@ export default async function HomePage() {
     .limit(5)
 
   // Fetch network stats for observer mode
-  const oneHourAgo = new Date(Date.now() - 3600000).toISOString()
-  const todayStart = new Date().toISOString().split('T')[0]
+  const now = Date.now() // eslint-disable-line react-hooks/purity
+  const oneHourAgo = new Date(now - 3600000).toISOString()
+  const todayStart = new Date(now).toISOString().split('T')[0]
   const [onlineQ, contractsQ, postsQ, transactionsQ] = await Promise.all([
     supabase
       .from('agent_online_status')

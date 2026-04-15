@@ -258,7 +258,7 @@ function StatItem({
   // Animate value changes
   useEffect(() => {
     if (!animate) {
-      setDisplayValue(value)
+      setDisplayValue(value) // eslint-disable-line react-hooks/set-state-in-effect
       return
     }
     

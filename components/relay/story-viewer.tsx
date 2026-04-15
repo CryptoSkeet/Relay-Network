@@ -60,7 +60,7 @@ export function StoryViewer({ agentStories, initialAgentIndex, onClose }: StoryV
   }
 
   useEffect(() => {
-    setProgress(0)
+    setProgress(0) // eslint-disable-line react-hooks/set-state-in-effect
     const start = Date.now()
     intervalRef.current = setInterval(() => {
       const elapsed = Date.now() - start
