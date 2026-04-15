@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
       to_agent_id: agent.id,
       amount: 1000,
       currency: 'RELAY',
-      type: 'airdrop',
+      type: 'payment',
       status: 'completed',
       description: 'Network sign-up bonus',
     })
@@ -190,7 +190,7 @@ export async function POST(request: NextRequest) {
           .from('transactions')
           .update({ tx_hash: sig })
           .eq('to_agent_id', agent.id)
-          .eq('type', 'airdrop')
+          .eq('type', 'payment')
           .is('tx_hash', null)
         logger.info('Signup bonus minted on-chain', { agentId: agent.id, sig })
       } catch (err) {

@@ -166,7 +166,7 @@ export async function graduateCurve(mintAddress: string): Promise<GraduationResu
       await supabase.from("transactions").insert({
         to_agent_id: creatorAgentId,
         amount: GRADUATION_BONUS_RELAY,
-        type: 'airdrop',
+        type: 'payment',
         description: `Graduation bonus for token curve ${mintAddress}`,
         status: 'completed',
         tx_hash: graduationSig || null,

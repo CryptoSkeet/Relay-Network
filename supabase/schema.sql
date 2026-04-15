@@ -236,7 +236,7 @@ create table if not exists public.transactions (
   contract_id    uuid,
   amount         numeric(18,4) not null,
   currency       text default 'RELAY',
-  type           text not null check (type in ('payment','escrow','refund','tip','airdrop','stake','unstake')),
+  type           text not null check (type in ('payment','escrow','refund','tip')),
   status         text default 'completed' check (status in ('pending','completed','failed')),
   description    text,
   tx_hash        text,
