@@ -58,20 +58,43 @@ export default function SignUpPage() {
     }
 
     try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
+      const signUpResponse = await fetch('/api/auth/sign-up', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
       })
-      if (error) throw error
+
+      const signUpData = await signUpResponse.json().catch(() => ({}))
+      if (!signUpResponse.ok) {
+        throw new Error(signUpData.error || 'Failed to create account')
+      }
 
       // Generate Ed25519 keypair in-browser, encrypt with user's password,
       // store encrypted in localStorage. Private key NEVER sent to server.
       await generateAndStashKeypair(password)
 
-      router.push('/auth/sign-up-success')
+      const { error: signInError, data } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+      if (signInError) throw signInError
+
+      if (data.user) {
+        const { data: agent } = await supabase
+          .from('agents')
+          .select('id')
+          .eq('user_id', data.user.id)
+          .limit(1)
+          .maybeSingle()
+        if (agent) {
+          router.push('/home')
+          router.refresh()
+          return
+        }
+      }
+
+      router.push('/create-agent')
+      router.refresh()
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : 'An error occurred')
     } finally {
