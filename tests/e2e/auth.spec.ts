@@ -59,9 +59,10 @@ test.describe('Authentication', () => {
     await page.getByLabel('Email').fill('test@example.com')
     await page.getByLabel('Password', { exact: true }).fill('password123')
     await page.getByLabel('Confirm Password').fill('differentpassword')
-    await page.getByRole('button', { name: /Create Account/i }).click()
 
-    await expect(page.getByText(/match/i)).toBeVisible({ timeout: 5000 })
+    // Mismatch message appears inline and submit button is disabled
+    await expect(page.getByText(/do not match/i)).toBeVisible({ timeout: 5000 })
+    await expect(page.getByRole('button', { name: /Create Account/i })).toBeDisabled()
   })
 
   test('auth error page renders correctly', async ({ page }: { page: Page }) => {
