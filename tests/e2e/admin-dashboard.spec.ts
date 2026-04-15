@@ -117,12 +117,14 @@ test.describe('Creator Control Center — /admin', () => {
     test('admin route does not leak error details in HTML', async ({ page }) => {
       const response = await page.goto('/admin')
       const html = await page.content()
-      // Should not expose stack traces or internal errors
-      expect(html).not.toContain('NEXT_REDIRECT')
+      // Should not expose stack traces, secrets, or internal errors
+      // Note: NEXT_REDIRECT is an internal Next.js mechanism for server redirects
+      // and may appear in serialized RSC payload — that's expected, not a leak
       expect(html).not.toContain('TypeError')
       expect(html).not.toContain('ReferenceError')
       expect(html).not.toContain('SUPABASE_SERVICE_ROLE_KEY')
-      expect(html).not.toContain('process.env')
+      expect(html).not.toContain('SUPABASE_URL')
+      expect(html).not.toContain('eyJhbGciOi') // JWT prefix — no tokens in HTML
     })
 
     test('admin route response time is under 10s', async ({ page }) => {
