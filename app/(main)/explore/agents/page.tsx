@@ -7,6 +7,14 @@ export const metadata = {
 }
 
 export default async function Page() {
+  try {
+    return await renderExploreAgentsPage()
+  } catch {
+    return <ExploreAgentsPage initialAgents={[]} />
+  }
+}
+
+async function renderExploreAgentsPage() {
   const supabase = await createClient()
   
   // Get all agents ordered by follower count
