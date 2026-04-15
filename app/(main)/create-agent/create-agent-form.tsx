@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { claimPendingKeypair } from '@/lib/crypto/browser-identity'
+import { useCreateAgent } from '@/hooks/useCreateAgent'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -29,13 +30,11 @@ const CAPABILITY_OPTIONS = [
 
 export function CreateAgentForm({ onSuccess }: CreateAgentFormProps) {
   const router = useRouter()
-  const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [selectedCapabilities, setSelectedCapabilities] = useState<string[]>([])
-  const [pendingPublicKey, setPendingPublicKey] = useState<string | null>(null)
   const [walletSetup, setWalletSetup] = useState<{ agentId: string; handle: string; solanaAddress: string | null } | null>(null)
   const [disclaimerAcknowledged, setDisclaimerAcknowledged] = useState(false)
+  const { createAgent, isCreating, isSuccess, result, error: creationError, activeStep, completedSteps, steps } = useCreateAgent()
 
   const handleWalletComplete = async (wallet: AgentWallet) => {
     if (!walletSetup) return
@@ -57,23 +56,22 @@ export function CreateAgentForm({ onSuccess }: CreateAgentFormProps) {
     router.push(`/agent/${walletSetup.handle}`)
   }
 
-  // Read the public key that was generated at sign-up
-  useEffect(() => {
-    const stored = localStorage.getItem('relay_pending_keypair')
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored)
-        if (parsed.publicKey) setPendingPublicKey(parsed.publicKey)
-      } catch { /* ignore */ }
-    }
-  }, [])
-  
   const [formData, setFormData] = useState({
     handle: '',
     display_name: '',
     bio: '',
     capabilities: [] as string[],
   })
+
+  useEffect(() => {
+    if (!isSuccess || !result || walletSetup) return
+
+    claimPendingKeypair(result.agentId).catch(() => {})
+    localStorage.setItem('relay_agent_id', result.agentId)
+    setFormData({ handle: '', display_name: '', bio: '', capabilities: [] })
+    setSelectedCapabilities([])
+    setWalletSetup({ agentId: result.agentId, handle: result.handle, solanaAddress: null })
+  }, [isSuccess, result, walletSetup])
 
   const toggleCapability = (capId: string) => {
     setSelectedCapabilities(prev =>
@@ -113,60 +111,15 @@ export function CreateAgentForm({ onSuccess }: CreateAgentFormProps) {
     
     if (!validateForm()) return
 
-    setIsLoading(true)
     setError(null)
-    
-    try {
-      // Get session token so the API can link agent to this user account
-      const { createClient: createBrowserClient } = await import('@/lib/supabase/client')
-      const supabase = createBrowserClient()
-      const { data: { session } } = await supabase.auth.getSession()
 
-      const response = await fetch('/api/agents', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify({
-          ...formData,
-          capabilities: selectedCapabilities,
-          public_key: pendingPublicKey ?? undefined,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create agent')
-      }
-
-      // Register agent with heartbeat protocol as backup
-      try {
-        await fetch('/api/v1/heartbeat/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            agent_id: data.agent.id,
-            agent_handle: data.agent.handle,
-          }),
-        })
-      } catch (hbErr) {
-        console.warn('Failed to register heartbeat', hbErr)
-      }
-
-      // Promote the pending keypair to a permanent per-agent key in localStorage
-      claimPendingKeypair(data.agent.id).catch(() => {})
-      localStorage.setItem('relay_agent_id', data.agent.id)
-      setFormData({ handle: '', display_name: '', bio: '', capabilities: [] })
-      setSelectedCapabilities([])
-      // Show wallet setup modal before navigating
-      setWalletSetup({ agentId: data.agent.id, handle: data.agent.handle, solanaAddress: data.agent.wallet_address || null })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
-    } finally {
-      setIsLoading(false)
-    }
+    await createAgent({
+      handle: formData.handle.trim(),
+      displayName: formData.display_name.trim(),
+      bio: formData.bio.trim() || undefined,
+      agentType: 'custom',
+      capabilities: selectedCapabilities,
+    })
   }
 
   return (
@@ -231,23 +184,12 @@ export function CreateAgentForm({ onSuccess }: CreateAgentFormProps) {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Error Alert */}
-              {error && (
+              {(error || creationError) && (
                 <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
                   <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
                   <div>
                     <p className="font-medium text-sm text-red-500">Error</p>
-                    <p className="text-sm text-red-500/80">{error}</p>
-                  </div>
-                </div>
-              )}
-
-              {/* Success Alert */}
-              {successMessage && (
-                <div className="flex items-start gap-3 p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
-                  <Sparkles className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="font-medium text-sm text-green-500">Success!</p>
-                    <p className="text-sm text-green-500/80">{successMessage}</p>
+                    <p className="text-sm text-red-500/80">{error ?? creationError}</p>
                   </div>
                 </div>
               )}
@@ -265,7 +207,7 @@ export function CreateAgentForm({ onSuccess }: CreateAgentFormProps) {
                     placeholder="agent_name"
                     value={formData.handle}
                     onChange={handleInputChange}
-                    disabled={isLoading}
+                    disabled={isCreating}
                     className="flex-1"
                     maxLength={30}
                   />
@@ -286,7 +228,7 @@ export function CreateAgentForm({ onSuccess }: CreateAgentFormProps) {
                   placeholder="My Awesome Agent"
                   value={formData.display_name}
                   onChange={handleInputChange}
-                  disabled={isLoading}
+                  disabled={isCreating}
                   maxLength={50}
                 />
               </div>
@@ -301,7 +243,7 @@ export function CreateAgentForm({ onSuccess }: CreateAgentFormProps) {
                   placeholder="Tell users what your agent does..."
                   value={formData.bio}
                   onChange={handleInputChange}
-                  disabled={isLoading}
+                  disabled={isCreating}
                   rows={3}
                   maxLength={500}
                   className="resize-none"
@@ -324,7 +266,7 @@ export function CreateAgentForm({ onSuccess }: CreateAgentFormProps) {
                       key={cap.id}
                       type="button"
                       onClick={() => toggleCapability(cap.id)}
-                      disabled={isLoading}
+                      disabled={isCreating}
                       className={cn(
                         'p-3 rounded-lg border-2 transition-all text-left',
                         selectedCapabilities.includes(cap.id)
@@ -369,7 +311,7 @@ export function CreateAgentForm({ onSuccess }: CreateAgentFormProps) {
                     type="checkbox"
                     checked={disclaimerAcknowledged}
                     onChange={e => setDisclaimerAcknowledged(e.target.checked)}
-                    disabled={isLoading}
+                    disabled={isCreating}
                     className="mt-0.5 w-4 h-4 accent-primary cursor-pointer"
                   />
                   <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors leading-relaxed">
@@ -382,17 +324,39 @@ export function CreateAgentForm({ onSuccess }: CreateAgentFormProps) {
                 </label>
               </div>
 
+              {isCreating && (
+                <div className="space-y-2 rounded-lg border border-border/50 bg-muted/40 p-4">
+                  {steps.map(step => {
+                    const isDone = completedSteps.includes(step.id)
+                    const isActive = activeStep === step.id
+                    return (
+                      <div key={step.id} className="flex items-center gap-2 text-sm">
+                        <span className={cn(
+                          'inline-flex h-5 w-5 items-center justify-center rounded-full border text-[10px] font-semibold',
+                          isDone ? 'border-green-500 bg-green-500 text-white' : isActive ? 'border-blue-500 text-blue-500' : 'border-muted-foreground/30 text-muted-foreground'
+                        )}>
+                          {isDone ? '✓' : isActive ? '…' : ''}
+                        </span>
+                        <span className={cn(isDone ? 'text-foreground' : isActive ? 'text-foreground font-medium' : 'text-muted-foreground')}>
+                          {step.label}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
               {/* Submit Button */}
               <Button
                 type="submit"
-                disabled={isLoading || !disclaimerAcknowledged}
+                disabled={isCreating || !disclaimerAcknowledged}
                 size="lg"
                 className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-semibold"
               >
-                {isLoading ? (
+                {isCreating ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Creating Agent & Registering Heartbeat...
+                    Creating Agent...
                   </>
                 ) : (
                   <>

@@ -33,6 +33,7 @@ interface CreateAgentParams {
   agentType: string;
   systemPrompt?: string;
   avatarUrl?: string;
+  capabilities?: string[];
 }
 
 interface CreateAgentResult {
@@ -88,9 +89,14 @@ export function useCreateAgent() {
         throw new Error(body.error ?? `HTTP ${response.status}`);
       }
 
-      const reader = response.body!.getReader();
+      if (!response.body) {
+        throw new Error("Agent creation stream unavailable");
+      }
+
+      const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      let completed = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -134,12 +140,17 @@ export function useCreateAgent() {
               handle:      event.handle as string,
             });
             setStatus("success");
+            completed = true;
           }
 
           if (event.type === "error") {
             throw new Error(event.message as string);
           }
         }
+      }
+
+      if (!completed) {
+        throw new Error("Agent creation ended before completion");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Agent creation failed");

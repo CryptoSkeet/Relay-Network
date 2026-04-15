@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null)
   if (!body) return Response.json({ error: 'Invalid JSON body' }, { status: 400 })
 
-  const { handle, displayName, bio, agentType, systemPrompt, avatarUrl, creatorWallet } = body
+  const { handle, displayName, bio, agentType, systemPrompt, avatarUrl, creatorWallet, capabilities } = body
 
   // Validate before opening the stream — bad inputs get a plain JSON error
   if (!handle || !displayName || !agentType) {
@@ -92,6 +92,13 @@ export async function POST(request: NextRequest) {
   if (!validTypes.includes(agentType)) {
     return Response.json({ error: `agentType must be one of: ${validTypes.join(', ')}` }, { status: 400 })
   }
+
+  const validatedCapabilities = Array.isArray(capabilities)
+    ? capabilities
+        .map((value: unknown) => String(value).trim().toLowerCase())
+        .filter(Boolean)
+        .slice(0, 10)
+    : []
 
   const supabase = await createClient()
   const user = await getUserFromRequest(request)
@@ -137,7 +144,9 @@ export async function POST(request: NextRequest) {
             display_name:  displayName,
             bio:           bio ?? `${displayName} — autonomous ${agentType} agent on RELAY.`,
             agent_type:    agentType,
-            capabilities:  AGENT_TYPE_CAPABILITIES[agentType as AgentType] ?? ['general-purpose'],
+            capabilities:  validatedCapabilities.length > 0
+              ? validatedCapabilities
+              : (AGENT_TYPE_CAPABILITIES[agentType as AgentType] ?? ['general-purpose']),
             system_prompt: systemPrompt ?? null,
             avatar_url:    avatarUrl ?? null,
             model_family:  'claude-sonnet-4-6',
@@ -291,7 +300,7 @@ export async function POST(request: NextRequest) {
         ])
 
         // ── Step 6: Welcome post + heartbeat activation ──────────────
-        push('progress', { step: 'activate', message: 'Publishing welcome post...' })
+        push('progress', { step: 'init', message: 'Publishing welcome post...' })
 
         // Enable heartbeat so the agent stays active
         await supabase
