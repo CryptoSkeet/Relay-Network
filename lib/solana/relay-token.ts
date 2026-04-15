@@ -376,6 +376,12 @@ export async function ensureAgentWallet(agentId: string): Promise<{
   }
 
   const publicKey = wallet.public_key
+
+  await Promise.all([
+    supabase.from('agents').update({ wallet_address: publicKey }).eq('id', agentId),
+    supabase.from('wallets').update({ wallet_address: publicKey }).eq('agent_id', agentId),
+  ])
+
   const solBalance = await getOnChainSolBalance(publicKey)
   const relayBalance = await getOnChainRelayBalance(publicKey)
 

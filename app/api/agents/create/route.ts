@@ -20,6 +20,8 @@ import { createClient, getUserFromRequest } from '@/lib/supabase/server'
 import { AGENT_TYPE_CAPABILITIES, type AgentType } from '@/lib/relay/agent-engine'
 import { checkRateLimit, agentCreationRateLimit, rateLimitResponse } from '@/lib/ratelimit'
 import { Connection } from '@solana/web3.js'
+import { encryptPrivateKey } from '@/lib/crypto/identity'
+import { ensureAgentWallet, mintRelayTokens } from '@/lib/solana/relay-token'
 // @ts-ignore
 import { generateAgentIdentity, mintAgentNFT, loadPayerKeypair } from '@/lib/agent-factory'
 
@@ -131,7 +133,7 @@ export async function POST(request: NextRequest) {
 
         // ── Step 1: Generate agent identity (DID + wallet from same Ed25519 seed) ──
         push('progress', { step: 'did', message: 'Generating agent identity...' })
-        const { did, walletAddress: agentWalletAddress, publicKeyHex } = generateAgentIdentity()
+        const { did, walletAddress: agentWalletAddress, publicKeyHex, privateKeyHex } = generateAgentIdentity()
 
         // ── Step 2: Insert agent + DID ────────────────────────────────────
         push('progress', { step: 'supabase', message: 'Registering agent...' })
@@ -169,11 +171,15 @@ export async function POST(request: NextRequest) {
           throw new Error(agentError.message)
         }
 
+        const encryptedIdentity = encryptPrivateKey(privateKeyHex)
+
         // Also store DID in agent_identities for key management
         const { error: didError } = await supabase.from('agent_identities').insert({
           agent_id:   agent.id,
           did,
           public_key: publicKeyHex,
+          encrypted_private_key: encryptedIdentity.encryptedKey,
+          encryption_iv: encryptedIdentity.iv,
         })
         if (didError) console.warn('[create] agent_identities insert failed:', didError.message)
 
@@ -209,18 +215,39 @@ export async function POST(request: NextRequest) {
             .eq('id', agent.id)
         }
 
+        const ensuredWallet = await ensureAgentWallet(agent.id)
+        await Promise.all([
+          supabase
+            .from('agents')
+            .update({ wallet_address: ensuredWallet.publicKey, did })
+            .eq('id', agent.id),
+          supabase
+            .from('wallets')
+            .upsert({
+              agent_id: agent.id,
+              wallet_address: ensuredWallet.publicKey,
+              balance: SIGNUP_BONUS,
+              staked_balance: 0,
+              locked_balance: 0,
+              lifetime_earned: SIGNUP_BONUS,
+              lifetime_spent: 0,
+              currency: 'RELAY',
+            }, { onConflict: 'agent_id' }),
+        ])
+
         // ── Step 4: Wallet + signup bonus ─────────────────────────────────
         push('progress', { step: 'wallet', message: 'Creating wallet...' })
 
-        const { error: walletError } = await supabase.from('wallets').insert({
+        const { error: walletError } = await supabase.from('wallets').upsert({
           agent_id:        agent.id,
           balance:         SIGNUP_BONUS,
           staked_balance:  0,
           locked_balance:  0,
           lifetime_earned: SIGNUP_BONUS,
           lifetime_spent:  0,
+          wallet_address:  ensuredWallet.publicKey,
           currency:        'RELAY',
-        })
+        }, { onConflict: 'agent_id' })
         if (walletError) throw new Error(`Wallet creation failed: ${walletError.message}`)
 
         await supabase.from('transactions').insert({
@@ -233,23 +260,18 @@ export async function POST(request: NextRequest) {
           description:   'Network sign-up bonus',
         })
 
-        // Mint signup bonus RELAY on-chain (fire-and-forget — DB credit above is authoritative)
-        ;(async () => {
-          try {
-            const { data: solWallet } = await supabase
-              .from('solana_wallets')
-              .select('public_key')
-              .eq('agent_id', agent.id)
-              .maybeSingle()
-            if (solWallet?.public_key) {
-              const { mintRelayTokens } = await import('@/lib/solana/relay-token')
-              const sig = await mintRelayTokens(solWallet.public_key, SIGNUP_BONUS)
-              console.log(`[create] Signup bonus minted on-chain for ${agent.id}: ${sig}`)
-            }
-          } catch (err) {
-            console.warn('[create] On-chain signup bonus mint failed (non-fatal):', err)
-          }
-        })()
+        try {
+          const sig = await mintRelayTokens(ensuredWallet.publicKey, SIGNUP_BONUS)
+          await supabase
+            .from('transactions')
+            .update({ tx_hash: sig })
+            .eq('to_agent_id', agent.id)
+            .eq('type', 'airdrop')
+            .is('tx_hash', null)
+          console.log(`[create] Signup bonus minted on-chain for ${agent.id}: ${sig}`)
+        } catch (err) {
+          throw new Error(err instanceof Error ? `On-chain signup bonus mint failed: ${err.message}` : 'On-chain signup bonus mint failed')
+        }
 
         // ── Step 5: Reputation + online status + notification ─────────────
         push('progress', { step: 'init', message: 'Initializing agent profile...' })

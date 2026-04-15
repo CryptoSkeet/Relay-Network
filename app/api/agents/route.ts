@@ -1,10 +1,11 @@
 import { createClient, getUserFromRequest } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import { ValidationError, ConflictError, isAppError } from '@/lib/errors'
-import { generateKeypair, generateDID } from '@/lib/crypto/identity'
+import { generateKeypair, generateDID, encryptPrivateKey } from '@/lib/crypto/identity'
 import { generateAndStoreAvatar } from '@/lib/generate-avatar'
 import { type NextRequest, NextResponse } from 'next/server'
 import { checkRateLimit, agentCreationRateLimit, rateLimitResponse } from '@/lib/ratelimit'
+import { ensureAgentWallet, mintRelayTokens } from '@/lib/solana/relay-token'
 
 // Lowercase-only to match DB handle constraint and avoid case-insensitive duplicates
 const HANDLE_REGEX = /^[a-z0-9_]{3,30}$/
@@ -131,6 +132,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    await supabase.from('transactions').insert({
+      from_agent_id: null,
+      to_agent_id: agent.id,
+      amount: 1000,
+      currency: 'RELAY',
+      type: 'airdrop',
+      status: 'completed',
+      description: 'Network sign-up bonus',
+    })
+
     // Create agent identity record (DID + public key, derived from Ed25519 keypair)
     let agentDid: string | null = null
     let identityPrivateKey: string | null = null
@@ -138,12 +149,16 @@ export async function POST(request: NextRequest) {
       const { publicKey: identityPubKey, privateKey: identityPrivKey } = await generateKeypair()
       identityPrivateKey = identityPrivKey
       agentDid = generateDID(identityPubKey)
+      const encryptedIdentity = encryptPrivateKey(identityPrivKey)
+      await supabase.from('agents').update({ did: agentDid, public_key: identityPubKey }).eq('id', agent.id)
       const { error: identityError } = await supabase
         .from('agent_identities')
         .insert({
           agent_id: agent.id,
           did: agentDid,
           public_key: identityPubKey,
+          encrypted_private_key: encryptedIdentity.encryptedKey,
+          encryption_iv: encryptedIdentity.iv,
           verification_tier: 'unverified',
           oauth_provider: user?.app_metadata?.provider || 'email',
           oauth_id: user?.id || null,
@@ -155,59 +170,33 @@ export async function POST(request: NextRequest) {
       logger.warn('Agent identity creation skipped', identityErr)
     }
 
-    // Derive Solana wallet from identity key (DID ↔ wallet linked via same Ed25519 seed)
+    // Derive Solana wallet from identity key and persist canonical address on both agents + wallets
+    let canonicalWalletAddress: string | null = null
     try {
-      if (process.env.SOLANA_WALLET_ENCRYPTION_KEY && identityPrivateKey) {
-        const { generateSolanaKeypairFromIdentity } = await import('@/lib/solana/generate-wallet')
-        const { publicKey, encryptedPrivateKey, iv } = generateSolanaKeypairFromIdentity(identityPrivateKey)
-        
-        const { error: solanaWalletError } = await supabase
-          .from('solana_wallets')
-          .insert({
-            agent_id: agent.id,
-            public_key: publicKey,
-            encrypted_private_key: encryptedPrivateKey,
-            encryption_iv: iv,
-          })
-
-        if (solanaWalletError) {
-          if (solanaWalletError.code === 'PGRST205') {
-            logger.info('Solana wallets table not yet created - skipping')
-          } else {
-            logger.warn('Failed to create Solana wallet for agent', solanaWalletError)
-          }
-        } else {
-          await supabase
-            .from('agents')
-            .update({ wallet_address: publicKey })
-            .eq('id', agent.id)
-        }
-      } else if (!identityPrivateKey) {
-        logger.info('No identity key available - skipping Solana wallet derivation')
-      } else {
-        logger.info('SOLANA_WALLET_ENCRYPTION_KEY not set - skipping Solana wallet')
-      }
+      const ensuredWallet = await ensureAgentWallet(agent.id)
+      canonicalWalletAddress = ensuredWallet.publicKey
+      await Promise.all([
+        supabase.from('agents').update({ wallet_address: ensuredWallet.publicKey }).eq('id', agent.id),
+        supabase.from('wallets').update({ wallet_address: ensuredWallet.publicKey }).eq('agent_id', agent.id),
+      ])
     } catch (solanaErr) {
       logger.info('Solana wallet generation skipped', solanaErr)
     }
 
-    // Mint signup bonus RELAY on-chain (fire-and-forget — DB credit above is authoritative)
-    ;(async () => {
+    if (canonicalWalletAddress) {
       try {
-        const { data: solWallet } = await supabase
-          .from('solana_wallets')
-          .select('public_key')
-          .eq('agent_id', agent.id)
-          .maybeSingle()
-        if (solWallet?.public_key) {
-          const { mintRelayTokens } = await import('@/lib/solana/relay-token')
-          const sig = await mintRelayTokens(solWallet.public_key, 1000)
-          logger.info('Signup bonus minted on-chain', { agentId: agent.id, sig })
-        }
+        const sig = await mintRelayTokens(canonicalWalletAddress, 1000)
+        await supabase
+          .from('transactions')
+          .update({ tx_hash: sig })
+          .eq('to_agent_id', agent.id)
+          .eq('type', 'airdrop')
+          .is('tx_hash', null)
+        logger.info('Signup bonus minted on-chain', { agentId: agent.id, sig })
       } catch (err) {
-        logger.warn('On-chain signup bonus mint failed (non-fatal)', err)
+        logger.warn('On-chain signup bonus mint failed', err)
       }
-    })()
+    }
 
     // Run non-critical setup in parallel (fire-and-forget, don't block response)
     // Heartbeat, online status, welcome post — all non-blocking
