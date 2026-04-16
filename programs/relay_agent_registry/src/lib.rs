@@ -1,9 +1,12 @@
 use anchor_lang::prelude::*;
+use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
 declare_id!("Hs1hX4pSZSAQKLgGrcydyEaJMsJfqXQqJyJvVnqdaoDE");
 
 /// Maximum byte lengths for stored fields.
 const MAX_HANDLE_LEN: usize = 30;
+/// Maximum contract ID length (UUID = 36 chars).
+const MAX_CONTRACT_ID_LEN: usize = 36;
 
 #[program]
 pub mod relay_agent_registry {
@@ -95,6 +98,120 @@ pub mod relay_agent_registry {
             model_hash,
             prompt_hash,
             committed_at: commitment.committed_at,
+        });
+
+        Ok(())
+    }
+
+    // ── Escrow instructions ─────────────────────────────────────────────
+
+    /// Lock RELAY tokens into a program-owned escrow vault for a contract.
+    /// The buyer transfers `amount` RELAY from their ATA to the escrow vault PDA.
+    pub fn lock_escrow(
+        ctx: Context<LockEscrow>,
+        contract_id: String,
+        amount: u64,
+    ) -> Result<()> {
+        require!(contract_id.len() <= MAX_CONTRACT_ID_LEN, EscrowError::ContractIdTooLong);
+        require!(amount > 0, EscrowError::ZeroAmount);
+
+        // Transfer RELAY from buyer ATA → escrow vault
+        let cpi_accounts = Transfer {
+            from: ctx.accounts.buyer_token_account.to_account_info(),
+            to: ctx.accounts.escrow_vault.to_account_info(),
+            authority: ctx.accounts.buyer.to_account_info(),
+        };
+        let cpi_program = ctx.accounts.token_program.to_account_info();
+        token::transfer(CpiContext::new(cpi_program, cpi_accounts), amount)?;
+
+        // Initialize the escrow metadata PDA
+        let escrow = &mut ctx.accounts.escrow_account;
+        escrow.contract_id = contract_id.clone();
+        escrow.buyer = ctx.accounts.buyer.key();
+        escrow.seller = ctx.accounts.seller.key();
+        escrow.mint = ctx.accounts.mint.key();
+        escrow.amount = amount;
+        escrow.state = EscrowState::Locked;
+        escrow.locked_at = Clock::get()?.unix_timestamp;
+        escrow.bump = ctx.bumps.escrow_account;
+        escrow.vault_bump = ctx.bumps.escrow_vault;
+
+        emit!(EscrowLocked {
+            contract_id,
+            buyer: escrow.buyer,
+            seller: escrow.seller,
+            amount,
+            locked_at: escrow.locked_at,
+        });
+
+        Ok(())
+    }
+
+    /// Release escrowed RELAY to the seller after contract settlement.
+    /// Only the payer (backend authority) can call this.
+    pub fn release_escrow(ctx: Context<ReleaseEscrow>) -> Result<()> {
+        let escrow = &ctx.accounts.escrow_account;
+        require!(escrow.state == EscrowState::Locked, EscrowError::NotLocked);
+
+        let contract_id_bytes = ctx.accounts.escrow_account.contract_id.as_bytes();
+        let vault_bump = ctx.accounts.escrow_account.vault_bump;
+        let seeds: &[&[u8]] = &[b"escrow-vault", contract_id_bytes, &[vault_bump]];
+
+        // Transfer RELAY from escrow vault → seller ATA
+        let cpi_accounts = Transfer {
+            from: ctx.accounts.escrow_vault.to_account_info(),
+            to: ctx.accounts.seller_token_account.to_account_info(),
+            authority: ctx.accounts.escrow_vault.to_account_info(),
+        };
+        let cpi_program = ctx.accounts.token_program.to_account_info();
+        token::transfer(
+            CpiContext::new_with_signer(cpi_program, cpi_accounts, &[seeds]),
+            escrow.amount,
+        )?;
+
+        // Mark escrow as released
+        let escrow_mut = &mut ctx.accounts.escrow_account;
+        escrow_mut.state = EscrowState::Released;
+
+        emit!(EscrowReleased {
+            contract_id: escrow_mut.contract_id.clone(),
+            seller: escrow_mut.seller,
+            amount: escrow_mut.amount,
+        });
+
+        Ok(())
+    }
+
+    /// Refund escrowed RELAY back to the buyer (contract cancelled).
+    /// Only the payer (backend authority) can call this.
+    pub fn refund_escrow(ctx: Context<RefundEscrow>) -> Result<()> {
+        let escrow = &ctx.accounts.escrow_account;
+        require!(escrow.state == EscrowState::Locked, EscrowError::NotLocked);
+
+        let contract_id_bytes = ctx.accounts.escrow_account.contract_id.as_bytes();
+        let vault_bump = ctx.accounts.escrow_account.vault_bump;
+        let seeds: &[&[u8]] = &[b"escrow-vault", contract_id_bytes, &[vault_bump]];
+
+        // Transfer RELAY from escrow vault → buyer ATA
+        let cpi_accounts = Transfer {
+            from: ctx.accounts.escrow_vault.to_account_info(),
+            to: ctx.accounts.buyer_token_account.to_account_info(),
+            authority: ctx.accounts.escrow_vault.to_account_info(),
+        };
+        let cpi_program = ctx.accounts.token_program.to_account_info();
+        token::transfer(
+            CpiContext::new_with_signer(cpi_program, cpi_accounts, &[seeds]),
+            escrow.amount,
+        )?;
+
+        // Mark escrow as refunded
+        let escrow_mut = &mut ctx.accounts.escrow_account;
+        escrow_mut.state = EscrowState::Refunded;
+
+        emit!(EscrowRefunded {
+            contract_id: escrow_mut.contract_id.clone(),
+            buyer: escrow_mut.buyer,
+            amount: escrow_mut.amount,
         });
 
         Ok(())
@@ -232,6 +349,163 @@ pub enum RegistryError {
     Unauthorized,
 }
 
+#[error_code]
+pub enum EscrowError {
+    #[msg("Contract ID exceeds 36 characters")]
+    ContractIdTooLong,
+    #[msg("Escrow amount must be greater than zero")]
+    ZeroAmount,
+    #[msg("Escrow is not in Locked state")]
+    NotLocked,
+}
+
+// ── Escrow state ──────────────────────────────────────────────────────────────
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+pub enum EscrowState {
+    Locked,
+    Released,
+    Refunded,
+}
+
+/// PDA: seeds = [b"escrow", contract_id.as_bytes()]
+#[account]
+pub struct EscrowAccount {
+    /// The contract UUID this escrow belongs to.
+    pub contract_id: String,
+    /// Buyer who locked the funds.
+    pub buyer: Pubkey,
+    /// Seller who receives funds on release.
+    pub seller: Pubkey,
+    /// The SPL token mint (RELAY).
+    pub mint: Pubkey,
+    /// Amount locked (raw units, 6 decimals).
+    pub amount: u64,
+    /// Current state: Locked → Released | Refunded.
+    pub state: EscrowState,
+    /// Unix timestamp when locked.
+    pub locked_at: i64,
+    /// PDA bump for the escrow account.
+    pub bump: u8,
+    /// PDA bump for the escrow vault token account.
+    pub vault_bump: u8,
+}
+
+/// Account size: 8 (discriminator) + (4+36) contract_id + 32 buyer + 32 seller
+///             + 32 mint + 8 amount + 1 state + 8 locked_at + 1 bump + 1 vault_bump = 163
+impl EscrowAccount {
+    pub const SIZE: usize = 8 + (4 + MAX_CONTRACT_ID_LEN) + 32 + 32 + 32 + 8 + 1 + 8 + 1 + 1;
+}
+
+// ── Escrow account contexts ──────────────────────────────────────────────────
+
+#[derive(Accounts)]
+#[instruction(contract_id: String, amount: u64)]
+pub struct LockEscrow<'info> {
+    /// The buyer locking RELAY into escrow.
+    #[account(mut)]
+    pub buyer: Signer<'info>,
+
+    /// Seller pubkey (not a signer — just recorded).
+    /// CHECK: Validated by the backend; stored for release routing.
+    pub seller: UncheckedAccount<'info>,
+
+    /// The RELAY SPL token mint.
+    /// CHECK: Validated by token program during transfer.
+    pub mint: UncheckedAccount<'info>,
+
+    /// Buyer's associated token account (RELAY).
+    #[account(mut)]
+    pub buyer_token_account: Account<'info, TokenAccount>,
+
+    /// Escrow metadata PDA.
+    #[account(
+        init,
+        payer = payer,
+        space = EscrowAccount::SIZE,
+        seeds = [b"escrow", contract_id.as_bytes()],
+        bump,
+    )]
+    pub escrow_account: Account<'info, EscrowAccount>,
+
+    /// Program-owned escrow vault (token account PDA that holds the RELAY).
+    #[account(
+        init,
+        payer = payer,
+        token::mint = mint,
+        token::authority = escrow_vault,
+        seeds = [b"escrow-vault", contract_id.as_bytes()],
+        bump,
+    )]
+    pub escrow_vault: Account<'info, TokenAccount>,
+
+    /// Transaction fee payer (backend).
+    #[account(mut)]
+    pub payer: Signer<'info>,
+
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
+    pub rent: Sysvar<'info, Rent>,
+}
+
+#[derive(Accounts)]
+pub struct ReleaseEscrow<'info> {
+    /// Backend authority that triggers release.
+    #[account(mut)]
+    pub payer: Signer<'info>,
+
+    /// Escrow metadata PDA.
+    #[account(
+        mut,
+        seeds = [b"escrow", escrow_account.contract_id.as_bytes()],
+        bump = escrow_account.bump,
+    )]
+    pub escrow_account: Account<'info, EscrowAccount>,
+
+    /// Escrow vault holding the locked RELAY.
+    #[account(
+        mut,
+        seeds = [b"escrow-vault", escrow_account.contract_id.as_bytes()],
+        bump = escrow_account.vault_bump,
+    )]
+    pub escrow_vault: Account<'info, TokenAccount>,
+
+    /// Seller's associated token account to receive RELAY.
+    #[account(mut)]
+    pub seller_token_account: Account<'info, TokenAccount>,
+
+    pub token_program: Program<'info, Token>,
+}
+
+#[derive(Accounts)]
+pub struct RefundEscrow<'info> {
+    /// Backend authority that triggers refund.
+    #[account(mut)]
+    pub payer: Signer<'info>,
+
+    /// Escrow metadata PDA.
+    #[account(
+        mut,
+        seeds = [b"escrow", escrow_account.contract_id.as_bytes()],
+        bump = escrow_account.bump,
+    )]
+    pub escrow_account: Account<'info, EscrowAccount>,
+
+    /// Escrow vault holding the locked RELAY.
+    #[account(
+        mut,
+        seeds = [b"escrow-vault", escrow_account.contract_id.as_bytes()],
+        bump = escrow_account.vault_bump,
+    )]
+    pub escrow_vault: Account<'info, TokenAccount>,
+
+    /// Buyer's associated token account to receive refund.
+    #[account(mut)]
+    pub buyer_token_account: Account<'info, TokenAccount>,
+
+    pub token_program: Program<'info, Token>,
+}
+
 #[event]
 pub struct AgentRegistered {
     pub did_pubkey: Pubkey,
@@ -253,4 +527,27 @@ pub struct ModelCommitted {
     pub model_hash: [u8; 32],
     pub prompt_hash: [u8; 32],
     pub committed_at: i64,
+}
+
+#[event]
+pub struct EscrowLocked {
+    pub contract_id: String,
+    pub buyer: Pubkey,
+    pub seller: Pubkey,
+    pub amount: u64,
+    pub locked_at: i64,
+}
+
+#[event]
+pub struct EscrowReleased {
+    pub contract_id: String,
+    pub seller: Pubkey,
+    pub amount: u64,
+}
+
+#[event]
+pub struct EscrowRefunded {
+    pub contract_id: String,
+    pub buyer: Pubkey,
+    pub amount: u64,
 }
