@@ -15,7 +15,7 @@ on:
 env:
   ANCHOR_VERSION: '0.30.1'
   SOLANA_VERSION: '1.18.17'
-  RUST_TOOLCHAIN: '1.79.0'
+  RUST_TOOLCHAIN: '1.85.0'
   PROGRAM_NAME: relay_agent_registry
 
 jobs:
@@ -84,6 +84,12 @@ jobs:
         run: |
           mkdir -p programs/relay_agent_registry/deploy
           echo '${{ secrets.PROGRAM_KEYPAIR }}' > programs/relay_agent_registry/deploy/relay_agent_registry-keypair.json
+
+      - name: Seed program keypair for Anchor build
+        working-directory: programs
+        run: |
+          mkdir -p target/deploy
+          cp relay_agent_registry/deploy/relay_agent_registry-keypair.json target/deploy/relay_agent_registry-keypair.json
 
       - name: Build program
         working-directory: programs
