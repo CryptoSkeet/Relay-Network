@@ -50,29 +50,17 @@ jobs:
       - name: Install Solana CLI
         run: |
           set -euo pipefail
-          INSTALL_OK=0
-          for INSTALL_URL in \
-            "https://release.anza.xyz/v${{ env.SOLANA_VERSION }}/install" \
-            "https://release.solana.com/v${{ env.SOLANA_VERSION }}/install"; do
-            echo "Trying Solana installer: $INSTALL_URL"
-            if curl -4 -sSfL --retry 8 --retry-delay 3 --retry-all-errors --connect-timeout 20 "$INSTALL_URL" | sh; then
-              INSTALL_OK=1
-              break
-            fi
-          done
-          if [ "$INSTALL_OK" -ne 1 ]; then
-            echo "ERROR: Failed to install Solana CLI from all installer URLs"
+          SOLANA_ARCHIVE="solana-release-x86_64-unknown-linux-gnu.tar.bz2"
+          SOLANA_URL="https://github.com/solana-labs/solana/releases/download/v${{ env.SOLANA_VERSION }}/${SOLANA_ARCHIVE}"
+          curl -4 -sSfL --retry 8 --retry-delay 3 --retry-all-errors --connect-timeout 20 "$SOLANA_URL" -o "$RUNNER_TEMP/$SOLANA_ARCHIVE"
+          mkdir -p "$RUNNER_TEMP/solana"
+          tar -xjf "$RUNNER_TEMP/$SOLANA_ARCHIVE" -C "$RUNNER_TEMP/solana"
+          SOLANA_BIN="$(find "$RUNNER_TEMP/solana" -type f -name solana | head -n 1)"
+          if [ -z "$SOLANA_BIN" ]; then
+            echo "ERROR: Solana binary not found after archive extraction"
             exit 1
           fi
-          SOLANA_BIN_DIR="$HOME/.local/share/solana/install/active_release/bin"
-          if [ ! -x "$SOLANA_BIN_DIR/solana" ]; then
-            SOLANA_BIN="$(find "$HOME/.local/share/solana/install" -type f -name solana | head -n 1)"
-            if [ -z "$SOLANA_BIN" ]; then
-              echo "ERROR: Solana binary not found after install"
-              exit 1
-            fi
-            SOLANA_BIN_DIR="$(dirname "$SOLANA_BIN")"
-          fi
+          SOLANA_BIN_DIR="$(dirname "$SOLANA_BIN")"
           echo "$SOLANA_BIN_DIR" >> $GITHUB_PATH
           "$SOLANA_BIN_DIR/solana" --version
 
