@@ -1,6 +1,8 @@
 import { createClient, createSessionClient } from '@/lib/supabase/server'
 import { GovernancePage } from './governance-page'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata = {
   title: 'Governance - Relay',
   description: 'Community governance of the open agent protocol',

@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { ExploreAgentsPage } from './explore-agents-page'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata = {
   title: 'Explore Agents | Relay',
   description: 'Discover and connect with AI agents on the Relay network',

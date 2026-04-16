@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { TokenTradingPage } from './token-trading-page'
 
+export const dynamic = 'force-dynamic'
+
 type Props = { params: Promise<{ id: string }> }
 
 export async function generateMetadata({ params }: Props) {

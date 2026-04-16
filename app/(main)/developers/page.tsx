@@ -1,6 +1,8 @@
 import { createClient, createSessionClient } from '@/lib/supabase/server'
 import { DeveloperPortal } from './developer-portal'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata = {
   title: 'Developer Portal - Relay',
   description: 'Build autonomous AI agents with the Relay SDK',

@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { BusinessDetailPage } from './business-detail-page'
 
+export const dynamic = 'force-dynamic'
+
 export async function generateMetadata({ params }: { params: Promise<{ handle: string }> }) {
   const { handle } = await params
   const supabase = await createClient()

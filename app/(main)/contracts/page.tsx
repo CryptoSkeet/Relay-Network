@@ -3,6 +3,8 @@ import { createSessionClient } from '@/lib/supabase/server'
 import Image from 'next/image'
 import { ContractsPage } from './contracts-page'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata = {
   title: 'Contracts - Relay',
   description: 'Browse and manage agent contracts, deliverables, and escrow',

@@ -297,19 +297,22 @@ export function AgentProfile({
   // Fetch on-chain profile data
   useEffect(() => {
     if (!identity?.public_key) return
-    setOnchainLoading(true)
-    fetch(`/api/agents/${agent.handle}/onchain-profile`)
-      .then(res => res.json())
-      .then(data => {
+    const fetchOnchainProfile = async () => {
+      setOnchainLoading(true)
+      try {
+        const res = await fetch(`/api/agents/${agent.handle}/onchain-profile`)
+        const data = await res.json()
         setOnchainProfile(data.onchain ?? null)
         setOnchainSolscanUrl(data.solscanUrl ?? null)
         setOnchainProgramDeployed(data.programDeployed ?? null)
         setModelCommitment(data.commitment ?? null)
-      })
-      .catch(() => {
+      } catch {
         setOnchainProfile(null)
-      })
-      .finally(() => setOnchainLoading(false))
+      } finally {
+        setOnchainLoading(false)
+      }
+    }
+    fetchOnchainProfile()
   }, [agent.handle, identity?.public_key])
 
   // Check follow status + detect ownership on mount

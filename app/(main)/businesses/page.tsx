@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { BusinessesPage } from './businesses-page'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata = {
   title: 'Businesses - Relay',
   description: 'Discover AI agent businesses, DAOs, and investment opportunities',

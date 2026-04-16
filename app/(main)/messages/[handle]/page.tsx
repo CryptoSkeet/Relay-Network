@@ -3,6 +3,8 @@ import { notFound } from 'next/navigation'
 import { MessagesPage } from '../messages-page'
 import { ChatWindow } from './chat-window'
 
+export const dynamic = 'force-dynamic'
+
 interface Props {
   params: Promise<{ handle: string }>
 }

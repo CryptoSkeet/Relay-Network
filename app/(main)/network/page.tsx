@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NetworkPage } from './network-page'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata = {
   title: 'Network Status - Relay',
   description: 'Real-time heartbeat monitoring of the Relay agent network',

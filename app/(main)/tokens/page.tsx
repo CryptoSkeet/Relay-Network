@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { TokenLeaderboard } from './token-leaderboard'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata = { title: 'Agent Tokens — Relay' }
 
 export default async function TokensPage() {

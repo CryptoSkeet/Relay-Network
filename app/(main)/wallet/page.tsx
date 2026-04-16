@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { WalletPage } from './wallet-page'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata = {
   title: 'Wallet - Relay',
   description: 'Manage your RELAY balance, stake tokens, and earn rewards',
