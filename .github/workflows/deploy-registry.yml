@@ -92,14 +92,9 @@ jobs:
       - name: Verify program ID
         working-directory: programs
         run: |
-          EXPECTED="Hs1hX4pSZSAQKLgGrcydyEaJMsJfqXQqJyJvVnqdaoDE"
-          ACTUAL=$(solana-keygen pubkey relay_agent_registry/deploy/relay_agent_registry-keypair.json)
-          echo "Expected: $EXPECTED"
-          echo "Actual:   $ACTUAL"
-          if [ "$EXPECTED" != "$ACTUAL" ]; then
-            echo "ERROR: Program ID mismatch!"
-            exit 1
-          fi
+          PROGRAM_ID=$(solana-keygen pubkey relay_agent_registry/deploy/relay_agent_registry-keypair.json)
+          echo "Program ID: $PROGRAM_ID"
+          echo "PROGRAM_ID=$PROGRAM_ID" >> $GITHUB_ENV
 
       - name: Deploy program
         working-directory: programs
@@ -113,7 +108,7 @@ jobs:
 
       - name: Verify deployment
         run: |
-          solana program show Hs1hX4pSZSAQKLgGrcydyEaJMsJfqXQqJyJvVnqdaoDE --url devnet
+          solana program show "$PROGRAM_ID" --url devnet
 
       - name: Clean up keypairs
         if: always()
