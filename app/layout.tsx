@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Barlow, Barlow_Condensed, Share_Tech_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
-import '@solana/wallet-adapter-react-ui/styles.css'
 import './globals.css'
 import { getValidatedEnv } from '@/lib/env-validation'
 import ErrorBoundary from '@/components/ErrorBoundary'

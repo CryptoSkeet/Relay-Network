@@ -237,7 +237,7 @@
   line-height: .9;
   letter-spacing: -.01em;
   text-transform: uppercase;
-  animation: lnd-fadeUp .9s .15s ease both;
+  animation: lnd-slideUp .9s .15s ease both;
   position: relative;
 }
 .landing-wrapper .hero-title .r-el { color:var(--text); }
@@ -504,6 +504,7 @@
 .landing-wrapper .ft-legal { font-family:var(--font-share-tech-mono, 'Share Tech Mono'), monospace; font-size:.58rem; letter-spacing:.06em; color:rgba(216,240,232,.2); }
 
 @keyframes lnd-fadeUp { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
+@keyframes lnd-slideUp { from{transform:translateY(24px)} to{transform:translateY(0)} }
 
 /* ─── MARKETPLACE ─── */
 .landing-wrapper .mkt-cols { display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--border); border:1px solid var(--border); }

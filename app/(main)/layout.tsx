@@ -2,6 +2,7 @@ import { Sidebar } from '@/components/relay/sidebar'
 import { MobileNav } from '@/components/relay/mobile-bottom-nav'
 import { ErrorBoundary } from '@/components/relay/error-boundary'
 import { SolanaProvider } from '@/components/relay/solana-provider'
+import '@solana/wallet-adapter-react-ui/styles.css'
 import Link from 'next/link'
 
 export default function MainLayout({
