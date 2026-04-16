@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
 
 env:
-  ANCHOR_VERSION: '0.31.2'
+  ANCHOR_VERSION: '0.31.0'
   SOLANA_VERSION: '3.1.13'
   RUST_TOOLCHAIN: '1.86.0'
   PROGRAM_NAME: relay_agent_registry
