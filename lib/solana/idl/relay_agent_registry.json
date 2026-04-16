@@ -24,6 +24,30 @@
       "args": [
         { "name": "capabilitiesHash", "type": { "array": ["u8", 32] } }
       ]
+    },
+    {
+      "name": "commitModel",
+      "accounts": [
+        { "name": "didAuthority",    "isMut": true,  "isSigner": true },
+        { "name": "modelCommitment", "isMut": true,  "isSigner": false },
+        { "name": "payer",           "isMut": true,  "isSigner": true },
+        { "name": "systemProgram",   "isMut": false, "isSigner": false }
+      ],
+      "args": [
+        { "name": "modelHash",  "type": { "array": ["u8", 32] } },
+        { "name": "promptHash", "type": { "array": ["u8", 32] } }
+      ]
+    },
+    {
+      "name": "updateCommitment",
+      "accounts": [
+        { "name": "didAuthority",    "isMut": true,  "isSigner": true },
+        { "name": "modelCommitment", "isMut": true,  "isSigner": false }
+      ],
+      "args": [
+        { "name": "modelHash",  "type": { "array": ["u8", 32] } },
+        { "name": "promptHash", "type": { "array": ["u8", 32] } }
+      ]
     }
   ],
   "accounts": [
@@ -38,6 +62,19 @@
           { "name": "createdAt",        "type": "i64"       },
           { "name": "updatedAt",        "type": "i64"       },
           { "name": "bump",             "type": "u8"        }
+        ]
+      }
+    },
+    {
+      "name": "ModelCommitment",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "agentDid",    "type": "publicKey" },
+          { "name": "modelHash",   "type": { "array": ["u8", 32] } },
+          { "name": "promptHash",  "type": { "array": ["u8", 32] } },
+          { "name": "committedAt", "type": "i64" },
+          { "name": "bump",        "type": "u8"  }
         ]
       }
     }
@@ -58,6 +95,15 @@
         { "name": "didPubkey",        "type": "publicKey", "index": false },
         { "name": "capabilitiesHash", "type": { "array": ["u8", 32] }, "index": false },
         { "name": "updatedAt",        "type": "i64",       "index": false }
+      ]
+    },
+    {
+      "name": "ModelCommitted",
+      "fields": [
+        { "name": "agentDid",    "type": "publicKey", "index": false },
+        { "name": "modelHash",   "type": { "array": ["u8", 32] }, "index": false },
+        { "name": "promptHash",  "type": { "array": ["u8", 32] }, "index": false },
+        { "name": "committedAt", "type": "i64",       "index": false }
       ]
     }
   ],

@@ -285,6 +285,15 @@ export function AgentProfile({
   const [onchainLoading, setOnchainLoading] = useState(false)
   const [onchainProgramDeployed, setOnchainProgramDeployed] = useState<boolean | null>(null)
 
+  // Relay Verify - model commitment state
+  const [modelCommitment, setModelCommitment] = useState<{
+    modelHash: string
+    promptHash: string
+    committedAt: number
+    address: string
+    solscanUrl: string | null
+  } | null>(null)
+
   // Fetch on-chain profile data
   useEffect(() => {
     if (!identity?.public_key) return
@@ -295,6 +304,7 @@ export function AgentProfile({
         setOnchainProfile(data.onchain ?? null)
         setOnchainSolscanUrl(data.solscanUrl ?? null)
         setOnchainProgramDeployed(data.programDeployed ?? null)
+        setModelCommitment(data.commitment ?? null)
       })
       .catch(() => {
         setOnchainProfile(null)
@@ -1282,6 +1292,61 @@ export function AgentProfile({
                       {onchainProgramDeployed === false
                         ? 'Registry program not yet deployed to Solana.'
                         : 'Not yet registered on-chain.'}
+                    </div>
+                  )}
+                </div>
+
+                {/* Relay Verify — Model Commitment */}
+                <div className="rounded-xl border border-border bg-secondary/30 p-4">
+                  <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-primary" />
+                    Relay Verify — Model Commitment
+                  </h3>
+                  {onchainLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <div className="w-4 h-4 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin" />
+                      Checking commitment status...
+                    </div>
+                  ) : modelCommitment ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                        <span className="text-sm font-semibold text-emerald-400">Model Committed On-Chain</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mb-3">
+                        This agent&#39;s model configuration is cryptographically committed to Solana. Every output is signed against this commitment and can be independently verified.
+                      </p>
+                      <div className="space-y-2">
+                        <span className="text-xs text-muted-foreground">Model Hash</span>
+                        <p className="font-mono text-xs text-muted-foreground break-all bg-background/50 p-2 rounded-lg">
+                          {modelCommitment.modelHash}
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <span className="text-xs text-muted-foreground">Prompt Hash</span>
+                        <p className="font-mono text-xs text-muted-foreground break-all bg-background/50 p-2 rounded-lg">
+                          {modelCommitment.promptHash}
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Committed</span>
+                        <span className="font-mono">{new Date(modelCommitment.committedAt * 1000).toLocaleDateString()}</span>
+                      </div>
+                      {modelCommitment.solscanUrl && (
+                        <a
+                          href={modelCommitment.solscanUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 text-sm text-primary hover:underline mt-2"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          View Commitment on Solscan
+                        </a>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-muted-foreground">
+                      No model commitment found. Output signing is available but not yet anchored on-chain.
                     </div>
                   )}
                 </div>

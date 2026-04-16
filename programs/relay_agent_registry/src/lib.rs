@@ -53,6 +53,52 @@ pub mod relay_agent_registry {
 
         Ok(())
     }
+
+    /// Commit a model configuration hash on-chain (Relay Verify – commitment layer).
+    /// Creates a PDA storing the model_hash and prompt_hash so any output can be
+    /// verified against the committed configuration.
+    pub fn commit_model(
+        ctx: Context<CommitModel>,
+        model_hash: [u8; 32],
+        prompt_hash: [u8; 32],
+    ) -> Result<()> {
+        let commitment = &mut ctx.accounts.model_commitment;
+        commitment.agent_did = ctx.accounts.did_authority.key();
+        commitment.model_hash = model_hash;
+        commitment.prompt_hash = prompt_hash;
+        commitment.committed_at = Clock::get()?.unix_timestamp;
+        commitment.bump = ctx.bumps.model_commitment;
+
+        emit!(ModelCommitted {
+            agent_did: commitment.agent_did,
+            model_hash,
+            prompt_hash,
+            committed_at: commitment.committed_at,
+        });
+
+        Ok(())
+    }
+
+    /// Update an existing model commitment (e.g. after system prompt change).
+    pub fn update_commitment(
+        ctx: Context<UpdateCommitment>,
+        model_hash: [u8; 32],
+        prompt_hash: [u8; 32],
+    ) -> Result<()> {
+        let commitment = &mut ctx.accounts.model_commitment;
+        commitment.model_hash = model_hash;
+        commitment.prompt_hash = prompt_hash;
+        commitment.committed_at = Clock::get()?.unix_timestamp;
+
+        emit!(ModelCommitted {
+            agent_did: commitment.agent_did,
+            model_hash,
+            prompt_hash,
+            committed_at: commitment.committed_at,
+        });
+
+        Ok(())
+    }
 }
 
 /// PDA: seeds = [b"agent-profile", did_pubkey.as_ref()]
@@ -76,6 +122,28 @@ pub struct AgentProfile {
 ///              + 8 (i64) + 8 (i64) + 1 (bump) = 123 bytes
 impl AgentProfile {
     pub const SIZE: usize = 8 + 32 + (4 + MAX_HANDLE_LEN) + 32 + 8 + 8 + 1;
+}
+
+/// PDA: seeds = [b"model-commitment", did_pubkey.as_ref()]
+/// Stores the committed model configuration for Relay Verify.
+#[account]
+pub struct ModelCommitment {
+    /// The agent's DID public key.
+    pub agent_did: Pubkey,
+    /// SHA-256 of (model_name + version + system_prompt + tool_list).
+    pub model_hash: [u8; 32],
+    /// SHA-256 of the system prompt alone (for quick prompt audit).
+    pub prompt_hash: [u8; 32],
+    /// Unix timestamp of the commitment.
+    pub committed_at: i64,
+    /// PDA bump seed.
+    pub bump: u8,
+}
+
+/// Account size: 8 (discriminator) + 32 (pubkey) + 32 (model_hash) + 32 (prompt_hash)
+///             + 8 (i64) + 1 (bump) = 113 bytes
+impl ModelCommitment {
+    pub const SIZE: usize = 8 + 32 + 32 + 32 + 8 + 1;
 }
 
 #[derive(Accounts)]
@@ -116,6 +184,44 @@ pub struct UpdateAgent<'info> {
     pub agent_profile: Account<'info, AgentProfile>,
 }
 
+#[derive(Accounts)]
+pub struct CommitModel<'info> {
+    /// The DID key owner — must sign to prove control.
+    #[account(mut)]
+    pub did_authority: Signer<'info>,
+
+    /// PDA for the model commitment, created on first commit.
+    #[account(
+        init,
+        payer = payer,
+        space = ModelCommitment::SIZE,
+        seeds = [b"model-commitment", did_authority.key().as_ref()],
+        bump,
+    )]
+    pub model_commitment: Account<'info, ModelCommitment>,
+
+    /// Transaction fee payer.
+    #[account(mut)]
+    pub payer: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct UpdateCommitment<'info> {
+    /// Only the original DID authority can update.
+    #[account(mut)]
+    pub did_authority: Signer<'info>,
+
+    #[account(
+        mut,
+        seeds = [b"model-commitment", did_authority.key().as_ref()],
+        bump = model_commitment.bump,
+        constraint = model_commitment.agent_did == did_authority.key() @ RegistryError::Unauthorized,
+    )]
+    pub model_commitment: Account<'info, ModelCommitment>,
+}
+
 #[error_code]
 pub enum RegistryError {
     #[msg("Handle exceeds 30 characters")]
@@ -139,4 +245,12 @@ pub struct AgentUpdated {
     pub did_pubkey: Pubkey,
     pub capabilities_hash: [u8; 32],
     pub updated_at: i64,
+}
+
+#[event]
+pub struct ModelCommitted {
+    pub agent_did: Pubkey,
+    pub model_hash: [u8; 32],
+    pub prompt_hash: [u8; 32],
+    pub committed_at: i64,
 }

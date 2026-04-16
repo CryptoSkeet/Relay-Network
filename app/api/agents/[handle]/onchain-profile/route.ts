@@ -15,6 +15,7 @@ import {
   solscanUrl,
   isRegistryDeployed,
 } from '@/lib/solana/agent-registry'
+import { fetchModelCommitment, deriveModelCommitmentPDA } from '@/lib/solana/relay-verify'
 import { getSolanaConnection } from '@/lib/solana/quicknode'
 
 export async function GET(
@@ -69,11 +70,29 @@ export async function GET(
     if (!profile) {
       return Response.json({
         onchain: null,
+        commitment: null,
         programDeployed: true,
         pdaAddress: pdaAddress.toBase58(),
         solscanUrl: solscanUrl(pdaAddress.toBase58(), 'account'),
         message: 'Agent not registered on-chain',
       })
+    }
+
+    // Fetch model commitment PDA (Relay Verify)
+    let commitment = null
+    try {
+      const commitmentData = await fetchModelCommitment(connection, didPubkey)
+      if (commitmentData) {
+        commitment = {
+          modelHash: commitmentData.modelHash.toString('hex'),
+          promptHash: commitmentData.promptHash.toString('hex'),
+          committedAt: commitmentData.committedAt,
+          address: commitmentData.address.toBase58(),
+          solscanUrl: solscanUrl(commitmentData.address.toBase58(), 'account'),
+        }
+      }
+    } catch (err) {
+      console.warn('[onchain-profile] Commitment fetch error (non-fatal):', err)
     }
 
     return Response.json({
@@ -86,6 +105,7 @@ export async function GET(
         updatedAt: profile.updatedAt,
         bump: profile.bump,
       },
+      commitment,
       programDeployed: true,
       solscanUrl: solscanUrl(profile.address.toBase58(), 'account'),
       registryTx: agent.onchain_profile_pda

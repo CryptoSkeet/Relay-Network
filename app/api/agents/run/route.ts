@@ -16,6 +16,8 @@ import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { buildAgentProfile, loadAgentMemories } from '@/lib/smart-agent'
 import { runAgentLoop } from '@/lib/agent-tools'
+import { signAgentOutput } from '@/lib/solana/relay-verify'
+import { decryptPrivateKey } from '@/lib/crypto/identity'
 
 export async function POST(request: NextRequest) {
   try {
@@ -57,11 +59,47 @@ export async function POST(request: NextRequest) {
       budget: Number(budget) || 0,
     })
 
+    // ── Relay Verify: sign the output ──────────────────────────────────
+    let relayVerify: { signature?: string; modelHash?: string; publicKey?: string } = {}
+    if (result.final_response) {
+      try {
+        const { data: identity } = await supabase
+          .from('agent_identities')
+          .select('public_key, encrypted_private_key, encryption_iv')
+          .eq('agent_id', agent_id)
+          .maybeSingle()
+
+        const { data: agentData } = await supabase
+          .from('agents')
+          .select('model_hash')
+          .eq('id', agent_id)
+          .maybeSingle()
+
+        if (identity?.encrypted_private_key && identity?.encryption_iv && agentData?.model_hash) {
+          const privateKeyHex = decryptPrivateKey(identity.encrypted_private_key, identity.encryption_iv)
+          const signature = signAgentOutput(
+            task.trim(),
+            result.final_response,
+            agentData.model_hash,
+            privateKeyHex
+          )
+          relayVerify = {
+            signature,
+            modelHash: agentData.model_hash,
+            publicKey: identity.public_key,
+          }
+        }
+      } catch (err) {
+        console.warn('[run] Relay Verify signing error (non-fatal):', err)
+      }
+    }
+
     return NextResponse.json({
       success: true,
       agent: agent.handle,
       task,
       ...result,
+      relayVerify: relayVerify.signature ? relayVerify : undefined,
     })
   } catch (err) {
     console.error('Agent run error:', err)

@@ -23,6 +23,7 @@ import { Connection, Keypair } from '@solana/web3.js'
 import { encryptPrivateKey } from '@/lib/crypto/identity'
 import { ensureAgentWallet, mintRelayTokens } from '@/lib/solana/relay-token'
 import { registerAgentOnChain, isRegistryDeployed, deriveAgentProfilePDA } from '@/lib/solana/agent-registry'
+import { commitModelOnChain, computeModelHash, computePromptHash } from '@/lib/solana/relay-verify'
 // @ts-ignore
 import { generateAgentIdentity, mintAgentNFT, loadPayerKeypair } from '@/lib/agent-factory'
 
@@ -208,6 +209,29 @@ export async function POST(request: NextRequest) {
                 .update({ onchain_profile_pda: onchainProfilePda, onchain_registry_tx: onchainRegistryTx })
                 .eq('id', agent.id)
               console.log(`[create] On-chain profile registered: PDA=${onchainProfilePda} tx=${onchainRegistryTx}`)
+
+              // ── Relay Verify: commit model configuration on-chain ──
+              try {
+                push('progress', { step: 'commitment', message: 'Committing model hash on-chain...' })
+                const agentCapsList = validatedCapabilities.length > 0
+                  ? validatedCapabilities
+                  : (AGENT_TYPE_CAPABILITIES[agentType as AgentType] ?? ['general-purpose'])
+                const effectivePrompt = systemPrompt ?? `Autonomous ${agentType} agent on RELAY.`
+                const modelHash = computeModelHash('claude-sonnet-4-6', '0.1.0', effectivePrompt, agentCapsList)
+                const promptHash = computePromptHash(effectivePrompt)
+                const commitResult = await commitModelOnChain(connection, didKeypair, payerKeypair, modelHash, promptHash)
+                await supabase
+                  .from('agents')
+                  .update({
+                    onchain_commitment_tx: commitResult.signature,
+                    model_hash: modelHash.toString('hex'),
+                  })
+                  .eq('id', agent.id)
+                console.log(`[create] Model commitment on-chain: PDA=${commitResult.commitmentAddress} tx=${commitResult.signature}`)
+              } catch (commitErr) {
+                // Non-fatal — agent still usable without commitment
+                console.warn('[create] Model commitment error (non-fatal):', commitErr)
+              }
             } else {
               console.log('[create] Registry program not deployed — skipping on-chain profile registration')
             }
