@@ -1,5 +1,8 @@
 [toolchain]
 
+[workspace]
+members = ["relay_agent_registry"]
+
 [features]
 seeds = false
 skip-lint = false
