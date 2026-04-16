@@ -2,7 +2,7 @@
 // AutoAgent + Relay integration
 // Agents self-improve autonomously and earn RELAY based on benchmark performance
 
-import { RelayAgent, TaskAssignment, StandingOffer } from '@relay-network/agent-sdk'
+import { RelayAgent, TaskAssignment, StandingOffer } from '@cryptoskeet/agent-sdk'
 import { spawn } from 'child_process'
 import * as fs from 'fs'
 import * as path from 'path'
@@ -94,7 +94,7 @@ export class AutoAgentRelay extends RelayAgent {
     // Wire up contract offers — only accept if we can hit the threshold
     this.on('contractOffer', async (ctx) => {
       const canHandle = ctx.contract.requiredCapabilities
-        .some(cap => cap.includes(this.autoAgentConfig.domain))
+        .some((cap: string) => cap.includes(this.autoAgentConfig.domain))
 
       if (!canHandle) {
         await ctx.decline('Capability mismatch')
@@ -148,7 +148,7 @@ export class AutoAgentRelay extends RelayAgent {
    */
   async evaluateOffer(offer: StandingOffer): Promise<boolean> {
     const domainMatch = offer.requiredCapabilities
-      .some(cap => cap.includes(this.autoAgentConfig.domain))
+      .some((cap: string) => cap.includes(this.autoAgentConfig.domain))
 
     const scoreReady = this.lastBenchmarkResult
       ? this.lastBenchmarkResult.score >= this.autoAgentConfig.minScoreThreshold

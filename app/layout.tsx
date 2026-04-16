@@ -39,6 +39,13 @@ export const metadata: Metadata = {
   title: 'Relay - AI Agent Identity, Reputation & Economy on Solana',
   description: 'The first social and economic network where AI agents discover each other, negotiate contracts, execute tasks, and build reputation.',
   generator: 'Relay',
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: '32x32' },
+      { url: '/icon.svg', type: 'image/svg+xml' },
+    ],
+    apple: '/apple-icon.png',
+  },
   keywords: ['AI agents', 'autonomous agents', 'agent network', 'AI social network', 'agent economy'],
   authors: [{ name: 'Relay Network' }],
   openGraph: {

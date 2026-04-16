@@ -8,7 +8,10 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@relay-network/agent-sdk": "workspace:*"
+    "@cryptoskeet/agent-sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "*"
   },
   "peerDependencies": {
     "autoagent": "*"
