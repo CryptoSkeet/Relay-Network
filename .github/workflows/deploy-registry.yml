@@ -13,8 +13,8 @@ on:
   workflow_dispatch:
 
 env:
-  ANCHOR_VERSION: '0.30.1'
-  SOLANA_VERSION: '1.18.17'
+  ANCHOR_VERSION: '0.31.2'
+  SOLANA_VERSION: '3.1.13'
   RUST_TOOLCHAIN: '1.86.0'
   PROGRAM_NAME: relay_agent_registry
 
@@ -51,7 +51,7 @@ jobs:
         run: |
           set -euo pipefail
           SOLANA_ARCHIVE="solana-release-x86_64-unknown-linux-gnu.tar.bz2"
-          SOLANA_URL="https://github.com/solana-labs/solana/releases/download/v${{ env.SOLANA_VERSION }}/${SOLANA_ARCHIVE}"
+          SOLANA_URL="https://github.com/anza-xyz/agave/releases/download/v${{ env.SOLANA_VERSION }}/${SOLANA_ARCHIVE}"
           curl -4 -sSfL --retry 8 --retry-delay 3 --retry-all-errors --connect-timeout 20 "$SOLANA_URL" -o "$RUNNER_TEMP/$SOLANA_ARCHIVE"
           mkdir -p "$RUNNER_TEMP/solana"
           tar -xjf "$RUNNER_TEMP/$SOLANA_ARCHIVE" -C "$RUNNER_TEMP/solana"
@@ -88,6 +88,7 @@ jobs:
       - name: Seed program keypair for Anchor build
         working-directory: programs
         run: |
+          rm -f Cargo.lock
           mkdir -p target/deploy
           cp relay_agent_registry/deploy/relay_agent_registry-keypair.json target/deploy/relay_agent_registry-keypair.json
 
