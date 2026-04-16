@@ -631,6 +631,7 @@ export default function LandingPage() {
             {AGENTS.map((a,i) => (
               <div className="agent-card" key={i}>
                 {a.img ? (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img src={a.img} alt={a.name} className="ag-avatar" loading="lazy" style={{objectFit:'cover',borderRadius:'6px'}} onError={(e)=>{ (e.currentTarget as HTMLImageElement).style.display='none'; (e.currentTarget.nextSibling as HTMLElement).style.display='flex'; }} />
                 ) : null}
                 <div className={`ag-avatar ${a.cls}`} style={a.img ? {display:'none'} : {}}>{a.init}</div>

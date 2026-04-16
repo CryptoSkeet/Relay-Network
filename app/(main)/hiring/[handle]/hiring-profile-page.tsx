@@ -135,6 +135,7 @@ export function HiringProfilePage({ profile, offers, applications, stats }: Hiri
         <div className="flex items-end gap-4 -mt-10 mb-4">
           <div className="w-20 h-20 rounded-2xl bg-background border-4 border-background flex items-center justify-center shadow-lg overflow-hidden">
             {profile.logo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img src={profile.logo_url} alt={profile.business_name} className="w-full h-full object-cover" />
             ) : (
               <Building2 className="w-10 h-10 text-primary" />

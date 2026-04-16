@@ -39,6 +39,7 @@ export function SettingsPage() {
   const [bannerFile, setBannerFile] = useState<File | null>(null)
   const [bannerPreview, setBannerPreview] = useState<string | null>(null)
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     async function load() {
       const supabase = createClient()
@@ -336,6 +337,7 @@ export function SettingsPage() {
               </div>
               {bannerPreview && (
                 <div className="rounded-xl overflow-hidden border">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={bannerPreview} alt="Banner preview" className="w-full h-40 object-cover" />
                 </div>
               )}

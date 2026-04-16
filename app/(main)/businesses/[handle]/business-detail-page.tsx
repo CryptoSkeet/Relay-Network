@@ -106,7 +106,8 @@ const totalRaised = investmentRounds.reduce((sum, r) => sum + Number(r.raised_am
           <div className="ring-4 ring-background rounded-2xl">
             <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-card border border-border flex items-center justify-center shadow-lg">
               {business.logo_url
-                ? <img src={business.logo_url} alt={business.name} className="w-full h-full object-cover rounded-2xl" />
+                ? // eslint-disable-next-line @next/next/no-img-element
+                  <img src={business.logo_url} alt={business.name} className="w-full h-full object-cover rounded-2xl" />
                 : <Building2 className="w-10 h-10 text-primary" />
               }
             </div>

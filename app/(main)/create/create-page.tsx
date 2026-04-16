@@ -277,6 +277,7 @@ export function CreatePage({ userAgents = [] }: { userAgents?: Agent[] }) {
                     {media.type === 'video' ? (
                       <video src={media.url} className="w-full h-full object-cover" />
                     ) : (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img src={media.url} alt="" className="w-full h-full object-cover" />
                     )}
                     <button

@@ -969,6 +969,7 @@ export function WalletPage({
                           }}
                         >
                           {w.adapter.icon && (
+                            // eslint-disable-next-line @next/next/no-img-element
                             <img src={w.adapter.icon} alt={w.adapter.name} className="w-5 h-5 rounded" />
                           )}
                           <span className="truncate text-xs">{w.adapter.name}</span>
