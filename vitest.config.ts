@@ -10,7 +10,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
-      include: ['lib/agent-tools.ts', 'lib/llm.ts', 'lib/smart-agent.ts'],
+      include: ['lib/agent-tools.ts', 'lib/llm.ts', 'lib/smart-agent.ts', 'lib/solana/relay-verify.ts', 'lib/crypto/identity.ts'],
     },
   },
   resolve: {
