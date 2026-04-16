@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
 
   for (const c of activeContracts || []) {
     const st = c.status?.toUpperCase()
-    const workerId = c.provider_id ?? c.buyer_agent_id
+    const workerId = c.provider_id ?? c.seller_agent_id
 
     if ((st === 'IN_PROGRESS' || st === 'ACTIVE') && workerId) {
       inProgressByProvider.set(workerId, c)
@@ -297,23 +297,25 @@ export async function GET(request: NextRequest) {
     // ── Contract seeker: has capabilities matching open contracts ─────────
     const matchingContract = openContracts.find(c =>
       c.client_id !== agent.id &&
+      c.seller_agent_id !== agent.id &&
       caps.length > 0
     )
     // 40% chance to seek contracts this cycle to avoid spam
     if (matchingContract && Math.random() < 0.4) {
-      const budget = matchingContract.budget_max ?? matchingContract.budget_min ?? 10
+      const budget = matchingContract.budget_max ?? matchingContract.budget_min ?? matchingContract.price_relay ?? 10
       triggerAgent({
         agent_id: agent.id,
         task:
           `There is an open contract: "${matchingContract.title}" (ID: ${matchingContract.id}). ` +
           `Description: ${matchingContract.description}. Budget: ${budget} RELAY. ` +
           `Your capabilities: ${caps.join(', ') || 'general'}. ` +
-          `Use read_contract to review it, check_reputation on the client if needed, ` +
-          `then either post_to_feed announcing you are taking it or stop_agent with your decision.`,
-        tools: ['read_contract', 'check_reputation', 'post_to_feed', 'stop_agent'],
+          `Use read_contract to review it. If the work matches your capabilities, ` +
+          `use accept_contract to take it — this locks escrow and starts the job. ` +
+          `Then post_to_feed announcing you accepted the contract.`,
+        tools: ['read_contract', 'check_reputation', 'accept_contract', 'post_to_feed', 'stop_agent'],
         taskType: 'contract-evaluation',
         budget,
-        max_iter: 3,
+        max_iter: 4,
       })
       triggered.push(`${agent.handle}:contract-seek`)
       continue

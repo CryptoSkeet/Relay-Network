@@ -225,6 +225,18 @@ export const AGENT_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: 'accept_contract',
+    description: 'Accept an open contract as a buyer — locks escrow and moves the contract to PENDING so the seller can start work. This is how you hire an agent for a posted contract.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        contract_id: { type: 'string', description: 'UUID of the OPEN contract to accept' },
+        requirements: { type: 'string', description: 'Optional specific requirements or instructions for the seller' },
+      },
+      required: ['contract_id'],
+    },
+  },
+  {
     name: 'settle_contract',
     description: 'Approve a delivered contract and release RELAY payment to the seller. Creates an on-chain transaction.',
     input_schema: {
@@ -396,37 +408,52 @@ async function handleSubmitWork(
 ): Promise<string> {
   const { contract_id, deliverable, summary } = input
 
-  const { data: contract } = await supabase
+  // Try provider_id first, then seller_agent_id (the seller is the worker)
+  let { data: contract } = await supabase
     .from('contracts')
-    .select('client_id, title')
+    .select('client_id, buyer_agent_id, title')
     .eq('id', contract_id)
     .eq('provider_id', agentId)
     .maybeSingle()
+
+  if (!contract) {
+    const { data: c2 } = await supabase
+      .from('contracts')
+      .select('client_id, buyer_agent_id, title')
+      .eq('id', contract_id)
+      .eq('seller_agent_id', agentId)
+      .maybeSingle()
+    contract = c2
+  }
 
   if (!contract) return `Contract ${contract_id} not found or you are not the provider.`
 
   const { error } = await supabase
     .from('contracts')
     .update({
-      status: 'delivered',
+      status: 'DELIVERED',
       deliverables: { result: deliverable.slice(0, 2000), summary },
       delivered_at: new Date().toISOString(),
     })
     .eq('id', contract_id)
-    .eq('provider_id', agentId)
 
   if (error) return `Failed to submit work: ${error.message}`
 
-  // Notify client
-  await supabase.from('contract_notifications').insert({
-    agent_id: contract.client_id,
-    contract_id,
-    notification_type: 'delivered',
-  }).then(() => {})
+  // Notify the buyer
+  const notifyId = contract.buyer_agent_id ?? contract.client_id
+  if (notifyId) {
+    await supabase.from('contract_notifications').insert({
+      agent_id: notifyId,
+      contract_id,
+      notification_type: 'delivered',
+    }).then(() => {})
+  }
 
   // Fire webhook to both provider and client
   triggerWebhooks(supabase, agentId, 'contractDelivered', { contract_id, title: contract.title, summary }).catch(() => {})
-  triggerWebhooks(supabase, contract.client_id, 'contractDelivered', { contract_id, title: contract.title, provider_id: agentId }).catch(() => {})
+  if (notifyId) {
+    triggerWebhooks(supabase, notifyId, 'contractDelivered', { contract_id, title: contract.title, provider_id: agentId }).catch(() => {})
+  }
 
   return `Work delivered on contract "${contract.title}". Summary: "${summary}". Client notified — awaiting verification.`
 }
@@ -876,6 +903,44 @@ async function handleSubmitTaskCompletion(
   return `Task approved and payment of ${payPerTask} RELAY released! ${validationNote}. Total tasks completed for this offer: ${(bid.tasks_completed ?? 0) + 1}`
 }
 
+async function handleAcceptContract(
+  supabase: any,
+  agentId: string,
+  input: Record<string, string>,
+): Promise<string> {
+  const { contract_id, requirements } = input
+
+  const { initiateContract, acceptContract } = await import('@/lib/contract-engine')
+
+  // Step 1: Initiate as buyer (locks escrow, moves OPEN → PENDING)
+  const initResult = await initiateContract({
+    contractId: contract_id,
+    buyerAgentId: agentId,
+    buyerWallet: null,
+    requirementsJson: requirements ? { notes: requirements } : null,
+  }) as { ok: boolean; data?: any; error?: string }
+
+  if (!initResult.ok) {
+    return `Failed to accept contract: ${initResult.error ?? 'Unknown error'}`
+  }
+
+  // Step 2: Auto-accept as seller (moves PENDING → ACTIVE so work can begin)
+  const sellerId = initResult.data?.seller_agent_id
+  if (sellerId) {
+    const acceptResult = await acceptContract({
+      contractId: contract_id,
+      sellerAgentId: sellerId,
+      message: 'Contract accepted, starting work.',
+    }) as { ok: boolean; error?: string }
+
+    if (!acceptResult.ok) {
+      return `Contract initiated (PENDING) but seller auto-accept failed: ${acceptResult.error}. Contract ID: ${contract_id}`
+    }
+  }
+
+  return `Contract "${initResult.data?.title}" accepted! Status: ACTIVE. Escrow locked. The seller will now work on the deliverable. Contract ID: ${contract_id}`
+}
+
 async function handleSettleContract(
   supabase: any,
   agentId: string,
@@ -1034,6 +1099,9 @@ export async function executeTool(
         break
       case 'hire_agent':
         output = await handleHireAgent(supabase, agentId, input)
+        break
+      case 'accept_contract':
+        output = await handleAcceptContract(supabase, agentId, input)
         break
       case 'settle_contract':
         output = await handleSettleContract(supabase, agentId, input)
