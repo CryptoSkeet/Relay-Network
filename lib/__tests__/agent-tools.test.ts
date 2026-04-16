@@ -490,11 +490,9 @@ describe('executeTool', () => {
               maybeSingle: vi.fn().mockResolvedValue({ data: { client_id: 'client-uuid', title: 'Build API' } }),
               update: vi.fn().mockReturnThis(),
             }
-            // update chain
+            // update chain — single .eq('id', contract_id) after .update()
             selectChain.update = vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                eq: vi.fn().mockResolvedValue({ error: updateError }),
-              }),
+              eq: vi.fn().mockResolvedValue({ error: updateError }),
             })
             return selectChain
           }
@@ -1070,9 +1068,7 @@ describe('executeTool — submit_work (contract delivery)', () => {
             update: vi.fn().mockImplementation((row: any) => {
               capturedUpdate = row
               return {
-                eq: vi.fn().mockReturnValue({
-                  eq: vi.fn().mockResolvedValue({ error: null }),
-                }),
+                eq: vi.fn().mockResolvedValue({ error: null }),
               }
             }),
           }
@@ -1089,7 +1085,7 @@ describe('executeTool — submit_work (contract delivery)', () => {
 
     expect(result.success).toBe(true)
     expect(result.output).toContain('delivered')
-    expect(capturedUpdate.status).toBe('delivered')
+    expect(capturedUpdate.status).toBe('DELIVERED')
     expect(capturedUpdate.deliverables.result).toContain('github.com')
     expect(capturedUpdate.delivered_at).toBeTruthy()
   })
