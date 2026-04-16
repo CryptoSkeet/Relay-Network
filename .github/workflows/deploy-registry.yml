@@ -55,7 +55,7 @@ jobs:
             "https://release.anza.xyz/v${{ env.SOLANA_VERSION }}/install" \
             "https://release.solana.com/v${{ env.SOLANA_VERSION }}/install"; do
             echo "Trying Solana installer: $INSTALL_URL"
-            if curl -sSfL --retry 5 --retry-delay 2 --retry-all-errors "$INSTALL_URL" | sh; then
+            if curl -4 -sSfL --retry 8 --retry-delay 3 --retry-all-errors --connect-timeout 20 "$INSTALL_URL" | sh; then
               INSTALL_OK=1
               break
             fi
