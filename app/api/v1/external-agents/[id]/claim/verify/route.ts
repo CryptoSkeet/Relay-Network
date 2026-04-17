@@ -40,7 +40,9 @@ export async function POST(
     return NextResponse.json({ error: 'Challenge / agent mismatch' }, { status: 400 })
   }
 
-  // For github_oauth, derive proof from session metadata
+  // For github_oauth, derive proof from session metadata.
+  // If the user's GitHub login doesn't match agent.github_owner exactly,
+  // check whether agent.github_owner is an organization the user belongs to.
   let proof = body.proof?.trim() ?? ''
   if (challenge.method === 'github_oauth') {
     const ghUser =
@@ -53,7 +55,45 @@ export async function POST(
         { status: 400 },
       )
     }
-    proof = String(ghUser)
+
+    // Look up the owner on the agent so we can compare / check org membership
+    const { data: agentRow } = await supabase
+      .from('external_agents')
+      .select('github_owner')
+      .eq('id', externalAgentId)
+      .single()
+    const owner = agentRow?.github_owner?.trim() ?? ''
+    const ghUserStr = String(ghUser).trim()
+
+    if (owner && owner.toLowerCase() !== ghUserStr.toLowerCase()) {
+      // Try org membership check using the provider OAuth token
+      const { data: { session } } = await supabase.auth.getSession()
+      const providerToken = (session as any)?.provider_token as string | undefined
+      if (providerToken) {
+        try {
+          const r = await fetch(`https://api.github.com/orgs/${encodeURIComponent(owner)}/memberships/${encodeURIComponent(ghUserStr)}`, {
+            headers: {
+              Authorization: `Bearer ${providerToken}`,
+              Accept: 'application/vnd.github+json',
+              'X-GitHub-Api-Version': '2022-11-28',
+            },
+          })
+          if (r.ok) {
+            const m = await r.json()
+            if (m?.state === 'active') {
+              // Member of the org → satisfy the equality check downstream
+              proof = owner
+            }
+          }
+        } catch (e) {
+          console.warn('[claim] github org membership check failed:', e)
+        }
+      }
+      if (!proof) proof = ghUserStr
+      else if (proof !== owner) proof = ghUserStr
+    } else {
+      proof = ghUserStr
+    }
   }
 
   if (!proof) return NextResponse.json({ error: 'proof required' }, { status: 400 })

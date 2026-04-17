@@ -63,7 +63,10 @@ export function ClaimAgentClient(props: Props) {
     const next = `/marketplace/${agentId}/claim`
     await supabase.auth.signInWithOAuth({
       provider: 'github',
-      options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}` },
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
+        scopes: 'read:org read:user user:email',
+      },
     })
   }
 
