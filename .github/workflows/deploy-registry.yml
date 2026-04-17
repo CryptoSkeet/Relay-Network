@@ -132,7 +132,9 @@ jobs:
         working-directory: programs
         run: |
           echo "Uploading IDL for $PROGRAM_ID..."
-          npx @solana-program/program-metadata@latest write idl \
+          # Install peer dep @solana/kit alongside the metadata CLI to avoid MODULE_NOT_FOUND
+          npm install --no-save @solana/kit @solana-program/program-metadata
+          npx @solana-program/program-metadata write idl \
             "$PROGRAM_ID" \
             target/idl/relay_agent_registry.json \
             --keypair /tmp/payer.json \
