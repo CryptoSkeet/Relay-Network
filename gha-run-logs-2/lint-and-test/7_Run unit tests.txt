@@ -1,0 +1,132 @@
+﻿2026-04-15T03:56:22.6019529Z ##[group]Run pnpm run test
+2026-04-15T03:56:22.6019814Z [36;1mpnpm run test[0m
+2026-04-15T03:56:22.6040548Z shell: /usr/bin/bash -e {0}
+2026-04-15T03:56:22.6040782Z env:
+2026-04-15T03:56:22.6041025Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-04-15T03:56:22.6041330Z ##[endgroup]
+2026-04-15T03:56:22.9106488Z 
+2026-04-15T03:56:22.9107664Z > my-project@0.2.1 test /home/runner/work/Relay-Network/Relay-Network
+2026-04-15T03:56:22.9108814Z > vitest run
+2026-04-15T03:56:22.9109277Z 
+2026-04-15T03:56:23.2894468Z 
+2026-04-15T03:56:23.2898654Z [1m[46m RUN [49m[22m [36mv4.1.1 [39m[90m/home/runner/work/Relay-Network/Relay-Network[39m
+2026-04-15T03:56:23.2899748Z 
+2026-04-15T03:56:24.0047939Z (node:2252) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-04-15T03:56:24.0057054Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-04-15T03:56:24.1545417Z [90mstderr[2m | lib/__tests__/agent-tools.test.ts
+2026-04-15T03:56:24.1547143Z [22m[39mbigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+2026-04-15T03:56:24.1552344Z 
+2026-04-15T03:56:24.2688373Z [90mstderr[2m | lib/__tests__/agent-tools.test.ts[2m > [22m[2mexecuteTool[2m > [22m[2msubmit_work[2m > [22m[2mreturns success message when update succeeds
+2026-04-15T03:56:24.2697733Z [22m[39m[webhooks] trigger error for contractDelivered: TypeError: supabase.from(...).select is not a function
+2026-04-15T03:56:24.2717551Z     at triggerWebhooks [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/webhooks.ts:45:8[90m)[39m
+2026-04-15T03:56:24.2727888Z     at handleSubmitWork [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/agent-tools.ts:428:3[90m)[39m
+2026-04-15T03:56:24.2729846Z [90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+2026-04-15T03:56:24.2731761Z     at Module.executeTool [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/agent-tools.ts:1003:18[90m)[39m
+2026-04-15T03:56:24.2733784Z     at [90m/home/runner/work/Relay-Network/Relay-Network/[39mlib/__tests__/agent-tools.test.ts:508:22
+2026-04-15T03:56:24.2736609Z     at [90mfile:///home/runner/work/Relay-Network/Relay-Network/[39mnode_modules/[4m.pnpm[24m/@vitest+runner@4.1.1/node_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1893:20
+2026-04-15T03:56:24.2738985Z [webhooks] trigger error for contractDelivered: TypeError: supabase.from(...).select is not a function
+2026-04-15T03:56:24.2740920Z     at triggerWebhooks [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/webhooks.ts:45:8[90m)[39m
+2026-04-15T03:56:24.2742950Z     at handleSubmitWork [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/agent-tools.ts:429:3[90m)[39m
+2026-04-15T03:56:24.2744838Z [90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+2026-04-15T03:56:24.2747007Z     at Module.executeTool [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/agent-tools.ts:1003:18[90m)[39m
+2026-04-15T03:56:24.2748930Z     at [90m/home/runner/work/Relay-Network/Relay-Network/[39mlib/__tests__/agent-tools.test.ts:508:22
+2026-04-15T03:56:24.2751434Z     at [90mfile:///home/runner/work/Relay-Network/Relay-Network/[39mnode_modules/[4m.pnpm[24m/@vitest+runner@4.1.1/node_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1893:20
+2026-04-15T03:56:24.2752967Z 
+2026-04-15T03:56:24.2826805Z [90mstderr[2m | lib/__tests__/agent-tools.test.ts[2m > [22m[2mrunAgentLoop (Anthropic)[2m > [22m[2mrecords work memory after submit_work succeeds
+2026-04-15T03:56:24.2830926Z [22m[39m[webhooks] trigger error for contractDelivered: TypeError: supabase.from(...).select(...).eq(...).eq(...).contains is not a function
+2026-04-15T03:56:24.2833241Z     at triggerWebhooks [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/webhooks.ts:48:8[90m)[39m
+2026-04-15T03:56:24.2835304Z     at handleSubmitWork [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/agent-tools.ts:428:3[90m)[39m
+2026-04-15T03:56:24.2837933Z [90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+2026-04-15T03:56:24.2839823Z     at executeTool [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/agent-tools.ts:1003:18[90m)[39m
+2026-04-15T03:56:24.2841951Z     at runAgentLoopAnthropic [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/agent-tools.ts:1153:22[90m)[39m
+2026-04-15T03:56:24.2844176Z     at Module.runAgentLoop [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/agent-tools.ts:1082:14[90m)[39m
+2026-04-15T03:56:24.2846651Z     at [90m/home/runner/work/Relay-Network/Relay-Network/[39mlib/__tests__/agent-tools.test.ts:737:5
+2026-04-15T03:56:24.2849151Z     at [90mfile:///home/runner/work/Relay-Network/Relay-Network/[39mnode_modules/[4m.pnpm[24m/@vitest+runner@4.1.1/node_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1893:20
+2026-04-15T03:56:24.2851726Z [webhooks] trigger error for contractDelivered: TypeError: supabase.from(...).select(...).eq(...).eq(...).contains is not a function
+2026-04-15T03:56:24.2853894Z     at triggerWebhooks [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/webhooks.ts:48:8[90m)[39m
+2026-04-15T03:56:24.2855967Z     at handleSubmitWork [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/agent-tools.ts:429:3[90m)[39m
+2026-04-15T03:56:24.2858443Z [90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+2026-04-15T03:56:24.2860289Z     at executeTool [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/agent-tools.ts:1003:18[90m)[39m
+2026-04-15T03:56:24.2862395Z     at runAgentLoopAnthropic [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/agent-tools.ts:1153:22[90m)[39m
+2026-04-15T03:56:24.2864528Z     at Module.runAgentLoop [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/agent-tools.ts:1082:14[90m)[39m
+2026-04-15T03:56:24.2866737Z     at [90m/home/runner/work/Relay-Network/Relay-Network/[39mlib/__tests__/agent-tools.test.ts:737:5
+2026-04-15T03:56:24.2869267Z     at [90mfile:///home/runner/work/Relay-Network/Relay-Network/[39mnode_modules/[4m.pnpm[24m/@vitest+runner@4.1.1/node_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1893:20
+2026-04-15T03:56:24.2870809Z 
+2026-04-15T03:56:24.4129297Z [90mstderr[2m | lib/__tests__/agent-tools.test.ts[2m > [22m[2mexecuteTool — submit_task_completion (standing task payments)[2m > [22m[2mcredits agent wallet with correct amount
+2026-04-15T03:56:24.4132153Z [22m[39mOn-chain RELAY mint for task payment failed (non-fatal): Error: SOLANA_WALLET_ENCRYPTION_KEY environment variable is required
+2026-04-15T03:56:24.4134497Z     at getEncryptionKey [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/solana/generate-wallet.ts:7:11[90m)[39m
+2026-04-15T03:56:24.4137132Z     at generateSolanaKeypair [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/solana/generate-wallet.ts:25:25[90m)[39m
+2026-04-15T03:56:24.4139366Z     at ensureAgentWallet [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/solana/relay-token.ts:366:12[90m)[39m
+2026-04-15T03:56:24.4141283Z [90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+2026-04-15T03:56:24.4143037Z     at handleSubmitTaskCompletion [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/agent-tools.ts:853:28[90m)[39m
+2026-04-15T03:56:24.4144975Z     at Module.executeTool [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/agent-tools.ts:1033:18[90m)[39m
+2026-04-15T03:56:24.4147057Z     at [90m/home/runner/work/Relay-Network/Relay-Network/[39mlib/__tests__/agent-tools.test.ts:962:20
+2026-04-15T03:56:24.4149501Z     at [90mfile:///home/runner/work/Relay-Network/Relay-Network/[39mnode_modules/[4m.pnpm[24m/@vitest+runner@4.1.1/node_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1893:20
+2026-04-15T03:56:24.4151018Z 
+2026-04-15T03:56:24.5070463Z [90mstderr[2m | lib/__tests__/agent-tools.test.ts[2m > [22m[2mexecuteTool — submit_task_completion (standing task payments)[2m > [22m[2mdeducts from client wallet
+2026-04-15T03:56:24.5077226Z [22m[39mOn-chain RELAY mint for task payment failed (non-fatal): Error: SOLANA_WALLET_ENCRYPTION_KEY environment variable is required
+2026-04-15T03:56:24.5079572Z     at getEncryptionKey [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/solana/generate-wallet.ts:7:11[90m)[39m
+2026-04-15T03:56:24.5081859Z     at generateSolanaKeypair [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/solana/generate-wallet.ts:25:25[90m)[39m
+2026-04-15T03:56:24.5084124Z     at ensureAgentWallet [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/solana/relay-token.ts:366:12[90m)[39m
+2026-04-15T03:56:24.5086054Z [90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+2026-04-15T03:56:24.5088439Z     at handleSubmitTaskCompletion [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/agent-tools.ts:853:28[90m)[39m
+2026-04-15T03:56:24.5090560Z     at Module.executeTool [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/agent-tools.ts:1033:18[90m)[39m
+2026-04-15T03:56:24.5092359Z     at [90m/home/runner/work/Relay-Network/Relay-Network/[39mlib/__tests__/agent-tools.test.ts:978:5
+2026-04-15T03:56:24.5094834Z     at [90mfile:///home/runner/work/Relay-Network/Relay-Network/[39mnode_modules/[4m.pnpm[24m/@vitest+runner@4.1.1/node_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1893:20
+2026-04-15T03:56:24.5096924Z 
+2026-04-15T03:56:24.5726452Z [90mstderr[2m | lib/__tests__/agent-tools.test.ts[2m > [22m[2mexecuteTool — submit_task_completion (standing task payments)[2m > [22m[2mrecords a payment transaction
+2026-04-15T03:56:24.5729212Z [22m[39mOn-chain RELAY mint for task payment failed (non-fatal): Error: SOLANA_WALLET_ENCRYPTION_KEY environment variable is required
+2026-04-15T03:56:24.5731618Z     at getEncryptionKey [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/solana/generate-wallet.ts:7:11[90m)[39m
+2026-04-15T03:56:24.5733955Z     at generateSolanaKeypair [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/solana/generate-wallet.ts:25:25[90m)[39m
+2026-04-15T03:56:24.5736502Z     at ensureAgentWallet [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/solana/relay-token.ts:366:12[90m)[39m
+2026-04-15T03:56:24.5738481Z [90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+2026-04-15T03:56:24.5740477Z     at handleSubmitTaskCompletion [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/agent-tools.ts:853:28[90m)[39m
+2026-04-15T03:56:24.5742656Z     at Module.executeTool [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/agent-tools.ts:1033:18[90m)[39m
+2026-04-15T03:56:24.5744536Z     at [90m/home/runner/work/Relay-Network/Relay-Network/[39mlib/__tests__/agent-tools.test.ts:992:5
+2026-04-15T03:56:24.5747165Z     at [90mfile:///home/runner/work/Relay-Network/Relay-Network/[39mnode_modules/[4m.pnpm[24m/@vitest+runner@4.1.1/node_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1893:20
+2026-04-15T03:56:24.5748731Z 
+2026-04-15T03:56:24.6304820Z [90mstderr[2m | lib/__tests__/agent-tools.test.ts[2m > [22m[2mexecuteTool — submit_task_completion (standing task payments)[2m > [22m[2mincrements tasks_completed on the bid
+2026-04-15T03:56:24.6310047Z [22m[39mOn-chain RELAY mint for task payment failed (non-fatal): Error: SOLANA_WALLET_ENCRYPTION_KEY environment variable is required
+2026-04-15T03:56:24.6312333Z     at getEncryptionKey [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/solana/generate-wallet.ts:7:11[90m)[39m
+2026-04-15T03:56:24.6314560Z     at generateSolanaKeypair [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/solana/generate-wallet.ts:25:25[90m)[39m
+2026-04-15T03:56:24.6316952Z     at ensureAgentWallet [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/solana/relay-token.ts:366:12[90m)[39m
+2026-04-15T03:56:24.6318816Z [90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+2026-04-15T03:56:24.6320982Z     at handleSubmitTaskCompletion [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/agent-tools.ts:853:28[90m)[39m
+2026-04-15T03:56:24.6323073Z     at Module.executeTool [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/agent-tools.ts:1033:18[90m)[39m
+2026-04-15T03:56:24.6324910Z     at [90m/home/runner/work/Relay-Network/Relay-Network/[39mlib/__tests__/agent-tools.test.ts:1008:5
+2026-04-15T03:56:24.6327705Z     at [90mfile:///home/runner/work/Relay-Network/Relay-Network/[39mnode_modules/[4m.pnpm[24m/@vitest+runner@4.1.1/node_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1893:20
+2026-04-15T03:56:24.6329175Z 
+2026-04-15T03:56:24.6475199Z [90mstderr[2m | lib/__tests__/agent-tools.test.ts[2m > [22m[2mexecuteTool — submit_task_completion (standing task payments)[2m > [22m[2mprevents client balance going negative
+2026-04-15T03:56:24.6479158Z [22m[39mOn-chain RELAY mint for task payment failed (non-fatal): Error: SOLANA_WALLET_ENCRYPTION_KEY environment variable is required
+2026-04-15T03:56:24.6481444Z     at getEncryptionKey [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/solana/generate-wallet.ts:7:11[90m)[39m
+2026-04-15T03:56:24.6483643Z     at generateSolanaKeypair [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/solana/generate-wallet.ts:25:25[90m)[39m
+2026-04-15T03:56:24.6486786Z     at ensureAgentWallet [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/solana/relay-token.ts:366:12[90m)[39m
+2026-04-15T03:56:24.6488731Z [90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+2026-04-15T03:56:24.6493523Z     at handleSubmitTaskCompletion [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/agent-tools.ts:853:28[90m)[39m
+2026-04-15T03:56:24.6495582Z     at Module.executeTool [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/agent-tools.ts:1033:18[90m)[39m
+2026-04-15T03:56:24.6497731Z     at [90m/home/runner/work/Relay-Network/Relay-Network/[39mlib/__tests__/agent-tools.test.ts:1045:5
+2026-04-15T03:56:24.6500216Z     at [90mfile:///home/runner/work/Relay-Network/Relay-Network/[39mnode_modules/[4m.pnpm[24m/@vitest+runner@4.1.1/node_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1893:20
+2026-04-15T03:56:24.6503506Z 
+2026-04-15T03:56:24.6505377Z [90mstderr[2m | lib/__tests__/agent-tools.test.ts[2m > [22m[2mexecuteTool — submit_work (contract delivery)[2m > [22m[2msets contract status to delivered with deliverables payload
+2026-04-15T03:56:24.6517886Z [22m[39m[webhooks] trigger error for contractDelivered: TypeError: supabase.from(...).select is not a function
+2026-04-15T03:56:24.6519776Z     at triggerWebhooks [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/webhooks.ts:45:8[90m)[39m
+2026-04-15T03:56:24.6521472Z  [32m✓[39m lib/__tests__/agent-tools.test.ts [2m([22m[2m67 tests[22m[2m)[22m[33m 420[2mms[22m[39m
+2026-04-15T03:56:24.6526302Z     at handleSubmitWork [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/agent-tools.ts:428:3[90m)[39m
+2026-04-15T03:56:24.6528110Z [90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+2026-04-15T03:56:24.6529877Z     at Module.executeTool [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/agent-tools.ts:1003:18[90m)[39m
+2026-04-15T03:56:24.6531689Z     at [90m/home/runner/work/Relay-Network/Relay-Network/[39mlib/__tests__/agent-tools.test.ts:1084:20
+2026-04-15T03:56:24.6534099Z     at [90mfile:///home/runner/work/Relay-Network/Relay-Network/[39mnode_modules/[4m.pnpm[24m/@vitest+runner@4.1.1/node_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1893:20
+2026-04-15T03:56:24.6542777Z [webhooks] trigger error for contractDelivered: TypeError: supabase.from(...).select is not a function
+2026-04-15T03:56:24.6544628Z     at triggerWebhooks [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/webhooks.ts:45:8[90m)[39m
+2026-04-15T03:56:24.6546760Z     at handleSubmitWork [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/agent-tools.ts:429:3[90m)[39m
+2026-04-15T03:56:24.6549013Z [90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+2026-04-15T03:56:24.6550570Z     at Module.executeTool [90m(/home/runner/work/Relay-Network/Relay-Network/[39mlib/agent-tools.ts:1003:18[90m)[39m
+2026-04-15T03:56:24.6552186Z     at [90m/home/runner/work/Relay-Network/Relay-Network/[39mlib/__tests__/agent-tools.test.ts:1084:20
+2026-04-15T03:56:24.6554332Z     at [90mfile:///home/runner/work/Relay-Network/Relay-Network/[39mnode_modules/[4m.pnpm[24m/@vitest+runner@4.1.1/node_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1893:20
+2026-04-15T03:56:24.6555564Z 
+2026-04-15T03:56:24.6565429Z 
+2026-04-15T03:56:24.6597235Z [2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+2026-04-15T03:56:24.6598463Z [2m      Tests [22m [1m[32m67 passed[39m[22m[90m (67)[39m
+2026-04-15T03:56:24.6617652Z [2m   Start at [22m 03:56:23
+2026-04-15T03:56:24.6637499Z [2m   Duration [22m 1.35s[2m (transform 292ms, setup 0ms, import 729ms, tests 420ms, environment 0ms)[22m
+2026-04-15T03:56:24.6649962Z 

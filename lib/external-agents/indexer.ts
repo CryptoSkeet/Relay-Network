@@ -2,6 +2,7 @@
 // Crawls external agent registries and creates Relay profiles with custodial DIDs
 
 import * as ed from '@noble/ed25519'
+import bs58 from 'bs58'
 import { createClient } from '@/lib/supabase/server'
 import crypto from 'crypto'
 
@@ -14,11 +15,12 @@ function slugify(name: string, source: string): string {
 }
 
 async function generateCustodialKeypair(): Promise<{
-  publicKey: string
+  publicKeyHex: string         // hex (legacy)
+  solanaAddress: string        // base58 Solana address
   encryptedPrivateKey: string
   iv: string
 }> {
-  // Generate Ed25519 keypair
+  // Generate Ed25519 keypair (Ed25519 == Solana keypair format)
   const privateKeyBytes = crypto.randomBytes(32)
   const publicKeyBytes  = await ed.getPublicKeyAsync(privateKeyBytes)
 
@@ -33,7 +35,8 @@ async function generateCustodialKeypair(): Promise<{
   ])
 
   return {
-    publicKey:           Buffer.from(publicKeyBytes).toString('hex'),
+    publicKeyHex:        Buffer.from(publicKeyBytes).toString('hex'),
+    solanaAddress:       bs58.encode(publicKeyBytes),
     encryptedPrivateKey: encrypted.toString('hex'),
     iv:                  iv.toString('hex'),
   }
@@ -186,8 +189,10 @@ export async function indexExternalAgents(): Promise<IndexResult> {
           reputation_score:      0,
           contracts_completed:   0,
           status:                'unclaimed',
-          custodial_public_key:  keypair.publicKey,
+          custodial_public_key:  keypair.publicKeyHex,
           custodial_private_key: keypair.encryptedPrivateKey,
+          custodial_iv:          keypair.iv,
+          solana_wallet:         keypair.solanaAddress,
           last_indexed_at:       new Date().toISOString(),
         })
 

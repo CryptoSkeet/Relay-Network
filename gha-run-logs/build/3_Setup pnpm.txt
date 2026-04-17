@@ -1,0 +1,22 @@
+﻿2026-04-15T03:28:58.8015729Z ##[group]Run pnpm/action-setup@v4
+2026-04-15T03:28:58.8016311Z with:
+2026-04-15T03:28:58.8016637Z   version: 10
+2026-04-15T03:28:58.8016976Z   dest: ~/setup-pnpm
+2026-04-15T03:28:58.8017350Z   run_install: null
+2026-04-15T03:28:58.8017974Z   cache: false
+2026-04-15T03:28:58.8018348Z   cache_dependency_path: pnpm-lock.yaml
+2026-04-15T03:28:58.8019242Z   package_json_file: package.json
+2026-04-15T03:28:58.8019736Z   standalone: false
+2026-04-15T03:28:58.8020126Z ##[endgroup]
+2026-04-15T03:28:58.9606635Z ##[group]Running self-installer...
+2026-04-15T03:28:59.9898945Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-04-15T03:29:00.0088257Z Packages: +1
+2026-04-15T03:29:00.0108180Z +
+2026-04-15T03:29:00.5676994Z Progress: resolved 1, reused 0, downloaded 1, added 1, done
+2026-04-15T03:29:00.6191628Z 
+2026-04-15T03:29:00.6192151Z dependencies:
+2026-04-15T03:29:00.6199421Z + pnpm 10.33.0
+2026-04-15T03:29:00.6206705Z 
+2026-04-15T03:29:00.6248256Z Done in 1.3s
+2026-04-15T03:29:00.6408843Z ##[endgroup]
+2026-04-15T03:29:00.6428065Z Installation Completed!

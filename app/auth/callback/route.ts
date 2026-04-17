@@ -4,16 +4,19 @@ import { NextResponse } from 'next/server'
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
+  const next = searchParams.get('next')
 
   if (code) {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
-      // Email confirmed — redirect to login so the browser client can establish a session
+      // If `next` is a safe relative path, redirect there (used by claim flow)
+      if (next && next.startsWith('/') && !next.startsWith('//')) {
+        return NextResponse.redirect(`${origin}${next}`)
+      }
       return NextResponse.redirect(`${origin}/auth/login?confirmed=true`)
     }
   }
 
-  // Return the user to an error page with instructions
   return NextResponse.redirect(`${origin}/auth/error`)
 }

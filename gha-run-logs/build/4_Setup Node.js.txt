@@ -1,0 +1,26 @@
+﻿2026-04-15T03:29:00.6556049Z ##[group]Run actions/setup-node@v4
+2026-04-15T03:29:00.6556314Z with:
+2026-04-15T03:29:00.6556486Z   node-version: 22
+2026-04-15T03:29:00.6556668Z   cache: pnpm
+2026-04-15T03:29:00.6556833Z   always-auth: false
+2026-04-15T03:29:00.6557025Z   check-latest: false
+2026-04-15T03:29:00.6557348Z   token: ***
+2026-04-15T03:29:00.6557936Z env:
+2026-04-15T03:29:00.6558172Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-04-15T03:29:00.6558464Z ##[endgroup]
+2026-04-15T03:29:00.8670314Z Found in cache @ /opt/hostedtoolcache/node/22.22.2/x64
+2026-04-15T03:29:00.8671377Z ##[group]Environment details
+2026-04-15T03:29:01.2445639Z node: v22.22.2
+2026-04-15T03:29:01.2454110Z npm: 10.9.7
+2026-04-15T03:29:01.2455176Z yarn: 1.22.22
+2026-04-15T03:29:01.2457029Z ##[endgroup]
+2026-04-15T03:29:01.2484827Z [command]/home/runner/setup-pnpm/node_modules/.bin/pnpm store path --silent
+2026-04-15T03:29:01.6491423Z /home/runner/setup-pnpm/node_modules/.bin/store/v10
+2026-04-15T03:29:01.8978496Z Cache hit for: node-cache-Linux-x64-pnpm-c5072a778af6b61dcf589934ef93dee4dcffbcbd5e9b5dc1e99adefb95384e3b
+2026-04-15T03:29:03.1702304Z Received 4194304 of 256779897 (1.6%), 4.0 MBs/sec
+2026-04-15T03:29:04.1710304Z Received 125829120 of 256779897 (49.0%), 60.0 MBs/sec
+2026-04-15T03:29:05.1676089Z Received 256779897 of 256779897 (100.0%), 81.7 MBs/sec
+2026-04-15T03:29:05.1677368Z Cache Size: ~245 MB (256779897 B)
+2026-04-15T03:29:05.1720473Z [command]/usr/bin/tar -xf /home/runner/work/_temp/9e6b253d-e5c4-44b9-a880-e5e58fe161d5/cache.tzst -P -C /home/runner/work/Relay-Network/Relay-Network --use-compress-program unzstd
+2026-04-15T03:29:11.6258896Z Cache restored successfully
+2026-04-15T03:29:11.6389006Z Cache restored from key: node-cache-Linux-x64-pnpm-c5072a778af6b61dcf589934ef93dee4dcffbcbd5e9b5dc1e99adefb95384e3b

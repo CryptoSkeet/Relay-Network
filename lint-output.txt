@@ -1,0 +1,461 @@
+﻿
+> my-project@0.2.1 lint C:\Users\dirby\v0-ai-agent-instagram
+> eslint .
+
+
+C:\Users\dirby\v0-ai-agent-instagram\app\(main)\agent\[handle]\agent-profile.tsx
+  340:7   warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any')
+  348:7   warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any')
+  471:11  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+C:\Users\dirby\v0-ai-agent-instagram\app\(main)\analytics\analytics-page.tsx
+  59:5  error  Error: Cannot access variable before it is declared
+
+`loadAnalytics` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+C:\Users\dirby\v0-ai-agent-instagram\app\(main)\analytics\analytics-page.tsx:59:5
+  57 |
+  58 |   useEffect(() => {
+> 59 |     loadAnalytics()
+     |     ^^^^^^^^^^^^^ `loadAnalytics` accessed before it is declared
+  60 |   }, [])
+  61 |
+  62 |   async function loadAnalytics() {
+
+C:\Users\dirby\v0-ai-agent-instagram\app\(main)\analytics\analytics-page.tsx:62:3
+   60 |   }, [])
+   61 |
+>  62 |   async function loadAnalytics() {
+      |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  63 |     const supabase = createClient()
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  64 |
+      ΓÇª
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 258 |     setLoading(false)
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 259 |   }
+      | ^^^^ `loadAnalytics` is declared here
+  260 |
+  261 |   if (loading) {
+  262 |     return (  react-hooks/immutability
+
+C:\Users\dirby\v0-ai-agent-instagram\app\(main)\businesses\[handle]\business-detail-page.tsx
+  109:19  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+C:\Users\dirby\v0-ai-agent-instagram\app\(main)\create-agent\create-agent-form.tsx
+  229:48  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+C:\Users\dirby\v0-ai-agent-instagram\app\(main)\create\create-page.tsx
+  280:23  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+C:\Users\dirby\v0-ai-agent-instagram\app\(main)\explore\agents\explore-agents-page.tsx
+  32:5  error    Error: Cannot access variable before it is declared
+
+`loadAgents` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+C:\Users\dirby\v0-ai-agent-instagram\app\(main)\explore\agents\explore-agents-page.tsx:32:5
+  30 |
+  31 |   useEffect(() => {
+> 32 |     loadAgents()
+     |     ^^^^^^^^^^ `loadAgents` accessed before it is declared
+  33 |   }, [activeFilter, searchQuery])
+  34 |
+  35 |   async function loadAgents() {
+
+C:\Users\dirby\v0-ai-agent-instagram\app\(main)\explore\agents\explore-agents-page.tsx:35:3
+  33 |   }, [activeFilter, searchQuery])
+  34 |
+> 35 |   async function loadAgents() {
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 36 |     setLoading(true)
+     | ^^^^^^^^^^^^^^^^^^^^
+> 37 |     let query = supabase.from('agents').select('*')
+     ΓÇª
+     | ^^^^^^^^^^^^^^^^^^^^
+> 64 |     setLoading(false)
+     | ^^^^^^^^^^^^^^^^^^^^
+> 65 |   }
+     | ^^^^ `loadAgents` is declared here
+  66 |
+  67 |   const handleFollow = async (agentId: string) => {
+  68 |     // Optimistic update  react-hooks/immutability
+  33:6  warning  React Hook useEffect has a missing dependency: 'loadAgents'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             react-hooks/exhaustive-deps
+
+C:\Users\dirby\v0-ai-agent-instagram\app\(main)\hiring\[handle]\hiring-profile-page.tsx
+  138:15  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+C:\Users\dirby\v0-ai-agent-instagram\app\(main)\home\page.tsx
+  50:31  error  Error: Cannot call impure function during render
+
+`Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Users\dirby\v0-ai-agent-instagram\app\(main)\home\page.tsx:50:31
+  48 |
+  49 |   // Fetch network stats for observer mode
+> 50 |   const oneHourAgo = new Date(Date.now() - 3600000).toISOString()
+     |                               ^^^^^^^^^^ Cannot call impure function
+  51 |   const todayStart = new Date().toISOString().split('T')[0]
+  52 |   const [onlineQ, contractsQ, postsQ, transactionsQ] = await Promise.all([
+  53 |     supabase  react-hooks/purity
+
+C:\Users\dirby\v0-ai-agent-instagram\app\(main)\messages\messages-page.tsx
+  62:31  error  Error: Cannot call impure function during render
+
+`Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Users\dirby\v0-ai-agent-instagram\app\(main)\messages\messages-page.tsx:62:31
+  60 |     if (!ts) return ''
+  61 |     const d = new Date(ts)
+> 62 |     const diffH = Math.floor((Date.now() - d.getTime()) / 3600000)
+     |                               ^^^^^^^^^^ Cannot call impure function
+  63 |     if (diffH < 1) return 'now'
+  64 |     if (diffH < 24) return `${diffH}h ago`
+  65 |     return d.toLocaleDateString([], { month: 'short', day: 'numeric' })  react-hooks/purity
+
+C:\Users\dirby\v0-ai-agent-instagram\app\(main)\network\page.tsx
+  28:35  error  Error: Cannot call impure function during render
+
+`Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Users\dirby\v0-ai-agent-instagram\app\(main)\network\page.tsx:28:35
+  26 |   
+  27 |   // Get recent heartbeat count
+> 28 |   const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+     |                                   ^^^^^^^^^^ Cannot call impure function
+  29 |   const { count: recentHeartbeats } = await supabase
+  30 |     .from('agent_heartbeats')
+  31 |     .select('*', { count: 'exact', head: true })           react-hooks/purity
+  35:31  error  Error: Cannot call impure function during render
+
+`Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Users\dirby\v0-ai-agent-instagram\app\(main)\network\page.tsx:35:31
+  33 |   
+  34 |   // Get heartbeat history for the chart (last hour, grouped by minute)
+> 35 |   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+     |                               ^^^^^^^^^^ Cannot call impure function
+  36 |   const { data: heartbeatHistory } = await supabase
+  37 |     .from('agent_heartbeats')
+  38 |     .select('created_at')  react-hooks/purity
+
+C:\Users\dirby\v0-ai-agent-instagram\app\(main)\search\page.tsx
+  60:5  error    Error: Cannot access variable before it is declared
+
+`loadAgents` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+C:\Users\dirby\v0-ai-agent-instagram\app\(main)\search\page.tsx:60:5
+  58 |   useEffect(() => {
+  59 |     // Load initial data
+> 60 |     loadAgents()
+     |     ^^^^^^^^^^ `loadAgents` accessed before it is declared
+  61 |     loadPosts()
+  62 |   }, [])
+  63 |
+
+C:\Users\dirby\v0-ai-agent-instagram\app\(main)\search\page.tsx:75:3
+  73 |   }, [searchQuery, activeTab])
+  74 |
+> 75 |   async function loadAgents() {
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 76 |     setLoading(true)
+     | ^^^^^^^^^^^^^^^^^^^^
+> 77 |     let query = supabase
+     ΓÇª
+     | ^^^^^^^^^^^^^^^^^^^^
+> 93 |     setLoading(false)
+     | ^^^^^^^^^^^^^^^^^^^^
+> 94 |   }
+     | ^^^^ `loadAgents` is declared here
+  95 |
+  96 |   async function loadPosts() {
+  97 |     setLoading(true)                                       react-hooks/immutability
+  61:5  error    Error: Cannot access variable before it is declared
+
+`loadPosts` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+C:\Users\dirby\v0-ai-agent-instagram\app\(main)\search\page.tsx:61:5
+  59 |     // Load initial data
+  60 |     loadAgents()
+> 61 |     loadPosts()
+     |     ^^^^^^^^^ `loadPosts` accessed before it is declared
+  62 |   }, [])
+  63 |
+  64 |   useEffect(() => {
+
+C:\Users\dirby\v0-ai-agent-instagram\app\(main)\search\page.tsx:96:3
+   94 |   }
+   95 |
+>  96 |   async function loadPosts() {
+      |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  97 |     setLoading(true)
+      | ^^^^^^^^^^^^^^^^^^^^
+>  98 |     let query = supabase
+      ΓÇª
+      | ^^^^^^^^^^^^^^^^^^^^
+> 114 |     setLoading(false)
+      | ^^^^^^^^^^^^^^^^^^^^
+> 115 |   }
+      | ^^^^ `loadPosts` is declared here
+  116 |
+  117 |   const formatNumber = (num: number) => {
+  118 |     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`  react-hooks/immutability
+  62:6  warning  React Hook useEffect has missing dependencies: 'loadAgents' and 'loadPosts'. Either include them or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           react-hooks/exhaustive-deps
+  73:6  warning  React Hook useEffect has missing dependencies: 'loadAgents' and 'loadPosts'. Either include them or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           react-hooks/exhaustive-deps
+
+C:\Users\dirby\v0-ai-agent-instagram\app\(main)\settings\settings-page.tsx
+  106:6   warning  React Hook useEffect has a missing dependency: 'loadApiKeys'. Either include it or remove the dependency array                                                                                                                                                                           react-hooks/exhaustive-deps
+  339:19  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  564:54  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`                                                                                                                                                                                                                          react/no-unescaped-entities
+
+C:\Users\dirby\v0-ai-agent-instagram\app\(main)\token\token-page.tsx
+  181:23  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  181:33  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+
+C:\Users\dirby\v0-ai-agent-instagram\app\(main)\wallet\wallet-page.tsx
+  972:29  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+C:\Users\dirby\v0-ai-agent-instagram\app\about\page.tsx
+   51:39  error  Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+  112:42  error  Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+  123:42  error  Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+  134:42  error  Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+  158:42  error  Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+  169:42  error  Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+
+C:\Users\dirby\v0-ai-agent-instagram\app\auth\sign-up-success\page.tsx
+  37:71  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+C:\Users\dirby\v0-ai-agent-instagram\app\landing\LandingContent.tsx
+  201:39  error  Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+  536:48  error  Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+  539:48  error  Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+  549:48  error  Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+
+C:\Users\dirby\v0-ai-agent-instagram\app\landing\page.tsx
+  324:41  error    Comments inside children section of tag should be placed inside braces                                                                                                                                                                                                                   react/jsx-no-comment-textnodes
+  634:19  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  658:50  error    Comments inside children section of tag should be placed inside braces                                                                                                                                                                                                                   react/jsx-no-comment-textnodes
+  661:50  error    Comments inside children section of tag should be placed inside braces                                                                                                                                                                                                                   react/jsx-no-comment-textnodes
+  671:50  error    Comments inside children section of tag should be placed inside braces                                                                                                                                                                                                                   react/jsx-no-comment-textnodes
+
+C:\Users\dirby\v0-ai-agent-instagram\app\privacy\page.tsx
+   88:63   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+   88:72   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+   88:74   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+   88:78   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+   88:80   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+   88:84   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+   88:89   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+   88:93   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+   89:103  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+   89:112  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  184:111  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+  223:17   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  223:32   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+
+C:\Users\dirby\v0-ai-agent-instagram\app\terms\page.tsx
+   85:34   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+   85:47   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+   90:35   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+   90:41   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+   91:102  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+   91:111  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  101:36   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  101:40   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  104:52   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  104:56   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  104:58   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  104:62   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  105:13   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  105:21   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  129:88   error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+  145:69   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  145:76   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  146:33   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  146:43   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  146:93   error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+  147:56   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  147:60   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  147:105  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+  163:58   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  163:71   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  177:101  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+  219:13   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  219:26   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  248:77   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  248:93   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  272:81   error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+  284:78   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  284:87   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  313:38   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  313:44   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  313:50   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  313:63   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  340:38   error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+  348:42   error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+  401:37   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  401:52   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  415:95   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  415:99   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  419:97   error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+  420:89   error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+  453:96   error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+C:\Users\dirby\v0-ai-agent-instagram\app\tokenomics\page.tsx
+   64:40  error  Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+   94:40  error  Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+  139:40  error  Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+  168:40  error  Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+
+C:\Users\dirby\v0-ai-agent-instagram\app\whitepaper\page.tsx
+   83:37  error  Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+  108:45  error  Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+  132:45  error  Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+  140:20  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`         react/no-unescaped-entities
+  162:37  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`         react/no-unescaped-entities
+  162:74  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`         react/no-unescaped-entities
+  169:20  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`         react/no-unescaped-entities
+  177:68  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`         react/no-unescaped-entities
+  184:45  error  Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+  193:44  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`         react/no-unescaped-entities
+  236:24  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`         react/no-unescaped-entities
+  243:45  error  Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+  273:94  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`         react/no-unescaped-entities
+  302:91  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`         react/no-unescaped-entities
+  305:53  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`         react/no-unescaped-entities
+  399:45  error  Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+  402:51  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`         react/no-unescaped-entities
+  403:97  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`         react/no-unescaped-entities
+  421:79  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`         react/no-unescaped-entities
+  451:98  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`         react/no-unescaped-entities
+  489:68  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`         react/no-unescaped-entities
+  500:59  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`         react/no-unescaped-entities
+  507:45  error  Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+  510:88  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`         react/no-unescaped-entities
+  591:59  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`         react/no-unescaped-entities
+  599:45  error  Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+  668:45  error  Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+  671:37  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`         react/no-unescaped-entities
+  695:56  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`         react/no-unescaped-entities
+  704:45  error  Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+  819:45  error  Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+  850:45  error  Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+  865:41  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`         react/no-unescaped-entities
+  895:45  error  Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+  996:45  error  Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+
+C:\Users\dirby\v0-ai-agent-instagram\components\ErrorBoundary.tsx
+  103:14  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+C:\Users\dirby\v0-ai-agent-instagram\components\relay\agent-avatar.tsx
+  73:11  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+C:\Users\dirby\v0-ai-agent-instagram\components\relay\create-post-box.tsx
+  291:21  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  311:19  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  374:15  warning  Image elements must have an alt prop, either with meaningful text, or an empty string for decorative images                                                                                                                                                                              jsx-a11y/alt-text
+
+C:\Users\dirby\v0-ai-agent-instagram\components\relay\mobile-bottom-nav.tsx
+  115:17  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+C:\Users\dirby\v0-ai-agent-instagram\components\relay\observer-mode.tsx
+  207:27  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 react/no-unescaped-entities
+  261:7   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\dirby\v0-ai-agent-instagram\components\relay\observer-mode.tsx:261:7
+  259 |   useEffect(() => {
+  260 |     if (!animate) {
+> 261 |       setDisplayValue(value)
+      |       ^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  262 |       return
+  263 |     }
+  264 |       react-hooks/set-state-in-effect
+  284:6   warning  React Hook useEffect has a missing dependency: 'displayValue'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 react-hooks/exhaustive-deps
+
+C:\Users\dirby\v0-ai-agent-instagram\components\relay\post-card.tsx
+  207:13  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+C:\Users\dirby\v0-ai-agent-instagram\components\relay\sidebar.tsx
+  77:7  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\dirby\v0-ai-agent-instagram\components\relay\sidebar.tsx:77:7
+  75 |   useEffect(() => {
+  76 |     if (moreNavItems.some((item) => pathname === item.href)) {
+> 77 |       setMoreOpen(true)
+     |       ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  78 |     }
+  79 |   }, [pathname])
+  80 |  react-hooks/set-state-in-effect
+
+C:\Users\dirby\v0-ai-agent-instagram\components\relay\story-viewer.tsx
+  63:5  error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\dirby\v0-ai-agent-instagram\components\relay\story-viewer.tsx:63:5
+  61 |
+  62 |   useEffect(() => {
+> 63 |     setProgress(0)
+     |     ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  64 |     const start = Date.now()
+  65 |     intervalRef.current = setInterval(() => {
+  66 |       const elapsed = Date.now() - start  react-hooks/set-state-in-effect
+  75:6  warning  React Hook useEffect has a missing dependency: 'goNext'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      react-hooks/exhaustive-deps
+  85:6  warning  React Hook useEffect has missing dependencies: 'goNext', 'goPrev', and 'onClose'. Either include them or remove the dependency array. If 'onClose' changes too often, find the parent component that defines it and wrap that definition in useCallback                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        react-hooks/exhaustive-deps
+
+C:\Users\dirby\v0-ai-agent-instagram\components\ui\onboarding-tour.tsx
+  33:7  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\dirby\v0-ai-agent-instagram\components\ui\onboarding-tour.tsx:33:7
+  31 |     const seen = window.localStorage.getItem('relay_onboarding_seen')
+  32 |     if (!seen) {
+> 33 |       setIsOpen(true)
+     |       ^^^^^^^^^ Avoid calling setState() directly within an effect
+  34 |     }
+  35 |   }, [])
+  36 |  react-hooks/set-state-in-effect
+
+C:\Users\dirby\v0-ai-agent-instagram\components\ui\sidebar.tsx
+  611:26  error  Error: Cannot call impure function during render
+
+`Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Users\dirby\v0-ai-agent-instagram\components\ui\sidebar.tsx:611:26
+  609 |   // Random width between 50 to 90%.
+  610 |   const width = React.useMemo(() => {
+> 611 |     return `${Math.floor(Math.random() * 40) + 50}%`
+      |                          ^^^^^^^^^^^^^ Cannot call impure function
+  612 |   }, [])
+  613 |
+  614 |   return (  react-hooks/purity
+
+C:\Users\dirby\v0-ai-agent-instagram\lib\security.ts
+  180:5  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-require-imports')
+
+Γ£û 155 problems (132 errors, 23 warnings)
+  0 errors and 3 warnings potentially fixable with the `--fix` option.
+
+ΓÇëELIFECYCLEΓÇë Command failed with exit code 1.

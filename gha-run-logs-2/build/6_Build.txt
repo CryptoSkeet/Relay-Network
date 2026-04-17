@@ -1,0 +1,56 @@
+﻿2026-04-15T03:57:03.9789896Z ##[group]Run pnpm run build
+2026-04-15T03:57:03.9790206Z [36;1mpnpm run build[0m
+2026-04-15T03:57:03.9811663Z shell: /usr/bin/bash -e {0}
+2026-04-15T03:57:03.9811892Z env:
+2026-04-15T03:57:03.9812130Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-04-15T03:57:03.9812421Z ##[endgroup]
+2026-04-15T03:57:04.3209808Z 
+2026-04-15T03:57:04.3211417Z > my-project@0.2.1 build /home/runner/work/Relay-Network/Relay-Network
+2026-04-15T03:57:04.3212514Z > next build
+2026-04-15T03:57:04.3212913Z 
+2026-04-15T03:57:04.7609643Z ⚠ No build cache found. Please configure build caching for faster rebuilds. Read more: https://nextjs.org/docs/messages/no-cache
+2026-04-15T03:57:04.7684685Z Attention: Next.js now collects completely anonymous telemetry regarding usage.
+2026-04-15T03:57:04.7686119Z This information is used to shape Next.js' roadmap and prioritize features.
+2026-04-15T03:57:04.7687897Z You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+2026-04-15T03:57:04.7689321Z https://nextjs.org/telemetry
+2026-04-15T03:57:04.7689980Z 
+2026-04-15T03:57:04.8035661Z ▲ Next.js 16.2.1 (Turbopack)
+2026-04-15T03:57:04.8043049Z 
+2026-04-15T03:57:04.8303821Z ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+2026-04-15T03:57:04.9278231Z   Creating an optimized production build ...
+2026-04-15T03:57:41.3978729Z ✓ Compiled successfully in 36.2s
+2026-04-15T03:57:41.4053213Z   Running TypeScript ...
+2026-04-15T03:58:06.1703675Z   Finished TypeScript in 24.8s ...
+2026-04-15T03:58:06.1758699Z   Collecting page data using 1 worker ...
+2026-04-15T03:58:06.7372491Z ❌ Environment validation failed:
+2026-04-15T03:58:06.7374794Z Missing required variables: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, ANTHROPIC_API_KEY, CRON_SECRET, KV_REST_API_URL, KV_REST_API_TOKEN
+2026-04-15T03:58:06.7377201Z ⚠️ Environment validation failed — some env vars may be missing. App will still build.
+2026-04-15T03:58:06.8654976Z bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+2026-04-15T03:58:06.8913058Z [Upstash Redis] The 'url' property is missing or undefined in your Redis config.
+2026-04-15T03:58:06.8916720Z [Upstash Redis] The 'token' property is missing or undefined in your Redis config.
+2026-04-15T03:58:07.4526724Z ⚠ Using edge runtime on a page currently disables static generation for that page
+2026-04-15T03:58:07.7763194Z   Generating static pages using 1 worker (0/123) ...
+2026-04-15T03:58:08.2724035Z Contracts query error: {
+2026-04-15T03:58:08.2724759Z   message: 'TypeError: fetch failed',
+2026-04-15T03:58:08.2730104Z   details: 'TypeError: fetch failed\n' +
+2026-04-15T03:58:08.2730904Z     '\n' +
+2026-04-15T03:58:08.2732861Z     'Caused by: Error: getaddrinfo ENOTFOUND placeholder.supabase.co (ENOTFOUND)\n' +
+2026-04-15T03:58:08.2734119Z     'Error: getaddrinfo ENOTFOUND placeholder.supabase.co\n' +
+2026-04-15T03:58:08.2735300Z     '    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)\n' +
+2026-04-15T03:58:08.2736643Z     '    at GetAddrInfoReqWrap.callbackTrampoline (node:internal/async_hooks:130:17)',
+2026-04-15T03:58:08.2737621Z   hint: '',
+2026-04-15T03:58:08.2738146Z   code: ''
+2026-04-15T03:58:08.2738655Z }
+2026-04-15T03:58:08.6029897Z Error occurred prerendering page "/explore/agents". Read more: https://nextjs.org/docs/messages/prerender-error
+2026-04-15T03:58:08.6068017Z Error: supabaseUrl is required.
+2026-04-15T03:58:08.6069361Z     at <unknown> (.next/server/chunks/ssr/_0b4d_t~._.js:37:44256)
+2026-04-15T03:58:08.6070841Z     at new r (.next/server/chunks/ssr/_0b4d_t~._.js:37:44507)
+2026-04-15T03:58:08.6072439Z     at c.createClient (.next/server/chunks/ssr/_0b4d_t~._.js:37:49529)
+2026-04-15T03:58:08.6073479Z     at <unknown> (.next/server/chunks/ssr/_0b4d_t~._.js:55:81)
+2026-04-15T03:58:08.6074441Z     at <unknown> (.next/server/chunks/ssr/_07pklq3._.js:1:2960) {
+2026-04-15T03:58:08.6081672Z   digest: '3512869941'
+2026-04-15T03:58:08.6102528Z }
+2026-04-15T03:58:08.6103529Z Export encountered an error on /(main)/explore/agents/page: /explore/agents, exiting the build.
+2026-04-15T03:58:08.6356170Z ⨯ Next.js build worker exited with code: 1 and signal: null
+2026-04-15T03:58:08.6811952Z  ELIFECYCLE  Command failed with exit code 1.
+2026-04-15T03:58:08.7039862Z ##[error]Process completed with exit code 1.

@@ -107,6 +107,8 @@ async function renderMarketplace() {
     x402_enabled:  agent.x402_enabled,
     mcp_endpoint:  agent.mcp_endpoint,
     reputation:    agent.reputation_score,
+    claim_status:  (agent.status === 'claimed' ? 'claimed' : 'unclaimed') as 'claimed' | 'unclaimed',
+    accrued_relay: Number(agent.accrued_relay ?? 0),
     agent: {
       id: agent.id,
       handle: agent.relay_did?.split(':').pop() ?? agent.name.toLowerCase().replace(/\s+/g, '-'),

@@ -1,0 +1,66 @@
+﻿2026-04-15T03:55:57.5892674Z ##[group]Run pnpm run lint
+2026-04-15T03:55:57.5892980Z [36;1mpnpm run lint[0m
+2026-04-15T03:55:57.5914519Z shell: /usr/bin/bash -e {0}
+2026-04-15T03:55:57.5914758Z env:
+2026-04-15T03:55:57.5914999Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-04-15T03:55:57.5915300Z ##[endgroup]
+2026-04-15T03:55:57.8756882Z 
+2026-04-15T03:55:57.8758069Z > my-project@0.2.1 lint /home/runner/work/Relay-Network/Relay-Network
+2026-04-15T03:55:57.8759102Z > eslint .
+2026-04-15T03:55:57.8759573Z 
+2026-04-15T03:56:22.3056718Z 
+2026-04-15T03:56:22.3068148Z /home/runner/work/Relay-Network/Relay-Network/app/(main)/agent/[handle]/agent-profile.tsx
+2026-04-15T03:56:22.3070072Z   340:7   warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any')
+2026-04-15T03:56:22.3072073Z   348:7   warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any')
+2026-04-15T03:56:22.3103164Z ##[warning]  471:11  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+2026-04-15T03:56:22.3115107Z 
+2026-04-15T03:56:22.3115811Z /home/runner/work/Relay-Network/Relay-Network/app/(main)/analytics/analytics-page.tsx
+2026-04-15T03:56:22.3118859Z   58:3  warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/exhaustive-deps')
+2026-04-15T03:56:22.3119673Z 
+2026-04-15T03:56:22.3120460Z /home/runner/work/Relay-Network/Relay-Network/app/(main)/businesses/[handle]/business-detail-page.tsx
+2026-04-15T03:56:22.3139094Z ##[warning]  109:19  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+2026-04-15T03:56:22.3142016Z 
+2026-04-15T03:56:22.3142622Z /home/runner/work/Relay-Network/Relay-Network/app/(main)/create/create-page.tsx
+2026-04-15T03:56:22.3147675Z ##[warning]  280:23  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+2026-04-15T03:56:22.3150603Z 
+2026-04-15T03:56:22.3151367Z /home/runner/work/Relay-Network/Relay-Network/app/(main)/hiring/[handle]/hiring-profile-page.tsx
+2026-04-15T03:56:22.3156930Z ##[warning]  138:15  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+2026-04-15T03:56:22.3160094Z 
+2026-04-15T03:56:22.3160637Z /home/runner/work/Relay-Network/Relay-Network/app/(main)/search/page.tsx
+2026-04-15T03:56:22.3162104Z   103:3  warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/exhaustive-deps')
+2026-04-15T03:56:22.3164971Z ##[warning]  113:6  warning  React Hook useEffect has missing dependencies: 'loadAgents' and 'loadPosts'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+2026-04-15T03:56:22.3167140Z 
+2026-04-15T03:56:22.3167758Z /home/runner/work/Relay-Network/Relay-Network/app/(main)/settings/settings-page.tsx
+2026-04-15T03:56:22.3171436Z ##[warning]  106:6   warning  React Hook useEffect has a missing dependency: 'loadApiKeys'. Either include it or remove the dependency array                                                                                                                                                                           react-hooks/exhaustive-deps
+2026-04-15T03:56:22.3178452Z ##[warning]  339:19  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+2026-04-15T03:56:22.3181259Z 
+2026-04-15T03:56:22.3181885Z /home/runner/work/Relay-Network/Relay-Network/app/(main)/wallet/wallet-page.tsx
+2026-04-15T03:56:22.3186802Z ##[warning]  972:29  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+2026-04-15T03:56:22.3189648Z 
+2026-04-15T03:56:22.3190138Z /home/runner/work/Relay-Network/Relay-Network/app/landing/page.tsx
+2026-04-15T03:56:22.3194666Z ##[warning]  634:19  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+2026-04-15T03:56:22.3197819Z 
+2026-04-15T03:56:22.3198422Z /home/runner/work/Relay-Network/Relay-Network/components/relay/agent-avatar.tsx
+2026-04-15T03:56:22.3203099Z ##[warning]  73:11  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+2026-04-15T03:56:22.3205872Z 
+2026-04-15T03:56:22.3206701Z /home/runner/work/Relay-Network/Relay-Network/components/relay/create-post-box.tsx
+2026-04-15T03:56:22.3211383Z ##[warning]  291:21  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+2026-04-15T03:56:22.3218806Z ##[warning]  311:19  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+2026-04-15T03:56:22.3223989Z ##[warning]  374:15  warning  Image elements must have an alt prop, either with meaningful text, or an empty string for decorative images                                                                                                                                                                              jsx-a11y/alt-text
+2026-04-15T03:56:22.3226346Z 
+2026-04-15T03:56:22.3227067Z /home/runner/work/Relay-Network/Relay-Network/components/relay/mobile-bottom-nav.tsx
+2026-04-15T03:56:22.3231361Z ##[warning]  115:17  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+2026-04-15T03:56:22.3234202Z 
+2026-04-15T03:56:22.3234817Z /home/runner/work/Relay-Network/Relay-Network/components/relay/observer-mode.tsx
+2026-04-15T03:56:22.3237706Z ##[warning]  284:6  warning  React Hook useEffect has a missing dependency: 'displayValue'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+2026-04-15T03:56:22.3239620Z 
+2026-04-15T03:56:22.3240196Z /home/runner/work/Relay-Network/Relay-Network/components/relay/post-card.tsx
+2026-04-15T03:56:22.3244935Z ##[warning]  207:13  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+2026-04-15T03:56:22.3248142Z 
+2026-04-15T03:56:22.3248747Z /home/runner/work/Relay-Network/Relay-Network/components/relay/story-viewer.tsx
+2026-04-15T03:56:22.3252099Z ##[warning]  75:6  warning  React Hook useEffect has a missing dependency: 'goNext'. Either include it or remove the dependency array                                                                                                                                                react-hooks/exhaustive-deps
+2026-04-15T03:56:22.3258213Z ##[warning]  85:6  warning  React Hook useEffect has missing dependencies: 'goNext', 'goPrev', and 'onClose'. Either include them or remove the dependency array. If 'onClose' changes too often, find the parent component that defines it and wrap that definition in useCallback  react-hooks/exhaustive-deps
+2026-04-15T03:56:22.3260893Z 
+2026-04-15T03:56:22.3261452Z ✖ 22 problems (0 errors, 22 warnings)
+2026-04-15T03:56:22.3262187Z   0 errors and 4 warnings potentially fixable with the `--fix` option.
+2026-04-15T03:56:22.3262687Z 

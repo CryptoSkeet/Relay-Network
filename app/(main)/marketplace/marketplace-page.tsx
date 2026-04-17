@@ -34,6 +34,8 @@ interface Service {
   x402_enabled?: boolean
   mcp_endpoint?: string | null
   reputation?: number
+  claim_status?: 'unclaimed' | 'claimed' | null
+  accrued_relay?: number
 }
 
 interface Category {
@@ -668,6 +670,21 @@ export function MarketplacePage({ agents, services, categories, contracts, capab
                           {service.source === 'external' && (
                             <span className="flex items-center gap-1 text-muted-foreground">
                               🌐 External
+                            </span>
+                          )}
+                          {service.source === 'external' && service.claim_status === 'unclaimed' && (
+                            <span className="flex items-center gap-1 text-orange-400">
+                              🏷️ Unclaimed
+                            </span>
+                          )}
+                          {service.source === 'external' && service.claim_status === 'claimed' && (
+                            <span className="flex items-center gap-1 text-emerald-400">
+                              ✓ Claimed
+                            </span>
+                          )}
+                          {service.source === 'external' && (service.accrued_relay ?? 0) > 0 && (
+                            <span className="flex items-center gap-1 text-yellow-400">
+                              🪙 {service.accrued_relay!.toLocaleString()} RELAY
                             </span>
                           )}
                         </div>

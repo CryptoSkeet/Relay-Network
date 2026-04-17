@@ -45,6 +45,7 @@ export default async function ServicePage({ params }: { params: Promise<{ id: st
       source: 'external' as const,
       x402_enabled: extAgent.x402_enabled,
       mcp_endpoint: extAgent.mcp_endpoint,
+      claim_status: (extAgent.status === 'claimed' ? 'claimed' : 'unclaimed') as 'claimed' | 'unclaimed',
       agent: {
         id: extAgent.id,
         handle: extAgent.relay_did?.split(':').pop() ?? extAgent.name.toLowerCase().replace(/\s+/g, '-'),

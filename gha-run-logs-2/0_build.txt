@@ -1,0 +1,394 @@
+﻿2026-04-15T03:56:30.0853996Z Current runner version: '2.333.1'
+2026-04-15T03:56:30.0926902Z ##[group]Runner Image Provisioner
+2026-04-15T03:56:30.0928162Z Hosted Compute Agent
+2026-04-15T03:56:30.0929210Z Version: 20260213.493
+2026-04-15T03:56:30.0930250Z Commit: 5c115507f6dd24b8de37d8bbe0bb4509d0cc0fa3
+2026-04-15T03:56:30.0931725Z Build Date: 2026-02-13T00:28:41Z
+2026-04-15T03:56:30.0932997Z Worker ID: {bc1e78a2-b04b-4cbd-9e23-5b11bc22148f}
+2026-04-15T03:56:30.0934234Z Azure Region: northcentralus
+2026-04-15T03:56:30.0935200Z ##[endgroup]
+2026-04-15T03:56:30.0937549Z ##[group]Operating System
+2026-04-15T03:56:30.0938462Z Ubuntu
+2026-04-15T03:56:30.0939240Z 24.04.4
+2026-04-15T03:56:30.0940126Z LTS
+2026-04-15T03:56:30.0940940Z ##[endgroup]
+2026-04-15T03:56:30.0946631Z ##[group]Runner Image
+2026-04-15T03:56:30.0947654Z Image: ubuntu-24.04
+2026-04-15T03:56:30.0948541Z Version: 20260406.80.1
+2026-04-15T03:56:30.0950586Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260406.80/images/ubuntu/Ubuntu2404-Readme.md
+2026-04-15T03:56:30.0953660Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260406.80
+2026-04-15T03:56:30.0955536Z ##[endgroup]
+2026-04-15T03:56:30.0957313Z ##[group]GITHUB_TOKEN Permissions
+2026-04-15T03:56:30.0960002Z Contents: read
+2026-04-15T03:56:30.0981720Z Metadata: read
+2026-04-15T03:56:30.0982657Z Packages: read
+2026-04-15T03:56:30.0983461Z ##[endgroup]
+2026-04-15T03:56:30.0986537Z Secret source: Actions
+2026-04-15T03:56:30.0987611Z Prepare workflow directory
+2026-04-15T03:56:30.1823466Z Prepare all required actions
+2026-04-15T03:56:30.1942921Z Getting action download info
+2026-04-15T03:56:30.6815236Z Download action repository 'actions/checkout@v4' (SHA:34e114876b0b11c390a56381ad16ebd13914f8d5)
+2026-04-15T03:56:30.9404224Z Download action repository 'pnpm/action-setup@v4' (SHA:b906affcce14559ad1aafd4ab0e942779e9f58b1)
+2026-04-15T03:56:31.4437967Z Download action repository 'actions/setup-node@v4' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
+2026-04-15T03:56:31.6681680Z Complete job name: build
+2026-04-15T03:56:31.7528389Z ##[group]Run actions/checkout@v4
+2026-04-15T03:56:31.7529728Z with:
+2026-04-15T03:56:31.7530515Z   repository: CryptoSkeet/Relay-Network
+2026-04-15T03:56:31.7532120Z   token: ***
+2026-04-15T03:56:31.7532881Z   ssh-strict: true
+2026-04-15T03:56:31.7533664Z   ssh-user: git
+2026-04-15T03:56:31.7534481Z   persist-credentials: true
+2026-04-15T03:56:31.7535373Z   clean: true
+2026-04-15T03:56:31.7536183Z   sparse-checkout-cone-mode: true
+2026-04-15T03:56:31.7537156Z   fetch-depth: 1
+2026-04-15T03:56:31.7537942Z   fetch-tags: false
+2026-04-15T03:56:31.7538740Z   show-progress: true
+2026-04-15T03:56:31.7539553Z   lfs: false
+2026-04-15T03:56:31.7540280Z   submodules: false
+2026-04-15T03:56:31.7541243Z   set-safe-directory: true
+2026-04-15T03:56:31.7542413Z ##[endgroup]
+2026-04-15T03:56:31.8783466Z Syncing repository: CryptoSkeet/Relay-Network
+2026-04-15T03:56:31.8787805Z ##[group]Getting Git version info
+2026-04-15T03:56:31.8790278Z Working directory is '/home/runner/work/Relay-Network/Relay-Network'
+2026-04-15T03:56:31.8793964Z [command]/usr/bin/git version
+2026-04-15T03:56:31.8825327Z git version 2.53.0
+2026-04-15T03:56:31.8858295Z ##[endgroup]
+2026-04-15T03:56:31.8878107Z Temporarily overriding HOME='/home/runner/work/_temp/91aa1ea3-e22c-4d6f-9164-a61093a3eac2' before making global git config changes
+2026-04-15T03:56:31.8883605Z Adding repository directory to the temporary git global config as a safe directory
+2026-04-15T03:56:31.8902200Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Relay-Network/Relay-Network
+2026-04-15T03:56:31.8944980Z Deleting the contents of '/home/runner/work/Relay-Network/Relay-Network'
+2026-04-15T03:56:31.8949325Z ##[group]Initializing the repository
+2026-04-15T03:56:31.8956628Z [command]/usr/bin/git init /home/runner/work/Relay-Network/Relay-Network
+2026-04-15T03:56:31.9064514Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-04-15T03:56:31.9068714Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-04-15T03:56:31.9079810Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-04-15T03:56:31.9082665Z hint: call:
+2026-04-15T03:56:31.9084176Z hint:
+2026-04-15T03:56:31.9086179Z hint: 	git config --global init.defaultBranch <name>
+2026-04-15T03:56:31.9094431Z hint:
+2026-04-15T03:56:31.9096667Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-04-15T03:56:31.9100142Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-04-15T03:56:31.9103348Z hint:
+2026-04-15T03:56:31.9105052Z hint: 	git branch -m <name>
+2026-04-15T03:56:31.9106761Z hint:
+2026-04-15T03:56:31.9113462Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-04-15T03:56:31.9117595Z Initialized empty Git repository in /home/runner/work/Relay-Network/Relay-Network/.git/
+2026-04-15T03:56:31.9126245Z [command]/usr/bin/git remote add origin https://github.com/CryptoSkeet/Relay-Network
+2026-04-15T03:56:31.9133326Z ##[endgroup]
+2026-04-15T03:56:31.9135929Z ##[group]Disabling automatic garbage collection
+2026-04-15T03:56:31.9138359Z [command]/usr/bin/git config --local gc.auto 0
+2026-04-15T03:56:31.9168815Z ##[endgroup]
+2026-04-15T03:56:31.9172002Z ##[group]Setting up auth
+2026-04-15T03:56:31.9176975Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-04-15T03:56:31.9217761Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-04-15T03:56:31.9541392Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-04-15T03:56:31.9591395Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-04-15T03:56:31.9839848Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-04-15T03:56:31.9874505Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-04-15T03:56:32.0167372Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-04-15T03:56:32.0260230Z ##[endgroup]
+2026-04-15T03:56:32.0283734Z ##[group]Fetching the repository
+2026-04-15T03:56:32.0295003Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +7922f48cf7e149b41a6072b76a28513e417d40d1:refs/remotes/origin/main
+2026-04-15T03:56:32.8541790Z From https://github.com/CryptoSkeet/Relay-Network
+2026-04-15T03:56:32.8542898Z  * [new ref]         7922f48cf7e149b41a6072b76a28513e417d40d1 -> origin/main
+2026-04-15T03:56:32.8545845Z ##[endgroup]
+2026-04-15T03:56:32.8547039Z ##[group]Determining the checkout info
+2026-04-15T03:56:32.8548022Z ##[endgroup]
+2026-04-15T03:56:32.8548737Z [command]/usr/bin/git sparse-checkout disable
+2026-04-15T03:56:32.8550873Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-04-15T03:56:32.8558571Z ##[group]Checking out the ref
+2026-04-15T03:56:32.8561995Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2026-04-15T03:56:32.9453342Z Switched to a new branch 'main'
+2026-04-15T03:56:32.9454107Z branch 'main' set up to track 'origin/main'.
+2026-04-15T03:56:32.9458603Z ##[endgroup]
+2026-04-15T03:56:32.9461835Z [command]/usr/bin/git log -1 --format=%H
+2026-04-15T03:56:32.9462854Z 7922f48cf7e149b41a6072b76a28513e417d40d1
+2026-04-15T03:56:32.9626352Z ##[group]Run pnpm/action-setup@v4
+2026-04-15T03:56:32.9626721Z with:
+2026-04-15T03:56:32.9626934Z   version: 10
+2026-04-15T03:56:32.9627154Z   dest: ~/setup-pnpm
+2026-04-15T03:56:32.9627390Z   run_install: null
+2026-04-15T03:56:32.9627622Z   cache: false
+2026-04-15T03:56:32.9627858Z   cache_dependency_path: pnpm-lock.yaml
+2026-04-15T03:56:32.9628367Z   package_json_file: package.json
+2026-04-15T03:56:32.9628639Z   standalone: false
+2026-04-15T03:56:32.9628875Z ##[endgroup]
+2026-04-15T03:56:33.1108819Z ##[group]Running self-installer...
+2026-04-15T03:56:33.7952507Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-04-15T03:56:33.8512222Z Packages: +1
+2026-04-15T03:56:33.8552377Z +
+2026-04-15T03:56:34.3107289Z Progress: resolved 1, reused 0, downloaded 1, added 1, done
+2026-04-15T03:56:34.3412715Z 
+2026-04-15T03:56:34.3418198Z dependencies:
+2026-04-15T03:56:34.3444611Z + pnpm 10.33.0
+2026-04-15T03:56:34.3445086Z 
+2026-04-15T03:56:34.3538676Z Done in 1s
+2026-04-15T03:56:34.3763719Z ##[endgroup]
+2026-04-15T03:56:34.3779688Z Installation Completed!
+2026-04-15T03:56:34.3994249Z ##[group]Run actions/setup-node@v4
+2026-04-15T03:56:34.3994545Z with:
+2026-04-15T03:56:34.3994720Z   node-version: 22
+2026-04-15T03:56:34.3994907Z   cache: pnpm
+2026-04-15T03:56:34.3995084Z   always-auth: false
+2026-04-15T03:56:34.3995286Z   check-latest: false
+2026-04-15T03:56:34.3995615Z   token: ***
+2026-04-15T03:56:34.3995783Z env:
+2026-04-15T03:56:34.3996007Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-04-15T03:56:34.3996296Z ##[endgroup]
+2026-04-15T03:56:34.5897722Z Found in cache @ /opt/hostedtoolcache/node/22.22.2/x64
+2026-04-15T03:56:34.5906168Z ##[group]Environment details
+2026-04-15T03:56:35.0094867Z node: v22.22.2
+2026-04-15T03:56:35.0095803Z npm: 10.9.7
+2026-04-15T03:56:35.0096619Z yarn: 1.22.22
+2026-04-15T03:56:35.0098544Z ##[endgroup]
+2026-04-15T03:56:35.0127420Z [command]/home/runner/setup-pnpm/node_modules/.bin/pnpm store path --silent
+2026-04-15T03:56:35.4492390Z /home/runner/setup-pnpm/node_modules/.bin/store/v10
+2026-04-15T03:56:35.5947474Z Cache hit for: node-cache-Linux-x64-pnpm-c5072a778af6b61dcf589934ef93dee4dcffbcbd5e9b5dc1e99adefb95384e3b
+2026-04-15T03:56:36.7073499Z Received 121634816 of 256779897 (47.4%), 116.0 MBs/sec
+2026-04-15T03:56:37.4625859Z Received 256779897 of 256779897 (100.0%), 139.5 MBs/sec
+2026-04-15T03:56:37.4711794Z Cache Size: ~245 MB (256779897 B)
+2026-04-15T03:56:37.4940199Z [command]/usr/bin/tar -xf /home/runner/work/_temp/d2e09686-a5b0-4831-8f28-34bc9fd41b4d/cache.tzst -P -C /home/runner/work/Relay-Network/Relay-Network --use-compress-program unzstd
+2026-04-15T03:56:45.1047734Z Cache restored successfully
+2026-04-15T03:56:45.1192955Z Cache restored from key: node-cache-Linux-x64-pnpm-c5072a778af6b61dcf589934ef93dee4dcffbcbd5e9b5dc1e99adefb95384e3b
+2026-04-15T03:56:45.1369418Z ##[group]Run pnpm install --no-frozen-lockfile
+2026-04-15T03:56:45.1369832Z [36;1mpnpm install --no-frozen-lockfile[0m
+2026-04-15T03:56:45.1403208Z shell: /usr/bin/bash -e {0}
+2026-04-15T03:56:45.1403450Z env:
+2026-04-15T03:56:45.1403689Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-04-15T03:56:45.1403986Z ##[endgroup]
+2026-04-15T03:56:45.6809611Z Progress: resolved 0, reused 1, downloaded 0, added 0
+2026-04-15T03:56:46.6833751Z Progress: resolved 208, reused 201, downloaded 0, added 0
+2026-04-15T03:56:47.6871665Z Progress: resolved 439, reused 407, downloaded 0, added 0
+2026-04-15T03:56:48.6943714Z Progress: resolved 543, reused 498, downloaded 2, added 0
+2026-04-15T03:56:49.6948631Z Progress: resolved 807, reused 757, downloaded 12, added 0
+2026-04-15T03:56:50.7012856Z Progress: resolved 1077, reused 974, downloaded 30, added 0
+2026-04-15T03:56:51.7142532Z Progress: resolved 1231, reused 1033, downloaded 62, added 0
+2026-04-15T03:56:52.7103583Z Progress: resolved 1255, reused 1069, downloaded 92, added 0
+2026-04-15T03:56:53.7535409Z Progress: resolved 1318, reused 1110, downloaded 119, added 0
+2026-04-15T03:56:54.8186869Z Progress: resolved 1349, reused 1135, downloaded 120, added 0
+2026-04-15T03:56:55.8175629Z Progress: resolved 1452, reused 1229, downloaded 120, added 0
+2026-04-15T03:56:56.5445254Z  WARN  10 deprecated subdependencies found: @toruslabs/solana-embed@2.1.0, @walletconnect/sign-client@2.19.0, @walletconnect/sign-client@2.19.1, @walletconnect/universal-provider@2.19.0, @walletconnect/universal-provider@2.19.1, glob@7.2.3, inflight@1.0.6, lodash.isequal@4.5.0, rimraf@3.0.2, rpc-websockets@10.0.0
+2026-04-15T03:56:56.6192334Z Packages: +1381
+2026-04-15T03:56:56.6209552Z ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+2026-04-15T03:56:56.8161886Z Progress: resolved 1474, reused 1260, downloaded 120, added 0
+2026-04-15T03:56:57.8161822Z Progress: resolved 1474, reused 1260, downloaded 120, added 288
+2026-04-15T03:56:58.8168832Z Progress: resolved 1474, reused 1260, downloaded 120, added 449
+2026-04-15T03:56:59.8192539Z Progress: resolved 1474, reused 1260, downloaded 120, added 916
+2026-04-15T03:57:00.8175833Z Progress: resolved 1474, reused 1260, downloaded 120, added 1057
+2026-04-15T03:57:01.8182941Z Progress: resolved 1474, reused 1260, downloaded 120, added 1178
+2026-04-15T03:57:02.4372618Z Progress: resolved 1474, reused 1260, downloaded 120, added 1381, done
+2026-04-15T03:57:03.8735588Z  WARN  Issues with peer dependencies found
+2026-04-15T03:57:03.8736718Z .
+2026-04-15T03:57:03.8737666Z ├─┬ openai 6.32.0
+2026-04-15T03:57:03.8756466Z │ └── ✕ unmet peer ws@^8.18.0: found 7.5.10
+2026-04-15T03:57:03.8757435Z ├─┬ solana-agent-kit 2.0.10
+2026-04-15T03:57:03.8758310Z │ └─┬ @openai/agents 0.0.7
+2026-04-15T03:57:03.8759024Z │   └─┬ openai 5.23.2
+2026-04-15T03:57:03.8781867Z │     └── ✕ unmet peer ws@^8.18.0: found 7.5.10
+2026-04-15T03:57:03.8799908Z ├─┬ valtio 1.13.2
+2026-04-15T03:57:03.8804307Z │ └─┬ use-sync-external-store 1.2.0
+2026-04-15T03:57:03.8810322Z │   └── ✕ unmet peer react@"^16.8.0 || ^17.0.0 || ^18.0.0": found 19.2.4
+2026-04-15T03:57:03.8811875Z ├─┬ @supabase/ssr 0.10.0
+2026-04-15T03:57:03.8813245Z │ └── ✕ unmet peer @supabase/supabase-js@^2.100.1: found 2.99.0
+2026-04-15T03:57:03.8814228Z └─┬ @x402/svm 2.9.0
+2026-04-15T03:57:03.8815127Z   ├─┬ @solana-program/compute-budget 0.11.0
+2026-04-15T03:57:03.8816786Z   │ └── ✕ unmet peer @solana/kit@^5.0: found 6.8.0
+2026-04-15T03:57:03.8817755Z   ├─┬ @solana-program/token 0.9.0
+2026-04-15T03:57:03.8818845Z   │ └── ✕ unmet peer @solana/kit@^5.0: found 6.8.0
+2026-04-15T03:57:03.8820270Z   └─┬ @solana-program/token-2022 0.6.1
+2026-04-15T03:57:03.8821520Z     ├── ✕ unmet peer @solana/kit@^5.0: found 6.8.0
+2026-04-15T03:57:03.8822882Z     └── ✕ unmet peer @solana/sysvars@^5.0: found 6.8.0
+2026-04-15T03:57:03.8823625Z 
+2026-04-15T03:57:03.8841687Z dependencies:
+2026-04-15T03:57:03.8851801Z + @anthropic-ai/sdk 0.78.0
+2026-04-15T03:57:03.8881751Z + @hookform/resolvers 3.10.0
+2026-04-15T03:57:03.8882738Z + @metaplex-foundation/mpl-token-metadata 3.4.0
+2026-04-15T03:57:03.8883364Z + @metaplex-foundation/umi 1.5.1
+2026-04-15T03:57:03.8883936Z + @metaplex-foundation/umi-bundle-defaults 1.5.1
+2026-04-15T03:57:03.8884443Z + @noble/ed25519 2.3.0
+2026-04-15T03:57:03.8884802Z + @noble/hashes 1.8.0
+2026-04-15T03:57:03.8885163Z + @quicknode/sdk 2.6.0
+2026-04-15T03:57:03.8885589Z + @radix-ui/react-accordion 1.2.12
+2026-04-15T03:57:03.8886103Z + @radix-ui/react-alert-dialog 1.1.15
+2026-04-15T03:57:03.8886631Z + @radix-ui/react-aspect-ratio 1.1.8
+2026-04-15T03:57:03.8887153Z + @radix-ui/react-avatar 1.1.11
+2026-04-15T03:57:03.8887619Z + @radix-ui/react-checkbox 1.3.3
+2026-04-15T03:57:03.8888134Z + @radix-ui/react-collapsible 1.1.12
+2026-04-15T03:57:03.8888775Z + @radix-ui/react-context-menu 2.2.16
+2026-04-15T03:57:03.8889366Z + @radix-ui/react-dialog 1.1.15
+2026-04-15T03:57:03.8889894Z + @radix-ui/react-dropdown-menu 2.1.16
+2026-04-15T03:57:03.8890474Z + @radix-ui/react-hover-card 1.1.15
+2026-04-15T03:57:03.8891252Z + @radix-ui/react-label 2.1.8
+2026-04-15T03:57:03.8891803Z + @radix-ui/react-menubar 1.1.16
+2026-04-15T03:57:03.8892387Z + @radix-ui/react-navigation-menu 1.2.14
+2026-04-15T03:57:03.8892966Z + @radix-ui/react-popover 1.1.15
+2026-04-15T03:57:03.8893486Z + @radix-ui/react-progress 1.1.8
+2026-04-15T03:57:03.8894045Z + @radix-ui/react-radio-group 1.3.8
+2026-04-15T03:57:03.8894614Z + @radix-ui/react-scroll-area 1.2.10
+2026-04-15T03:57:03.8895131Z + @radix-ui/react-select 2.2.6
+2026-04-15T03:57:03.8895662Z + @radix-ui/react-separator 1.1.8
+2026-04-15T03:57:03.8896608Z + @radix-ui/react-slider 1.3.6
+2026-04-15T03:57:03.8897072Z + @radix-ui/react-slot 1.2.4
+2026-04-15T03:57:03.8897580Z + @radix-ui/react-switch 1.2.6
+2026-04-15T03:57:03.8898034Z + @radix-ui/react-tabs 1.1.13
+2026-04-15T03:57:03.8898549Z + @radix-ui/react-toast 1.2.15
+2026-04-15T03:57:03.8899023Z + @radix-ui/react-toggle 1.1.10
+2026-04-15T03:57:03.8899543Z + @radix-ui/react-toggle-group 1.1.11
+2026-04-15T03:57:03.8900151Z + @radix-ui/react-tooltip 1.2.8
+2026-04-15T03:57:03.8900591Z + @solana/kit 6.8.0
+2026-04-15T03:57:03.8903396Z + @solana/spl-token 0.4.14
+2026-04-15T03:57:03.8903980Z + @solana/wallet-adapter-base 0.9.27
+2026-04-15T03:57:03.8904626Z + @solana/wallet-adapter-coinbase 0.1.23
+2026-04-15T03:57:03.8905221Z + @solana/wallet-adapter-ledger 0.9.29
+2026-04-15T03:57:03.8905838Z + @solana/wallet-adapter-phantom 0.9.28
+2026-04-15T03:57:03.8906445Z + @solana/wallet-adapter-react 0.15.39
+2026-04-15T03:57:03.8907047Z + @solana/wallet-adapter-react-ui 0.9.39
+2026-04-15T03:57:03.8907762Z + @solana/wallet-adapter-solflare 0.6.32
+2026-04-15T03:57:03.8908401Z + @solana/wallet-adapter-torus 0.11.32
+2026-04-15T03:57:03.8909048Z + @solana/wallet-adapter-walletconnect 0.1.21
+2026-04-15T03:57:03.8909614Z + @solana/web3.js 1.98.4
+2026-04-15T03:57:03.8910026Z + @supabase/ssr 0.10.0
+2026-04-15T03:57:03.8910492Z + @supabase/supabase-js 2.99.0
+2026-04-15T03:57:03.8911195Z + @upstash/ratelimit 2.0.8
+2026-04-15T03:57:03.8911644Z + @upstash/redis 1.36.4
+2026-04-15T03:57:03.8912120Z + @vercel/analytics 1.6.1
+2026-04-15T03:57:03.8912550Z + @vercel/blob 2.3.1
+2026-04-15T03:57:03.8912944Z + @x402/core 2.9.0
+2026-04-15T03:57:03.8913336Z + @x402/fetch 2.9.0
+2026-04-15T03:57:03.8913694Z + @x402/svm 2.9.0
+2026-04-15T03:57:03.8914035Z + ai 6.0.116
+2026-04-15T03:57:03.8914392Z + autoprefixer 10.4.24
+2026-04-15T03:57:03.8914779Z + axios 1.13.6
+2026-04-15T03:57:03.8915109Z + bs58 6.0.0
+2026-04-15T03:57:03.8915545Z + class-variance-authority 0.7.1
+2026-04-15T03:57:03.8916005Z + clsx 2.1.1
+2026-04-15T03:57:03.8916344Z + cmdk 1.1.1
+2026-04-15T03:57:03.8916665Z + date-fns 4.1.0
+2026-04-15T03:57:03.8917007Z + dotenv 17.3.1
+2026-04-15T03:57:03.8917405Z + embla-carousel-react 8.6.0
+2026-04-15T03:57:03.8917851Z + ethers 6.16.0
+2026-04-15T03:57:03.8918208Z + input-otp 1.4.2
+2026-04-15T03:57:03.8918547Z + lucide-react 0.564.0
+2026-04-15T03:57:03.8918863Z + next 16.2.1
+2026-04-15T03:57:03.8919183Z + next-themes 0.4.6
+2026-04-15T03:57:03.8919508Z + openai 6.32.0
+2026-04-15T03:57:03.8920130Z + openapi-types 12.1.3
+2026-04-15T03:57:03.8941476Z + react 19.2.4
+2026-04-15T03:57:03.8941924Z + react-day-picker 9.13.2
+2026-04-15T03:57:03.8942362Z + react-dom 19.2.4
+2026-04-15T03:57:03.8942696Z + react-hook-form 7.71.1
+2026-04-15T03:57:03.8943049Z + react-markdown 10.1.0
+2026-04-15T03:57:03.8943460Z + react-resizable-panels 2.1.9
+2026-04-15T03:57:03.8943836Z + recharts 2.15.0
+2026-04-15T03:57:03.8944151Z + server-only 0.0.1
+2026-04-15T03:57:03.8944500Z + solana-agent-kit 2.0.10
+2026-04-15T03:57:03.8944815Z + sonner 1.7.4
+2026-04-15T03:57:03.8945088Z + stripe 20.4.1
+2026-04-15T03:57:03.8945355Z + swr 2.4.1
+2026-04-15T03:57:03.8945643Z + tailwind-merge 3.4.0
+2026-04-15T03:57:03.8945966Z + tweetnacl 1.0.3
+2026-04-15T03:57:03.8946292Z + tweetnacl-util 0.15.1
+2026-04-15T03:57:03.8946614Z + uuid 13.0.0
+2026-04-15T03:57:03.8946885Z + vaul 1.1.2
+2026-04-15T03:57:03.8947149Z + zod 3.25.76
+2026-04-15T03:57:03.8947305Z 
+2026-04-15T03:57:03.8947422Z devDependencies:
+2026-04-15T03:57:03.8947747Z + @playwright/test 1.58.2
+2026-04-15T03:57:03.8948109Z + @tailwindcss/postcss 4.2.0
+2026-04-15T03:57:03.8948458Z + @types/node 22.19.11
+2026-04-15T03:57:03.8948777Z + @types/react 19.2.14
+2026-04-15T03:57:03.8949098Z + @types/react-dom 19.2.3
+2026-04-15T03:57:03.8949445Z + @vitest/coverage-v8 4.1.1
+2026-04-15T03:57:03.8949754Z + docx 9.6.1
+2026-04-15T03:57:03.8950009Z + eslint 9.39.4
+2026-04-15T03:57:03.8950314Z + eslint-config-next 16.2.1
+2026-04-15T03:57:03.8950630Z + postcss 8.5.6
+2026-04-15T03:57:03.8950913Z + tailwindcss 4.2.0
+2026-04-15T03:57:03.8951498Z + tw-animate-css 1.3.3
+2026-04-15T03:57:03.8952084Z + typescript 5.7.3
+2026-04-15T03:57:03.8952361Z + vitest 4.1.1
+2026-04-15T03:57:03.8952518Z 
+2026-04-15T03:57:03.8953212Z ╭ Warning ─────────────────────────────────────────────────────────────────────╮
+2026-04-15T03:57:03.8954006Z │                                                                              │
+2026-04-15T03:57:03.8954877Z │   Ignored build scripts: bigint-buffer@1.1.5, bufferutil@4.1.0,              │
+2026-04-15T03:57:03.8955857Z │   sharp@0.34.5, unrs-resolver@1.11.1, utf-8-validate@5.0.10,                 │
+2026-04-15T03:57:03.8956758Z │   utf-8-validate@6.0.6.                                                      │
+2026-04-15T03:57:03.8957693Z │   Run "pnpm approve-builds" to pick which dependencies should be allowed     │
+2026-04-15T03:57:03.8958580Z │   to run scripts.                                                            │
+2026-04-15T03:57:03.8959322Z │                                                                              │
+2026-04-15T03:57:03.8960163Z ╰──────────────────────────────────────────────────────────────────────────────╯
+2026-04-15T03:57:03.8960738Z Done in 18.7s using pnpm v10.33.0
+2026-04-15T03:57:03.9789910Z ##[group]Run pnpm run build
+2026-04-15T03:57:03.9790209Z [36;1mpnpm run build[0m
+2026-04-15T03:57:03.9811670Z shell: /usr/bin/bash -e {0}
+2026-04-15T03:57:03.9811900Z env:
+2026-04-15T03:57:03.9812133Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-04-15T03:57:03.9812424Z ##[endgroup]
+2026-04-15T03:57:04.3209861Z 
+2026-04-15T03:57:04.3211433Z > my-project@0.2.1 build /home/runner/work/Relay-Network/Relay-Network
+2026-04-15T03:57:04.3212523Z > next build
+2026-04-15T03:57:04.3212921Z 
+2026-04-15T03:57:04.7609687Z ⚠ No build cache found. Please configure build caching for faster rebuilds. Read more: https://nextjs.org/docs/messages/no-cache
+2026-04-15T03:57:04.7684721Z Attention: Next.js now collects completely anonymous telemetry regarding usage.
+2026-04-15T03:57:04.7686135Z This information is used to shape Next.js' roadmap and prioritize features.
+2026-04-15T03:57:04.7687979Z You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+2026-04-15T03:57:04.7689332Z https://nextjs.org/telemetry
+2026-04-15T03:57:04.7689992Z 
+2026-04-15T03:57:04.8035710Z ▲ Next.js 16.2.1 (Turbopack)
+2026-04-15T03:57:04.8043079Z 
+2026-04-15T03:57:04.8303868Z ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+2026-04-15T03:57:04.9278273Z   Creating an optimized production build ...
+2026-04-15T03:57:41.3978773Z ✓ Compiled successfully in 36.2s
+2026-04-15T03:57:41.4053253Z   Running TypeScript ...
+2026-04-15T03:58:06.1703716Z   Finished TypeScript in 24.8s ...
+2026-04-15T03:58:06.1758729Z   Collecting page data using 1 worker ...
+2026-04-15T03:58:06.7372539Z ❌ Environment validation failed:
+2026-04-15T03:58:06.7374808Z Missing required variables: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, ANTHROPIC_API_KEY, CRON_SECRET, KV_REST_API_URL, KV_REST_API_TOKEN
+2026-04-15T03:58:06.7377238Z ⚠️ Environment validation failed — some env vars may be missing. App will still build.
+2026-04-15T03:58:06.8655017Z bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+2026-04-15T03:58:06.8913100Z [Upstash Redis] The 'url' property is missing or undefined in your Redis config.
+2026-04-15T03:58:06.8916733Z [Upstash Redis] The 'token' property is missing or undefined in your Redis config.
+2026-04-15T03:58:07.4526769Z ⚠ Using edge runtime on a page currently disables static generation for that page
+2026-04-15T03:58:07.7763236Z   Generating static pages using 1 worker (0/123) ...
+2026-04-15T03:58:08.2724073Z Contracts query error: {
+2026-04-15T03:58:08.2724767Z   message: 'TypeError: fetch failed',
+2026-04-15T03:58:08.2730118Z   details: 'TypeError: fetch failed\n' +
+2026-04-15T03:58:08.2730918Z     '\n' +
+2026-04-15T03:58:08.2732872Z     'Caused by: Error: getaddrinfo ENOTFOUND placeholder.supabase.co (ENOTFOUND)\n' +
+2026-04-15T03:58:08.2734160Z     'Error: getaddrinfo ENOTFOUND placeholder.supabase.co\n' +
+2026-04-15T03:58:08.2735311Z     '    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)\n' +
+2026-04-15T03:58:08.2736661Z     '    at GetAddrInfoReqWrap.callbackTrampoline (node:internal/async_hooks:130:17)',
+2026-04-15T03:58:08.2737630Z   hint: '',
+2026-04-15T03:58:08.2738153Z   code: ''
+2026-04-15T03:58:08.2738662Z }
+2026-04-15T03:58:08.6029945Z Error occurred prerendering page "/explore/agents". Read more: https://nextjs.org/docs/messages/prerender-error
+2026-04-15T03:58:08.6068048Z Error: supabaseUrl is required.
+2026-04-15T03:58:08.6069376Z     at <unknown> (.next/server/chunks/ssr/_0b4d_t~._.js:37:44256)
+2026-04-15T03:58:08.6070852Z     at new r (.next/server/chunks/ssr/_0b4d_t~._.js:37:44507)
+2026-04-15T03:58:08.6072455Z     at c.createClient (.next/server/chunks/ssr/_0b4d_t~._.js:37:49529)
+2026-04-15T03:58:08.6073489Z     at <unknown> (.next/server/chunks/ssr/_0b4d_t~._.js:55:81)
+2026-04-15T03:58:08.6074921Z     at <unknown> (.next/server/chunks/ssr/_07pklq3._.js:1:2960) {
+2026-04-15T03:58:08.6081685Z   digest: '3512869941'
+2026-04-15T03:58:08.6102540Z }
+2026-04-15T03:58:08.6103535Z Export encountered an error on /(main)/explore/agents/page: /explore/agents, exiting the build.
+2026-04-15T03:58:08.6356216Z ⨯ Next.js build worker exited with code: 1 and signal: null
+2026-04-15T03:58:08.6811995Z  ELIFECYCLE  Command failed with exit code 1.
+2026-04-15T03:58:08.7039886Z ##[error]Process completed with exit code 1.
+2026-04-15T03:58:08.7111717Z Post job cleanup.
+2026-04-15T03:58:08.8578265Z Pruning is unnecessary.
+2026-04-15T03:58:08.8727188Z Post job cleanup.
+2026-04-15T03:58:09.0171906Z [command]/usr/bin/git version
+2026-04-15T03:58:09.0228565Z git version 2.53.0
+2026-04-15T03:58:09.0282613Z Temporarily overriding HOME='/home/runner/work/_temp/9e41db37-d6fc-4f2b-aa72-68077a62d291' before making global git config changes
+2026-04-15T03:58:09.0284512Z Adding repository directory to the temporary git global config as a safe directory
+2026-04-15T03:58:09.0290952Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Relay-Network/Relay-Network
+2026-04-15T03:58:09.0340096Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-04-15T03:58:09.0382798Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-04-15T03:58:09.0658395Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-04-15T03:58:09.0685592Z http.https://github.com/.extraheader
+2026-04-15T03:58:09.0700522Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-04-15T03:58:09.0737449Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-04-15T03:58:09.0994521Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-04-15T03:58:09.1037271Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-04-15T03:58:09.1450211Z Cleaning up orphan processes
+2026-04-15T03:58:09.1971364Z ##[warning]Node.js 20 actions are deprecated. The following actions are running on Node.js 20 and may not work as expected: actions/checkout@v4, actions/setup-node@v4, pnpm/action-setup@v4. Actions will be forced to run with Node.js 24 by default starting June 2nd, 2026. Node.js 20 will be removed from the runner on September 16th, 2026. Please check if updated versions of these actions are available that support Node.js 24. To opt into Node.js 24 now, set the FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true environment variable on the runner or in your workflow file. Once Node.js 24 becomes the default, you can temporarily opt out by setting ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

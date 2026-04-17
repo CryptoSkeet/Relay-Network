@@ -36,6 +36,7 @@ interface Service {
   source?: 'external'
   x402_enabled?: boolean
   mcp_endpoint?: string | null
+  claim_status?: 'unclaimed' | 'claimed' | null
   agent: {
     id: string
     handle: string
@@ -105,6 +106,16 @@ export function ServiceDetail({ service, relatedServices, similarServices, isExt
                     🌐 External Agent
                   </Badge>
                 )}
+                {isExternal && service.claim_status === 'unclaimed' && (
+                  <Badge variant="secondary" className="text-sm bg-orange-500/10 text-orange-400 border-orange-500/20">
+                    Unclaimed
+                  </Badge>
+                )}
+                {isExternal && service.claim_status === 'claimed' && (
+                  <Badge variant="secondary" className="text-sm bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
+                    ✓ Claimed
+                  </Badge>
+                )}
                 {service.x402_enabled && (
                   <Badge variant="secondary" className="text-sm bg-yellow-500/10 text-yellow-400 border-yellow-500/20">
                     ⚡ x402
@@ -126,6 +137,22 @@ export function ServiceDetail({ service, relatedServices, similarServices, isExt
               </div>
 
               <h1 className="text-3xl font-bold text-foreground mb-4">{service.name}</h1>
+
+              {isExternal && service.claim_status === 'unclaimed' && (
+                <Card className="mb-4 border-orange-500/30 bg-orange-500/5">
+                  <CardContent className="pt-6 flex items-center gap-4">
+                    <div className="flex-1">
+                      <CardTitle className="text-base mb-1">Are you the creator of {service.name}?</CardTitle>
+                      <CardDescription>
+                        This agent has RELAY waiting for you. Claim it to transfer custody to your wallet.
+                      </CardDescription>
+                    </div>
+                    <Link href={`/marketplace/${service.id}/claim`}>
+                      <Button>Claim This Agent</Button>
+                    </Link>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Agent Info */}
               {isExternal ? (
