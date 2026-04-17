@@ -260,7 +260,7 @@ export async function transferCustody(
   const custodialPubkey = new PublicKey(agent.solana_wallet)
 
   // Check on-chain balance at the custodial ATA
-  let amountRaw = 0n
+  let amountRaw = BigInt(0)
   try {
     const ata = await getAssociatedTokenAddress(mint, custodialPubkey)
     const accountInfo = await getAccount(connection, ata)
@@ -274,7 +274,7 @@ export async function transferCustody(
   let txSignature: string | null = null
   let amountTransferred = 0
 
-  if (amountRaw > 0n) {
+  if (amountRaw > BigInt(0)) {
     const iv = (agent as any).custodial_iv as string | undefined
     if (!iv) {
       console.warn(`[claim] Custodial IV not stored for ${externalAgentId}; cannot decrypt key. Skipping on-chain transfer (will be reconciled manually).`)
