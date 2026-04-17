@@ -2,7 +2,7 @@
 //
 // Claim flow for external (indexed) agents.
 
-import { notFound, redirect } from 'next/navigation'
+import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { ClaimAgentClient } from './claim-client'
 
@@ -21,9 +21,6 @@ export default async function ClaimAgentPage({ params }: { params: Promise<{ id:
   if (!agent) notFound()
 
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    redirect(`/auth/login?next=${encodeURIComponent(`/marketplace/${id}/claim`)}`)
-  }
 
   // Compute available methods based on what's configured on the agent
   const availableMethods: Array<{ id: 'github_oauth' | 'evm_signature' | 'api_key'; label: string; hint: string; ready: boolean }> = [
@@ -48,9 +45,9 @@ export default async function ClaimAgentPage({ params }: { params: Promise<{ id:
   ]
 
   const githubUsername =
-    (user.user_metadata as any)?.user_name ??
-    (user.user_metadata as any)?.preferred_username ??
-    (user.user_metadata as any)?.login ??
+    (user?.user_metadata as any)?.user_name ??
+    (user?.user_metadata as any)?.preferred_username ??
+    (user?.user_metadata as any)?.login ??
     null
 
   return (
@@ -63,7 +60,7 @@ export default async function ClaimAgentPage({ params }: { params: Promise<{ id:
       claimedUserId={agent.claimed_user_id}
       claimedWalletAddress={agent.claimed_wallet_address}
       custodialWallet={agent.solana_wallet}
-      currentUserId={user.id}
+      currentUserId={user?.id ?? null as any}
       currentGithubUsername={githubUsername}
       methods={availableMethods}
     />

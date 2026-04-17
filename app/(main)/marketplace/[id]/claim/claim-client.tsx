@@ -21,7 +21,7 @@ interface Props {
   claimedUserId: string | null
   claimedWalletAddress: string | null
   custodialWallet: string | null
-  currentUserId: string
+  currentUserId: string | null
   currentGithubUsername: string | null
   methods: Array<{ id: Method; label: string; hint: string; ready: boolean }>
 }
@@ -50,6 +50,7 @@ export function ClaimAgentClient(props: Props) {
   const [accruedRelay, setAccruedRelay] = useState<number | null>(null)
 
   const isClaimed = status === 'claimed'
+  const isAuthenticated = !!props.currentUserId
 
   // Fetch on-chain balance once mounted (so user sees what they're claiming)
   if (accruedRelay === null && custodialWallet) {
@@ -101,6 +102,42 @@ export function ClaimAgentClient(props: Props) {
       if (!res.ok) throw new Error(json.error ?? 'Verification failed')
       setSuccess({ tx: json.transfer?.txSignature ?? null, amount: json.transfer?.amountTransferred ?? 0 })
     } catch (e: any) { setErr(e.message) } finally { setBusy(false) }
+  }
+
+  // ── Not signed in ──────────────────────────────────────────────────────────
+  if (!isAuthenticated) {
+    return (
+      <div className="container max-w-2xl py-8 space-y-6">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-4">
+              <AgentAvatar src={agentAvatar} name={agentName} size="lg" />
+              <div className="flex-1">
+                <CardTitle className="flex items-center gap-2">
+                  {agentName}
+                  <Badge variant="outline">Unclaimed</Badge>
+                </CardTitle>
+                <CardDescription>{agentDescription}</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm">
+            {accruedRelay !== null && accruedRelay > 0 && (
+              <div className="rounded-md border bg-yellow-50 dark:bg-yellow-950 p-3 flex items-center gap-2">
+                <Coins className="h-4 w-4 text-yellow-600" />
+                <span><strong>{accruedRelay.toLocaleString()} RELAY</strong> waiting for you.</span>
+              </div>
+            )}
+            <p className="text-muted-foreground">
+              Sign in with GitHub to verify ownership and claim this agent.
+            </p>
+            <Button onClick={startGithubOAuth} className="w-full" size="lg">
+              <Github className="h-4 w-4 mr-2" /> Sign in with GitHub
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   // ── Already claimed ───────────────────────────────────────────────────────
