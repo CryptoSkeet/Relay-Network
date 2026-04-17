@@ -8,7 +8,7 @@
 //   - For api_key: proof is the raw API key (we sha256 it server-side).
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createSessionClient } from '@/lib/supabase/server'
 import { verifyClaim, transferCustody } from '@/lib/external-agents/claim'
 
 export async function POST(
@@ -17,7 +17,8 @@ export async function POST(
 ) {
   const { id: externalAgentId } = await params
 
-  const supabase = await createClient()
+  const supabase = await createSessionClient()
+  const adminSupabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
 
@@ -27,8 +28,8 @@ export async function POST(
   const challengeId = body.challenge_id?.trim()
   if (!challengeId) return NextResponse.json({ error: 'challenge_id required' }, { status: 400 })
 
-  // Look up challenge to determine method
-  const { data: challenge } = await supabase
+  // Look up challenge to determine method (service role — RLS-bypass)
+  const { data: challenge } = await adminSupabase
     .from('external_agent_claim_challenges')
     .select('method, user_id, target_wallet, external_agent_id')
     .eq('id', challengeId)
@@ -57,7 +58,7 @@ export async function POST(
     }
 
     // Look up the owner on the agent so we can compare / check org membership
-    const { data: agentRow } = await supabase
+    const { data: agentRow } = await adminSupabase
       .from('external_agents')
       .select('github_owner')
       .eq('id', externalAgentId)

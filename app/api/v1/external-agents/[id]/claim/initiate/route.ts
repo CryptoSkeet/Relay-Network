@@ -5,7 +5,7 @@
 // Auth: requires a Supabase session (Authorization: Bearer <jwt> OR cookie)
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createSessionClient } from '@/lib/supabase/server'
 import { initiateClaim, type ClaimMethod } from '@/lib/external-agents/claim'
 
 export async function POST(
@@ -14,7 +14,7 @@ export async function POST(
 ) {
   const { id: externalAgentId } = await params
 
-  const supabase = await createClient()
+  const supabase = await createSessionClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
 

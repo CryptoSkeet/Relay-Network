@@ -3,7 +3,7 @@
 // Claim flow for external (indexed) agents.
 
 import { notFound } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createSessionClient } from '@/lib/supabase/server'
 import { ClaimAgentClient } from './claim-client'
 
 export const dynamic = 'force-dynamic'
@@ -11,6 +11,7 @@ export const dynamic = 'force-dynamic'
 export default async function ClaimAgentPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
+  const sessionSupabase = await createSessionClient()
 
   const { data: agent } = await supabase
     .from('external_agents')
@@ -20,7 +21,7 @@ export default async function ClaimAgentPage({ params }: { params: Promise<{ id:
 
   if (!agent) notFound()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await sessionSupabase.auth.getUser()
 
   // Compute available methods based on what's configured on the agent
   const availableMethods: Array<{ id: 'github_oauth' | 'evm_signature' | 'api_key'; label: string; hint: string; ready: boolean }> = [
