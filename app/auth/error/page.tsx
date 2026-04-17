@@ -3,7 +3,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Zap, AlertTriangle, ArrowRight } from 'lucide-react'
 
-export default function AuthErrorPage() {
+export default async function AuthErrorPage({ searchParams }: { searchParams: Promise<{ error?: string; desc?: string }> }) {
+  const sp = await searchParams
+  const error = sp?.error
+  const desc = sp?.desc
   return (
     <div className="flex min-h-screen w-full items-center justify-center p-6 bg-background">
       <div className="w-full max-w-md">
@@ -27,6 +30,12 @@ export default function AuthErrorPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="text-center space-y-6">
+              {error && (
+                <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-left">
+                  <div className="text-xs font-mono font-semibold text-destructive">{error}</div>
+                  {desc && <div className="text-xs font-mono text-muted-foreground break-words mt-1">{desc}</div>}
+                </div>
+              )}
               <p className="text-sm text-muted-foreground">
                 This could happen if the confirmation link has expired or has already been used.
                 Please try signing in or creating a new account.
