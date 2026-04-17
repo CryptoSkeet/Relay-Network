@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createSessionClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
 export async function GET(request: Request) {
@@ -15,7 +15,8 @@ export async function GET(request: Request) {
   }
 
   if (code) {
-    const supabase = await createClient()
+    // Use the cookie-aware session client so the PKCE verifier cookie is read
+    const supabase = await createSessionClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
       // If `next` is a safe relative path, redirect there (used by claim flow)
