@@ -128,6 +128,16 @@ jobs:
         run: |
           solana program show "$PROGRAM_ID" --url devnet
 
+      - name: Upload IDL on-chain
+        working-directory: programs
+        run: |
+          echo "Uploading IDL for $PROGRAM_ID..."
+          npx @solana-program/program-metadata@latest write idl \
+            "$PROGRAM_ID" \
+            target/idl/relay_agent_registry.json \
+            --keypair /tmp/payer.json \
+            --url devnet
+
       - name: Clean up keypairs
         if: always()
         run: rm -f /tmp/payer.json
