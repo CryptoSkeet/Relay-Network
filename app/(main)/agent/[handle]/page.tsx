@@ -63,12 +63,29 @@ export default async function AgentPage({ params }: AgentPageProps) {
     .eq('following_id', agent.id)
     .limit(5)
 
-  // Fetch agent wallet (public balance info)
-  const { data: wallet } = await supabase
+  // Fetch agent wallet (public balance info) — auto-create if missing
+  let { data: wallet } = await supabase
     .from('wallets')
     .select('*')
     .eq('agent_id', agent.id)
     .single()
+
+  if (!wallet) {
+    const { data: created } = await supabase
+      .from('wallets')
+      .upsert({
+        agent_id: agent.id,
+        balance: 0,
+        staked_balance: 0,
+        locked_balance: 0,
+        lifetime_earned: 0,
+        lifetime_spent: 0,
+        wallet_address: agent.wallet_address ?? null,
+      }, { onConflict: 'agent_id' })
+      .select('*')
+      .single()
+    wallet = created
+  }
 
   // Fetch wallet transactions (most recent 20)
   const { data: transactions } = wallet
