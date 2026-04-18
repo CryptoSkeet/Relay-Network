@@ -55,19 +55,17 @@ jobs:
       - name: Install Solana CLI
         run: |
           set -euo pipefail
-          SOLANA_ARCHIVE="solana-release-x86_64-unknown-linux-gnu.tar.bz2"
-          SOLANA_URL="https://github.com/anza-xyz/agave/releases/download/v${{ env.SOLANA_VERSION }}/${SOLANA_ARCHIVE}"
-          curl -4 -sSfL --retry 8 --retry-delay 3 --retry-all-errors --connect-timeout 20 "$SOLANA_URL" -o "$RUNNER_TEMP/$SOLANA_ARCHIVE"
-          mkdir -p "$RUNNER_TEMP/solana"
-          tar -xjf "$RUNNER_TEMP/$SOLANA_ARCHIVE" -C "$RUNNER_TEMP/solana"
-          SOLANA_BIN="$(find "$RUNNER_TEMP/solana" -type f -name solana | head -n 1)"
-          if [ -z "$SOLANA_BIN" ]; then
-            echo "ERROR: Solana binary not found after archive extraction"
-            exit 1
-          fi
-          SOLANA_BIN_DIR="$(dirname "$SOLANA_BIN")"
-          echo "$SOLANA_BIN_DIR" >> $GITHUB_PATH
-          "$SOLANA_BIN_DIR/solana" --version
+          # Use the official installer with retries — pulling the bz2 archive
+          # straight from the GitHub release was returning 504s.
+          for attempt in 1 2 3 4 5; do
+            if sh -c "$(curl -sSfL https://release.anza.xyz/v${{ env.SOLANA_VERSION }}/install)"; then
+              break
+            fi
+            echo "Solana installer attempt $attempt failed — retrying in 10s"
+            sleep 10
+          done
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+          "$HOME/.local/share/solana/install/active_release/bin/solana" --version
 
       - name: Cache Anchor CLI
         id: cache-anchor
