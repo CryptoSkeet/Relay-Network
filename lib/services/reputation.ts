@@ -41,9 +41,10 @@ export const REPUTATION_WEIGHTS = {
 } as const
 
 // Both legacy lowercase and engine UPPERCASE statuses are valid
-// (see 20260319_contract_engine.sql).
+// (see 20260319_contract_engine.sql). "Failed" is derived from the activity
+// log (cancelled-after-accept), not from a contract status — see
+// recomputeReputation().
 const COMPLETED_STATUSES = ['SETTLED', 'completed'] as const
-const FAILED_STATUSES    = ['FAILED', 'failed']    as const
 const DISPUTED_STATUSES  = ['DISPUTED', 'disputed'] as const
 
 export interface ReputationScore {
@@ -117,22 +118,36 @@ export async function recomputeReputation(agentId: string): Promise<{
     return { success: false, error: 'Agent not found' }
   }
 
-  const [completedQ, failedQ, disputedQ, endorseQ, spamQ] = await Promise.all([
-    supabase
-      .from('contracts')
-      .select('id', { count: 'exact', head: true })
-      .eq('seller_agent_id', agentId)
-      .in('status', COMPLETED_STATUSES as unknown as string[]),
-    supabase
-      .from('contracts')
-      .select('id', { count: 'exact', head: true })
-      .eq('seller_agent_id', agentId)
-      .in('status', FAILED_STATUSES as unknown as string[]),
-    supabase
-      .from('contracts')
-      .select('id', { count: 'exact', head: true })
-      .eq('seller_agent_id', agentId)
-      .in('status', DISPUTED_STATUSES as unknown as string[]),
+  // Pull seller-side contract IDs once so we can derive per-status counts AND
+  // count "failed" cancellations from the activity log without coupling the
+  // log query to an agent_id column it doesn't have.
+  const { data: sellerContracts } = await supabase
+    .from('contracts')
+    .select('id, status')
+    .eq('seller_agent_id', agentId)
+
+  const sellerContractIds = (sellerContracts ?? []).map(c => c.id)
+
+  const completed = (sellerContracts ?? []).filter(c =>
+    COMPLETED_STATUSES.includes(c.status as typeof COMPLETED_STATUSES[number])
+  ).length
+  const disputes  = (sellerContracts ?? []).filter(c =>
+    DISPUTED_STATUSES.includes(c.status as typeof DISPUTED_STATUSES[number])
+  ).length
+
+  // "Failed" = cancelled AFTER work began. We can't read the schema's `status`
+  // alone because cancelled-while-OPEN/PENDING is a clean retraction with no
+  // reputation impact. Count CANCELLED transitions whose from_status was
+  // ACTIVE or DELIVERED in contract_activity_log instead.
+  const [failedQ, endorseQ, spamQ] = await Promise.all([
+    sellerContractIds.length > 0
+      ? supabase
+          .from('contract_activity_log')
+          .select('id', { count: 'exact', head: true })
+          .in('contract_id', sellerContractIds)
+          .eq('action', 'CANCELLED')
+          .in('from_status', ['ACTIVE', 'DELIVERED'])
+      : Promise.resolve({ count: 0, error: null } as const),
     supabase
       .from('peer_endorsements')
       .select('id', { count: 'exact', head: true })
@@ -143,10 +158,8 @@ export async function recomputeReputation(agentId: string): Promise<{
       .eq('agent_id', agentId),
   ])
 
-  const completed    = completedQ.count ?? 0
-  const failed       = failedQ.count    ?? 0
-  const disputes     = disputedQ.count  ?? 0
-  const endorsements = endorseQ.count   ?? 0
+  const failed       = failedQ.count   ?? 0
+  const endorsements = endorseQ.count  ?? 0
   // spam_flags table is optional; treat missing-table errors as zero
   const spamFlags    = spamQ.error ? 0 : (spamQ.count ?? 0)
 
