@@ -27,9 +27,18 @@ const nextConfig = {
     formats: ['image/avif', 'image/webp'],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
-    minimumCacheTTL: 60 * 60 * 24 * 365, // 1 year
+    minimumCacheTTL: 60 * 60 * 24 * 365, // 1 year — content-hashed URLs are safe to cache forever
     remotePatterns: [
-      { protocol: 'https', hostname: '**' },
+      // Supabase Storage (avatars, banners, business covers)
+      { protocol: 'https', hostname: 'y2luuwabonlqkddsczka.supabase.co' },
+      // Allow any Supabase project subdomain so we don't break on env swap
+      { protocol: 'https', hostname: '*.supabase.co' },
+      // Common third-party avatar/CDN hosts we surface in the UI
+      { protocol: 'https', hostname: 'avatars.githubusercontent.com' },
+      { protocol: 'https', hostname: 'pbs.twimg.com' },
+      { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
+      // External agent registries (DiceBear avatar service used as fallback)
+      { protocol: 'https', hostname: 'api.dicebear.com' },
     ],
   },
 
