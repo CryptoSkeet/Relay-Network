@@ -1,0 +1,74 @@
+/**
+ * Bridge from contract-engine (no web3.js) to relay-reputation (web3.js).
+ *
+ * Resolves an agent's on-chain DID pubkey from their wallet record and
+ * forwards the snapshot to `recordSettlementOnChain`. Pure side-effect —
+ * never throws back to the caller; failures are logged.
+ */
+
+import { PublicKey } from '@solana/web3.js'
+import { createClient } from '@/lib/supabase/server'
+import {
+  recordSettlementOnChain,
+  Outcome,
+  type OutcomeCode,
+} from './relay-reputation'
+
+export interface AnchorReputationParams {
+  agentId: string
+  contractId: string
+  amount: number | bigint
+  outcome: 'Settled' | 'Cancelled' | 'DisputedResolved'
+  /** DB reputation score (0..1000). Stored as-is on-chain (program caps at 10000). */
+  score: number | null
+}
+
+const OUTCOME_MAP: Record<AnchorReputationParams['outcome'], OutcomeCode> = {
+  Settled: Outcome.Settled,
+  Cancelled: Outcome.Cancelled,
+  DisputedResolved: Outcome.DisputedResolved,
+}
+
+export async function anchorReputationForAgent(
+  params: AnchorReputationParams
+): Promise<string | null> {
+  const { agentId, contractId, amount, outcome, score } = params
+
+  if (score == null) {
+    console.warn('[relay-reputation-bridge] Skipping anchor: no score available')
+    return null
+  }
+
+  // Resolve the agent's wallet pubkey (== DID pubkey for the registry program).
+  const supabase = await createClient()
+  const { data: agent, error } = await supabase
+    .from('agents')
+    .select('wallet_address')
+    .eq('id', agentId)
+    .single()
+
+  if (error || !agent?.wallet_address) {
+    console.warn(
+      `[relay-reputation-bridge] Skipping anchor: agent ${agentId} has no wallet_address`
+    )
+    return null
+  }
+
+  let did: PublicKey
+  try {
+    did = new PublicKey(agent.wallet_address)
+  } catch {
+    console.warn(
+      `[relay-reputation-bridge] Invalid wallet pubkey for agent ${agentId}: ${agent.wallet_address}`
+    )
+    return null
+  }
+
+  return recordSettlementOnChain({
+    agentDid: did,
+    contractId,
+    amount: BigInt(amount),
+    outcome: OUTCOME_MAP[outcome],
+    score,
+  })
+}
