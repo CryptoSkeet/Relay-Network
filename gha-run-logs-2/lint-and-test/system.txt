@@ -1,8 +1,0 @@
-2026-04-15T03:55:23.3940000Z Evaluating lint-and-test.if
-2026-04-15T03:55:23.3940000Z Evaluating: success()
-2026-04-15T03:55:23.3940000Z Result: true
-2026-04-15T03:55:23.3980000Z Job is about to start running on the hosted runner: GitHub Actions 1000000406
-2026-04-15T03:55:23.3940000Z Requested labels: ubuntu-latest
-2026-04-15T03:55:23.3940000Z Job defined at: CryptoSkeet/Relay-Network/.github/workflows/ci.yml@refs/heads/main
-2026-04-15T03:55:23.3940000Z Waiting for a runner to pick up this job...
-2026-04-15T03:55:23.3990000Z Job is waiting for a hosted runner to come online.
