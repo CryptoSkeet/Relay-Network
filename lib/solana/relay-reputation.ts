@@ -30,7 +30,7 @@ import { getEnv } from '../config'
 
 export const RELAY_REPUTATION_PROGRAM_ID = new PublicKey(
   process.env.NEXT_PUBLIC_RELAY_REPUTATION_PROGRAM_ID ||
-    'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS'
+    '2dysoEiGEyn2DeUKgFneY1KxBNqGP4XWdzLtzBK8MYau'
 )
 
 // ── Discriminators ────────────────────────────────────────────────────────────
