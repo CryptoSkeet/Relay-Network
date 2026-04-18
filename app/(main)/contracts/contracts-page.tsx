@@ -81,6 +81,7 @@ interface ContractWithAgents extends Omit<Contract, 'deliverables'> {
   deliverables?: Deliverable[] | string[]
   escrow?: Escrow[]
   dispute?: Dispute | null
+  settlement_tx?: { tx_hash: string; created_at: string; amount: number } | null
   capabilities?: Array<{
     capability: CapabilityTag | null
   }>
@@ -182,7 +183,7 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
       const { data: agentRows } = agentIds.size > 0
         ? await supabase
             .from('agents')
-            .select('id, handle, display_name, avatar_url, is_verified')
+            .select('id, handle, display_name, avatar_url, is_verified, solana_wallet, wallet_address')
             .in('id', [...agentIds])
         : { data: [] }
 
@@ -203,6 +204,21 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
         escrowMap.set(e.contract_id, list)
       }
 
+      // Fetch settlement transactions (fallback if escrow.release_tx_hash isn't populated)
+      const { data: settleTxs } = contractIds.length > 0
+        ? await supabase
+            .from('transactions')
+            .select('contract_id, tx_hash, created_at, amount')
+            .in('contract_id', contractIds)
+            .eq('type', 'payment')
+            .not('tx_hash', 'is', null)
+            .order('created_at', { ascending: false })
+        : { data: [] }
+      const settleTxMap = new Map<string, { tx_hash: string; created_at: string; amount: number }>()
+      for (const t of settleTxs || []) {
+        if (!settleTxMap.has(t.contract_id)) settleTxMap.set(t.contract_id, t)
+      }
+
       const normalized = data.map((c: any) => {
         const clientId = c.client_id ?? c.seller_agent_id
         const providerId = c.provider_id ?? c.buyer_agent_id
@@ -214,6 +230,7 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
           provider: agentMap.get(providerId) ?? null,
           dispute: null,
           escrow: escrowMap.get(c.id) ?? [],
+          settlement_tx: settleTxMap.get(c.id) ?? null,
           budget_max: c.budget_max ?? c.price_relay ?? 0,
           budget_min: c.budget_min ?? c.price_relay ?? 0,
         }
@@ -943,34 +960,64 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
                         </div>
                         {/* On-chain settlement */}
                         {(() => {
-                          const settled = contract.escrow?.find(e => e.release_tx_hash)
-                          if (!settled?.release_tx_hash) return null
+                          const escrowSettled = contract.escrow?.find(e => e.release_tx_hash)
+                          const txHash = escrowSettled?.release_tx_hash || contract.settlement_tx?.tx_hash
+                          const releasedAt = escrowSettled?.released_at || contract.settlement_tx?.created_at
                           const cluster = process.env.NEXT_PUBLIC_SOLANA_CLUSTER || 'devnet'
-                          const url = `https://solscan.io/tx/${settled.release_tx_hash}${cluster === 'mainnet-beta' ? '' : `?cluster=${cluster}`}`
-                          return (
-                            <div className="mt-3 pt-3 border-t flex flex-wrap items-center justify-between gap-2">
-                              <div className="text-xs text-muted-foreground">
-                                <span className="text-emerald-500 font-medium">Settled on-chain</span>
-                                {settled.released_at && (
-                                  <span className="ml-2">
-                                    {formatDistanceToNow(new Date(settled.released_at), { addSuffix: true })}
+                          const clusterQS = cluster === 'mainnet-beta' ? '' : `?cluster=${cluster}`
+                          const isSettled = ['completed', 'SETTLED'].includes(contract.status as string)
+
+                          if (txHash) {
+                            const url = `https://solscan.io/tx/${txHash}${clusterQS}`
+                            return (
+                              <div className="mt-3 pt-3 border-t flex flex-wrap items-center justify-between gap-2">
+                                <div className="text-xs text-muted-foreground">
+                                  <span className="text-emerald-500 font-medium">Settled on-chain</span>
+                                  {releasedAt && (
+                                    <span className="ml-2">
+                                      {formatDistanceToNow(new Date(releasedAt), { addSuffix: true })}
+                                    </span>
+                                  )}
+                                </div>
+                                <a
+                                  href={url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                  View on Solscan
+                                  <span className="font-mono text-muted-foreground">
+                                    ({txHash.slice(0, 6)}…{txHash.slice(-4)})
                                   </span>
-                                )}
+                                </a>
                               </div>
-                              <a
-                                href={url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                              >
-                                <ExternalLink className="w-3 h-3" />
-                                View on Solscan
-                                <span className="font-mono text-muted-foreground">
-                                  ({settled.release_tx_hash.slice(0, 6)}…{settled.release_tx_hash.slice(-4)})
-                                </span>
-                              </a>
-                            </div>
-                          )
+                            )
+                          }
+
+                          // Fallback: settled but no on-chain tx — link to provider wallet activity
+                          const providerWallet = (contract.provider as any)?.solana_wallet || (contract.provider as any)?.wallet_address
+                          if (isSettled && providerWallet) {
+                            const url = `https://solscan.io/account/${providerWallet}${clusterQS}`
+                            return (
+                              <div className="mt-3 pt-3 border-t flex flex-wrap items-center justify-between gap-2">
+                                <div className="text-xs text-muted-foreground">
+                                  Settled off-chain · view provider wallet activity
+                                </div>
+                                <a
+                                  href={url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                  Provider wallet on Solscan
+                                </a>
+                              </div>
+                            )
+                          }
+
+                          return null
                         })()}
                       </div>
                     </details>
