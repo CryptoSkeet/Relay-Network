@@ -38,6 +38,12 @@ export function SettingsPage() {
   const [gradientTo, setGradientTo] = useState('#06b6d4')
   const [bannerFile, setBannerFile] = useState<File | null>(null)
   const [bannerPreview, setBannerPreview] = useState<string | null>(null)
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [avatarUrlInput, setAvatarUrlInput] = useState('')
+  const [avatarSaving, setAvatarSaving] = useState(false)
+  const [avatarSaved, setAvatarSaved] = useState(false)
+  const [avatarError, setAvatarError] = useState<string | null>(null)
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -84,6 +90,7 @@ export function SettingsPage() {
         setGradientFrom(found.gradient_from ?? '#7c3aed')
         setGradientTo(found.gradient_to ?? '#06b6d4')
         setBannerPreview(found.banner_url ?? null)
+        setAvatarPreview(found.avatar_url ?? null)
         setHeartbeatEnabled(found.heartbeat_enabled ?? false)
         setHeartbeatInterval(found.heartbeat_interval_ms ? Math.round(found.heartbeat_interval_ms / 60000) : 60)
 
@@ -152,6 +159,60 @@ export function SettingsPage() {
         setBannerPreview(reader.result as string)
       }
       reader.readAsDataURL(file)
+    }
+  }
+
+  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 5 * 1024 * 1024) {
+      setAvatarError('File too large (max 5MB)')
+      return
+    }
+    setAvatarError(null)
+    setAvatarFile(file)
+    setAvatarUrlInput('')
+    const reader = new FileReader()
+    reader.onloadend = () => setAvatarPreview(reader.result as string)
+    reader.readAsDataURL(file)
+  }
+
+  const saveAvatar = async () => {
+    setAvatarSaving(true); setAvatarSaved(false); setAvatarError(null)
+    try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('Not signed in')
+
+      const fd = new FormData()
+      if (avatarFile) {
+        fd.append('avatar', avatarFile)
+      } else if (avatarUrlInput.trim()) {
+        fd.append('avatar_url', avatarUrlInput.trim())
+      } else {
+        throw new Error('Choose a file or paste an image URL')
+      }
+      if (agent?.id) fd.append('agent_id', agent.id)
+
+      const res = await fetch('/api/profile/customize', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        body: fd,
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Avatar save failed')
+      if (data.agent?.avatar_url) {
+        setAvatarPreview(data.agent.avatar_url)
+        setAgent({ ...agent, avatar_url: data.agent.avatar_url })
+      }
+      setAvatarFile(null)
+      setAvatarUrlInput('')
+      setAvatarSaved(true)
+      setTimeout(() => setAvatarSaved(false), 2500)
+    } catch (err) {
+      setAvatarError(err instanceof Error ? err.message : 'Save failed')
+    } finally {
+      setAvatarSaving(false)
     }
   }
 
@@ -316,6 +377,53 @@ export function SettingsPage() {
     if (activeSection === 'customization') {
       return (
         <div className="space-y-6">
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle>Profile Picture</CardTitle>
+              <CardDescription>Upload an image or paste a URL — square images work best</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-4">
+                <div className="w-20 h-20 rounded-full overflow-hidden ring-2 ring-border bg-secondary flex items-center justify-center shrink-0">
+                  {avatarPreview ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={avatarPreview} alt="Avatar preview" className="w-full h-full object-cover" />
+                  ) : (
+                    <User className="w-8 h-8 text-muted-foreground" />
+                  )}
+                </div>
+                <div className="flex-1 space-y-2">
+                  <Input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                    onChange={handleAvatarUpload}
+                  />
+                  <Input
+                    type="text"
+                    placeholder="Or paste image URL (https://...)"
+                    value={avatarUrlInput}
+                    onChange={(e) => {
+                      setAvatarUrlInput(e.target.value)
+                      setAvatarFile(null)
+                      if (e.target.value.trim()) setAvatarPreview(e.target.value.trim())
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <Button
+                  onClick={saveAvatar}
+                  disabled={avatarSaving || (!avatarFile && !avatarUrlInput.trim())}
+                  className="gap-2"
+                >
+                  <Save className="w-4 h-4" />
+                  {avatarSaving ? 'Saving…' : avatarSaved ? 'Saved!' : 'Save Profile Picture'}
+                </Button>
+                {avatarError && <p className="text-sm text-destructive">{avatarError}</p>}
+              </div>
+            </CardContent>
+          </Card>
+
           <Card className="glass-card">
             <CardHeader>
               <CardTitle>Profile Banner</CardTitle>

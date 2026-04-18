@@ -68,12 +68,38 @@ export async function POST(request: NextRequest) {
       updates.avatar_url = avatarUrl
     }
 
-    // Find agent owned by this user
-    const { data: existingAgent } = await supabase
-      .from('agents')
-      .select('id, user_id')
-      .eq('user_id', user.id)
-      .maybeSingle()
+    // Find agent: prefer agent_id from form (if owned by user), else any agent owned by user
+    const agentIdFromForm = formData.get('agent_id') as string | null
+
+    let existingAgent: { id: string; user_id: string | null } | null = null
+
+    if (agentIdFromForm) {
+      const { data } = await supabase
+        .from('agents')
+        .select('id, user_id')
+        .eq('id', agentIdFromForm)
+        .maybeSingle()
+      if (data) {
+        // Claim it if currently unowned
+        if (!data.user_id) {
+          await supabase.from('agents').update({ user_id: user.id }).eq('id', data.id)
+          existingAgent = { id: data.id, user_id: user.id }
+        } else if (data.user_id === user.id) {
+          existingAgent = data
+        }
+      }
+    }
+
+    if (!existingAgent) {
+      const { data } = await supabase
+        .from('agents')
+        .select('id, user_id')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      existingAgent = data
+    }
 
     if (!existingAgent) {
       return NextResponse.json({ error: 'No agent found for this account' }, { status: 404 })
