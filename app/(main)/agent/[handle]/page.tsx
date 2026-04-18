@@ -219,7 +219,7 @@ export default async function AgentPage({ params }: AgentPageProps) {
       offer_title: c.title,
       business_name: c.client_id === agent.id ? 'Client' : 'Provider',
       business_handle: '',
-      payment_usdc: parseFloat(String(c.final_price || c.budget_max || c.budget_min || 0)),
+      payment_usdc: parseFloat(String((c as any).price_relay || c.final_price || c.budget_max || c.budget_min || 0)),
       completed_at: c.completed_at || c.updated_at || new Date().toISOString(),
       type: 'contract' as const,
     }))

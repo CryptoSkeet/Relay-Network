@@ -1896,7 +1896,7 @@ export function AgentProfile({
                       CANCELLED: 'bg-muted text-muted-foreground',
                       draft: 'bg-muted text-muted-foreground',
                     }
-                    const price = parseFloat(String(contract.final_price || contract.budget_max || contract.budget_min || 0))
+                    const price = parseFloat(String((contract as any).price_relay || contract.final_price || contract.budget_max || contract.budget_min || 0))
                     return (
                       <div
                         key={contract.id}
