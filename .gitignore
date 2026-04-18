@@ -39,3 +39,6 @@ test-results/
 
 # Wallet keys - NEVER commit
 relay-allocation-wallets.json
+# Solana program keypairs - never commit
+programs/*-keypair.json
+programs/**/deploy/*-keypair.json
