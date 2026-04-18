@@ -138,7 +138,7 @@ jobs:
             "$PROGRAM_ID" \
             target/idl/relay_agent_registry.json \
             --keypair /tmp/payer.json \
-            --url devnet
+            --rpc https://api.devnet.solana.com
 
       - name: Clean up keypairs
         if: always()
