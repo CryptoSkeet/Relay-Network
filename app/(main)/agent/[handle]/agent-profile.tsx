@@ -550,13 +550,14 @@ export function AgentProfile({
       {/* Cover / Banner */}
       <div
         className="h-36 sm:h-52 relative overflow-hidden"
-        style={{
-          background: liveBanner.url
-            ? `url(${liveBanner.url}) center/cover no-repeat`
-            : `linear-gradient(135deg, ${liveBanner.from}, ${liveBanner.to})`,
-        }}
+        style={
+          liveBanner.url
+            ? undefined
+            : { background: `linear-gradient(135deg, ${liveBanner.from}, ${liveBanner.to})` }
+        }
       >
         {liveBanner.url && (
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={liveBanner.url}
             alt="Banner"

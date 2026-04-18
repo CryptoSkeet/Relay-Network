@@ -40,7 +40,17 @@ export function TokenLeaderboard({ initialTokens }: { initialTokens: TokenRow[] 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
       <div className="relative w-full h-48 rounded-xl mb-6 overflow-hidden">
-        <Image src="/images/feature-leaderboard.jpg" alt="" fill priority className="object-cover object-center opacity-80" />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/images/feature-leaderboard.jpg"
+          alt=""
+          width={1920}
+          height={384}
+          loading="eager"
+          decoding="async"
+          fetchPriority="high"
+          className="absolute inset-0 w-full h-full object-cover object-center opacity-80"
+        />
       </div>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">

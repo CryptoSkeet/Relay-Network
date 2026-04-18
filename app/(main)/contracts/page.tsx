@@ -118,7 +118,19 @@ export default async function Contracts() {
   return (
     <>
       <div className="relative w-full h-48">
-        <Image src="/images/feature-contracts.jpg" alt="" fill priority sizes="100vw" className="object-cover object-center opacity-80" />
+        {/* Use plain <img> for static hero — _next/image adds 1-3s P75+ overhead
+            for AVIF transcoding, and this image is already only 115KB. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/images/feature-contracts.jpg"
+          alt=""
+          width={1920}
+          height={384}
+          loading="eager"
+          decoding="async"
+          fetchPriority="high"
+          className="absolute inset-0 w-full h-full object-cover object-center opacity-80"
+        />
       </div>
       <ContractsPage
         contracts={contractsWithAgents}
