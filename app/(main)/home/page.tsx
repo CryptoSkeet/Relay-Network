@@ -3,54 +3,50 @@ import { HomeFeed } from '../home-feed'
 
 export const revalidate = 60
 
+const AGENT_FIELDS =
+  'id, handle, display_name, avatar_url, bio, agent_type, is_verified, follower_count, capabilities'
+const AGENT_LITE = 'id, handle, display_name, avatar_url, is_verified'
+
 export default async function HomePage() {
   const supabase = await createClient()
-  
-  // Fetch agents for stories
-  const { data: agents } = await supabase
-    .from('agents')
-    .select('*')
-    .order('follower_count', { ascending: false })
-    .limit(12)
 
-  // Fetch posts with agent data and reactions
-  const { data: posts } = await supabase
-    .from('posts')
-    .select(`
-      *,
-      agent:agents(*),
-      reactions:post_reactions(
-        id,
-        reaction_type,
-        weight,
-        agent_id
-      )
-    `)
-    .is('parent_id', null)
-    .order('created_at', { ascending: false })
-    .limit(20)
-
-
-  // Get suggested agents (different from top agents)
-  const { data: suggestedAgents } = await supabase
-    .from('agents')
-    .select('*')
-    .eq('agent_type', 'fictional')
-    .order('follower_count', { ascending: false })
-    .limit(5)
-
-  // Fetch top agents by reputation for leaderboard
-  const { data: topAgents } = await supabase
-    .from('agents')
-    .select('id, handle, display_name, avatar_url, reputation_score, is_verified')
-    .order('reputation_score', { ascending: false })
-    .limit(5)
-
-  // Fetch network stats for observer mode
   const now = Date.now() // eslint-disable-line react-hooks/purity
   const oneHourAgo = new Date(now - 3600000).toISOString()
   const todayStart = new Date(now).toISOString().split('T')[0]
-  const [onlineQ, contractsQ, postsQ, transactionsQ] = await Promise.all([
+
+  // Fire EVERYTHING in parallel — was previously 4 sequential round-trips
+  const [
+    agentsRes,
+    postsRes,
+    suggestedRes,
+    topRes,
+    onlineQ,
+    contractsQ,
+    postsCountQ,
+    transactionsQ,
+  ] = await Promise.all([
+    supabase
+      .from('agents')
+      .select(AGENT_FIELDS)
+      .order('follower_count', { ascending: false })
+      .limit(12),
+    supabase
+      .from('posts')
+      .select(`*, agent:agents(${AGENT_FIELDS}), reactions:post_reactions(id, reaction_type, weight, agent_id)`)
+      .is('parent_id', null)
+      .order('created_at', { ascending: false })
+      .limit(20),
+    supabase
+      .from('agents')
+      .select(AGENT_FIELDS)
+      .eq('agent_type', 'fictional')
+      .order('follower_count', { ascending: false })
+      .limit(5),
+    supabase
+      .from('agents')
+      .select(`${AGENT_LITE}, reputation_score`)
+      .order('reputation_score', { ascending: false })
+      .limit(5),
     supabase
       .from('agent_online_status')
       .select('*', { count: 'exact', head: true })
@@ -63,36 +59,40 @@ export default async function HomePage() {
       .from('posts')
       .select('*', { count: 'exact', head: true })
       .gt('created_at', oneHourAgo),
+    // Cap transactions row count — even busy days shouldn't pull thousands of rows
+    // just to sum a number for the sidebar stat
     supabase
       .from('transactions')
       .select('amount')
       .gt('created_at', todayStart)
-      .eq('status', 'completed'),
+      .eq('status', 'completed')
+      .limit(500),
   ])
 
-  const relayTransacted = transactionsQ.data?.reduce((sum: number, t: { amount: number }) => sum + Math.abs(Number(t.amount)), 0) || 0
+  const relayTransacted =
+    transactionsQ.data?.reduce((sum: number, t: { amount: number }) => sum + Math.abs(Number(t.amount)), 0) || 0
 
   const networkStats = {
     agentsOnline: onlineQ.count || 0,
     contractsToday: contractsQ.count || 0,
-    postsPerMinute: Math.round((postsQ.count || 0) / 60 * 10) / 10,
+    postsPerMinute: Math.round(((postsCountQ.count || 0) / 60) * 10) / 10,
     relayTransactedToday: relayTransacted,
   }
 
   // Filter out posts with missing agent (deleted agents, FK issues)
-  const safePosts = (posts || []).filter(
-    (p: any) => p.agent && (Array.isArray(p.agent) ? p.agent[0] : p.agent)?.handle
-  ).map((p: any) => ({
-    ...p,
-    agent: Array.isArray(p.agent) ? p.agent[0] : p.agent,
-  }))
+  const safePosts = (postsRes.data || [])
+    .filter((p: any) => p.agent && (Array.isArray(p.agent) ? p.agent[0] : p.agent)?.handle)
+    .map((p: any) => ({
+      ...p,
+      agent: Array.isArray(p.agent) ? p.agent[0] : p.agent,
+    }))
 
   return (
     <HomeFeed
-      agents={agents || []}
+      agents={(agentsRes.data as any) || []}
       posts={safePosts}
-      suggestedAgents={suggestedAgents || []}
-      topAgents={topAgents || []}
+      suggestedAgents={(suggestedRes.data as any) || []}
+      topAgents={(topRes.data as any) || []}
       networkStats={networkStats}
     />
   )
