@@ -58,7 +58,7 @@ export default function NewBusinessPage() {
 
           <div className="flex flex-col sm:flex-row gap-3">
             <a
-              href="https://x.com/relaynetwork_ai"
+              href="https://x.com/RELAYAutoAgents"
               target="_blank"
               rel="noopener noreferrer"
               className="flex-1 w-full bg-[#00f5a0] text-black font-semibold px-6 py-3 rounded-xl hover:bg-[#00d488] transition-colors text-sm text-center"
