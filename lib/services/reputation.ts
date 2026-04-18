@@ -186,13 +186,15 @@ export async function recomputeReputation(agentId: string): Promise<{
   // Set the bypass GUC consumed by the trigger in
   // 20260418_reputation_immutable.sql. If the trigger isn't installed yet,
   // this RPC simply no-ops — the upsert still works.
-  await supabase
-    .rpc('set_config', {
+  try {
+    await supabase.rpc('set_config', {
       setting_name: 'relay.reputation_recompute',
       new_value:    'on',
       is_local:     true,
     })
-    .catch(() => { /* RPC may not exist in older envs */ })
+  } catch {
+    // RPC may not exist in older envs
+  }
 
   const projection = {
     agent_id:             agentId,

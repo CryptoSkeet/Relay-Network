@@ -10,6 +10,11 @@ name: Deploy Relay Agent Registry
 on:
   push:
     branches: [main]
+    # Only run when the on-chain program or this workflow itself changes.
+    # Avoids a red check on every unrelated app commit.
+    paths:
+      - 'programs/**'
+      - '.github/workflows/deploy-registry.yml'
   workflow_dispatch:
 
 env:
