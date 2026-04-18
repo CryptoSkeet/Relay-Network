@@ -10,41 +10,67 @@ export const metadata = {
   description: 'Browse and manage agent contracts, deliverables, and escrow',
 }
 
+const AGENT_FIELDS = 'id, handle, display_name, avatar_url, bio, agent_type, is_verified, follower_count, capabilities, wallet_address'
+const AGENT_LITE_FIELDS = 'id, handle, display_name, avatar_url, is_verified, wallet_address'
+
 export default async function Contracts() {
-  // Use service-role client for data queries (bypasses RLS for marketplace view)
   const supabase = await createClient()
 
-  // Get user auth safely (non-blocking)
-  let user: any = null
-  try {
-    const sessionClient = await createSessionClient()
-    const { data } = await sessionClient.auth.getUser()
-    user = data?.user ?? null
-  } catch {
-    // Auth unavailable — proceed as anonymous viewer
-  }
+  // Kick off auth + the slow data queries in parallel
+  const userPromise = (async () => {
+    try {
+      const sessionClient = await createSessionClient()
+      const { data } = await sessionClient.auth.getUser()
+      return data?.user ?? null
+    } catch {
+      return null
+    }
+  })()
 
-  // Get user's agent
-  const { data: userAgent } = user ? await supabase
-    .from('agents')
-    .select('id')
-    .eq('user_id', user.id)
-    .maybeSingle() : { data: null }
-
-  // Fetch ALL contracts (marketplace view) — no user filter on server.
-  // Use plain select without FK hints to avoid constraint name mismatches
-  // (4 FKs to agents: client_id, provider_id, seller_agent_id, buyer_agent_id).
-  const { data: contracts, error: contractsError } = await supabase
+  const contractsPromise = supabase
     .from('contracts')
     .select('*')
     .order('created_at', { ascending: false })
     .limit(100)
 
+  const agentsPromise = supabase
+    .from('agents')
+    .select(AGENT_FIELDS)
+    .order('display_name')
+    .limit(200)
+
+  const statsPromise = Promise.all([
+    supabase.from('contracts').select('*', { count: 'exact', head: true }),
+    supabase.from('contracts').select('*', { count: 'exact', head: true }).in('status', ['open', 'OPEN', 'PENDING']),
+    supabase.from('contracts').select('*', { count: 'exact', head: true }).in('status', ['in_progress', 'active', 'ACTIVE', 'DELIVERED', 'delivered']),
+    supabase.from('contracts').select('*', { count: 'exact', head: true }).in('status', ['completed', 'SETTLED', 'CANCELLED', 'cancelled']),
+    supabase.from('contracts').select('*', { count: 'exact', head: true }).in('status', ['disputed', 'DISPUTED']),
+  ])
+
+  const [user, contractsRes, agentsRes, statsRes] = await Promise.all([
+    userPromise,
+    contractsPromise,
+    agentsPromise,
+    statsPromise,
+  ])
+
+  const { data: contracts, error: contractsError } = contractsRes
   if (contractsError) {
     console.error('Contracts query error:', contractsError)
   }
 
-  // Collect all agent IDs to resolve in one go
+  // Resolve user agent (only if signed in) — uses already-fetched agents list when possible
+  let userAgentId: string | null = null
+  if (user) {
+    const { data: ua } = await supabase
+      .from('agents')
+      .select('id')
+      .eq('user_id', user.id)
+      .maybeSingle()
+    userAgentId = ua?.id ?? null
+  }
+
+  // Collect all agent IDs referenced by contracts
   const agentIds = new Set<string>()
   for (const c of contracts || []) {
     if (c.client_id) agentIds.add(c.client_id)
@@ -53,22 +79,21 @@ export default async function Contracts() {
     if (c.buyer_agent_id) agentIds.add(c.buyer_agent_id)
   }
 
-  const { data: agentRows } = agentIds.size > 0
-    ? await supabase
-        .from('agents')
-        .select('id, handle, display_name, avatar_url, is_verified')
-        .in('id', [...agentIds])
-    : { data: [] }
+  // Build the agent map from the agents we already fetched. Fetch any missing ones (rare).
+  const agentMap = new Map<string, any>()
+  for (const a of agentsRes.data || []) agentMap.set(a.id, a)
+  const missing = [...agentIds].filter(id => !agentMap.has(id))
+  if (missing.length > 0) {
+    const { data: extra } = await supabase
+      .from('agents')
+      .select(AGENT_LITE_FIELDS)
+      .in('id', missing)
+    for (const a of extra || []) agentMap.set(a.id, a)
+  }
 
-  const agentMap = new Map((agentRows || []).map(a => [a.id, a]))
-
-  // Normalize contracts: merge engine columns into client/provider
   const contractsWithAgents = (contracts || []).map(c => {
-    // Engine uses seller_agent_id as the offer creator → map to "client"
-    // Engine uses buyer_agent_id as the buyer → map to "provider"
     const clientId = c.client_id ?? c.seller_agent_id
     const providerId = c.provider_id ?? c.buyer_agent_id
-
     return {
       ...c,
       client_id: clientId,
@@ -76,21 +101,12 @@ export default async function Contracts() {
       client: agentMap.get(clientId) ?? null,
       provider: agentMap.get(providerId) ?? null,
       dispute: null,
-      // Normalize budget: use budget_max/budget_min or price_relay
       budget_max: c.budget_max ?? c.price_relay ?? 0,
       budget_min: c.budget_min ?? c.price_relay ?? 0,
     }
   })
 
-  // Fetch accurate stats via server-side counts (no row limit)
-  const [totalQ, openQ, activeQ, completedQ, disputedQ] = await Promise.all([
-    supabase.from('contracts').select('*', { count: 'exact', head: true }),
-    supabase.from('contracts').select('*', { count: 'exact', head: true }).in('status', ['open', 'OPEN', 'PENDING']),
-    supabase.from('contracts').select('*', { count: 'exact', head: true }).in('status', ['in_progress', 'active', 'ACTIVE', 'DELIVERED', 'delivered']),
-    supabase.from('contracts').select('*', { count: 'exact', head: true }).in('status', ['completed', 'SETTLED', 'CANCELLED', 'cancelled']),
-    supabase.from('contracts').select('*', { count: 'exact', head: true }).in('status', ['disputed', 'DISPUTED']),
-  ])
-
+  const [totalQ, openQ, activeQ, completedQ, disputedQ] = statsRes
   const contractStats = {
     total: totalQ.count ?? 0,
     open: openQ.count ?? 0,
@@ -99,22 +115,15 @@ export default async function Contracts() {
     disputed: disputedQ.count ?? 0,
   }
 
-  // Fetch all agents for the new contract dialog
-  const { data: agents } = await supabase
-    .from('agents')
-    .select('*')
-    .order('display_name')
-
   return (
     <>
-      {/* Hero image rendered in server component for instant LCP */}
       <div className="relative w-full h-48">
         <Image src="/images/feature-contracts.jpg" alt="" fill priority sizes="100vw" className="object-cover object-center opacity-80" />
       </div>
       <ContractsPage
         contracts={contractsWithAgents}
-        agents={agents || []}
-        userAgentId={userAgent?.id || null}
+        agents={(agentsRes.data as any) || []}
+        userAgentId={userAgentId}
         capabilityTags={[]}
         serverStats={contractStats}
       />
