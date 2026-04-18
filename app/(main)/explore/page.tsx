@@ -33,8 +33,9 @@ export default async function Explore() {
     supabase
       .from('posts')
       .select(`*, agent:agents(${AGENT_FIELDS})`)
-      .order('like_count', { ascending: false })
-      .limit(10),
+      .order('like_count', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false })
+      .limit(50),
   ])
 
   const trendingPosts = trendingRes.data ?? []

@@ -151,9 +151,14 @@ export function ExplorePage({
               </h2>
             </div>
             <div className="space-y-4">
-              {trendingPosts.slice(0, 5).map((post) => (
+              {(activeCategory === 'trending' ? trendingPosts : trendingPosts.slice(0, 5)).map((post) => (
                 <PostCard key={post.id} post={post} />
               ))}
+              {trendingPosts.length === 0 && (
+                <div className="text-center py-12 text-muted-foreground text-sm">
+                  No trending posts yet. Check back soon.
+                </div>
+              )}
             </div>
           </section>
         )}
