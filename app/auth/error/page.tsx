@@ -3,15 +3,40 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Zap, AlertTriangle, ArrowRight } from 'lucide-react'
 
+// Map raw error codes to friendly messages + recommended next step
+const ERROR_MESSAGES: Record<string, { title: string; body: string; primaryCta?: { label: string; href: string } }> = {
+  exchange_failed: {
+    title: "Sign-in link can't be reused",
+    body: 'This sign-in link has already been used or has expired. Please sign in again — it only takes a second.',
+    primaryCta: { label: 'Sign in', href: '/auth/login' },
+  },
+  no_code: {
+    title: 'Sign-in link incomplete',
+    body: 'The link you followed was missing some information. Try signing in again from the login page.',
+    primaryCta: { label: 'Go to sign in', href: '/auth/login' },
+  },
+  access_denied: {
+    title: 'Sign-in cancelled',
+    body: 'You cancelled the sign-in. No problem — you can try again any time.',
+    primaryCta: { label: 'Try again', href: '/auth/login' },
+  },
+  server_error: {
+    title: 'Temporary server issue',
+    body: 'Our auth provider had a hiccup. This is usually fixed by trying again in a moment.',
+    primaryCta: { label: 'Retry', href: '/auth/login' },
+  },
+}
+
 export default async function AuthErrorPage({ searchParams }: { searchParams: Promise<{ error?: string; desc?: string }> }) {
   const sp = await searchParams
   const error = sp?.error
   const desc = sp?.desc
+  const friendly = error ? ERROR_MESSAGES[error] : undefined
+
   return (
     <div className="flex min-h-screen w-full items-center justify-center p-6 bg-background">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center gap-8">
-          {/* Logo */}
           <Link href="/" className="flex items-center gap-3 group">
             <div className="w-12 h-12 rounded-xl gradient-relay flex items-center justify-center glow-primary">
               <Zap className="w-7 h-7 text-white" />
@@ -24,36 +49,42 @@ export default async function AuthErrorPage({ searchParams }: { searchParams: Pr
               <div className="mx-auto w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
                 <AlertTriangle className="w-8 h-8 text-destructive" />
               </div>
-              <CardTitle className="text-2xl font-bold">Authentication Error</CardTitle>
+              <CardTitle className="text-2xl font-bold">
+                {friendly?.title ?? 'Authentication issue'}
+              </CardTitle>
               <CardDescription className="text-muted-foreground">
-                Something went wrong during authentication
+                {friendly?.body ?? 'Something interrupted your sign-in. Please try again below.'}
               </CardDescription>
             </CardHeader>
             <CardContent className="text-center space-y-6">
-              {error && (
-                <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-left">
-                  <div className="text-xs font-mono font-semibold text-destructive">{error}</div>
-                  {desc && <div className="text-xs font-mono text-muted-foreground break-words mt-1">{desc}</div>}
-                </div>
-              )}
-              <p className="text-sm text-muted-foreground">
-                This could happen if the confirmation link has expired or has already been used.
-                Please try signing in or creating a new account.
-              </p>
-
               <div className="flex flex-col gap-3">
                 <Button asChild className="w-full gradient-relay text-white">
-                  <Link href="/auth/login">
-                    Sign In
+                  <Link href={friendly?.primaryCta?.href ?? '/auth/login'}>
+                    {friendly?.primaryCta?.label ?? 'Sign in'}
                     <ArrowRight className="w-4 h-4 ml-2" />
                   </Link>
                 </Button>
                 <Button asChild variant="outline" className="w-full">
                   <Link href="/auth/sign-up">
-                    Create Account
+                    Create new account
                   </Link>
                 </Button>
               </div>
+
+              {/* Only show raw error to logged-in admins / dev — keep collapsed for normal users */}
+              {error && (
+                <details className="text-left">
+                  <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+                    Technical details
+                  </summary>
+                  <div className="mt-2 rounded-md border border-border bg-muted/30 p-3">
+                    <div className="text-xs font-mono text-muted-foreground">
+                      <div><span className="font-semibold">code:</span> {error}</div>
+                      {desc && <div className="break-words"><span className="font-semibold">desc:</span> {desc}</div>}
+                    </div>
+                  </div>
+                </details>
+              )}
             </CardContent>
           </Card>
         </div>
