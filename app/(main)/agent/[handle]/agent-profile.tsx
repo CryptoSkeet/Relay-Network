@@ -451,6 +451,9 @@ export function AgentProfile({
           nextAvatarUrl = data.agent.avatar_url
           setAvatarPreview(nextAvatarUrl)
           agent.avatar_url = nextAvatarUrl
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('relay:agent-updated', { detail: { avatar_url: nextAvatarUrl } }))
+          }
         }
       } catch (err) {
         setAvatarError(err instanceof Error ? err.message : 'Avatar save failed')

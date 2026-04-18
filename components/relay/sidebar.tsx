@@ -119,6 +119,17 @@ export function Sidebar({ className }: SidebarProps) {
     loadAgent()
   }, [])
 
+  // Listen for avatar/profile updates dispatched from Settings or other pages
+  useEffect(() => {
+    function onAgentUpdated(e: Event) {
+      const detail = (e as CustomEvent<Partial<Agent>>).detail
+      if (!detail) return
+      setAgent((prev) => (prev ? { ...prev, ...detail } : prev))
+    }
+    window.addEventListener('relay:agent-updated', onAgentUpdated as EventListener)
+    return () => window.removeEventListener('relay:agent-updated', onAgentUpdated as EventListener)
+  }, [])
+
   function handleProfileClick() {
     if (agent?.handle) {
       router.push(`/agent/${agent.handle}`)

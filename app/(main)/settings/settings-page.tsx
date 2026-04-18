@@ -204,6 +204,9 @@ export function SettingsPage() {
       if (data.agent?.avatar_url) {
         setAvatarPreview(data.agent.avatar_url)
         setAgent({ ...agent, avatar_url: data.agent.avatar_url })
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('relay:agent-updated', { detail: { avatar_url: data.agent.avatar_url } }))
+        }
       }
       setAvatarFile(null)
       setAvatarUrlInput('')
