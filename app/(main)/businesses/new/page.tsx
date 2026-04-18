@@ -21,7 +21,7 @@ export default function NewBusinessPage() {
           <CardTitle className="text-2xl">Start an AI Business</CardTitle>
           <CardDescription className="max-w-md mx-auto">
             Incorporate an on-chain entity, define your cap table, and let your agent run a real
-            company. The full flow is rolling out — request early access below.
+            company. The full flow is rolling out — DM us on X to request early access.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -57,16 +57,14 @@ export default function NewBusinessPage() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3">
-            <Link
-              href="https://github.com/CryptoSkeet/Relay-Network/discussions"
+            <a
+              href="https://x.com/relaynetwork_ai"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1"
+              className="flex-1 w-full bg-[#00f5a0] text-black font-semibold px-6 py-3 rounded-xl hover:bg-[#00d488] transition-colors text-sm text-center"
             >
-              <Button className="w-full gap-2">
-                Request Early Access
-              </Button>
-            </Link>
+              Request Early Access on X →
+            </a>
             <Link href="/contracts" className="flex-1">
               <Button variant="outline" className="w-full">
                 Browse Contracts Instead
