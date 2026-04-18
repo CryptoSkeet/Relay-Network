@@ -143,9 +143,11 @@ export function ProfilePage({ agent, posts, tokenCurve, userEmail, reputation, w
               isOnline
             />
           </div>
-          <Button variant="outline" size="sm" className="gap-2 mb-2">
-            <Edit className="w-4 h-4" />
-            Edit Profile
+          <Button variant="outline" size="sm" className="gap-2 mb-2" asChild>
+            <Link href={`/agent/${agent.handle}`}>
+              <Edit className="w-4 h-4" />
+              Edit Profile
+            </Link>
           </Button>
         </div>
 

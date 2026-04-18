@@ -266,6 +266,10 @@ export function AgentProfile({
   const [bannerUrl, setBannerUrl] = useState(agent.banner_url || '')
   const [bannerSaving, setBannerSaving] = useState(false)
   const [bannerGenerating, setBannerGenerating] = useState(false)
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(agent.avatar_url || null)
+  const [avatarUrlInput, setAvatarUrlInput] = useState('')
+  const [avatarError, setAvatarError] = useState<string | null>(null)
   const [liveBanner, setLiveBanner] = useState({
     url: agent.banner_url || '',
     from: agent.gradient_from || agent.theme_color || '#7c3aed',
@@ -417,7 +421,44 @@ export function AgentProfile({
   // Save banner changes
   const saveBanner = async () => {
     setBannerSaving(true)
+    setAvatarError(null)
     const supabase = createClient()
+
+    let nextAvatarUrl: string | null = agent.avatar_url ?? null
+    const trimmedAvatarUrl = avatarUrlInput.trim()
+
+    // If user uploaded a file or pasted a URL, push through /api/profile/customize
+    if (avatarFile || trimmedAvatarUrl) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) throw new Error('Not signed in')
+
+        const fd = new FormData()
+        if (avatarFile) {
+          fd.append('avatar', avatarFile)
+        } else if (trimmedAvatarUrl) {
+          fd.append('avatar_url', trimmedAvatarUrl)
+        }
+
+        const res = await fetch('/api/profile/customize', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${session.access_token}` },
+          body: fd,
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'Avatar upload failed')
+        if (data.agent?.avatar_url) {
+          nextAvatarUrl = data.agent.avatar_url
+          setAvatarPreview(nextAvatarUrl)
+          agent.avatar_url = nextAvatarUrl
+        }
+      } catch (err) {
+        setAvatarError(err instanceof Error ? err.message : 'Avatar save failed')
+        setBannerSaving(false)
+        return
+      }
+    }
+
     const updates: Record<string, string | null> = {
       gradient_from: bannerUrl ? null : bannerFrom,
       gradient_to: bannerUrl ? null : bannerTo,
@@ -427,6 +468,8 @@ export function AgentProfile({
     }
     await supabase.from('agents').update(updates).eq('id', agent.id)
     setLiveBanner({ url: bannerUrl, from: bannerFrom, to: bannerTo })
+    setAvatarFile(null)
+    setAvatarUrlInput('')
     setBannerSaving(false)
     setBannerDialog(false)
   }
@@ -579,11 +622,62 @@ export function AgentProfile({
 
         {/* Banner editor dialog */}
         <Dialog open={bannerDialog} onOpenChange={setBannerDialog}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Customize Banner</DialogTitle>
+              <DialogTitle>Edit Profile</DialogTitle>
             </DialogHeader>
             <div className="space-y-5 pt-2">
+              {/* Avatar editor */}
+              <div className="space-y-3">
+                <Label className="text-xs text-muted-foreground">Profile Picture</Label>
+                <div className="flex items-center gap-4">
+                  <div className="ring-2 ring-border rounded-full">
+                    <AgentAvatar
+                      src={avatarPreview}
+                      name={agent.display_name}
+                      size="lg"
+                    />
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <Input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (!file) return
+                        if (file.size > 5 * 1024 * 1024) {
+                          setAvatarError('File too large (max 5MB)')
+                          return
+                        }
+                        setAvatarError(null)
+                        setAvatarFile(file)
+                        setAvatarUrlInput('')
+                        const reader = new FileReader()
+                        reader.onloadend = () => setAvatarPreview(reader.result as string)
+                        reader.readAsDataURL(file)
+                      }}
+                      className="text-xs h-9"
+                    />
+                    <Input
+                      placeholder="Or paste an image URL"
+                      value={avatarUrlInput}
+                      onChange={(e) => {
+                        setAvatarUrlInput(e.target.value)
+                        setAvatarFile(null)
+                        if (e.target.value.trim()) setAvatarPreview(e.target.value.trim())
+                      }}
+                      className="text-xs h-9"
+                    />
+                  </div>
+                </div>
+                {avatarError && (
+                  <p className="text-xs text-destructive">{avatarError}</p>
+                )}
+              </div>
+
+              <div className="border-t border-border" />
+
+              <Label className="text-xs text-muted-foreground">Banner</Label>
               {/* Live preview */}
               <div
                 className="h-24 rounded-lg overflow-hidden relative"
