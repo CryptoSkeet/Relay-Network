@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import Link from 'next/link'
-import { FileText, Plus, Clock, CheckCircle, XCircle, AlertCircle, Coins, ArrowRight, Filter, CheckCheck, Zap, RefreshCw, PlusCircle, Loader2, Wallet, Lock, Unlock, Scale, Send, Eye, Shield, ChevronDown } from 'lucide-react'
+import { FileText, Plus, Clock, CheckCircle, XCircle, AlertCircle, Coins, ArrowRight, Filter, CheckCheck, Zap, RefreshCw, PlusCircle, Loader2, Wallet, Lock, Unlock, Scale, Send, Eye, Shield, ChevronDown, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -188,6 +188,21 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
 
       const agentMap = new Map((agentRows || []).map((a: any) => [a.id, a]))
 
+      // Fetch escrow rows for these contracts
+      const contractIds = data.map((c: any) => c.id)
+      const { data: escrowRows } = contractIds.length > 0
+        ? await supabase
+            .from('escrow')
+            .select('id, contract_id, amount, currency, status, released_at, release_tx_hash')
+            .in('contract_id', contractIds)
+        : { data: [] }
+      const escrowMap = new Map<string, any[]>()
+      for (const e of escrowRows || []) {
+        const list = escrowMap.get(e.contract_id) || []
+        list.push(e)
+        escrowMap.set(e.contract_id, list)
+      }
+
       const normalized = data.map((c: any) => {
         const clientId = c.client_id ?? c.seller_agent_id
         const providerId = c.provider_id ?? c.buyer_agent_id
@@ -198,6 +213,7 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
           client: agentMap.get(clientId) ?? null,
           provider: agentMap.get(providerId) ?? null,
           dispute: null,
+          escrow: escrowMap.get(c.id) ?? [],
           budget_max: c.budget_max ?? c.price_relay ?? 0,
           budget_min: c.budget_min ?? c.price_relay ?? 0,
         }
@@ -925,6 +941,37 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
                             <span>No budget or deadline set.</span>
                           )}
                         </div>
+                        {/* On-chain settlement */}
+                        {(() => {
+                          const settled = contract.escrow?.find(e => e.release_tx_hash)
+                          if (!settled?.release_tx_hash) return null
+                          const cluster = process.env.NEXT_PUBLIC_SOLANA_CLUSTER || 'devnet'
+                          const url = `https://solscan.io/tx/${settled.release_tx_hash}${cluster === 'mainnet-beta' ? '' : `?cluster=${cluster}`}`
+                          return (
+                            <div className="mt-3 pt-3 border-t flex flex-wrap items-center justify-between gap-2">
+                              <div className="text-xs text-muted-foreground">
+                                <span className="text-emerald-500 font-medium">Settled on-chain</span>
+                                {settled.released_at && (
+                                  <span className="ml-2">
+                                    {formatDistanceToNow(new Date(settled.released_at), { addSuffix: true })}
+                                  </span>
+                                )}
+                              </div>
+                              <a
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                                View on Solscan
+                                <span className="font-mono text-muted-foreground">
+                                  ({settled.release_tx_hash.slice(0, 6)}…{settled.release_tx_hash.slice(-4)})
+                                </span>
+                              </a>
+                            </div>
+                          )
+                        })()}
                       </div>
                     </details>
                   </CardContent>
