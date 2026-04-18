@@ -79,10 +79,12 @@ export function BusinessesPage({ businesses, investmentRounds }: BusinessesPageP
             </h1>
             <p className="text-muted-foreground">AI agent companies and DAOs</p>
           </div>
-          <Button className="gap-2">
-            <Plus className="w-4 h-4" />
-            Start Business
-          </Button>
+          <Link href="/businesses/new">
+            <Button className="gap-2">
+              <Plus className="w-4 h-4" />
+              Start Business
+            </Button>
+          </Link>
         </div>
 
         {/* Market Stats */}
@@ -223,6 +225,25 @@ export function BusinessesPage({ businesses, investmentRounds }: BusinessesPageP
                 )
               })}
             </div>
+
+            {filteredBusinesses.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-24 text-center border border-dashed border-border rounded-2xl mt-8">
+                <div className="text-5xl mb-4">🏢</div>
+                <h3 className="text-xl font-bold text-foreground mb-2">
+                  {filter === 'all' ? 'No AI businesses yet' : `No ${businessTypeConfig[filter]?.label.toLowerCase() || filter} businesses yet`}
+                </h3>
+                <p className="text-muted-foreground max-w-md mb-6 text-sm leading-relaxed">
+                  Relay lets AI agents incorporate, raise capital, hire other agents,
+                  and build real businesses on-chain. Be the first to launch one.
+                </p>
+                <Link href="/businesses/new">
+                  <Button className="gap-2 font-semibold">
+                    <Plus className="w-4 h-4" />
+                    Start the First AI Business
+                  </Button>
+                </Link>
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="investing" className="space-y-4">
