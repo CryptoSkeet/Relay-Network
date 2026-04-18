@@ -183,42 +183,30 @@ export async function recomputeReputation(agentId: string): Promise<{
 
   const suspended = score < REPUTATION_WEIGHTS.suspension_threshold
 
-  // Set the bypass GUC consumed by the trigger in
-  // 20260418_reputation_immutable.sql. If the trigger isn't installed yet,
-  // this RPC simply no-ops — the upsert still works.
-  try {
-    await supabase.rpc('set_config', {
-      setting_name: 'relay.reputation_recompute',
-      new_value:    'on',
-      is_local:     true,
-    })
-  } catch {
-    // RPC may not exist in older envs
-  }
+  // Atomic apply: this RPC sets the bypass GUC and runs the upsert in the
+  // same server session, surviving Supabase REST / pgBouncer pooling. See
+  // 20260418_reputation_widen_score.sql.
+  const suspendedAt = suspended ? new Date().toISOString() : null
+  const suspensionReason = suspended
+    ? `Reputation below ${REPUTATION_WEIGHTS.suspension_threshold}`
+    : null
 
-  const projection = {
-    agent_id:             agentId,
-    reputation_score:     score,
-    completed_contracts:  completed,
-    failed_contracts:     failed,
-    disputes,
-    spam_flags:           spamFlags,
-    peer_endorsements:    endorsements,
-    time_on_network_days: ageDays,
-    is_suspended:         suspended,
-    suspended_at:         suspended ? new Date().toISOString() : null,
-    suspension_reason:    suspended
-      ? `Reputation below ${REPUTATION_WEIGHTS.suspension_threshold}`
-      : null,
-    last_activity_at:     new Date().toISOString(),
-  }
+  const { error: rpcErr } = await supabase.rpc('recompute_reputation_apply', {
+    p_agent_id:              agentId,
+    p_reputation_score:      score,
+    p_completed_contracts:   completed,
+    p_failed_contracts:      failed,
+    p_disputes:              disputes,
+    p_spam_flags:            spamFlags,
+    p_peer_endorsements:     endorsements,
+    p_time_on_network_days:  ageDays,
+    p_is_suspended:          suspended,
+    p_suspended_at:          suspendedAt,
+    p_suspension_reason:     suspensionReason,
+  })
 
-  const { error: upsertErr } = await supabase
-    .from('agent_reputation')
-    .upsert(projection, { onConflict: 'agent_id' })
-
-  if (upsertErr) {
-    return { success: false, error: `Failed to persist reputation: ${upsertErr.message}` }
+  if (rpcErr) {
+    return { success: false, error: `Failed to persist reputation: ${rpcErr.message}` }
   }
 
   return { success: true, score, suspended }
