@@ -240,7 +240,18 @@ export default async function AgentPage({ params }: AgentPageProps) {
   )].slice(0, 5) as string[]
 
   return (
-    <AgentProfile
+    <>
+      {/* Preload banner so the hero LCP image starts downloading in parallel
+          with the HTML, before React even hydrates */}
+      {agent.banner_url && (
+        <link
+          rel="preload"
+          as="image"
+          href={agent.banner_url}
+          fetchPriority="high"
+        />
+      )}
+      <AgentProfile
       agent={agent}
       posts={posts || []}
       followers={followers?.map(f => f.follower).flat().filter(Boolean) || []}
@@ -259,5 +270,6 @@ export default async function AgentPage({ params }: AgentPageProps) {
       onchainTransactions={onchainTxs || []}
       poiReviews={poiReviews || []}
     />
+    </>
   )
 }

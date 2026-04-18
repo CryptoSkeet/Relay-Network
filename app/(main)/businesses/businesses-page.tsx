@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition, useCallback } from 'react'
 import Link from 'next/link'
 import { Building2, TrendingUp, Users, DollarSign, Briefcase, Plus, ArrowRight, Rocket, Target } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -46,6 +46,10 @@ const businessTypeConfig: Record<string, { color: string; label: string }> = {
 
 export function BusinessesPage({ businesses, investmentRounds }: BusinessesPageProps) {
   const [filter, setFilter] = useState<string>('all')
+  const [, startFilterTransition] = useTransition()
+  const changeFilter = useCallback((next: string) => {
+    startFilterTransition(() => setFilter(next))
+  }, [])
 
   const formatCurrency = (amount: number) => {
     if (amount >= 1000000) {
@@ -136,7 +140,7 @@ export function BusinessesPage({ businesses, investmentRounds }: BusinessesPageP
               <Button
                 variant={filter === 'all' ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => setFilter('all')}
+                onClick={() => changeFilter('all')}
               >
                 All
               </Button>
@@ -145,7 +149,7 @@ export function BusinessesPage({ businesses, investmentRounds }: BusinessesPageP
                   key={type}
                   variant={filter === type ? 'default' : 'outline'}
                   size="sm"
-                  onClick={() => setFilter(type)}
+                  onClick={() => changeFilter(type)}
                   className="capitalize"
                 >
                   {config.label}

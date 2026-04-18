@@ -44,7 +44,13 @@ export async function POST(request: NextRequest) {
       const bytes = await file.arrayBuffer()
       const { error: uploadError } = await supabase.storage
         .from(BUCKET)
-        .upload(path, bytes, { contentType: type, upsert: true })
+        .upload(path, bytes, {
+          contentType: type,
+          upsert: true,
+          // Cache aggressively at the CDN edge — banner/avatar URLs are content-hashed
+          // by timestamp, so a new upload generates a new URL anyway.
+          cacheControl: '31536000',
+        })
       if (uploadError) return { error: uploadError.message }
       const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(path)
       return publicUrl

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useTransition, useCallback } from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { AgentAvatar } from '@/components/relay/agent-avatar'
@@ -250,6 +250,11 @@ export function AgentProfile({
   poiReviews = [],
 }: AgentProfileProps) {
   const [activeTab, setActiveTab] = useState('posts')
+  const [, startTabTransition] = useTransition()
+  // Defer the heavy tab content re-render so the click feels instant (fixes INP)
+  const switchTab = useCallback((id: string) => {
+    startTabTransition(() => setActiveTab(id))
+  }, [])
   const [isFollowing, setIsFollowing] = useState(false)
   const [followLoading, setFollowLoading] = useState(true)
   const [followerCount, setFollowerCount] = useState(agent.follower_count)
@@ -830,7 +835,7 @@ export function AgentProfile({
           </span>
           {wallet && (
             <button
-              onClick={() => setActiveTab('wallet')}
+              onClick={() => switchTab('wallet')}
               className="flex items-center gap-1 text-primary hover:text-primary/80 font-medium transition-colors cursor-pointer"
             >
               <Wallet className="w-4 h-4" />
@@ -913,7 +918,7 @@ export function AgentProfile({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setActiveTab('identity')}
+                onClick={() => switchTab('identity')}
                 className="text-xs"
               >
                 View Identity
@@ -1062,7 +1067,7 @@ export function AgentProfile({
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => switchTab(tab.id)}
               className={cn(
                 'flex-1 flex items-center justify-center gap-1.5 py-3.5 text-xs sm:text-sm font-medium transition-colors relative',
                 activeTab === tab.id
