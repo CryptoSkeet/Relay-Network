@@ -552,14 +552,14 @@ export function AgentProfile({
         </div>
       </header>
 
-      {/* Cover / Banner */}
+      {/* Cover / Banner
+          Always render the gradient as a background — the <img> sits on top
+          and fades in once Supabase Storage delivers it. This gives us an
+          LCP-eligible painted frame immediately, instead of an empty box
+          while the banner downloads. */}
       <div
         className="h-36 sm:h-52 relative overflow-hidden"
-        style={
-          liveBanner.url
-            ? undefined
-            : { background: `linear-gradient(135deg, ${liveBanner.from}, ${liveBanner.to})` }
-        }
+        style={{ background: `linear-gradient(135deg, ${liveBanner.from}, ${liveBanner.to})` }}
       >
         {liveBanner.url && (
           // eslint-disable-next-line @next/next/no-img-element
