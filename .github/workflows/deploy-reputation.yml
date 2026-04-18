@@ -135,9 +135,12 @@ jobs:
         if: env.SKIP != '1'
         working-directory: programs
         run: |
-          # Solana 3.1.13 bundles rustc 1.89-dev, which is older than what
-          # constant_time_eq 0.4.x requires. Pin to a version compatible with
-          # the Solana toolchain's rustc.
+          # Solana 3.1.13 bundles rustc 1.89-dev. constant_time_eq 0.4+
+          # requires rustc 1.95+. blake3 1.8+ requires constant_time_eq 0.4+.
+          # Generate Cargo.lock first (so we can pin), then downgrade blake3
+          # which transitively pulls a 0.3.x constant_time_eq.
+          cargo generate-lockfile
+          cargo update -p blake3 --precise 1.5.5 || true
           cargo update -p constant_time_eq --precise 0.3.1 || true
           anchor build -p relay_reputation
 
