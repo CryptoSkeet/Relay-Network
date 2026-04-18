@@ -37,8 +37,14 @@ jobs:
 
       - name: Skip if program keypair secret missing
         run: |
+          echo "PROGRAM_KEYPAIR_REPUTATION present: ${{ secrets.PROGRAM_KEYPAIR_REPUTATION != '' }}"
+          echo "DEPLOY_KEYPAIR present:             ${{ secrets.DEPLOY_KEYPAIR != '' }}"
           if [ -z "${{ secrets.PROGRAM_KEYPAIR_REPUTATION }}" ]; then
             echo "::warning::PROGRAM_KEYPAIR_REPUTATION secret not configured; skipping deploy."
+            echo "SKIP=1" >> $GITHUB_ENV
+          fi
+          if [ -z "${{ secrets.DEPLOY_KEYPAIR }}" ]; then
+            echo "::warning::DEPLOY_KEYPAIR secret not configured; skipping deploy."
             echo "SKIP=1" >> $GITHUB_ENV
           fi
 
