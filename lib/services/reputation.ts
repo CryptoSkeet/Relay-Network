@@ -1,21 +1,33 @@
 /**
- * Agent Reputation Service
- * 
- * Manages reputation scores (0-1000) based on:
- * - Completed contracts (+20 each)
- * - Failed contracts (-30 each)
- * - Disputes (-50 each)
- * - Spam flags (-25 each)
- * - Peer endorsements (+10 each)
- * - Time on network (+1 per day, max +100)
- * 
- * Automatic suspension if score drops below 100
+ * Agent Reputation Service — DETERMINISTIC, DERIVED FROM CONTRACT HISTORY
+ *
+ * Reputation is NOT a mutable database field that admins can edit.
+ * It is recomputed atomically from immutable on-chain/off-chain history:
+ *
+ *   score = clamp(0, 1000,
+ *       STARTING (500)
+ *     + completed_contracts  *  +20
+ *     + failed_contracts     *  -30
+ *     + disputed_contracts   *  -50
+ *     + spam_flags           *  -25
+ *     + peer_endorsements    *  +10
+ *     + min(age_days, 100)   *  +1
+ *   )
+ *
+ *   is_suspended = score < 100
+ *
+ * Same inputs → same output. No admin override. The cached row in
+ * `agent_reputation` is a denormalized projection of these counts and is
+ * rewritten by `recomputeReputation()` only — direct UPDATEs are blocked at
+ * the database layer (see migration 20260418_reputation_immutable.sql).
  */
 
 import { createClient } from '@/lib/supabase/server'
 
-// Reputation score adjustments
-const REPUTATION_CHANGES = {
+// Score weights — these are the ONLY weights. Changing them is a protocol
+// change, not an admin action.
+export const REPUTATION_WEIGHTS = {
+  starting: 500,
   completed_contract: 20,
   failed_contract: -30,
   dispute: -50,
@@ -23,20 +35,16 @@ const REPUTATION_CHANGES = {
   peer_endorsement: 10,
   time_bonus_per_day: 1,
   max_time_bonus: 100,
+  min_score: 0,
+  max_score: 1000,
+  suspension_threshold: 100,
 } as const
 
-// Suspension threshold
-const SUSPENSION_THRESHOLD = 100
-
-// Starting reputation
-const STARTING_REPUTATION = 500
-
-export interface ReputationUpdate {
-  agentId: string
-  event: keyof typeof REPUTATION_CHANGES | 'custom'
-  customChange?: number
-  reason?: string
-}
+// Both legacy lowercase and engine UPPERCASE statuses are valid
+// (see 20260319_contract_engine.sql).
+const COMPLETED_STATUSES = ['SETTLED', 'completed'] as const
+const FAILED_STATUSES    = ['FAILED', 'failed']    as const
+const DISPUTED_STATUSES  = ['DISPUTED', 'disputed'] as const
 
 export interface ReputationScore {
   score: number
@@ -52,260 +60,246 @@ export interface ReputationScore {
 }
 
 /**
- * Get agent's current reputation
+ * Read the cached reputation projection. Reflects the last
+ * `recomputeReputation()` run.
  */
 export async function getReputation(agentId: string): Promise<ReputationScore | null> {
   const supabase = await createClient()
-  
+
   const { data, error } = await supabase
     .from('agent_reputation')
     .select('*')
     .eq('agent_id', agentId)
     .single()
-  
+
   if (error || !data) return null
-  
+
   return {
-    score: data.reputation_score,
+    score:              data.reputation_score,
     completedContracts: data.completed_contracts,
-    failedContracts: data.failed_contracts,
-    disputes: data.disputes,
-    spamFlags: data.spam_flags,
-    peerEndorsements: data.peer_endorsements,
-    timeOnNetworkDays: data.time_on_network_days,
-    isSuspended: data.is_suspended,
-    suspendedAt: data.suspended_at,
-    suspensionReason: data.suspension_reason,
+    failedContracts:    data.failed_contracts,
+    disputes:           data.disputes,
+    spamFlags:          data.spam_flags,
+    peerEndorsements:   data.peer_endorsements,
+    timeOnNetworkDays:  data.time_on_network_days,
+    isSuspended:        data.is_suspended,
+    suspendedAt:        data.suspended_at,
+    suspensionReason:   data.suspension_reason,
   }
 }
 
 /**
- * Update agent reputation based on event
+ * Recompute an agent's reputation from immutable history.
+ *
+ * Pure function of:
+ *   - contracts.status grouped by seller_agent_id == agentId
+ *   - peer_endorsements.endorsed_id == agentId
+ *   - spam_flags.agent_id == agentId (if table exists)
+ *   - agents.created_at (for time bonus)
+ *
+ * Idempotent. Calling it twice in a row produces identical results.
  */
-export async function updateReputation(update: ReputationUpdate): Promise<{
+export async function recomputeReputation(agentId: string): Promise<{
   success: boolean
-  newScore?: number
+  score?: number
   suspended?: boolean
   error?: string
 }> {
   const supabase = await createClient()
-  
-  // Get current reputation
-  const { data: current, error: fetchError } = await supabase
-    .from('agent_reputation')
-    .select('*')
-    .eq('agent_id', update.agentId)
+
+  const { data: agent, error: agentErr } = await supabase
+    .from('agents')
+    .select('id, created_at')
+    .eq('id', agentId)
     .single()
-  
-  if (fetchError || !current) {
-    return { success: false, error: 'Reputation record not found' }
+
+  if (agentErr || !agent) {
+    return { success: false, error: 'Agent not found' }
   }
-  
-  // Calculate change
-  let scoreChange = 0
-  const updates: Record<string, number | boolean | string | null> = {
-    updated_at: new Date().toISOString(),
-    last_activity_at: new Date().toISOString(),
-  }
-  
-  switch (update.event) {
-    case 'completed_contract':
-      scoreChange = REPUTATION_CHANGES.completed_contract
-      updates.completed_contracts = current.completed_contracts + 1
-      break
-    case 'failed_contract':
-      scoreChange = REPUTATION_CHANGES.failed_contract
-      updates.failed_contracts = current.failed_contracts + 1
-      break
-    case 'dispute':
-      scoreChange = REPUTATION_CHANGES.dispute
-      updates.disputes = current.disputes + 1
-      break
-    case 'spam_flag':
-      scoreChange = REPUTATION_CHANGES.spam_flag
-      updates.spam_flags = current.spam_flags + 1
-      break
-    case 'peer_endorsement':
-      scoreChange = REPUTATION_CHANGES.peer_endorsement
-      updates.peer_endorsements = current.peer_endorsements + 1
-      break
-    case 'time_bonus_per_day':
-      if (current.time_on_network_days < REPUTATION_CHANGES.max_time_bonus) {
-        scoreChange = REPUTATION_CHANGES.time_bonus_per_day
-        updates.time_on_network_days = current.time_on_network_days + 1
-      }
-      break
-    case 'custom':
-      scoreChange = update.customChange || 0
-      break
-  }
-  
-  // Calculate new score (clamped to 0-1000)
-  const newScore = Math.max(0, Math.min(1000, current.reputation_score + scoreChange))
-  updates.reputation_score = newScore
-  
-  // Check for automatic suspension
-  let suspended = current.is_suspended
-  if (newScore < SUSPENSION_THRESHOLD && !current.is_suspended) {
-    suspended = true
-    updates.is_suspended = true
-    updates.suspended_at = new Date().toISOString()
-    updates.suspension_reason = update.reason || `Reputation dropped below ${SUSPENSION_THRESHOLD}`
-    
-    // Log suspension event
-    await supabase.from('auth_audit_log').insert({
-      agent_id: update.agentId,
-      event_type: 'suspension',
-      success: true,
-      metadata: {
-        previous_score: current.reputation_score,
-        new_score: newScore,
-        reason: updates.suspension_reason,
-      },
+
+  const [completedQ, failedQ, disputedQ, endorseQ, spamQ] = await Promise.all([
+    supabase
+      .from('contracts')
+      .select('id', { count: 'exact', head: true })
+      .eq('seller_agent_id', agentId)
+      .in('status', COMPLETED_STATUSES as unknown as string[]),
+    supabase
+      .from('contracts')
+      .select('id', { count: 'exact', head: true })
+      .eq('seller_agent_id', agentId)
+      .in('status', FAILED_STATUSES as unknown as string[]),
+    supabase
+      .from('contracts')
+      .select('id', { count: 'exact', head: true })
+      .eq('seller_agent_id', agentId)
+      .in('status', DISPUTED_STATUSES as unknown as string[]),
+    supabase
+      .from('peer_endorsements')
+      .select('id', { count: 'exact', head: true })
+      .eq('endorsed_id', agentId),
+    supabase
+      .from('spam_flags')
+      .select('id', { count: 'exact', head: true })
+      .eq('agent_id', agentId),
+  ])
+
+  const completed    = completedQ.count ?? 0
+  const failed       = failedQ.count    ?? 0
+  const disputes     = disputedQ.count  ?? 0
+  const endorsements = endorseQ.count   ?? 0
+  // spam_flags table is optional; treat missing-table errors as zero
+  const spamFlags    = spamQ.error ? 0 : (spamQ.count ?? 0)
+
+  const ageMs   = Date.now() - new Date(agent.created_at).getTime()
+  const ageDays = Math.max(0, Math.floor(ageMs / (1000 * 60 * 60 * 24)))
+  const timeBonus = Math.min(ageDays, REPUTATION_WEIGHTS.max_time_bonus)
+
+  const raw =
+      REPUTATION_WEIGHTS.starting
+    + completed    * REPUTATION_WEIGHTS.completed_contract
+    + failed       * REPUTATION_WEIGHTS.failed_contract
+    + disputes     * REPUTATION_WEIGHTS.dispute
+    + spamFlags    * REPUTATION_WEIGHTS.spam_flag
+    + endorsements * REPUTATION_WEIGHTS.peer_endorsement
+    + timeBonus    * REPUTATION_WEIGHTS.time_bonus_per_day
+
+  const score = Math.max(
+    REPUTATION_WEIGHTS.min_score,
+    Math.min(REPUTATION_WEIGHTS.max_score, raw),
+  )
+
+  const suspended = score < REPUTATION_WEIGHTS.suspension_threshold
+
+  // Set the bypass GUC consumed by the trigger in
+  // 20260418_reputation_immutable.sql. If the trigger isn't installed yet,
+  // this RPC simply no-ops — the upsert still works.
+  await supabase
+    .rpc('set_config', {
+      setting_name: 'relay.reputation_recompute',
+      new_value:    'on',
+      is_local:     true,
     })
+    .catch(() => { /* RPC may not exist in older envs */ })
+
+  const projection = {
+    agent_id:             agentId,
+    reputation_score:     score,
+    completed_contracts:  completed,
+    failed_contracts:     failed,
+    disputes,
+    spam_flags:           spamFlags,
+    peer_endorsements:    endorsements,
+    time_on_network_days: ageDays,
+    is_suspended:         suspended,
+    suspended_at:         suspended ? new Date().toISOString() : null,
+    suspension_reason:    suspended
+      ? `Reputation below ${REPUTATION_WEIGHTS.suspension_threshold}`
+      : null,
+    last_activity_at:     new Date().toISOString(),
   }
-  
-  // Update reputation
-  const { error: updateError } = await supabase
+
+  const { error: upsertErr } = await supabase
     .from('agent_reputation')
-    .update(updates)
-    .eq('agent_id', update.agentId)
-  
-  if (updateError) {
-    return { success: false, error: 'Failed to update reputation' }
+    .upsert(projection, { onConflict: 'agent_id' })
+
+  if (upsertErr) {
+    return { success: false, error: `Failed to persist reputation: ${upsertErr.message}` }
   }
-  
-  return {
-    success: true,
-    newScore,
-    suspended,
-  }
+
+  return { success: true, score, suspended }
 }
 
 /**
- * Unsuspend an agent (admin action)
+ * Backwards-compatible shim used by older call sites
+ * (`lib/contract-engine.js`). The `event` argument is ignored — every event
+ * triggers the same deterministic recompute.
+ *
+ * @deprecated Call `recomputeReputation(agentId)` directly.
  */
-export async function unsuspendAgent(
-  agentId: string,
+export async function updateReputation(update: {
+  agentId: string
+  event?: string
+  customChange?: number
   reason?: string
-): Promise<{ success: boolean; error?: string }> {
-  const supabase = await createClient()
-  
-  const { error } = await supabase
-    .from('agent_reputation')
-    .update({
-      is_suspended: false,
-      suspended_at: null,
-      suspension_reason: null,
-      // Reset score to minimum viable
-      reputation_score: SUSPENSION_THRESHOLD,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('agent_id', agentId)
-  
-  if (error) {
-    return { success: false, error: 'Failed to unsuspend agent' }
+}): Promise<{ success: boolean; newScore?: number; suspended?: boolean; error?: string }> {
+  const result = await recomputeReputation(update.agentId)
+  return {
+    success:  result.success,
+    newScore: result.score,
+    suspended: result.suspended,
+    error:    result.error,
   }
-  
-  // Log unsuspension
-  await supabase.from('auth_audit_log').insert({
-    agent_id: agentId,
-    event_type: 'unsuspension',
-    success: true,
-    metadata: { reason: reason || 'Admin action' },
-  })
-  
-  return { success: true }
 }
 
 /**
- * Add peer endorsement
+ * Add a peer endorsement. Endorsements are counted by
+ * `recomputeReputation()`, so we just insert the row and recompute — no
+ * manual score delta.
  */
 export async function addEndorsement(
   endorserId: string,
   endorsedId: string,
-  message?: string
+  message?: string,
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient()
-  
-  // Check if already endorsed
+
+  if (endorserId === endorsedId) {
+    return { success: false, error: 'Cannot endorse yourself' }
+  }
+
   const { data: existing } = await supabase
     .from('peer_endorsements')
     .select('id')
     .eq('endorser_id', endorserId)
     .eq('endorsed_id', endorsedId)
     .single()
-  
+
   if (existing) {
     return { success: false, error: 'Already endorsed this agent' }
   }
-  
-  // Can't endorse yourself
-  if (endorserId === endorsedId) {
-    return { success: false, error: 'Cannot endorse yourself' }
-  }
-  
-  // Create endorsement
+
   const { error: insertError } = await supabase
     .from('peer_endorsements')
-    .insert({
-      endorser_id: endorserId,
-      endorsed_id: endorsedId,
-      message,
-    })
-  
+    .insert({ endorser_id: endorserId, endorsed_id: endorsedId, message })
+
   if (insertError) {
     return { success: false, error: 'Failed to create endorsement' }
   }
-  
-  // Update endorsed agent's reputation
-  await updateReputation({
-    agentId: endorsedId,
-    event: 'peer_endorsement',
-  })
-  
+
+  await recomputeReputation(endorsedId)
   return { success: true }
 }
 
 /**
- * Remove peer endorsement
+ * Remove a peer endorsement. Triggers a deterministic recompute — there is
+ * no "subtract 10" delta path.
  */
 export async function removeEndorsement(
   endorserId: string,
-  endorsedId: string
+  endorsedId: string,
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient()
-  
+
   const { error } = await supabase
     .from('peer_endorsements')
     .delete()
     .eq('endorser_id', endorserId)
     .eq('endorsed_id', endorsedId)
-  
+
   if (error) {
     return { success: false, error: 'Failed to remove endorsement' }
   }
-  
-  // Decrease reputation (reverse the endorsement bonus)
-  await updateReputation({
-    agentId: endorsedId,
-    event: 'custom',
-    customChange: -REPUTATION_CHANGES.peer_endorsement,
-    reason: 'Endorsement removed',
-  })
-  
+
+  await recomputeReputation(endorsedId)
   return { success: true }
 }
 
-/**
- * Get all endorsements for an agent
- */
 export async function getEndorsements(agentId: string): Promise<{
   received: Array<{ endorserId: string; message?: string; createdAt: string }>
-  given: Array<{ endorsedId: string; message?: string; createdAt: string }>
+  given:    Array<{ endorsedId: string; message?: string; createdAt: string }>
 }> {
   const supabase = await createClient()
-  
+
   const [received, given] = await Promise.all([
     supabase
       .from('peer_endorsements')
@@ -318,40 +312,30 @@ export async function getEndorsements(agentId: string): Promise<{
       .eq('endorser_id', agentId)
       .order('created_at', { ascending: false }),
   ])
-  
+
   return {
-    received: (received.data || []).map(e => ({
-      endorserId: e.endorser_id,
-      message: e.message,
-      createdAt: e.created_at,
+    received: (received.data ?? []).map(r => ({
+      endorserId: r.endorser_id,
+      message:    r.message ?? undefined,
+      createdAt:  r.created_at,
     })),
-    given: (given.data || []).map(e => ({
-      endorsedId: e.endorsed_id,
-      message: e.message,
-      createdAt: e.created_at,
+    given: (given.data ?? []).map(g => ({
+      endorsedId: g.endorsed_id,
+      message:    g.message ?? undefined,
+      createdAt:  g.created_at,
     })),
   }
 }
 
-/**
- * Calculate reputation tier based on score
- */
 export function getReputationTier(score: number): {
-  tier: 'critical' | 'low' | 'medium' | 'high' | 'excellent'
+  tier:  'novice' | 'apprentice' | 'verified' | 'trusted' | 'elite' | 'legendary'
   label: string
   color: string
 } {
-  if (score < 100) {
-    return { tier: 'critical', label: 'Critical', color: 'red' }
-  }
-  if (score < 300) {
-    return { tier: 'low', label: 'Low', color: 'orange' }
-  }
-  if (score < 600) {
-    return { tier: 'medium', label: 'Medium', color: 'yellow' }
-  }
-  if (score < 850) {
-    return { tier: 'high', label: 'High', color: 'green' }
-  }
-  return { tier: 'excellent', label: 'Excellent', color: 'emerald' }
+  if (score >= 900) return { tier: 'legendary',  label: 'Legendary',  color: 'text-amber-400'    }
+  if (score >= 750) return { tier: 'elite',      label: 'Elite',      color: 'text-purple-400'   }
+  if (score >= 600) return { tier: 'trusted',    label: 'Trusted',    color: 'text-blue-400'     }
+  if (score >= 400) return { tier: 'verified',   label: 'Verified',   color: 'text-emerald-400'  }
+  if (score >= 200) return { tier: 'apprentice', label: 'Apprentice', color: 'text-cyan-400'     }
+  return            { tier: 'novice',     label: 'Novice',     color: 'text-muted-foreground' }
 }

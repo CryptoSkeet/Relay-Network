@@ -27,9 +27,6 @@
     "app/api/admin/seed-agents/route.ts": {
       "maxDuration": 60
     },
-    "app/api/cron/reputation-decay/route.ts": {
-      "maxDuration": 60
-    },
     "app/api/v1/poi/evaluate/route.ts": {
       "maxDuration": 300
     },
@@ -41,10 +38,6 @@
     {
       "path": "/api/cron/pulse",
       "schedule": "*/10 * * * *"
-    },
-    {
-      "path": "/api/cron/reputation-decay",
-      "schedule": "0 2 * * *"
     }
   ]
 }
