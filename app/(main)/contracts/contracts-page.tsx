@@ -958,66 +958,73 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
                             <span>No budget or deadline set.</span>
                           )}
                         </div>
-                        {/* On-chain settlement */}
+                        {/* On-chain settlement / wallet links */}
                         {(() => {
                           const escrowSettled = contract.escrow?.find(e => e.release_tx_hash)
                           const txHash = escrowSettled?.release_tx_hash || contract.settlement_tx?.tx_hash
                           const releasedAt = escrowSettled?.released_at || contract.settlement_tx?.created_at
                           const cluster = process.env.NEXT_PUBLIC_SOLANA_CLUSTER || 'devnet'
                           const clusterQS = cluster === 'mainnet-beta' ? '' : `?cluster=${cluster}`
-                          const isSettled = ['completed', 'SETTLED'].includes(contract.status as string)
+                          const clientWallet = (contract.client as any)?.solana_wallet || (contract.client as any)?.wallet_address
+                          const providerWallet = (contract.provider as any)?.solana_wallet || (contract.provider as any)?.wallet_address
 
-                          if (txHash) {
-                            const url = `https://solscan.io/tx/${txHash}${clusterQS}`
-                            return (
-                              <div className="mt-3 pt-3 border-t flex flex-wrap items-center justify-between gap-2">
-                                <div className="text-xs text-muted-foreground">
-                                  <span className="text-emerald-500 font-medium">Settled on-chain</span>
-                                  {releasedAt && (
-                                    <span className="ml-2">
-                                      {formatDistanceToNow(new Date(releasedAt), { addSuffix: true })}
+                          if (!txHash && !clientWallet && !providerWallet) return null
+
+                          return (
+                            <div className="mt-3 pt-3 border-t space-y-2">
+                              {txHash && (
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <div className="text-xs text-muted-foreground">
+                                    <span className="text-emerald-500 font-medium">Settled on-chain</span>
+                                    {releasedAt && (
+                                      <span className="ml-2">
+                                        {formatDistanceToNow(new Date(releasedAt), { addSuffix: true })}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <a
+                                    href={`https://solscan.io/tx/${txHash}${clusterQS}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                                  >
+                                    <ExternalLink className="w-3 h-3" />
+                                    View tx on Solscan
+                                    <span className="font-mono text-muted-foreground">
+                                      ({txHash.slice(0, 6)}…{txHash.slice(-4)})
                                     </span>
+                                  </a>
+                                </div>
+                              )}
+                              {(clientWallet || providerWallet) && (
+                                <div className="flex flex-wrap items-center gap-3 text-xs">
+                                  <span className="text-muted-foreground">On Solscan:</span>
+                                  {clientWallet && (
+                                    <a
+                                      href={`https://solscan.io/account/${clientWallet}${clusterQS}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 text-primary hover:underline"
+                                    >
+                                      <ExternalLink className="w-3 h-3" />
+                                      Client wallet
+                                    </a>
+                                  )}
+                                  {providerWallet && (
+                                    <a
+                                      href={`https://solscan.io/account/${providerWallet}${clusterQS}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 text-primary hover:underline"
+                                    >
+                                      <ExternalLink className="w-3 h-3" />
+                                      Provider wallet
+                                    </a>
                                   )}
                                 </div>
-                                <a
-                                  href={url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                                >
-                                  <ExternalLink className="w-3 h-3" />
-                                  View on Solscan
-                                  <span className="font-mono text-muted-foreground">
-                                    ({txHash.slice(0, 6)}…{txHash.slice(-4)})
-                                  </span>
-                                </a>
-                              </div>
-                            )
-                          }
-
-                          // Fallback: settled but no on-chain tx — link to provider wallet activity
-                          const providerWallet = (contract.provider as any)?.solana_wallet || (contract.provider as any)?.wallet_address
-                          if (isSettled && providerWallet) {
-                            const url = `https://solscan.io/account/${providerWallet}${clusterQS}`
-                            return (
-                              <div className="mt-3 pt-3 border-t flex flex-wrap items-center justify-between gap-2">
-                                <div className="text-xs text-muted-foreground">
-                                  Settled off-chain · view provider wallet activity
-                                </div>
-                                <a
-                                  href={url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                                >
-                                  <ExternalLink className="w-3 h-3" />
-                                  Provider wallet on Solscan
-                                </a>
-                              </div>
-                            )
-                          }
-
-                          return null
+                              )}
+                            </div>
+                          )
                         })()}
                       </div>
                     </details>
