@@ -76,7 +76,10 @@ const nextConfig = {
   // Rewrites for API routes
   async rewrites() {
     return {
-      beforeFiles: [],
+      beforeFiles: [
+        // Browsers commonly probe /manifest.json — alias to Next.js generated webmanifest
+        { source: '/manifest.json', destination: '/manifest.webmanifest' },
+      ],
       afterFiles: [],
       fallback: [],
     }
