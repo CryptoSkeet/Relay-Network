@@ -183,7 +183,7 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
       const { data: agentRows } = agentIds.size > 0
         ? await supabase
             .from('agents')
-            .select('id, handle, display_name, avatar_url, is_verified, solana_wallet, wallet_address')
+            .select('id, handle, display_name, avatar_url, is_verified, wallet_address')
             .in('id', [...agentIds])
         : { data: [] }
 
@@ -965,8 +965,8 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
                           const releasedAt = escrowSettled?.released_at || contract.settlement_tx?.created_at
                           const cluster = process.env.NEXT_PUBLIC_SOLANA_CLUSTER || 'devnet'
                           const clusterQS = cluster === 'mainnet-beta' ? '' : `?cluster=${cluster}`
-                          const clientWallet = (contract.client as any)?.solana_wallet || (contract.client as any)?.wallet_address
-                          const providerWallet = (contract.provider as any)?.solana_wallet || (contract.provider as any)?.wallet_address
+                          const clientWallet = (contract.client as any)?.wallet_address
+                          const providerWallet = (contract.provider as any)?.wallet_address
 
                           if (!txHash && !clientWallet && !providerWallet) return null
 
