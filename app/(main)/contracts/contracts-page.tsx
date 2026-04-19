@@ -118,14 +118,11 @@ const statusConfig: Record<string, { icon: typeof FileText; color: string; bg: s
   DISPUTED: { icon: AlertCircle, color: 'text-orange-500', bg: 'bg-orange-500/10' },
 }
 
-import { Skeleton } from '@/components/ui/skeleton'
-
 export function ContractsPage({ contracts: initialContracts, agents, userAgentId, capabilityTags, serverStats }: ContractsPageProps) {
   const [mounted, setMounted] = useState(false)
   const [filter, setFilter] = useState<string>('all')
   const [viewMode, setViewMode] = useState<'all' | 'my-created' | 'my-accepted'>('all')
   const [contracts, setContracts] = useState<ContractWithAgents[]>(initialContracts)
-  const [loading, setLoading] = useState(false)
   const [liveStats, setLiveStats] = useState(serverStats ?? null)
   const [contractMilestones, setContractMilestones] = useState<Record<string, Milestone[]>>({})
   const [isNewContractOpen, setIsNewContractOpen] = useState(false)
@@ -245,10 +242,7 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
 
   useEffect(() => {
     setMounted(true)
-    // If initialContracts is empty, show loading skeleton
-    if (initialContracts.length === 0) setLoading(true)
-    else setLoading(false)
-  }, [initialContracts])
+  }, [])
 
   // Supabase Realtime: re-fetch on any contract change
   useEffect(() => {
@@ -625,125 +619,119 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
               variant={viewMode === 'all' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setViewMode('all')}
-              <div className="p-3 sm:p-4" suppressHydrationWarning>
-                {loading ? (
-                  <div className="space-y-4">
-                    {[...Array(5)].map((_, i) => (
-                      <Skeleton key={i} className="h-24 bg-muted animate-pulse rounded-xl" />
-                    ))}
-                  </div>
-                ) : mounted ? (
-                  <Tabs value={filter} onValueChange={setFilter} className="space-y-3 sm:space-y-4" suppressHydrationWarning>
-                    <TabsList className="w-full overflow-x-auto scrollbar-hide gap-1" suppressHydrationWarning>
-                      <TabsTrigger value="all" className="touch-manipulation text-xs sm:text-sm">All</TabsTrigger>
-                      <TabsTrigger value="open" className="touch-manipulation text-xs sm:text-sm">Open</TabsTrigger>
-                      <TabsTrigger value="active" className="touch-manipulation text-xs sm:text-sm">Active</TabsTrigger>
-                      <TabsTrigger value="delivered" className="touch-manipulation text-xs sm:text-sm">Delivered</TabsTrigger>
-                      <TabsTrigger value="completed" className="touch-manipulation text-xs sm:text-sm">Completed</TabsTrigger>
-                      <TabsTrigger value="disputed" className="touch-manipulation text-xs sm:text-sm text-orange-500">Disputed</TabsTrigger>
-                    </TabsList>
+              className="shrink-0"
+            >
+              All My Contracts
+            </Button>
+            <Button
+              variant={viewMode === 'my-created' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('my-created')}
+              className="shrink-0"
+            >
+              <Send className="w-3 h-3 mr-1.5" />
+              Created by Me
+            </Button>
+            <Button
+              variant={viewMode === 'my-accepted' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('my-accepted')}
+              className="shrink-0"
+            >
+              <CheckCircle className="w-3 h-3 mr-1.5" />
+              Accepted by Me
+            </Button>
+          </div>
+        )}
 
-                  <div className="space-y-3 sm:space-y-4">
-                    {filteredContracts.map((contract) => {
-                      const StatusIcon = statusConfig[contract.status as keyof typeof statusConfig]?.icon || FileText
-                      const statusColor = statusConfig[contract.status as keyof typeof statusConfig]?.color || 'text-muted-foreground'
-                      const statusBg = statusConfig[contract.status as keyof typeof statusConfig]?.bg || 'bg-muted'
-                      const overallProgress = getOverallProgress(contract.id, contract.status)
-                      const milestones = contractMilestones[contract.id] || []
-                      const completedMilestones = milestones.filter(m => m.status === 'completed').length
+        {/* Stats and Escrow Widget */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5 sm:gap-4">
+          <Card className="bg-muted/50">
+            <CardContent className="p-3 sm:p-4">
+              <p className="text-xl sm:text-2xl font-bold">{stats.total}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">Total</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-blue-500/10 border-blue-500/20">
+            <CardContent className="p-3 sm:p-4">
+              <p className="text-xl sm:text-2xl font-bold text-blue-500">{stats.open}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">Open</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-yellow-500/10 border-yellow-500/20">
+            <CardContent className="p-3 sm:p-4">
+              <p className="text-xl sm:text-2xl font-bold text-yellow-500">{stats.active}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">Active</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-green-500/10 border-green-500/20">
+            <CardContent className="p-3 sm:p-4">
+              <p className="text-xl sm:text-2xl font-bold text-green-500">{stats.completed}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">Done</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-orange-500/10 border-orange-500/20">
+            <CardContent className="p-3 sm:p-4">
+              <p className="text-xl sm:text-2xl font-bold text-orange-500">{stats.disputed}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">Disputed</p>
+            </CardContent>
+          </Card>
+        </div>
 
-                      return (
-                        <Card key={contract.id} className="glass-card hover:border-primary/50 transition-all">
-                          <CardContent className="p-4 sm:p-6 space-y-4">
-                            {/* Header */}
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex-1 min-w-0">
-                                <div className="flex flex-wrap items-center gap-2 mb-2">
-                                  <Badge className={cn(statusBg, statusColor, 'capitalize text-xs')}>
-                                    <StatusIcon className="w-3 h-3 mr-1" />
-                                    {(contract.status as string).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                                  </Badge>
-                                  <span className="text-xs text-muted-foreground">
-                                    {formatDistanceToNow(new Date(contract.created_at), { addSuffix: true })}
-                                  </span>
-                                </div>
-                                <h3 className="text-base sm:text-lg font-semibold mb-1 line-clamp-2">{contract.title}</h3>
-                                <p className="text-muted-foreground text-xs sm:text-sm mb-3 line-clamp-2">
-                                  {contract.description}
-                                </p>
-                              </div>
-                              <div className="text-right shrink-0">
-                                <p className={cn(
-                                  "text-xl sm:text-2xl font-bold",
-                                  overallProgress === 100 ? "text-green-500" : "text-primary"
-                                )}>{overallProgress}%</p>
-                                <p className="text-[10px] sm:text-xs text-muted-foreground">
-                                  {['completed', 'SETTLED'].includes(contract.status) ? 'Completed' : 'Progress'}
-                                </p>
-                                {contract.completed_at && (
-                                  <p className="text-[10px] text-green-500 mt-1">
-                                    {formatDistanceToNow(new Date(contract.completed_at), { addSuffix: true })}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Progress Bar */}
-                            <div className="space-y-1">
-                              <Progress 
-                                value={overallProgress} 
-                                className={cn("h-2", overallProgress === 100 && "bg-green-500/20")} 
-                              />
-                              <div className="flex items-center justify-between">
-                                {milestones.length > 0 && (
-                                  <p className="text-xs text-muted-foreground">
-                                    {completedMilestones} of {milestones.length} milestones completed
-                                  </p>
-                                )}
-                                {overallProgress === 100 && contract.status !== 'completed' && (
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline"
-                                    className="h-6 text-xs text-green-500 border-green-500/50 hover:bg-green-500/10"
-                                    onClick={() => markContractComplete(contract.id)}
-                                  >
-                                    <CheckCircle className="w-3 h-3 mr-1" />
-                                    Mark Complete
-                                  </Button>
-                                )}
-                              </div>
-                            </div>
-                            {/* ...existing code... */}
-                          </CardContent>
-                        </Card>
-                      )
-                    })}
-
-                    {filteredContracts.length === 0 && (
-                      <div className="text-center py-12">
-                        <FileText className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                        <h3 className="text-lg font-semibold mb-2">No contracts found</h3>
-                        <p className="text-muted-foreground mb-4">
-                          {filter !== 'all' ? 'Try a different filter' : 'Create your first collaboration contract'}
-                        </p>
-                        {filter === 'all' && (
-                          <Button onClick={() => setIsNewContractOpen(true)}>
-                            <Plus className="w-4 h-4 mr-2" />
-                            Create Contract
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  </Tabs>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="h-10 bg-muted rounded-lg animate-pulse" />
-                    <div className="h-32 bg-muted rounded-lg animate-pulse" />
-                    <div className="h-32 bg-muted rounded-lg animate-pulse" />
-                  </div>
-                )}
+        {/* Escrow Widget */}
+        {userAgentId && (escrowStats.locked > 0 || escrowStats.pending > 0 || escrowStats.released > 0) && (
+          <Card className="mt-4 bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Wallet className="w-5 h-5 text-primary" />
+                <h3 className="font-semibold">Escrow Wallet</h3>
               </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="flex items-center gap-2">
+                  <Lock className="w-4 h-4 text-yellow-500" />
+                  <div>
+                    <p className="text-lg font-bold">{escrowStats.locked.toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground">Locked</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-blue-500" />
+                  <div>
+                    <p className="text-lg font-bold">{escrowStats.pending.toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground">Pending</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Unlock className="w-4 h-4 text-green-500" />
+                  <div>
+                    <p className="text-lg font-bold">{escrowStats.released.toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground">Released</p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Content */}
+      <div className="p-3 sm:p-4" suppressHydrationWarning>
+        {mounted ? (
+          <Tabs value={filter} onValueChange={setFilter} className="space-y-3 sm:space-y-4" suppressHydrationWarning>
+            <TabsList className="w-full overflow-x-auto scrollbar-hide gap-1" suppressHydrationWarning>
+              <TabsTrigger value="all" className="touch-manipulation text-xs sm:text-sm">All</TabsTrigger>
+              <TabsTrigger value="open" className="touch-manipulation text-xs sm:text-sm">Open</TabsTrigger>
+              <TabsTrigger value="active" className="touch-manipulation text-xs sm:text-sm">Active</TabsTrigger>
+              <TabsTrigger value="delivered" className="touch-manipulation text-xs sm:text-sm">Delivered</TabsTrigger>
+              <TabsTrigger value="completed" className="touch-manipulation text-xs sm:text-sm">Completed</TabsTrigger>
+              <TabsTrigger value="disputed" className="touch-manipulation text-xs sm:text-sm text-orange-500">Disputed</TabsTrigger>
+            </TabsList>
+
+          <div className="space-y-3 sm:space-y-4">
+            {filteredContracts.map((contract) => {
+              const StatusIcon = statusConfig[contract.status as keyof typeof statusConfig]?.icon || FileText
+              const statusColor = statusConfig[contract.status as keyof typeof statusConfig]?.color || 'text-muted-foreground'
+              const statusBg = statusConfig[contract.status as keyof typeof statusConfig]?.bg || 'bg-muted'
               const overallProgress = getOverallProgress(contract.id, contract.status)
               const milestones = contractMilestones[contract.id] || []
               const completedMilestones = milestones.filter(m => m.status === 'completed').length
