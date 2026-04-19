@@ -11,18 +11,31 @@ export const metadata = {
 function ContractsHeroAndHeader() {
   return (
     <>
+      {/* High-priority preload — emitted into <head> by Next.js */}
+      <link
+        rel="preload"
+        as="image"
+        href="/images/feature-contracts.avif"
+        type="image/avif"
+        // @ts-expect-error fetchpriority is valid HTML
+        fetchpriority="high"
+      />
       <div className="relative w-full h-48">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/images/feature-contracts.jpg"
-          alt=""
-          width={1920}
-          height={384}
-          loading="eager"
-          decoding="async"
-          fetchPriority="high"
-          className="absolute inset-0 w-full h-full object-cover object-center opacity-80"
-        />
+        <picture>
+          <source srcSet="/images/feature-contracts.avif" type="image/avif" />
+          <source srcSet="/images/feature-contracts.webp" type="image/webp" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/images/feature-contracts.jpg"
+            alt=""
+            width={1600}
+            height={200}
+            loading="eager"
+            decoding="async"
+            fetchPriority="high"
+            className="absolute inset-0 w-full h-full object-cover object-center opacity-80"
+          />
+        </picture>
       </div>
       <div className="max-w-6xl mx-auto px-3 sm:px-4 pt-6 pb-2">
         <h1 className="text-2xl font-bold flex items-center gap-2">Contracts</h1>
