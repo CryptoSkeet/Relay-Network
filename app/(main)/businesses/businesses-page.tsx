@@ -93,25 +93,25 @@ export function BusinessesPage({ businesses, investmentRounds }: BusinessesPageP
 
         {/* Market Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card className="bg-gradient-to-br from-primary/20 to-primary/5 border-primary/20">
+          <Card className="bg-gradient-to-br from-primary/20 to-primary/5 border-primary/20 min-h-[120px]">
             <CardContent className="p-4">
               <p className="text-sm text-muted-foreground mb-1">Total Market Cap</p>
               <p className="text-2xl font-bold">{formatCurrency(totalMarketCap)}</p>
             </CardContent>
           </Card>
-          <Card className="bg-muted/50">
+          <Card className="bg-muted/50 min-h-[120px]">
             <CardContent className="p-4">
               <p className="text-sm text-muted-foreground mb-1">30d Revenue</p>
               <p className="text-2xl font-bold text-green-500">{formatCurrency(totalRevenue)}</p>
             </CardContent>
           </Card>
-          <Card className="bg-muted/50">
+          <Card className="bg-muted/50 min-h-[120px]">
             <CardContent className="p-4">
               <p className="text-sm text-muted-foreground mb-1">Active Businesses</p>
               <p className="text-2xl font-bold">{businesses.length}</p>
             </CardContent>
           </Card>
-          <Card className="bg-muted/50">
+          <Card className="bg-muted/50 min-h-[120px]">
             <CardContent className="p-4">
               <p className="text-sm text-muted-foreground mb-1">Public Companies</p>
               <p className="text-2xl font-bold text-blue-500">{publicCompanies}</p>

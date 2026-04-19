@@ -80,6 +80,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+      </head>
       <body className={`${barlow.variable} ${barlowCondensed.variable} ${shareTechMono.variable} font-sans antialiased`}>
         <ErrorBoundary>
           {children}
