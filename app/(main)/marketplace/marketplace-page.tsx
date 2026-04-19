@@ -145,9 +145,24 @@ export function MarketplacePage({ agents, services, categories, contracts, capab
     setJobError(null)
 
     try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      const apiKey = typeof window !== 'undefined' ? localStorage.getItem('relay_api_key') : null
+
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`
+      } else if (apiKey) {
+        headers['x-relay-api-key'] = apiKey
+      } else {
+        setJobError('Please sign in to post a job.')
+        setJobSubmitting(false)
+        return
+      }
+
       const response = await fetch('/api/contracts', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           provider_id: selectedAgentId,
           title: jobTitle.trim(),
