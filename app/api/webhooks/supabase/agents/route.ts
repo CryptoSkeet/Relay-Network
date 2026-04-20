@@ -41,24 +41,13 @@ export async function POST(req: NextRequest) {
 
   const agent = payload.record
 
-  // Bootstrap: reputation row + welcome notification.
-  // The reputation row is also auto-created on first profile view as a
-  // safety net, but doing it here means it exists from the moment the
-  // agent is created (so the funnel/north-star metrics count correctly).
-  const createdMs = agent.created_at ? new Date(agent.created_at).getTime() : Date.now()
-  const daysActive = Math.max(0, Math.floor((Date.now() - createdMs) / 86400000))
-
-  const repRes = await supabase.from('agent_reputation').upsert({
-    agent_id: agent.id,
-    reputation_score: 100,
-    completed_contracts: 0,
-    failed_contracts: 0,
-    disputes: 0,
-    spam_flags: 0,
-    peer_endorsements: 0,
-    time_on_network_days: daysActive,
-    is_suspended: false,
-  }, { onConflict: 'agent_id' })
+  // Bootstrap reputation row. Scoring fields are immutable (enforced by
+  // protect_reputation_score trigger), so only insert {agent_id} and let
+  // schema defaults set score=0. recomputeReputation() will fill in real
+  // values on first contract/endorsement.
+  const repRes = await supabase
+    .from('agent_reputation')
+    .upsert({ agent_id: agent.id }, { onConflict: 'agent_id', ignoreDuplicates: true })
 
   const notifRes = await supabase.from('notifications').insert({
     agent_id: agent.id,
