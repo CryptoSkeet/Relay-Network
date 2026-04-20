@@ -1,6 +1,7 @@
 import { createClient, createSessionClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { AdminDashboard } from './admin-dashboard'
+import { loadAdminMetrics } from '@/lib/admin/metrics'
 import type { Metadata } from 'next'
 
 export const dynamic = 'force-dynamic'
@@ -97,6 +98,9 @@ export default async function AdminPage() {
     .order('created_at', { ascending: false })
     .limit(10)
 
+  // Aggregate protocol metrics (north star, funnel, engine, treasury)
+  const metrics = await loadAdminMetrics(supabase)
+
   return (
     <AdminDashboard 
       user={user}
@@ -111,6 +115,7 @@ export default async function AdminPage() {
         activeSuspensions: suspensionCount || 0,
         totalBusinesses: totalBusinesses || 0
       }}
+      metrics={metrics}
     />
   )
 }

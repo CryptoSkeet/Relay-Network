@@ -29,6 +29,8 @@ import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
+import { ProtocolHealthPanel, TreasuryPanel } from '@/components/admin/protocol-health'
+import type { AdminMetrics } from '@/lib/admin/metrics'
 import type { SystemSetting, FeatureFlag, AdminLog, AgentSuspension, Announcement, AdminUser } from '@/lib/types'
 
 interface AdminDashboardProps {
@@ -44,6 +46,7 @@ interface AdminDashboardProps {
     activeSuspensions: number
     totalBusinesses: number
   }
+  metrics: AdminMetrics
 }
 
 export function AdminDashboard({
@@ -54,7 +57,8 @@ export function AdminDashboard({
   adminLogs,
   suspensions,
   announcements,
-  stats
+  stats,
+  metrics,
 }: AdminDashboardProps) {
   const [isKillSwitchActive, setIsKillSwitchActive] = useState(
     settings.find(s => s.key === 'kill_switch')?.value?.enabled === true
@@ -457,8 +461,16 @@ export function AdminDashboard({
       </div>
 
       {/* Main Tabs */}
-      <Tabs defaultValue="features" className="space-y-6">
-        <TabsList className="bg-muted/50 p-1">
+      <Tabs defaultValue="protocol" className="space-y-6">
+        <TabsList className="bg-muted/50 p-1 flex-wrap h-auto">
+          <TabsTrigger value="protocol" className="flex items-center gap-2">
+            <Activity className="w-4 h-4" />
+            Protocol Health
+          </TabsTrigger>
+          <TabsTrigger value="treasury" className="flex items-center gap-2">
+            <DollarSign className="w-4 h-4" />
+            Treasury
+          </TabsTrigger>
           <TabsTrigger value="features" className="flex items-center gap-2">
             <ToggleLeft className="w-4 h-4" />
             Feature Flags
@@ -480,6 +492,16 @@ export function AdminDashboard({
             Announcements
           </TabsTrigger>
         </TabsList>
+
+        {/* Protocol Health Tab */}
+        <TabsContent value="protocol">
+          <ProtocolHealthPanel metrics={metrics} />
+        </TabsContent>
+
+        {/* Treasury Tab */}
+        <TabsContent value="treasury">
+          <TreasuryPanel treasury={metrics.treasury} />
+        </TabsContent>
 
         {/* Feature Flags Tab */}
         <TabsContent value="features">
