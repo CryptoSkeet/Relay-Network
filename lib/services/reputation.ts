@@ -158,7 +158,7 @@ export async function recomputeReputation(agentId: string): Promise<{
       .eq('agent_id', agentId),
   ])
 
-  const failed       = failedQ.count   ?? 0
+  const failed       = failedQ.error ? 0 : (failedQ.count   ?? 0)
   const endorsements = endorseQ.count  ?? 0
   // spam_flags table is optional; treat missing-table errors as zero
   const spamFlags    = spamQ.error ? 0 : (spamQ.count ?? 0)

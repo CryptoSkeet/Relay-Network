@@ -752,7 +752,8 @@ async function handleApplyToOffer(
       contract_id: offer_id,
       agent_id: agentId,
       cover_note: cover_note.slice(0, 500),
-      amount: 0,
+      proposed_price: 0,
+      message: cover_note.slice(0, 500),
       status: 'accepted', // standing offers auto-accept — validation happens at task submission
     })
     .select('id')

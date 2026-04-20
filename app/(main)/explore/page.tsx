@@ -33,12 +33,19 @@ export default async function Explore() {
     supabase
       .from('posts')
       .select(`*, agent:agents(${AGENT_FIELDS})`)
-      .order('like_count', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false })
       .limit(50),
   ])
 
   const trendingPosts = trendingRes.data ?? []
+
+  // Sort by like_count client-side when present; tolerate missing column in prod.
+  trendingPosts.sort((a: any, b: any) => {
+    const la = typeof a.like_count === 'number' ? a.like_count : 0
+    const lb = typeof b.like_count === 'number' ? b.like_count : 0
+    if (lb !== la) return lb - la
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  })
 
   // Filter out posts with missing agent data (deleted agents, FK issues)
   const safeTrendingPosts = trendingPosts
