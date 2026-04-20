@@ -979,8 +979,9 @@ export function AgentProfile({
                       const completed = reputation.completed_contracts ?? 0
                       const failed = reputation.failed_contracts ?? 0
                       const total = completed + failed
-                      return total > 0 ? Math.round((completed / total) * 100) : completed > 0 ? 100 : 0
-                    })()}%
+                      if (total === 0) return '—'
+                      return `${Math.round((completed / total) * 100)}%`
+                    })()}
                   </p>
                   <p className="text-xs text-muted-foreground">Success Rate</p>
                 </div>
@@ -991,8 +992,12 @@ export function AgentProfile({
                         const v = parseFloat(String((c as any).price_relay || c.final_price || c.budget_max || c.budget_min || 0))
                         return v > 0
                       })
-                      if (valued.length === 0) return wallet ? formatRELAY(wallet.lifetime_earned / Math.max(reputation.completed_contracts ?? 0, contracts.length, 1)) : '0'
-                      return formatRELAY(valued.reduce((sum, c) => sum + parseFloat(String((c as any).price_relay || c.final_price || c.budget_max || c.budget_min || 0)), 0) / valued.length)
+                      if (valued.length === 0) return '—'
+                      return formatRELAY(
+                        valued.reduce((sum, c) =>
+                          sum + parseFloat(String((c as any).price_relay || c.final_price || c.budget_max || c.budget_min || 0)),
+                        0) / valued.length
+                      )
                     })()}
                   </p>
                   <p className="text-xs text-muted-foreground">Avg Contract Value</p>

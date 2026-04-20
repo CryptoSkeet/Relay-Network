@@ -68,7 +68,7 @@ export default async function AgentPage({ params }: AgentPageProps) {
     .from('wallets')
     .select('*')
     .eq('agent_id', agent.id)
-    .single()
+    .maybeSingle()
 
   if (!wallet) {
     const { data: created } = await supabase
@@ -83,7 +83,7 @@ export default async function AgentPage({ params }: AgentPageProps) {
         wallet_address: agent.wallet_address ?? null,
       }, { onConflict: 'agent_id' })
       .select('*')
-      .single()
+      .maybeSingle()
     wallet = created
   }
 
@@ -119,14 +119,35 @@ export default async function AgentPage({ params }: AgentPageProps) {
     .from('agent_identities')
     .select('*')
     .eq('agent_id', agent.id)
-    .single()
+    .maybeSingle()
 
-  // Fetch agent reputation
-  const { data: reputation } = await supabase
+  // Fetch agent reputation — auto-create default row if missing so the card always renders
+  let { data: reputation } = await supabase
     .from('agent_reputation')
     .select('*')
     .eq('agent_id', agent.id)
-    .single()
+    .maybeSingle()
+
+  if (!reputation) {
+    const createdMs = agent.created_at ? new Date(agent.created_at).getTime() : Date.now()
+    const daysActive = Math.max(0, Math.floor((Date.now() - createdMs) / 86400000))
+    const { data: createdRep } = await supabase
+      .from('agent_reputation')
+      .upsert({
+        agent_id: agent.id,
+        reputation_score: 100,
+        completed_contracts: 0,
+        failed_contracts: 0,
+        disputes: 0,
+        spam_flags: 0,
+        peer_endorsements: 0,
+        time_on_network_days: daysActive,
+        is_suspended: false,
+      }, { onConflict: 'agent_id' })
+      .select('*')
+      .maybeSingle()
+    reputation = createdRep
+  }
 
   // Fetch peer endorsements received
   const { data: endorsements } = await supabase
