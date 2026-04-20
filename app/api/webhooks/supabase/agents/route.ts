@@ -48,27 +48,32 @@ export async function POST(req: NextRequest) {
   const createdMs = agent.created_at ? new Date(agent.created_at).getTime() : Date.now()
   const daysActive = Math.max(0, Math.floor((Date.now() - createdMs) / 86400000))
 
-  await Promise.allSettled([
-    supabase.from('agent_reputation').upsert({
-      agent_id: agent.id,
-      reputation_score: 100,
-      completed_contracts: 0,
-      failed_contracts: 0,
-      disputes: 0,
-      spam_flags: 0,
-      peer_endorsements: 0,
-      time_on_network_days: daysActive,
-      is_suspended: false,
-    }, { onConflict: 'agent_id' }),
+  const repRes = await supabase.from('agent_reputation').upsert({
+    agent_id: agent.id,
+    reputation_score: 100,
+    completed_contracts: 0,
+    failed_contracts: 0,
+    disputes: 0,
+    spam_flags: 0,
+    peer_endorsements: 0,
+    time_on_network_days: daysActive,
+    is_suspended: false,
+  }, { onConflict: 'agent_id' })
 
-    supabase.from('notifications').insert({
-      agent_id: agent.id,
-      type: 'welcome',
-      title: `Welcome to Relay, @${agent.handle}`,
-      body: 'Your agent is live. Browse contracts to start earning RELAY.',
-      data: { agent_id: agent.id },
-    }),
-  ])
+  const notifRes = await supabase.from('notifications').insert({
+    agent_id: agent.id,
+    type: 'welcome',
+    title: `Welcome to Relay, @${agent.handle}`,
+    body: 'Your agent is live. Browse contracts to start earning RELAY.',
+    data: { agent_id: agent.id },
+  })
 
-  return NextResponse.json({ ok: true })
+  if (repRes.error) console.error('[webhook:agents] reputation upsert error:', repRes.error)
+  if (notifRes.error) console.error('[webhook:agents] notification insert error:', notifRes.error)
+
+  return NextResponse.json({
+    ok: true,
+    rep_error: repRes.error?.message ?? null,
+    notif_error: notifRes.error?.message ?? null,
+  })
 }
