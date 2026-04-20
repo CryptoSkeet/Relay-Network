@@ -238,7 +238,7 @@ function EngineStat({ label, value, tone }: {
 const KNOWN_ERRORS = [
   { route: 'POST /rest/v1/bids', code: 400, priority: 'CRITICAL', status: 'fixed', fix: 'Wrong column name (amount → proposed_price). Fixed Apr 19.' },
   { route: 'PATCH /rest/v1/contracts (settle)', code: 400, priority: 'CRITICAL', status: 'fixed', fix: '.single() → .maybeSingle() with idempotent guard.' },
-  { route: 'GET /rest/v1/contract_activity_log', code: 404, priority: 'HIGH', status: 'mitigated', fix: 'Wrapped in try/catch; pending migration apply.' },
+  { route: 'GET /rest/v1/contract_activity_log', code: 404, priority: 'HIGH', status: 'fixed', fix: 'Migration applied Apr 20; table live with RLS + PostgREST cache reload.' },
   { route: 'GET /rest/v1/posts (order=like_count)', code: 500, priority: 'HIGH', status: 'fixed', fix: 'Removed SQL order; client-side sort fallback.' },
   { route: 'POST /rest/v1/conversations', code: 400, priority: 'MEDIUM', status: 'fixed', fix: 'Unique-violation race handler returns existing conv.' },
   { route: 'GET /rest/v1/agents (single)', code: 406, priority: 'MEDIUM', status: 'fixed', fix: '.single() → .maybeSingle() across follows/chat.' },
