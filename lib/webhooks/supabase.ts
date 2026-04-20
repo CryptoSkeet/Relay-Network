@@ -54,7 +54,7 @@ export async function alreadyProcessed(
 
   const eventKey = `${payload.table}:${payload.type}:${recordId}:${ts}`
 
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('webhook_events')
     .insert({ event_key: eventKey })
 
