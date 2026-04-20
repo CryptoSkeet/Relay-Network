@@ -127,6 +127,7 @@ export function WalletPage({
   const [isStaking, setIsStaking] = useState(false)
   const [isPurchasing, setIsPurchasing] = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
+  const [txFilter, setTxFilter] = useState<'all' | 'earned' | 'spent' | 'staked' | 'escrow'>('all')
   const [isClient, setIsClient] = useState(false)
 
   // Send modal state
@@ -1043,57 +1044,106 @@ export function WalletPage({
 
           {/* Transactions Tab */}
           <TabsContent value="transactions" className="space-y-4">
-            <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
-              <Button variant="outline" size="sm" className="shrink-0">All</Button>
-              <Button variant="ghost" size="sm" className="shrink-0">Earned</Button>
-              <Button variant="ghost" size="sm" className="shrink-0">Spent</Button>
-              <Button variant="ghost" size="sm" className="shrink-0">Staked</Button>
-              <Button variant="ghost" size="sm" className="shrink-0">Escrow</Button>
-            </div>
-
-            {transactions.map((tx) => {
-              const config = txTypeConfig[tx.type] || { icon: Coins, color: 'text-muted-foreground', label: tx.type, positive: false }
-              const TxIcon = config.icon
-
+            {(() => {
+              const EARNED = new Set(['earned','purchased','bonus','reward','deposit','transfer_in','released','unstaked','unstake'])
+              const SPENT  = new Set(['spent','withdrawn','withdrawal','transfer_out','fee'])
+              const STAKED = new Set(['staked','stake','unstaked','unstake'])
+              const ESCROW = new Set(['locked','released'])
+              const filtered = transactions.filter(tx => {
+                const t = String(tx.type || '').toLowerCase()
+                switch (txFilter) {
+                  case 'earned': return EARNED.has(t)
+                  case 'spent':  return SPENT.has(t)
+                  case 'staked': return STAKED.has(t)
+                  case 'escrow': return ESCROW.has(t)
+                  default: return true
+                }
+              })
               return (
-                <Card key={tx.id}>
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className={cn('p-2 rounded-full bg-muted', config.color)}>
-                          <TxIcon className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <p className="font-medium">{config.label}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {tx.description || tx.memo || `Transaction ${tx.id.slice(0, 8)}`}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatDistanceToNow(new Date(tx.created_at), { addSuffix: true })}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className={cn('text-lg font-bold', config.positive ? 'text-green-500' : 'text-red-500')}>
-                          {config.positive ? '+' : '-'}{formatAmount(Number(tx.amount))}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          Balance: {formatAmount(Number(tx.balance_after))}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
+                <>
+                  <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+                    {([
+                      { key: 'all', label: 'All' },
+                      { key: 'earned', label: 'Earned' },
+                      { key: 'spent', label: 'Spent' },
+                      { key: 'staked', label: 'Staked' },
+                      { key: 'escrow', label: 'Escrow' },
+                    ] as const).map(({ key, label }) => {
+                      const count = key === 'all'
+                        ? transactions.length
+                        : transactions.filter(tx => {
+                            const t = String(tx.type || '').toLowerCase()
+                            if (key === 'earned') return EARNED.has(t)
+                            if (key === 'spent') return SPENT.has(t)
+                            if (key === 'staked') return STAKED.has(t)
+                            return ESCROW.has(t)
+                          }).length
+                      return (
+                        <Button
+                          key={key}
+                          variant={txFilter === key ? 'outline' : 'ghost'}
+                          size="sm"
+                          className="shrink-0"
+                          onClick={() => setTxFilter(key)}
+                        >
+                          {label}
+                          <span className="ml-2 text-xs opacity-60">{count}</span>
+                        </Button>
+                      )
+                    })}
+                  </div>
 
-            {transactions.length === 0 && (
-              <div className="text-center py-12">
-                <History className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No transactions yet</h3>
-                <p className="text-muted-foreground">Your transaction history will appear here</p>
-              </div>
-            )}
+                  {filtered.map((tx) => {
+                    const config = txTypeConfig[tx.type] || { icon: Coins, color: 'text-muted-foreground', label: tx.type, positive: false }
+                    const TxIcon = config.icon
+                    return (
+                      <Card key={tx.id}>
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <div className={cn('p-2 rounded-full bg-muted', config.color)}>
+                                <TxIcon className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <p className="font-medium">{config.label}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {tx.description || tx.memo || `Transaction ${tx.id.slice(0, 8)}`}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {formatDistanceToNow(new Date(tx.created_at), { addSuffix: true })}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className={cn('text-lg font-bold', config.positive ? 'text-green-500' : 'text-red-500')}>
+                                {config.positive ? '+' : '-'}{formatAmount(Number(tx.amount))}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                Balance: {formatAmount(Number(tx.balance_after))}
+                              </p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )
+                  })}
+
+                  {filtered.length === 0 && (
+                    <div className="text-center py-12">
+                      <History className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                      <h3 className="text-lg font-semibold mb-2">
+                        {txFilter === 'all' ? 'No transactions yet' : `No ${txFilter} transactions`}
+                      </h3>
+                      <p className="text-muted-foreground">
+                        {txFilter === 'all'
+                          ? 'Your transaction history will appear here'
+                          : 'Try switching filters above to see other activity'}
+                      </p>
+                    </div>
+                  )}
+                </>
+              )
+            })()}
           </TabsContent>
         </Tabs>
       </div>
