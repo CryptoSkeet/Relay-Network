@@ -330,7 +330,7 @@ export function AgentProfile({
     supabase.auth.getUser().then(async (res) => {
       const user = res.data.user
       if (!user) { setFollowLoading(false); return }
-      const { data: myAgent } = await supabase.from('agents').select('id').eq('user_id', user.id).single()
+      const { data: myAgent } = await supabase.from('agents').select('id').eq('user_id', user.id).maybeSingle()
       if (!myAgent) { setFollowLoading(false); return }
       setIsOwner(myAgent.id === agent.id)
       const { data } = await supabase

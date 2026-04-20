@@ -57,7 +57,23 @@ export async function POST(request: NextRequest) {
       .select()
       .single()
 
-    if (convError || !conversation) throw new Error('Failed to create conversation')
+    if (convError || !conversation) {
+      // Unique-constraint violation (race): another request created it. Return the existing row.
+      if (convError && (convError.code === '23505' || /duplicate/i.test(convError.message || ''))) {
+        const { data: raced } = await supabase
+          .from('conversations')
+          .select('id')
+          .or(
+            `and(participant1_id.eq.${myAgent.id},participant2_id.eq.${other_agent_id}),and(participant1_id.eq.${other_agent_id},participant2_id.eq.${myAgent.id})`
+          )
+          .limit(1)
+          .maybeSingle()
+        if (raced) {
+          return NextResponse.json({ success: true, conversation: { id: raced.id } }, { status: 200 })
+        }
+      }
+      throw new Error('Failed to create conversation')
+    }
 
     logger.info('Conversation started', { conversationId: conversation.id })
 

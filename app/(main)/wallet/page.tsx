@@ -10,65 +10,71 @@ export const metadata = {
 
 export default async function Wallet() {
   const supabase = await createClient()
-  
-  // Fetch wallets with agent info
-  const { data: wallets } = await supabase
-    .from('wallets')
-    .select(`
-      *,
-      agent:agents(*)
-    `)
-    .order('available_balance', { ascending: false })
-    .limit(20)
 
-  // Fetch recent transactions
-  const { data: transactions } = await supabase
-    .from('wallet_transactions')
-    .select(`
-      *,
-      wallet:wallets(*, agent:agents(*))
-    `)
-    .order('created_at', { ascending: false })
-    .limit(50)
+  // All of these tables/columns may not exist in every environment. Use
+  // Promise.allSettled + tolerant fallbacks so one missing table never
+  // 400/404s the entire wallet page.
+  const [
+    walletsRes,
+    transactionsRes,
+    stakesRes,
+    tokenSupplyRes,
+    openContractsRes,
+  ] = await Promise.allSettled([
+    supabase
+      .from('wallets')
+      .select('*, agent:agents(*)')
+      .order('balance', { ascending: false })
+      .limit(20),
+    supabase
+      .from('transactions')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(50),
+    supabase
+      .from('stakes')
+      .select('*, wallet:wallets(*, agent:agents(*))')
+      .eq('is_active', true)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('token_supply')
+      .select('*'),
+    supabase
+      .from('contracts')
+      .select('*')
+      .in('status', ['open', 'OPEN'])
+      .order('budget_max', { ascending: false })
+      .limit(20),
+  ])
 
-  // Fetch active stakes
-  const { data: stakes } = await supabase
-    .from('stakes')
-    .select(`
-      *,
-      wallet:wallets(*, agent:agents(*))
-    `)
-    .eq('is_active', true)
-    .order('created_at', { ascending: false })
+  const pick = <T,>(r: PromiseSettledResult<{ data: T[] | null; error: unknown } | any>): T[] => {
+    if (r.status !== 'fulfilled') return []
+    const v: any = r.value
+    if (v?.error) return []
+    return (v?.data as T[]) ?? []
+  }
 
-  // Fetch token supply info
-  const { data: tokenSupply } = await supabase
-    .from('token_supply')
-    .select('*')
-
-  // Fetch open contracts for "Earn RELAY" tab (matching capabilities)
-  const { data: openContracts } = await supabase
-    .from('contracts')
-    .select('*, client:client_id(id, handle, display_name, avatar_url)')
-    .in('status', ['open', 'OPEN'])
-    .order('budget_max', { ascending: false })
-    .limit(20)
+  const wallets = pick<any>(walletsRes)
+  const transactions = pick<any>(transactionsRes)
+  const stakes = pick<any>(stakesRes)
+  const tokenSupply = pick<any>(tokenSupplyRes)
+  const openContracts = pick<any>(openContractsRes)
 
   // Calculate circulating supply
-  const circulatingSupply = tokenSupply?.reduce((sum, t) => {
+  const circulatingSupply = tokenSupply.reduce((sum: number, t: any) => {
     if (t.category === 'circulating') return sum + Number(t.distributed)
     return sum
-  }, 0) || 0
+  }, 0)
 
   const totalSupply = 1000000000 // 1 billion
 
   return (
     <WalletPage 
-      wallets={wallets || []} 
-      transactions={transactions || []} 
-      stakes={stakes || []}
-      tokenSupply={tokenSupply || []}
-      openContracts={openContracts || []}
+      wallets={wallets} 
+      transactions={transactions} 
+      stakes={stakes}
+      tokenSupply={tokenSupply}
+      openContracts={openContracts}
       circulatingSupply={circulatingSupply}
       totalSupply={totalSupply}
     />

@@ -40,7 +40,7 @@ export function ChatWindow({ agent }: ChatWindowProps) {
     const supabase = createClient()
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return
-      supabase.from('agents').select('id').eq('user_id', user.id).single()
+      supabase.from('agents').select('id').eq('user_id', user.id).maybeSingle()
         .then(({ data }) => { if (data) setMyAgentId(data.id) })
     })
   }, [])

@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
       if (!user) return NextResponse.json({ isFollowing: false })
 
       const { data: myAgent } = await supabase
-        .from('agents').select('id').eq('user_id', user.id).single()
+        .from('agents').select('id').eq('user_id', user.id).maybeSingle()
       if (!myAgent) return NextResponse.json({ isFollowing: false })
 
       const { data } = await supabase
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
         .select('id')
         .eq('follower_id', myAgent.id)
         .eq('following_id', followingId)
-        .single()
+        .maybeSingle()
 
       return NextResponse.json({ isFollowing: !!data })
     }
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
     if (!following_id) throw new ValidationError('following_id required')
 
     const { data: myAgent } = await supabase
-      .from('agents').select('id').eq('user_id', user.id).single()
+      .from('agents').select('id').eq('user_id', user.id).maybeSingle()
     if (!myAgent) throw new NotFoundError('Your agent not found')
 
     if (myAgent.id === following_id) throw new ValidationError('Cannot follow yourself')
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
     supabase.rpc('increment_follower_count', { agent_id: following_id }).then(({ error: rpcErr }) => {
       if (rpcErr) {
         // Fallback if RPC doesn't exist
-        supabase.from('agents').select('follower_count').eq('id', following_id).single().then(({ data }) => {
+        supabase.from('agents').select('follower_count').eq('id', following_id).maybeSingle().then(({ data }) => {
           if (data) supabase.from('agents').update({ follower_count: (data.follower_count || 0) + 1 }).eq('id', following_id)
         })
       }
@@ -114,7 +114,7 @@ export async function DELETE(request: NextRequest) {
     if (!followingId) throw new ValidationError('following_id required')
 
     const { data: myAgent } = await supabase
-      .from('agents').select('id').eq('user_id', user.id).single()
+      .from('agents').select('id').eq('user_id', user.id).maybeSingle()
     if (!myAgent) throw new NotFoundError('Your agent not found')
 
     await supabase
