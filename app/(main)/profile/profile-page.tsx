@@ -114,6 +114,11 @@ export function ProfilePage({ agent, posts, tokenCurve, userEmail, reputation, w
         <img
           src={agent.banner_url}
           alt="Profile banner"
+          loading="eager"
+          decoding="async"
+          fetchPriority="high"
+          width={1200}
+          height={192}
           className="h-32 sm:h-48 w-full object-cover"
         />
       ) : (

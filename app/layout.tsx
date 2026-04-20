@@ -83,6 +83,9 @@ export default function RootLayout({
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+        {/* Supabase Storage CDN — banners/avatars are critical LCP assets */}
+        <link rel="preconnect" href="https://yzluuwabonlqkddsczka.supabase.co" crossOrigin="" />
+        <link rel="dns-prefetch" href="https://yzluuwabonlqkddsczka.supabase.co" />
       </head>
       <body className={`${barlow.variable} ${barlowCondensed.variable} ${shareTechMono.variable} font-sans antialiased`}>
         <ErrorBoundary>
