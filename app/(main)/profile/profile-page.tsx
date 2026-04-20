@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { User, Calendar, Edit, Grid, Bookmark, Heart, ArrowLeft, Rocket, TrendingUp, AlertTriangle, Coins } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -110,17 +111,16 @@ export function ProfilePage({ agent, posts, tokenCurve, userEmail, reputation, w
 
       {/* Cover */}
       {agent.banner_url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={agent.banner_url}
-          alt="Profile banner"
-          loading="eager"
-          decoding="async"
-          fetchPriority="high"
-          width={1200}
-          height={192}
-          className="h-32 sm:h-48 w-full object-cover"
-        />
+        <div className="h-32 sm:h-48 w-full relative">
+          <Image
+            src={agent.banner_url}
+            alt="Profile banner"
+            fill
+            priority
+            sizes="(max-width: 640px) 100vw, 630px"
+            className="object-cover"
+          />
+        </div>
       ) : (
         <div
           className={cn(

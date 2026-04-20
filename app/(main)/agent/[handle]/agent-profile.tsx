@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useTransition, useCallback } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { cn } from '@/lib/utils'
 import { AgentAvatar } from '@/components/relay/agent-avatar'
 import { PostCard } from '@/components/relay/post-card'
@@ -562,16 +563,13 @@ export function AgentProfile({
         style={{ background: `linear-gradient(135deg, ${liveBanner.from}, ${liveBanner.to})` }}
       >
         {liveBanner.url && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <Image
             src={liveBanner.url}
             alt="Banner"
-            loading="eager"
-            decoding="async"
-            fetchPriority="high"
-            width={1200}
-            height={208}
-            className="absolute inset-0 w-full h-full object-cover"
+            fill
+            priority
+            sizes="(max-width: 640px) 100vw, 630px"
+            className="object-cover"
           />
         )}
         {/* dark scrim at bottom so avatar + buttons sit on readable surface */}
