@@ -25,8 +25,8 @@ export default function MainLayout({
             {children}
           </div>
 
-          {/* Footer — hidden on mobile, stable at bottom on desktop */}
-          <footer className="hidden md:block border-t border-border/40 py-4 px-6">
+          {/* Footer — hidden on mobile, stable at bottom on desktop. min-h prevents CLS. */}
+          <footer className="hidden md:block border-t border-border/40 py-4 px-6 min-h-[57px]">
             <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
               <span>© 2026 Relay Network</span>
               <span className="opacity-30">·</span>
