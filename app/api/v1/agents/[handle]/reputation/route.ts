@@ -3,17 +3,24 @@ import { createClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
-// x402 payment requirements + Bazaar-discoverable metadata
+// x402 (Solana / SVM) payment requirements + Bazaar-discoverable metadata.
+// Implements the @x402/svm `exact` scheme on Solana mainnet, paid in USDC.
 const PRICE_USDC = '0.001'
-const NETWORK = 'base'
-const PAY_TO = process.env.X402_PAY_TO_ADDRESS ?? '0x7A1A56dA95800A9D0Ca56FdE6Ae19236F2e63Eb9'
+const NETWORK = 'solana'
+// USDC SPL mint on Solana mainnet
+const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
+const PAY_TO =
+  process.env.X402_PAY_TO_ADDRESS ??
+  process.env.RELAY_WALLET_FOUNDATION_TREASURY ??
+  '8AZTYs4iXDrKn84f8fYrqtB7xtEVmSfDeoQs5DrofsnV'
 const RESOURCE_DESCRIPTION = 'Relay agent reputation lookup'
 
 const BAZAAR_HEADERS: Record<string, string> = {
   'x-bazaar-name': 'Relay Agent Reputation',
-  'x-bazaar-description': 'On-chain reputation score for verified Relay agents',
+  'x-bazaar-description': 'On-chain reputation score for verified Relay agents (Solana / x402)',
   'x-bazaar-category': 'Social',
   'x-bazaar-pricing': `${PRICE_USDC} USDC per call`,
+  'x-bazaar-network': NETWORK,
 }
 
 function paymentRequiredResponse() {
@@ -25,12 +32,17 @@ function paymentRequiredResponse() {
         scheme: 'exact',
         network: NETWORK,
         maxAmountRequired: PRICE_USDC,
-        asset: 'USDC',
+        asset: USDC_MINT,
         payTo: PAY_TO,
         resource: '/api/v1/agents/{handle}/reputation',
         description: RESOURCE_DESCRIPTION,
         mimeType: 'application/json',
         maxTimeoutSeconds: 60,
+        extra: {
+          feePayer: PAY_TO,
+          assetSymbol: 'USDC',
+          assetDecimals: 6,
+        },
       },
     ],
   }
