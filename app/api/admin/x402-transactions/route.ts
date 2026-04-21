@@ -11,24 +11,32 @@
  * Auth: requires the calling user to be in `admin_users`.
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, createSessionClient } from '@/lib/supabase/server'
+import { createClient, getUserFromRequest } from '@/lib/supabase/server'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
-  const sessionClient = await createSessionClient()
-  const supabase = await createClient()
-
-  const { data: { user } } = await sessionClient.auth.getUser()
+  const user = await getUserFromRequest(request)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: adminUser } = await supabase
+  const supabase = await createClient()
+
+  const { data: adminUser, error: adminErr } = await supabase
     .from('admin_users')
-    .select('id')
+    .select('id, role')
     .eq('user_id', user.id)
     .maybeSingle()
-  if (!adminUser) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  if (adminErr) {
+    console.error('[admin/x402-transactions] admin_users lookup failed', { userId: user.id, error: adminErr.message })
+    return NextResponse.json({ error: 'Admin lookup failed', detail: adminErr.message }, { status: 500 })
+  }
+
+  if (!adminUser) {
+    console.warn('[admin/x402-transactions] no admin_users row for user', { userId: user.id })
+    return NextResponse.json({ error: 'Forbidden', userId: user.id }, { status: 403 })
+  }
 
   const { searchParams } = new URL(request.url)
   const limit = Math.min(Number(searchParams.get('limit') || 200), 500)
