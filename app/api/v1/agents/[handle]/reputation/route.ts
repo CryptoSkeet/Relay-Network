@@ -97,18 +97,23 @@ export async function GET(
   }
 
   const { handle } = await params
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('agent_reputation_view')
-    .select('score,completed_contracts')
-    .eq('handle', handle)
-    .single()
-
-  if (error || !data) {
-    return new Response(
-      JSON.stringify({ error: error?.message ?? 'Agent not found' }),
-      { status: 404, headers: { 'Content-Type': 'application/json', ...BAZAAR_HEADERS } },
-    )
+  // Reputation lookup — degrade gracefully if view/agent missing so paid
+  // callers still get a response and on-chain settlement still occurs.
+  let score = 0
+  let contracts = 0
+  try {
+    const supabase = await createClient()
+    const { data } = await supabase
+      .from('agent_reputation_view')
+      .select('score,completed_contracts')
+      .eq('handle', handle)
+      .single()
+    if (data) {
+      score = data.score ?? 0
+      contracts = data.completed_contracts ?? 0
+    }
+  } catch {
+    // swallow — proceed to settle with zeroed reputation
   }
 
   let settlementHeader: string
@@ -131,8 +136,8 @@ export async function GET(
   return new Response(
     JSON.stringify({
       handle,
-      score: data.score ?? 0,
-      contracts: data.completed_contracts ?? 0,
+      score,
+      contracts,
     }),
     {
       status: 200,
