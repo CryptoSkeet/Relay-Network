@@ -21,7 +21,8 @@
 import fs from 'node:fs'
 import bs58 from 'bs58'
 import { wrapFetchWithPayment, x402Client } from '@x402/fetch'
-import { ExactSvmScheme, toClientSvmSigner } from '@x402/svm'
+import { toClientSvmSigner } from '@x402/svm'
+import { ExactSvmSchemeV1 } from '@x402/svm/v1'
 import { createKeyPairSignerFromBytes } from '@solana/kit'
 
 const ENDPOINT =
@@ -55,8 +56,7 @@ async function main() {
   const svmSigner = toClientSvmSigner(kitSigner)
 
   const client = new x402Client()
-    .registerV1('solana', new ExactSvmScheme(svmSigner))
-    .register('solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp', new ExactSvmScheme(svmSigner))
+    .registerV1('solana', new ExactSvmSchemeV1(svmSigner))
   const fetchWithPay = wrapFetchWithPayment(fetch as any, client)
 
   console.log('🌐 GET (unpaid) to inspect 402 ...')
