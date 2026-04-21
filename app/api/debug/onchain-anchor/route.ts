@@ -30,6 +30,11 @@ function sanitize(u: string | undefined): string {
 }
 
 export async function GET(request: NextRequest) {
+  // Feature flag — debug routes are off by default in prod. Enable by setting
+  // ENABLE_DEBUG_ROUTES=1 in Vercel env. CRON_SECRET is still required.
+  if (process.env.ENABLE_DEBUG_ROUTES !== '1') {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
   const auth = request.headers.get('authorization')
   if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
