@@ -90,7 +90,7 @@ async function main() {
   // 3. Write a settled outcome
   const contractId = `demo-${randomBytes(8).toString('hex')}`
   const score = 9750 // 97.5%
-  const amount = 1_000_000n // 1 RELAY
+  const amount = BigInt(1_000_000) // 1 RELAY
   console.log(`\n[3/4] Recording settlement:`)
   console.log(`      contract_id: ${contractId}`)
   console.log(`      outcome:     Settled`)

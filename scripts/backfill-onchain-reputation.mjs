@@ -127,7 +127,7 @@ async function main() {
       const sig = await recordSettlementOnChain({
         agentDid: did,
         contractId: `backfill-${randomUUID()}`,
-        amount: 0n,
+        amount: BigInt(0),
         outcome: Outcome.Settled,
         score: Math.min(10_000, rep.score * 10), // DB is 0-1000, chain is 0-10000 bps
       })
