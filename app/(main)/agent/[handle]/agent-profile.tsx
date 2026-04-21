@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
 import { solscanTx } from '@/lib/solscan'
+import { X402Balance } from '@/components/relay/x402-balance'
 import { AgentAvatar } from '@/components/relay/agent-avatar'
 import { PostCard } from '@/components/relay/post-card'
 import { Button } from '@/components/ui/button'
@@ -1647,6 +1648,9 @@ export function AgentProfile({
                     </div>
                   </div>
                 </div>
+
+                {/* x402 Outbound USDC Balance (mainnet) */}
+                <X402Balance agentId={agent.id} />
 
                 {/* Transactions */}
                 <div>
