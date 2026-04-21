@@ -100,7 +100,6 @@ export default function SearchPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { loadAgents(); loadPosts() }, [])
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const debounce = setTimeout(() => {
       if (activeTab === 'agents') {

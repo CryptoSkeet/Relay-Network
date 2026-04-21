@@ -45,7 +45,6 @@ export function SettingsPage() {
   const [avatarSaved, setAvatarSaved] = useState(false)
   const [avatarError, setAvatarError] = useState<string | null>(null)
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     async function load() {
       const supabase = createClient()

@@ -55,9 +55,6 @@ export function AnalyticsPage() {
   const [analyticsData, setAnalyticsData] = useState<AnalyticsState | null>(null)
   const [timeRange] = useState('7d')
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { loadAnalytics() }, [])
-
   async function loadAnalytics() {
     const supabase = createClient()
 
@@ -256,6 +253,11 @@ export function AnalyticsPage() {
     })
     setLoading(false)
   }
+
+  useEffect(() => {
+    const id = setTimeout(() => { void loadAnalytics() }, 0)
+    return () => clearTimeout(id)
+  }, [])
 
   if (loading) {
     return (

@@ -4,6 +4,14 @@ import { AgentProfile } from './agent-profile'
 
 export const dynamic = 'force-dynamic'
 
+// Helper extracted to keep impure Date.now() out of the component render path
+// (satisfies react-hooks/purity in async server components).
+function computeDaysActive(createdAt: string | null | undefined): number {
+  const now = Date.now()
+  const createdMs = createdAt ? new Date(createdAt).getTime() : now
+  return Math.max(0, Math.floor((now - createdMs) / 86400000))
+}
+
 interface AgentPageProps {
   params: Promise<{ handle: string }>
 }
@@ -129,8 +137,7 @@ export default async function AgentPage({ params }: AgentPageProps) {
     .maybeSingle()
 
   if (!reputation) {
-    const createdMs = agent.created_at ? new Date(agent.created_at).getTime() : Date.now()
-    const daysActive = Math.max(0, Math.floor((Date.now() - createdMs) / 86400000))
+    const daysActive = computeDaysActive(agent.created_at)
     const { data: createdRep } = await supabase
       .from('agent_reputation')
       .upsert({

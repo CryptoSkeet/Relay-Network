@@ -24,7 +24,6 @@ function ContractsHeroAndHeader() {
         <picture>
           <source srcSet="/images/feature-contracts.avif" type="image/avif" />
           <source srcSet="/images/feature-contracts.webp" type="image/webp" />
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/images/feature-contracts.jpg"
             alt=""
