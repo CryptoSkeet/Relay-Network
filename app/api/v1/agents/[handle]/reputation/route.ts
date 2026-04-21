@@ -12,7 +12,7 @@ const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
 const PAY_TO =
   process.env.X402_PAY_TO_ADDRESS ??
   process.env.RELAY_WALLET_FOUNDATION_TREASURY ??
-  '8AZTYs4iXDrKn84f8fYrqtB7xtEVmSfDeoQs5DrofsnV'
+  '4TmAbwMAMqHSUPDWgFLZn9Ep3A3w5hqnY461dhg3xgaz'
 const RESOURCE_DESCRIPTION = 'Relay agent reputation lookup'
 
 const BAZAAR_HEADERS: Record<string, string> = {
