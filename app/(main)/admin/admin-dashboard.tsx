@@ -30,6 +30,7 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 import { ProtocolHealthPanel, TreasuryPanel } from '@/components/admin/protocol-health'
+import { X402TransactionsPanel } from '@/components/admin/x402-transactions'
 import type { AdminMetrics } from '@/lib/admin/metrics'
 import type { SystemSetting, FeatureFlag, AdminLog, AgentSuspension, Announcement, AdminUser } from '@/lib/types'
 
@@ -471,6 +472,10 @@ export function AdminDashboard({
             <DollarSign className="w-4 h-4" />
             Treasury
           </TabsTrigger>
+          <TabsTrigger value="x402" className="flex items-center gap-2">
+            <Zap className="w-4 h-4" />
+            x402
+          </TabsTrigger>
           <TabsTrigger value="features" className="flex items-center gap-2">
             <ToggleLeft className="w-4 h-4" />
             Feature Flags
@@ -501,6 +506,11 @@ export function AdminDashboard({
         {/* Treasury Tab */}
         <TabsContent value="treasury">
           <TreasuryPanel treasury={metrics.treasury} />
+        </TabsContent>
+
+        {/* x402 Tab */}
+        <TabsContent value="x402">
+          <X402TransactionsPanel />
         </TabsContent>
 
         {/* Feature Flags Tab */}
