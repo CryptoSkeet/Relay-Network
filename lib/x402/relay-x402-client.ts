@@ -4,8 +4,61 @@
 import { wrapFetchWithPayment, x402Client } from '@x402/fetch'
 import { ExactSvmScheme, toClientSvmSigner } from '@x402/svm'
 import { createKeyPairSignerFromBytes } from '@solana/kit'
+import { Connection, PublicKey } from '@solana/web3.js'
 import { getKeypairFromStorage } from '@/lib/solana/generate-wallet'
 import { createClient } from '@/lib/supabase/server'
+
+// SPL USDC mints (canonical)
+const USDC_MINTS = {
+  'solana:mainnet': 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+  'solana:devnet':  '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU',
+} as const
+
+// SPL token program (classic)
+const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
+// Associated token account program
+const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL')
+
+function deriveAta(owner: PublicKey, mint: PublicKey): PublicKey {
+  const [ata] = PublicKey.findProgramAddressSync(
+    [owner.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), mint.toBuffer()],
+    ASSOCIATED_TOKEN_PROGRAM_ID,
+  )
+  return ata
+}
+
+function rpcForNetwork(network: 'solana:mainnet' | 'solana:devnet'): string {
+  if (network === 'solana:mainnet') {
+    return process.env.X402_OUTBOUND_RPC_URL
+      || process.env.SOLANA_MAINNET_RPC_URL
+      || 'https://api.mainnet-beta.solana.com'
+  }
+  return process.env.QUICKNODE_RPC_URL
+    || process.env.NEXT_PUBLIC_SOLANA_RPC
+    || 'https://api.devnet.solana.com'
+}
+
+/**
+ * Check the agent's USDC balance on the outbound x402 network.
+ * Returns balance in whole USDC units (not micro-USDC).
+ * Returns 0 if the ATA doesn't exist yet.
+ */
+export async function getAgentUsdcBalance(
+  publicKey: string,
+  network: 'solana:mainnet' | 'solana:devnet' = 'solana:mainnet',
+): Promise<number> {
+  const conn = new Connection(rpcForNetwork(network), 'confirmed')
+  const owner = new PublicKey(publicKey)
+  const mint = new PublicKey(USDC_MINTS[network])
+  const ata = deriveAta(owner, mint)
+  try {
+    const bal = await conn.getTokenAccountBalance(ata)
+    return bal.value.uiAmount ?? 0
+  } catch {
+    // ATA doesn't exist → balance is 0
+    return 0
+  }
+}
 
 export interface X402Resource {
   url: string
@@ -19,6 +72,8 @@ export interface X402Result {
   amountPaidUsdc?: number
   txSignature?: string
   error?: string
+  network?: string
+  balanceUsdc?: number
 }
 
 /**
@@ -67,9 +122,24 @@ export async function agentFetchX402(
   // NOTE: the agent's wallet must hold real mainnet USDC at the same address
   // for outbound payment to succeed.
   const rawNetwork = (process.env.X402_OUTBOUND_NETWORK || 'solana:mainnet').trim()
-  const network = (rawNetwork === 'solana:mainnet' || rawNetwork === 'solana:devnet')
-    ? rawNetwork
-    : 'solana:mainnet'
+  const network: 'solana:mainnet' | 'solana:devnet' =
+    (rawNetwork === 'solana:mainnet' || rawNetwork === 'solana:devnet')
+      ? rawNetwork
+      : 'solana:mainnet'
+
+  // 3a. Pre-flight: confirm the agent actually has enough USDC on the
+  // outbound network. This turns opaque x402 handshake failures into a
+  // clear "insufficient USDC" error before we attempt the payment.
+  const balanceUsdc = await getAgentUsdcBalance(wallet.public_key, network)
+  if (balanceUsdc < resource.maxAmountUsdc) {
+    return {
+      success: false,
+      network,
+      balanceUsdc,
+      error: `Insufficient USDC on ${network}: have ${balanceUsdc}, need ${resource.maxAmountUsdc} (wallet ${wallet.public_key})`,
+    }
+  }
+
   const client = new x402Client()
     .register(network, new ExactSvmScheme(svmSigner))
 
@@ -87,7 +157,7 @@ export async function agentFetchX402(
     })
 
     if (!response.ok) {
-      return { success: false, error: `HTTP ${response.status}` }
+      return { success: false, network, balanceUsdc, error: `HTTP ${response.status}` }
     }
 
     const data = await response.json()
@@ -106,9 +176,11 @@ export async function agentFetchX402(
       success: true,
       data,
       amountPaidUsdc: resource.maxAmountUsdc,
+      network,
+      balanceUsdc,
     }
 
   } catch (err: any) {
-    return { success: false, error: err.message }
+    return { success: false, network, balanceUsdc, error: err.message }
   }
 }
