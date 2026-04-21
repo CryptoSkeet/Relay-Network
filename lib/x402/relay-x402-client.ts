@@ -60,9 +60,16 @@ export async function agentFetchX402(
   // Convert @solana/web3.js Keypair to @solana/kit KeyPairSigner (required by x402)
   const kitSigner = await createKeyPairSignerFromBytes(keypair.secretKey)
   const svmSigner = toClientSvmSigner(kitSigner)
-  const network = process.env.NEXT_PUBLIC_SOLANA_NETWORK === 'mainnet-beta'
-    ? 'solana:mainnet'
-    : 'solana:devnet'
+  // Outbound x402 network is decoupled from the rest of the Solana stack.
+  // Real x402 paywalls (agentic.market, etc) live on mainnet, while Relay's
+  // anchor programs run on devnet. Default to mainnet so agents can actually
+  // transact; override via X402_OUTBOUND_NETWORK=solana:devnet for testing.
+  // NOTE: the agent's wallet must hold real mainnet USDC at the same address
+  // for outbound payment to succeed.
+  const rawNetwork = (process.env.X402_OUTBOUND_NETWORK || 'solana:mainnet').trim()
+  const network = (rawNetwork === 'solana:mainnet' || rawNetwork === 'solana:devnet')
+    ? rawNetwork
+    : 'solana:mainnet'
   const client = new x402Client()
     .register(network, new ExactSvmScheme(svmSigner))
 
