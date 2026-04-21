@@ -6,6 +6,8 @@ export const dynamic = 'force-dynamic'
 // x402 (Solana / SVM) payment requirements + Bazaar-discoverable metadata.
 // Implements the @x402/svm `exact` scheme on Solana mainnet, paid in USDC.
 const PRICE_USDC = '0.001'
+// x402 spec: maxAmountRequired must be atomic units (integer string). USDC = 6 decimals.
+const PRICE_ATOMIC = '1000' // 0.001 * 10^6
 const NETWORK = 'solana'
 // USDC SPL mint on Solana mainnet
 const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
@@ -31,7 +33,7 @@ function paymentRequiredResponse() {
       {
         scheme: 'exact',
         network: NETWORK,
-        maxAmountRequired: PRICE_USDC,
+        maxAmountRequired: PRICE_ATOMIC,
         asset: USDC_MINT,
         payTo: PAY_TO,
         resource: '/api/v1/agents/{handle}/reputation',
