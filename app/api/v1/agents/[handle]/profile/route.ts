@@ -1,6 +1,10 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createPaywalledHandler, type PaywalledEndpoint } from '@/lib/x402/paywall'
+import {
+  deriveAgentProfilePDA,
+  solscanAccountUrl,
+} from '@/lib/solana/agent-profile'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,6 +22,10 @@ interface AgentProfile {
   on_chain_mint: string | null
   did: string | null
   created_at: string | null
+  /** Handle-derived PDA on the relay_agent_profile program. Anyone can re-derive
+   *  this address from the handle and verify the score on Solscan. */
+  onchain_profile_pda: string | null
+  onchain_profile_solscan_url: string | null
 }
 
 function extractHandle(req: NextRequest): string {
@@ -60,6 +68,8 @@ const endpoint: PaywalledEndpoint<AgentProfile> = {
         on_chain_mint: null,
         did: 'did:relay:relay_foundation',
         created_at: '2026-01-15T00:00:00Z',
+        onchain_profile_pda: 'derived from [b"profile", utf8(handle)]',
+        onchain_profile_solscan_url: 'https://solscan.io/account/<pda>',
       },
       schema: {
         type: 'object',
@@ -77,6 +87,8 @@ const endpoint: PaywalledEndpoint<AgentProfile> = {
           on_chain_mint: { type: ['string', 'null'] },
           did: { type: ['string', 'null'] },
           created_at: { type: ['string', 'null'] },
+          onchain_profile_pda: { type: ['string', 'null'] },
+          onchain_profile_solscan_url: { type: ['string', 'null'] },
         },
         required: ['handle', 'is_verified', 'reputation_score'],
       },
@@ -95,6 +107,22 @@ const endpoint: PaywalledEndpoint<AgentProfile> = {
         .eq('handle', handle)
         .single()
       if (!data) return null
+
+      // Derive the handle-keyed PDA so callers can verify on Solscan.
+      // This is a pure derivation (no RPC call) so it's safe in the hot path.
+      let pda: string | null = null
+      let pdaUrl: string | null = null
+      try {
+        const handleBytes = Buffer.from(data.handle, 'utf8').length
+        if (handleBytes >= 1 && handleBytes <= 32) {
+          const [pdaKey] = deriveAgentProfilePDA(data.handle)
+          pda = pdaKey.toBase58()
+          pdaUrl = solscanAccountUrl(pdaKey)
+        }
+      } catch {
+        /* PDA derivation is best-effort; never fail the API */
+      }
+
       return {
         handle: data.handle,
         display_name: data.display_name ?? null,
@@ -109,6 +137,8 @@ const endpoint: PaywalledEndpoint<AgentProfile> = {
         on_chain_mint: data.on_chain_mint ?? null,
         did: data.did ?? null,
         created_at: data.created_at ?? null,
+        onchain_profile_pda: pda,
+        onchain_profile_solscan_url: pdaUrl,
       }
     } catch {
       return null

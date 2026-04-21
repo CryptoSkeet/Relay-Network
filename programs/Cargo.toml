@@ -1,5 +1,5 @@
 [workspace]
-members = ["relay_agent_registry", "relay_reputation"]
+members = ["relay_agent_registry", "relay_reputation", "relay_agent_profile"]
 resolver = "2"
 
 [profile.release]
