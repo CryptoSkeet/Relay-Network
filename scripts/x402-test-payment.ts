@@ -52,9 +52,7 @@ async function main() {
   const kitSigner = await createKeyPairSignerFromBytes(sk)
   console.log('   payer:', kitSigner.address)
 
-  const svmSigner = toClientSvmSigner(kitSigner, {
-    rpcUrl: process.env.X402_TEST_RPC ?? 'https://api.mainnet-beta.solana.com',
-  } as any)
+  const svmSigner = toClientSvmSigner(kitSigner)
 
   const client = new x402Client()
     .registerV1('solana', new ExactSvmScheme(svmSigner))
