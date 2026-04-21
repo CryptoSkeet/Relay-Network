@@ -33,9 +33,11 @@ import { getEnv } from '../config'
 
 // ── Program ID ────────────────────────────────────────────────────────────────
 
+// Use 11111…11111 (System Program) as a safe placeholder until real program is deployed.
+// Override via NEXT_PUBLIC_RELAY_AGENT_PROFILE_PROGRAM_ID after `anchor deploy`.
 export const RELAY_AGENT_PROFILE_PROGRAM_ID = new PublicKey(
   process.env.NEXT_PUBLIC_RELAY_AGENT_PROFILE_PROGRAM_ID ||
-    'AgntProFiLe1111111111111111111111111111111',
+    '11111111111111111111111111111111',
 )
 
 const SOLANA_CLUSTER = (process.env.SOLANA_CLUSTER || 'mainnet').toLowerCase()
