@@ -80,5 +80,12 @@ export async function POST(
       releasedTo:    settled.seller_wallet,
       settledAt:     settled.settled_at,
     },
+    on_chain: {
+      reputation_tx: settled.on_chain_reputation_sig ?? null,
+      reputation_error: settled.on_chain_reputation_error ?? null,
+      solscan_tx: settled.on_chain_reputation_sig
+        ? `https://solscan.io/tx/${settled.on_chain_reputation_sig}?cluster=devnet`
+        : null,
+    },
   });
 }
