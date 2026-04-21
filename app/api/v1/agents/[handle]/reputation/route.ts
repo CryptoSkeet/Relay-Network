@@ -28,21 +28,60 @@ const facilitator = new HTTPFacilitatorClient({ url: FACILITATOR_URL })
 const FEE_PAYER =
   process.env.X402_FEE_PAYER ?? '2wKupLR9q6wXYppw8Gr2NvWxKBUqm4PPJKkQfoxHDBg4'
 
-const PAYMENT_REQUIREMENTS = {
-  scheme: 'exact' as const,
-  network: NETWORK,
-  maxAmountRequired: PRICE_ATOMIC,
-  asset: USDC_MINT,
-  payTo: PAY_TO,
-  resource: '/api/v1/agents/{handle}/reputation',
-  description: RESOURCE_DESCRIPTION,
-  mimeType: 'application/json',
-  maxTimeoutSeconds: 60,
-  extra: {
-    feePayer: FEE_PAYER,
-    assetSymbol: 'USDC',
-    assetDecimals: 6,
+const PUBLIC_BASE_URL =
+  process.env.NEXT_PUBLIC_APP_URL ??
+  process.env.X402_PUBLIC_BASE_URL ??
+  'https://relaynetwork.ai'
+
+// v1 Bazaar discovery payload (lives under outputSchema for x402 v1).
+// Facilitators that support the bazaar extension catalog this metadata
+// when they process a verify+settle for the endpoint.
+const BAZAAR_OUTPUT_SCHEMA = {
+  input: {
+    type: 'http',
+    method: 'GET',
+    discoverable: true,
+    pathParams: {
+      handle: 'relay-agent-handle (e.g. relay_foundation, mesa_open)',
+    },
   },
+  output: {
+    type: 'object',
+    example: {
+      handle: 'relay_foundation',
+      score: 1000,
+      contracts: 655,
+    },
+    schema: {
+      type: 'object',
+      properties: {
+        handle: { type: 'string' },
+        score: { type: 'integer' },
+        contracts: { type: 'integer' },
+      },
+      required: ['handle', 'score', 'contracts'],
+    },
+  },
+} as const
+
+function buildPaymentRequirements(resourceUrl: string) {
+  return {
+    scheme: 'exact' as const,
+    network: NETWORK,
+    maxAmountRequired: PRICE_ATOMIC,
+    asset: USDC_MINT,
+    payTo: PAY_TO,
+    resource: resourceUrl,
+    description: RESOURCE_DESCRIPTION,
+    mimeType: 'application/json',
+    maxTimeoutSeconds: 60,
+    outputSchema: BAZAAR_OUTPUT_SCHEMA,
+    extra: {
+      feePayer: FEE_PAYER,
+      assetSymbol: 'USDC',
+      assetDecimals: 6,
+    },
+  }
 }
 
 const BAZAAR_HEADERS: Record<string, string> = {
@@ -53,11 +92,14 @@ const BAZAAR_HEADERS: Record<string, string> = {
   'x-bazaar-network': NETWORK,
 }
 
-function paymentRequiredResponse(extraError?: string) {
+function paymentRequiredResponse(
+  paymentRequirements: ReturnType<typeof buildPaymentRequirements>,
+  extraError?: string,
+) {
   const body = {
     x402Version: 1,
     error: extraError ?? 'Payment required',
-    accepts: [PAYMENT_REQUIREMENTS],
+    accepts: [paymentRequirements],
   }
   return new Response(JSON.stringify(body), {
     status: 402,
@@ -69,34 +111,44 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ handle: string }> },
 ) {
+  const { handle } = await params
+  const resourceUrl = `${PUBLIC_BASE_URL}/api/v1/agents/${encodeURIComponent(handle)}/reputation`
+  const paymentRequirements = buildPaymentRequirements(resourceUrl)
+
   const paymentHeader = req.headers.get('x-payment')
   if (!paymentHeader) {
-    return paymentRequiredResponse()
+    return paymentRequiredResponse(paymentRequirements)
   }
 
   let paymentPayload
   try {
     paymentPayload = decodePaymentSignatureHeader(paymentHeader)
   } catch (e) {
-    return paymentRequiredResponse(`Invalid X-PAYMENT header: ${(e as Error).message}`)
+    return paymentRequiredResponse(
+      paymentRequirements,
+      `Invalid X-PAYMENT header: ${(e as Error).message}`,
+    )
   }
 
   try {
     const verification = await facilitator.verify(
       paymentPayload,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      PAYMENT_REQUIREMENTS as any,
+      paymentRequirements as any,
     )
     if (!verification.isValid) {
       return paymentRequiredResponse(
+        paymentRequirements,
         `Payment verification failed: ${verification.invalidReason ?? 'unknown'}`,
       )
     }
   } catch (e) {
-    return paymentRequiredResponse(`Facilitator verify error: ${(e as Error).message}`)
+    return paymentRequiredResponse(
+      paymentRequirements,
+      `Facilitator verify error: ${(e as Error).message}`,
+    )
   }
 
-  const { handle } = await params
   // Reputation lookup — degrade gracefully if view/agent missing so paid
   // callers still get a response and on-chain settlement still occurs.
   let score = 0
@@ -121,16 +173,20 @@ export async function GET(
     const settlement = await facilitator.settle(
       paymentPayload,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      PAYMENT_REQUIREMENTS as any,
+      paymentRequirements as any,
     )
     if (!settlement.success) {
       return paymentRequiredResponse(
+        paymentRequirements,
         `Payment settlement failed: ${settlement.errorReason ?? 'unknown'}`,
       )
     }
     settlementHeader = encodePaymentResponseHeader(settlement)
   } catch (e) {
-    return paymentRequiredResponse(`Facilitator settle error: ${(e as Error).message}`)
+    return paymentRequiredResponse(
+      paymentRequirements,
+      `Facilitator settle error: ${(e as Error).message}`,
+    )
   }
 
   return new Response(
