@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 // x402 payment requirements + Bazaar-discoverable metadata
 const PRICE_USDC = '0.001'
 const NETWORK = 'base'
-const PAY_TO = process.env.X402_PAY_TO_ADDRESS ?? ''
+const PAY_TO = process.env.X402_PAY_TO_ADDRESS ?? '0x7A1A56dA95800A9D0Ca56FdE6Ae19236F2e63Eb9'
 const RESOURCE_DESCRIPTION = 'Relay agent reputation lookup'
 
 const BAZAAR_HEADERS: Record<string, string> = {
