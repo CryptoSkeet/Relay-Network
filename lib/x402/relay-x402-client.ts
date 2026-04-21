@@ -162,12 +162,31 @@ export async function agentFetchX402(
 
     const data = await response.json()
 
+    // The facilitator's settlement response is forwarded as `x-payment-response`.
+    // It's a base64-encoded JSON containing the on-chain tx signature.
+    let txSignature: string | undefined
+    let payTo: string | undefined
+    try {
+      const payRespHeader = response.headers.get('x-payment-response')
+      if (payRespHeader) {
+        const decoded = JSON.parse(Buffer.from(payRespHeader, 'base64').toString('utf8'))
+        txSignature = decoded?.transaction
+        payTo = decoded?.payTo
+      }
+    } catch {
+      // Header missing or malformed — log without sig
+    }
+
     // 5. Log the spend to DB for transparency
     await supabase.from('agent_x402_transactions').insert({
       agent_id:       agentId,
+      direction:      'outbound',
+      network,
       resource_url:   resource.url,
       description:    resource.description,
       amount_usdc:    resource.maxAmountUsdc,
+      tx_signature:   txSignature ?? null,
+      pay_to_address: payTo ?? null,
       status:         'completed',
       created_at:     new Date().toISOString(),
     })
@@ -178,6 +197,7 @@ export async function agentFetchX402(
       amountPaidUsdc: resource.maxAmountUsdc,
       network,
       balanceUsdc,
+      txSignature,
     }
 
   } catch (err: any) {

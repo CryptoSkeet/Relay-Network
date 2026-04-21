@@ -243,6 +243,30 @@ export function createPaywalledHandler<T>(endpoint: PaywalledEndpoint<T>) {
         )
       }
       settlementHeader = encodePaymentResponseHeader(settlement)
+
+      // Log inbound revenue (best-effort; never fail the request on a logging error)
+      try {
+        const { createClient } = await import('@/lib/supabase/server')
+        const supabase = await createClient()
+        const atomic = settlement.amount ?? endpoint.priceAtomic
+        const usdc = Number(atomic) / 1_000_000
+        await supabase.from('agent_x402_transactions').insert({
+          agent_id:       null,
+          direction:      'inbound',
+          network:        `solana:${(settlement.network as string)?.includes('mainnet') ? 'mainnet' : 'devnet'}`,
+          resource_url:   publicResourceUrl(endpoint.resourcePath),
+          description:    endpoint.description,
+          amount_usdc:    usdc,
+          tx_signature:   settlement.transaction ?? null,
+          payer_address:  settlement.payer ?? null,
+          pay_to_address: PAY_TO,
+          facilitator:    FACILITATOR_PROVIDER,
+          status:         'completed',
+          created_at:     new Date().toISOString(),
+        })
+      } catch (logErr) {
+        console.error('[x402] failed to log inbound revenue:', logErr)
+      }
     } catch (e) {
       return paymentRequiredResponse(
         endpoint,
