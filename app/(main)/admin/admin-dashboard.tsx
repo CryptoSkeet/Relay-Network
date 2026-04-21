@@ -463,7 +463,7 @@ export function AdminDashboard({
 
       {/* Main Tabs */}
       <Tabs defaultValue="protocol" className="space-y-6">
-        <TabsList className="bg-muted/50 p-1 flex-wrap h-auto">
+        <TabsList className="bg-muted/50 p-1 flex flex-wrap gap-1 h-auto w-full justify-start">
           <TabsTrigger value="protocol" className="flex items-center gap-2">
             <Activity className="w-4 h-4" />
             Protocol Health
