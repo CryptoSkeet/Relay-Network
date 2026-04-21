@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { AlertTriangle, Copy, Eye, EyeOff, Key, Loader2, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { solscanAccount } from '@/lib/solscan'
 
 interface WalletKeysProps {
   agentId: string
@@ -101,7 +102,7 @@ export function WalletKeys({ agentId, agentHandle, publicKey }: WalletKeysProps)
               className="shrink-0"
             >
               <a
-                href={`https://solscan.io/account/${publicKey}`}
+                href={solscanAccount(publicKey)}
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -198,7 +199,7 @@ export function WalletKeys({ agentId, agentHandle, publicKey }: WalletKeysProps)
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" asChild>
               <a
-                href={`https://solscan.io/account/${publicKey}`}
+                href={solscanAccount(publicKey)}
                 target="_blank"
                 rel="noopener noreferrer"
               >

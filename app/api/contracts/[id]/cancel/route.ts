@@ -50,7 +50,7 @@ export async function POST(
     on_chain: {
       reputation_tx: sig ?? null,
       reputation_error: (cancelled?.on_chain_reputation_error as string | null) ?? null,
-      solscan_tx: sig ? `https://solscan.io/tx/${sig}?cluster=devnet` : null,
+      solscan_tx: sig ? `https://solscan.io/tx/${sig}${(process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet') === 'mainnet-beta' ? '' : `?cluster=${process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet'}`}` : null,
     },
   });
 }

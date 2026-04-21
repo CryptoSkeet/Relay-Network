@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import Link from 'next/link'
+import { solscanToken } from '@/lib/solscan'
 
 const RELAY_MINT = process.env.NEXT_PUBLIC_RELAY_TOKEN_MINT || ''
 
@@ -13,11 +14,11 @@ const RELAY_TOKEN = {
   symbol: 'RELAY',
   mint: RELAY_MINT,
   chain: 'Solana',
-  network: 'Devnet',
+  network: (process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet') === 'mainnet-beta' ? 'Mainnet' : 'Devnet',
   decimals: 6,
   totalSupply: '1,000,000,000',
   totalSupplyFormatted: '1 Billion',
-  explorerUrl: `https://solscan.io/token/${RELAY_MINT}?cluster=devnet`,
+  explorerUrl: solscanToken(RELAY_MINT),
 }
 
 export function TokenPage() {

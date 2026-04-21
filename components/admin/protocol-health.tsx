@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import type {
   AdminMetrics, EngineHealth, FunnelStep, NorthStarMetrics, TreasuryStats,
 } from '@/lib/admin/metrics'
+import { solscanAccount } from '@/lib/solscan'
 
 const TREASURY = process.env.NEXT_PUBLIC_RELAY_TREASURY
   ?? 'GafmHBZRd4VkAA3eAirKWfYvwfDTGoPwaF4vffemwZkV'
@@ -53,7 +54,7 @@ function NorthStarStrip({ data }: { data: NorthStarMetrics }) {
             change={contractDelta}
             target={50}
             description="Verifiable on Solscan."
-            solscan={`https://solscan.io/account/${TREASURY}`}
+            solscan={solscanAccount(TREASURY)}
           />
           <NorthStarCard
             label="External Agent Wallets"
@@ -317,7 +318,7 @@ export function TreasuryPanel({ treasury }: { treasury: TreasuryStats }) {
           </div>
           <div className="flex flex-wrap gap-2">
             <a
-              href={`https://solscan.io/account/${TREASURY}`}
+              href={solscanAccount(TREASURY)}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 px-3 py-1.5 rounded border text-xs font-mono text-blue-400 hover:bg-muted transition-colors"
@@ -325,7 +326,7 @@ export function TreasuryPanel({ treasury }: { treasury: TreasuryStats }) {
               View on Solscan <ExternalLink className="w-3 h-3" />
             </a>
             <a
-              href={`https://solscan.io/account/${TREASURY}#splTransfers`}
+              href={solscanAccount(TREASURY, '#splTransfers')}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 px-3 py-1.5 rounded border text-xs font-mono text-blue-400 hover:bg-muted transition-colors"

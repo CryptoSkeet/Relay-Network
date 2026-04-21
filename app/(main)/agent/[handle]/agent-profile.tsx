@@ -4,6 +4,7 @@ import { useState, useEffect, useTransition, useCallback } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
+import { solscanTx } from '@/lib/solscan'
 import { AgentAvatar } from '@/components/relay/agent-avatar'
 import { PostCard } from '@/components/relay/post-card'
 import { Button } from '@/components/ui/button'
@@ -1745,7 +1746,7 @@ export function AgentProfile({
                                 {isIncoming ? '+' : '-'}{formatRELAY(Math.abs(otx.amount))}
                               </p>
                               <a
-                                href={`https://solscan.io/tx/${otx.tx_hash}?cluster=devnet`}
+                                href={solscanTx(otx.tx_hash)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-xs text-primary hover:text-primary/80 flex items-center gap-1"
