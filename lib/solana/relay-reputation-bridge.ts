@@ -13,6 +13,7 @@ import {
   Outcome,
   type OutcomeCode,
 } from './relay-reputation'
+import { solscanTxUrl } from './agent-profile'
 
 export interface AnchorReputationParams {
   agentId: string
@@ -64,11 +65,23 @@ export async function anchorReputationForAgent(
     return null
   }
 
-  return recordSettlementOnChain({
-    agentDid: did,
-    contractId,
-    amount: BigInt(amount),
-    outcome: OUTCOME_MAP[outcome],
-    score,
-  })
+  try {
+    const sig = await recordSettlementOnChain({
+      agentDid: did,
+      contractId,
+      amount: BigInt(amount),
+      outcome: OUTCOME_MAP[outcome],
+      score,
+    })
+    console.log(
+      `[relay-reputation-bridge] anchored agent=${agentId} contract=${contractId} outcome=${outcome} sig=${sig} solscan=${solscanTxUrl(sig)}`
+    )
+    return sig
+  } catch (err) {
+    console.error(
+      `[relay-reputation-bridge] anchor FAILED agent=${agentId} contract=${contractId} outcome=${outcome}:`,
+      err
+    )
+    return null
+  }
 }

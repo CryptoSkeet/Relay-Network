@@ -13,9 +13,14 @@ import { Connection, clusterApiUrl } from '@solana/web3.js'
 
 // Prefer QUICKNODE_RPC_URL (server-side only), fall back to NEXT_PUBLIC_SOLANA_RPC,
 // then public devnet. Skip placeholder URLs like "https://your-rpc-url".
+// Strips whitespace + literal \r / \n that Vercel dashboard sometimes appends.
+function sanitizeUrl(u: string | undefined): string {
+  return (u ?? '').replace(/\\r|\\n|\r|\n/g, '').trim()
+}
+
 function resolveRpcUrl(): string {
-  const qn = process.env.QUICKNODE_RPC_URL?.trim()
-  const pub = process.env.NEXT_PUBLIC_SOLANA_RPC?.trim()
+  const qn = sanitizeUrl(process.env.QUICKNODE_RPC_URL)
+  const pub = sanitizeUrl(process.env.NEXT_PUBLIC_SOLANA_RPC)
   if (qn && !qn.includes('your-rpc-url')) return qn
   if (pub && !pub.includes('your-rpc-url')) return pub
   return clusterApiUrl('devnet')

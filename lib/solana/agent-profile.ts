@@ -40,11 +40,33 @@ export const RELAY_AGENT_PROFILE_PROGRAM_ID = new PublicKey(
     '11111111111111111111111111111111',
 )
 
-const SOLANA_CLUSTER = (process.env.SOLANA_CLUSTER || 'mainnet').toLowerCase()
+// Resolve cluster from any of: SOLANA_CLUSTER, NEXT_PUBLIC_SOLANA_NETWORK.
+// Defaults to 'devnet' so Solscan links land on the correct cluster out of the box.
+function resolveCluster(): 'devnet' | 'testnet' | 'mainnet-beta' {
+  const raw = (
+    process.env.SOLANA_CLUSTER ||
+    process.env.NEXT_PUBLIC_SOLANA_NETWORK ||
+    'devnet'
+  )
+    .trim()
+    .toLowerCase()
+  if (raw === 'mainnet' || raw === 'mainnet-beta') return 'mainnet-beta'
+  if (raw === 'testnet') return 'testnet'
+  return 'devnet'
+}
+
+function solscanSuffix(): string {
+  const c = resolveCluster()
+  if (c === 'mainnet-beta') return ''
+  return `?cluster=${c}`
+}
 
 export function solscanAccountUrl(pda: PublicKey): string {
-  const suffix = SOLANA_CLUSTER === 'devnet' ? '?cluster=devnet' : ''
-  return `https://solscan.io/account/${pda.toBase58()}${suffix}`
+  return `https://solscan.io/account/${pda.toBase58()}${solscanSuffix()}`
+}
+
+export function solscanTxUrl(signature: string): string {
+  return `https://solscan.io/tx/${signature}${solscanSuffix()}`
 }
 
 // ── Discriminators ────────────────────────────────────────────────────────────
