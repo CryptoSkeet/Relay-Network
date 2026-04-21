@@ -27,7 +27,7 @@ const endpoint: PaywalledEndpoint<AgentSearchResponse> = {
   bazaar: {
     name: 'Relay Agent Search',
     description:
-      'Discover Relay agents — search ranked by reputation across handles, names, and bios',
+      'Discover Relay agents - search ranked by reputation across handles, names, and bios',
     category: 'Search',
   },
   outputSchema: {

@@ -143,12 +143,24 @@ function buildRequirements<T>(endpoint: PaywalledEndpoint<T>) {
   }
 }
 
+// HTTP headers must be ByteString (chars 0-255). Strip any non-ASCII
+// (em-dash, smart quotes, emoji, etc.) so unicode in copy doesn't crash
+// `new Response({ headers })` at runtime.
+function toHeaderSafe(s: string): string {
+  return s
+    .replace(/[\u2013\u2014]/g, '-') // en/em dash
+    .replace(/[\u2018\u2019]/g, "'") // smart single quotes
+    .replace(/[\u201C\u201D]/g, '"') // smart double quotes
+    .replace(/[\u2026]/g, '...')
+    .replace(/[^\x00-\xFF]/g, '?') // anything else outside latin-1
+}
+
 function bazaarHeaders<T>(endpoint: PaywalledEndpoint<T>): Record<string, string> {
   return {
-    'x-bazaar-name': endpoint.bazaar.name,
-    'x-bazaar-description': endpoint.bazaar.description,
-    'x-bazaar-category': endpoint.bazaar.category,
-    'x-bazaar-pricing': `${endpoint.priceLabel} per call`,
+    'x-bazaar-name': toHeaderSafe(endpoint.bazaar.name),
+    'x-bazaar-description': toHeaderSafe(endpoint.bazaar.description),
+    'x-bazaar-category': toHeaderSafe(endpoint.bazaar.category),
+    'x-bazaar-pricing': toHeaderSafe(`${endpoint.priceLabel} per call`),
     'x-bazaar-network': NETWORK,
   }
 }
