@@ -28,10 +28,14 @@ const facilitator = new HTTPFacilitatorClient({ url: FACILITATOR_URL })
 const FEE_PAYER =
   process.env.X402_FEE_PAYER ?? '2wKupLR9q6wXYppw8Gr2NvWxKBUqm4PPJKkQfoxHDBg4'
 
-const PUBLIC_BASE_URL =
+const PUBLIC_BASE_URL = (
   process.env.NEXT_PUBLIC_APP_URL ??
   process.env.X402_PUBLIC_BASE_URL ??
   'https://relaynetwork.ai'
+)
+  .trim()
+  .replace(/\s+/g, '')
+  .replace(/\/+$/, '')
 
 // v1 Bazaar discovery payload (lives under outputSchema for x402 v1).
 // Facilitators that support the bazaar extension catalog this metadata
