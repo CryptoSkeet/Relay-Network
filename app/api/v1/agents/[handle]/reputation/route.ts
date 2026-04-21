@@ -23,6 +23,11 @@ const FACILITATOR_URL =
 
 const facilitator = new HTTPFacilitatorClient({ url: FACILITATOR_URL })
 
+// Facilitator-managed fee payer (pays SOL gas; required by PayAI x402 Solana facilitator).
+// Override with X402_FEE_PAYER for self-hosted facilitators.
+const FEE_PAYER =
+  process.env.X402_FEE_PAYER ?? '2wKupLR9q6wXYppw8Gr2NvWxKBUqm4PPJKkQfoxHDBg4'
+
 const PAYMENT_REQUIREMENTS = {
   scheme: 'exact' as const,
   network: NETWORK,
@@ -34,7 +39,7 @@ const PAYMENT_REQUIREMENTS = {
   mimeType: 'application/json',
   maxTimeoutSeconds: 60,
   extra: {
-    feePayer: PAY_TO,
+    feePayer: FEE_PAYER,
     assetSymbol: 'USDC',
     assetDecimals: 6,
   },
