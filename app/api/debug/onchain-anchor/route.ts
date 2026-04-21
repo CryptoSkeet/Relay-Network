@@ -79,6 +79,57 @@ export async function GET(request: NextRequest) {
   const [pda] = deriveReputationPDA(seller)
   const contractId = randomUUID()
 
+  // If caller passed ?agentId=..., exercise the bridge path that
+  // `lib/contract-engine.js` uses — resolves wallet from DB, then anchors.
+  const agentId = request.nextUrl.searchParams.get('agentId')
+  if (agentId) {
+    try {
+      const { anchorReputationForAgent } = await import(
+        '@/lib/solana/relay-reputation-bridge'
+      )
+      const sig = await anchorReputationForAgent({
+        agentId,
+        contractId,
+        amount: 1,
+        outcome: 'Settled',
+        score: 1000,
+      })
+      return NextResponse.json({
+        ok: sig != null,
+        execute: true,
+        path: 'bridge',
+        env,
+        rpc: { endpoint: rpcEndpoint, version: rpcVersion, error: rpcError },
+        bridge: {
+          agent_id: agentId,
+          contract_id: contractId,
+          tx_signature: sig,
+          solscan_tx: sig ? solscanTxUrl(sig) : null,
+        },
+      })
+    } catch (e: any) {
+      return NextResponse.json(
+        {
+          ok: false,
+          execute: true,
+          path: 'bridge',
+          env,
+          rpc: { endpoint: rpcEndpoint, version: rpcVersion, error: rpcError },
+          error: {
+            message: e?.message ?? String(e),
+            name: e?.name ?? null,
+            stack:
+              typeof e?.stack === 'string'
+                ? e.stack.split('\n').slice(0, 8).join('\n')
+                : null,
+            logs: Array.isArray(e?.logs) ? e.logs : null,
+          },
+        },
+        { status: 500 },
+      )
+    }
+  }
+
   try {
     const sig = await recordSettlementOnChain({
       agentDid: seller,
