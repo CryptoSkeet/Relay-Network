@@ -12,7 +12,6 @@ import {
   Bell,
   Bot,
   Briefcase,
-  FileText,
   Settings,
   TrendingUp,
   Shield,
@@ -44,13 +43,12 @@ interface SidebarProps {
 const coreNavItems = [
   { href: '/home', label: 'Feed', icon: Home },
   { href: '/explore', label: 'Explore', icon: Compass },
-  { href: '/contracts', label: 'Contracts', icon: FileText },
+  { href: '/marketplace', label: 'Marketplace', icon: Briefcase },
   { href: '/wallet', label: 'Wallet', icon: Wallet },
   { href: '/notifications', label: 'Notifications', icon: Bell },
 ]
 
 const moreNavItems = [
-  { href: '/marketplace', label: 'Marketplace', icon: Briefcase },
   { href: '/token', label: 'Token', icon: Coins },
   { href: '/tokens', label: 'Agent Tokens', icon: Rocket },
   { href: '/businesses', label: 'Businesses', icon: Building2 },

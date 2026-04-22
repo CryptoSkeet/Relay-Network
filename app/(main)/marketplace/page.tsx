@@ -8,9 +8,13 @@ export const metadata = {
   description: 'Discover AI agent services and hire agents for your projects',
 }
 
-export default async function Marketplace() {
+export default async function Marketplace(props: {
+  searchParams: Promise<{ tab?: string }>
+}) {
+  const searchParams = await props.searchParams
+  const initialTab = searchParams.tab === 'contracts' ? 'contracts' : 'market'
   try {
-    return await renderMarketplace()
+    return await renderMarketplace(initialTab)
   } catch {
     // Graceful fallback if DB queries fail
     return (
@@ -20,12 +24,13 @@ export default async function Marketplace() {
         categories={[{ id: 'all', name: 'All Services', count: 0 }]}
         contracts={[]}
         capabilityTags={[]}
+        initialTab={initialTab}
       />
     )
   }
 }
 
-async function renderMarketplace() {
+async function renderMarketplace(initialTab: 'market' | 'contracts' = 'market') {
   const supabase = await createClient()
   
   // Fetch agents with their services
@@ -139,6 +144,81 @@ async function renderMarketplace() {
     { id: 'Content', name: 'Content', count: getCategoryCount('Content') },
   ].filter(c => c.id === 'all' || c.count > 0)
 
+  // ── Contracts tab data ────────────────────────────────────────────────
+  const allAgentMap = new Map((agents || []).map((a: any) => [a.id, a]))
+
+  // Fetch all contracts (not just open) for the Contracts tab
+  const { data: allContracts } = await supabase
+    .from('contracts')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(100)
+
+  // Resolve any agent IDs not already in the agents map
+  const contractAgentIds = new Set<string>()
+  for (const c of allContracts || []) {
+    if (c.client_id) contractAgentIds.add(c.client_id)
+    if (c.provider_id) contractAgentIds.add(c.provider_id)
+    if (c.seller_agent_id) contractAgentIds.add(c.seller_agent_id)
+    if (c.buyer_agent_id) contractAgentIds.add(c.buyer_agent_id)
+  }
+  const missingIds = [...contractAgentIds].filter((id) => !allAgentMap.has(id))
+  if (missingIds.length > 0) {
+    const { data: extra } = await supabase
+      .from('agents')
+      .select('id, handle, display_name, avatar_url, is_verified, wallet_address')
+      .in('id', missingIds)
+    for (const a of extra || []) allAgentMap.set(a.id, a)
+  }
+
+  const contractsWithAgents = (allContracts || []).map((c: any) => {
+    const clientId = c.client_id ?? c.seller_agent_id
+    const providerId = c.provider_id ?? c.buyer_agent_id
+    return {
+      ...c,
+      client_id: clientId,
+      provider_id: providerId,
+      client: allAgentMap.get(clientId) ?? null,
+      provider: allAgentMap.get(providerId) ?? null,
+      dispute: null,
+      budget_max: c.budget_max ?? c.price_relay ?? 0,
+      budget_min: c.budget_min ?? c.price_relay ?? 0,
+    }
+  })
+
+  const [totalQ, openQ, activeQ, completedQ, disputedQ] = await Promise.all([
+    supabase.from('contracts').select('*', { count: 'exact', head: true }),
+    supabase.from('contracts').select('*', { count: 'exact', head: true }).in('status', ['open', 'OPEN', 'PENDING']),
+    supabase.from('contracts').select('*', { count: 'exact', head: true }).in('status', ['in_progress', 'active', 'ACTIVE', 'DELIVERED', 'delivered']),
+    supabase.from('contracts').select('*', { count: 'exact', head: true }).in('status', ['completed', 'SETTLED', 'CANCELLED', 'cancelled']),
+    supabase.from('contracts').select('*', { count: 'exact', head: true }).in('status', ['disputed', 'DISPUTED']),
+  ])
+
+  // Detect logged-in user's agent
+  let userAgentId: string | null = null
+  try {
+    const { createSessionClient } = await import('@/lib/supabase/server')
+    const sessionClient = await createSessionClient()
+    const { data: { user } } = await sessionClient.auth.getUser()
+    if (user) {
+      const { data: ua } = await supabase.from('agents').select('id').eq('user_id', user.id).maybeSingle()
+      userAgentId = ua?.id ?? null
+    }
+  } catch { /* unauthenticated — fine */ }
+
+  const contractsData = {
+    contracts: contractsWithAgents,
+    agents: agents || [],
+    userAgentId,
+    serverStats: {
+      total: totalQ.count ?? 0,
+      open: openQ.count ?? 0,
+      active: activeQ.count ?? 0,
+      completed: completedQ.count ?? 0,
+      disputed: disputedQ.count ?? 0,
+    },
+  }
+
   return (
     <MarketplacePage
       agents={agents || []}
@@ -146,6 +226,8 @@ async function renderMarketplace() {
       categories={categories}
       contracts={enrichedContracts}
       capabilityTags={Array.isArray(capabilityTags) ? capabilityTags : []}
+      contractsData={contractsData}
+      initialTab={initialTab}
     />
   )
 }

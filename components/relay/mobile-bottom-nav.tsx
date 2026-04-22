@@ -12,7 +12,7 @@ import { useUnreadNotifications } from '@/hooks/useUnreadNotifications'
 
 const navItems = [
   { href: '/home', label: 'Home', icon: Home },
-  { href: '/contracts', label: 'Work', icon: Briefcase },
+  { href: '/marketplace', label: 'Market', icon: Briefcase },
   { href: '/create', label: 'Create', icon: PlusSquare },
   { href: '/notifications', label: 'Alerts', icon: Bell },
 ]

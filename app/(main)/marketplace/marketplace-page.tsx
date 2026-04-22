@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Briefcase, Check, Sparkles } from 'lucide-react'
+import { Briefcase, Check, Sparkles, FileText } from 'lucide-react'
+import { ContractsPage } from '../contracts/contracts-page'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
@@ -70,12 +71,21 @@ interface MarketplaceContract {
   deliverables?: Array<{ id: string; title: string; status: string }>
 }
 
+interface ContractsBundle {
+  contracts: any[]
+  agents: any[]
+  userAgentId: string | null
+  serverStats?: { total: number; open: number; active: number; completed: number; disputed: number }
+}
+
 interface MarketplacePageProps {
   agents: Agent[]
   services: Service[]
   categories: Category[]
   contracts: MarketplaceContract[]
   capabilityTags: CapabilityTag[]
+  contractsData?: ContractsBundle
+  initialTab?: 'market' | 'contracts'
 }
 
 // Coarse RELAY → USD reference rate for display only
@@ -98,6 +108,8 @@ export function MarketplacePage({
   services,
   contracts,
   capabilityTags: _capabilityTags,
+  contractsData,
+  initialTab = 'market',
 }: MarketplacePageProps) {
   void _capabilityTags
   void agents
@@ -204,6 +216,10 @@ export function MarketplacePage({
   }, [tableServices])
 
   // ── Post-a-Job dialog state (preserved) ─────────────────────────────────
+  const [activeTab, setActiveTab] = useState<'market' | 'contracts'>(initialTab)
+
+  const [activeTab, setActiveTab] = useState<'market' | 'contracts'>(initialTab)
+
   const [jobDialogOpen, setJobDialogOpen] = useState(false)
   const [jobTitle, setJobTitle] = useState('')
   const [jobDescription, setJobDescription] = useState('')
@@ -290,7 +306,7 @@ export function MarketplacePage({
         setJobBudget('')
         setJobDeadline('')
         setJobSuccess(false)
-        router.push('/contracts')
+        setActiveTab('contracts')
       }, 1500)
     } catch (err) {
       setJobError(err instanceof Error ? err.message : 'Failed to post job')
@@ -301,94 +317,143 @@ export function MarketplacePage({
 
   return (
     <div className="flex-1">
-      {/* ── Page header ──────────────────────────────────────────────── */}
+      {/* ── Unified marketplace header with Market | Contracts tabs ──── */}
       <div className="border-b border-border bg-background">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 rounded-md bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
-              <Briefcase className="w-5 h-5 text-primary" />
+        <div className="max-w-7xl mx-auto px-4">
+          {/* Top row: brand + CTA */}
+          <div className="py-3 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-md bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+                {activeTab === 'market' ? (
+                  <Briefcase className="w-5 h-5 text-primary" />
+                ) : (
+                  <FileText className="w-5 h-5 text-primary" />
+                )}
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-lg font-semibold leading-tight truncate">Relay Marketplace</h1>
+                <p className="text-xs text-muted-foreground truncate">
+                  {activeTab === 'market'
+                    ? 'Thousands of agent services. Powered by x402 + Solana.'
+                    : 'Browse and manage contracts, deliverables, and escrow'}
+                </p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <h1 className="text-lg font-semibold leading-tight truncate">Relay Market</h1>
-              <p className="text-xs text-muted-foreground truncate">
-                Thousands of agent services. Zero API keys. Powered by x402 + Solana.
-              </p>
-            </div>
+            {activeTab === 'market' && (
+              <div className="hidden md:flex items-center gap-3 text-xs">
+                <Link href="/about" className="text-muted-foreground hover:text-foreground transition-colors">
+                  About
+                </Link>
+                <Link href="/whitepaper" className="text-muted-foreground hover:text-foreground transition-colors">
+                  Docs
+                </Link>
+                <Button
+                  size="sm"
+                  className="gap-1.5 h-8"
+                  onClick={() => {
+                    setJobDialogOpen(true)
+                    setJobError(null)
+                    setJobSuccess(false)
+                  }}
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Post a Job
+                </Button>
+              </div>
+            )}
           </div>
-          <div className="hidden md:flex items-center gap-3 text-xs">
-            <Link href="/about" className="text-muted-foreground hover:text-foreground transition-colors">
-              About
-            </Link>
-            <Link href="/.well-known/agents.json" className="text-muted-foreground hover:text-foreground transition-colors font-mono">
-              agents.json
-            </Link>
-            <Link href="/.well-known/mcp.json" className="text-muted-foreground hover:text-foreground transition-colors font-mono">
-              mcp.json
-            </Link>
-            <Link href="/whitepaper" className="text-muted-foreground hover:text-foreground transition-colors">
-              Docs
-            </Link>
-            <Button
-              size="sm"
-              className="gap-1.5 h-8"
-              onClick={() => {
-                setJobDialogOpen(true)
-                setJobError(null)
-                setJobSuccess(false)
-              }}
+          {/* Tab switcher */}
+          <div className="flex items-center gap-0">
+            <button
+              onClick={() => setActiveTab('market')}
+              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                activeTab === 'market'
+                  ? 'border-primary text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+              }`}
             >
-              <Sparkles className="w-3.5 h-3.5" />
-              Post a Job
-            </Button>
+              <Briefcase className="w-4 h-4" />
+              Market
+            </button>
+            <button
+              onClick={() => setActiveTab('contracts')}
+              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                activeTab === 'contracts'
+                  ? 'border-primary text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              Contracts
+            </button>
           </div>
         </div>
       </div>
 
-      {/* ── Dashboard ────────────────────────────────────────────────── */}
-      <MarketDashboard {...dashboardData} />
+      {/* ── Market tab ───────────────────────────────────────────────── */}
+      {activeTab === 'market' && (
+        <>
+          {/* ── Dashboard */}
+          <MarketDashboard {...dashboardData} />
 
-      {/* ── All Services table ───────────────────────────────────────── */}
-      <AllServicesTable
-        services={tableServices}
-        categories={tableCategories}
-        networks={tableNetworks}
-      />
+          {/* ── All Services table */}
+          <AllServicesTable
+            services={tableServices}
+            categories={tableCategories}
+            networks={tableNetworks}
+          />
 
-      {/* ── Open contracts strip ─────────────────────────────────────── */}
-      {contracts.length > 0 && (
-        <div className="max-w-7xl mx-auto px-4 pb-12">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">Open Contracts</h2>
-            <Link href="/contracts" className="text-xs text-muted-foreground hover:text-foreground">
-              View all →
-            </Link>
-          </div>
-          <div className="border border-border rounded-md overflow-hidden">
-            <ul className="divide-y divide-border">
-              {contracts.slice(0, 8).map((c) => (
-                <li key={c.id} className="px-4 py-3 flex items-center gap-4 hover:bg-muted/30 transition-colors">
-                  <div className="flex-1 min-w-0">
-                    <Link
-                      href={`/contracts/${c.id}`}
-                      className="font-medium text-sm hover:underline truncate block"
-                    >
-                      {c.title}
-                    </Link>
-                    {c.client && (
-                      <p className="text-xs text-muted-foreground">
-                        @{c.client.handle} · rep {c.client_reputation ?? '—'}
-                      </p>
-                    )}
-                  </div>
-                  <span className="text-sm font-mono tabular-nums shrink-0">
-                    {(c.amount || 0).toLocaleString()}{' '}
-                    <span className="text-muted-foreground">RELAY</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
+          {/* ── Open contracts strip */}
+          {contracts.length > 0 && (
+            <div className="max-w-7xl mx-auto px-4 pb-12">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold">Open Contracts</h2>
+                <button
+                  onClick={() => setActiveTab('contracts')}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  View all →
+                </button>
+              </div>
+              <div className="border border-border rounded-md overflow-hidden">
+                <ul className="divide-y divide-border">
+                  {contracts.slice(0, 8).map((c) => (
+                    <li key={c.id} className="px-4 py-3 flex items-center gap-4 hover:bg-muted/30 transition-colors">
+                      <div className="flex-1 min-w-0">
+                        <Link
+                          href={`/contracts/${c.id}`}
+                          className="font-medium text-sm hover:underline truncate block"
+                        >
+                          {c.title}
+                        </Link>
+                        {c.client && (
+                          <p className="text-xs text-muted-foreground">
+                            @{c.client.handle} · rep {c.client_reputation ?? '—'}
+                          </p>
+                        )}
+                      </div>
+                      <span className="text-sm font-mono tabular-nums shrink-0">
+                        {(c.amount || 0).toLocaleString()}{' '}
+                        <span className="text-muted-foreground">RELAY</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ── Contracts tab ────────────────────────────────────────────── */}
+      {activeTab === 'contracts' && (
+        <ContractsPage
+          contracts={(contractsData?.contracts ?? []) as any}
+          agents={(contractsData?.agents ?? []) as any}
+          userAgentId={contractsData?.userAgentId ?? null}
+          capabilityTags={[]}
+          serverStats={contractsData?.serverStats}
+        />
       )}
 
       {/* ── Post a Job Dialog ────────────────────────────────────────── */}
