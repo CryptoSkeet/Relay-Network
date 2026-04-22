@@ -37,14 +37,6 @@ pub const PERM_WRITE:    u8 = 0b0000_0010;
 pub const PERM_TRANSACT: u8 = 0b0000_0100;
 pub const PERM_ALL_VALID: u8 = PERM_READ | PERM_WRITE | PERM_TRANSACT;
 
-// Permission bitflags — agents prove what they're authorized to do.
-// Stored as u8 on the AgentProfile PDA so any verifier can derive the PDA
-// and check authorization without trusting the API layer.
-pub const PERM_READ:     u8 = 0b0000_0001;
-pub const PERM_WRITE:    u8 = 0b0000_0010;
-pub const PERM_TRANSACT: u8 = 0b0000_0100;
-pub const PERM_ALL_VALID: u8 = PERM_READ | PERM_WRITE | PERM_TRANSACT;
-
 #[program]
 pub mod relay_agent_profile {
     use super::*;
@@ -85,6 +77,8 @@ pub mod relay_agent_profile {
         is_verified: bool,
         is_suspended: bool,
         permissions: u8,
+        fulfilled_contracts: u64,
+        total_contracts: u64,
         profile_hash: [u8; 32],
     ) -> Result<()> {
         require!(!handle.is_empty(), ProfileError::HandleEmpty);
@@ -127,6 +121,8 @@ pub mod relay_agent_profile {
         profile.is_verified = is_verified;
         profile.is_suspended = is_suspended;
         profile.permissions = permissions;
+        profile.fulfilled_contracts = fulfilled_contracts;
+        profile.total_contracts = total_contracts;
         profile.profile_hash = profile_hash;
         profile.updated_at = now;
         profile.version = profile.version.saturating_add(1);
@@ -143,6 +139,8 @@ pub mod relay_agent_profile {
             is_verified,
             is_suspended,
             permissions,
+            fulfilled_contracts,
+            total_contracts,
             profile_hash,
             version: profile.version,
             updated_at: now,
@@ -227,31 +225,36 @@ pub struct AgentProfile {
     pub did_pubkey: Pubkey,         // 32
     pub wallet: Pubkey,             // 32
     pub reputation_score: u32,      // 4
-    pub completed_contracts: u32,   // 4
+    pub completed_contracts: u32,   // 4  (legacy count from DB)
     pub failed_contracts: u32,      // 4
     pub disputes: u32,              // 4
-    pub total_earned: u64,          // 8 (RELAY base units)
+    pub total_earned: u64,          // 8  (RELAY base units)
     pub is_verified: bool,          // 1
     pub is_suspended: bool,         // 1
-    pub permissions: u8,            // 1   bitflags: READ|WRITE|TRANSACT (KYA scope)
-    pub profile_hash: [u8; 32],     // 32  sha256 of canonical profile JSON
+    pub permissions: u8,            // 1  bitflags: READ|WRITE|TRANSACT (KYA scope)
+    pub fulfilled_contracts: u64,   // 8  atomic delivery counter
+    pub total_contracts: u64,       // 8  total work taken on
+    // fulfilled_contracts / total_contracts = on-chain reputation ratio,
+    // verifiable on Solscan. No database. No trust required.
+    pub profile_hash: [u8; 32],     // 32 sha256 of canonical profile JSON
     pub created_at: i64,            // 8
     pub updated_at: i64,            // 8
-    pub version: u64,               // 8   monotonic write counter
+    pub version: u64,               // 8  monotonic write counter
     pub bump: u8,                   // 1
 }
 
 impl AgentProfile {
     pub const SIZE: usize =
-        (4 + MAX_HANDLE_LEN)        // handle
+        (4 + MAX_HANDLE_LEN)         // handle
         + (4 + MAX_DISPLAY_NAME_LEN) // display_name
         + 32 + 32                    // did_pubkey + wallet
-        + 4 + 4 + 4 + 4              // counters
+        + 4 + 4 + 4 + 4              // legacy counters
         + 8                          // total_earned
         + 1 + 1 + 1                  // verified, suspended, permissions
+        + 8 + 8                      // fulfilled_contracts, total_contracts
         + 32                         // profile_hash
         + 8 + 8 + 8                  // created_at, updated_at, version
-        + 1; // bump
+        + 1;                         // bump
 }
 
 // ── Events ───────────────────────────────────────────────────────────────────
@@ -269,6 +272,8 @@ pub struct ProfileUpserted {
     pub is_verified: bool,
     pub is_suspended: bool,
     pub permissions: u8,
+    pub fulfilled_contracts: u64,
+    pub total_contracts: u64,
     pub profile_hash: [u8; 32],
     pub version: u64,
     pub updated_at: i64,

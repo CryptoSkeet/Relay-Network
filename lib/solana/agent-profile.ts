@@ -119,6 +119,8 @@ export function canonicalProfileJson(p: ProfileFields): string {
     is_verified: p.isVerified,
     is_suspended: p.isSuspended,
     permissions: resolvePermissions(p),
+    fulfilled_contracts: (p.fulfilledContracts ?? BigInt(0)).toString(),
+    total_contracts: (p.totalContracts ?? BigInt(0)).toString(),
   })
 }
 
@@ -147,6 +149,13 @@ export interface ProfileFields {
    * Defaults to READ|WRITE when omitted.
    */
   permissions?: number
+  /**
+   * Atomic on-chain delivery counters. `fulfilledContracts / totalContracts`
+   * is the verifiable reputation ratio — no database, no trust required.
+   * Both default to 0n when omitted.
+   */
+  fulfilledContracts?: bigint
+  totalContracts?: bigint
 }
 
 // Permission bitflags — mirror programs/relay_agent_profile/src/lib.rs
@@ -250,6 +259,7 @@ export async function upsertAgentProfileOnChain(
   // Layout: disc + handle(string) + display_name(string) + did_pubkey(32) +
   //   wallet(32) + reputation_score(u32) + completed(u32) + failed(u32) +
   //   disputes(u32) + total_earned(u64) + is_verified(u8) + is_suspended(u8) +
+  //   permissions(u8) + fulfilled_contracts(u64) + total_contracts(u64) +
   //   profile_hash(32)
   const u32 = (n: number) => {
     const b = Buffer.alloc(4)
@@ -276,6 +286,8 @@ export async function upsertAgentProfileOnChain(
     Buffer.from([fields.isVerified ? 1 : 0]),
     Buffer.from([fields.isSuspended ? 1 : 0]),
     Buffer.from([resolvePermissions(fields)]),
+    u64(fields.fulfilledContracts ?? BigInt(0)),
+    u64(fields.totalContracts ?? BigInt(0)),
     hash,
   ])
 
@@ -319,6 +331,11 @@ export interface OnChainAgentProfile {
   totalEarned: bigint
   isVerified: boolean
   isSuspended: boolean
+  permissions: number
+  fulfilledContracts: bigint
+  totalContracts: bigint
+  /** fulfilled / total ratio as a float (NaN when totalContracts === 0n) */
+  fulfillmentRate: number
   profileHash: string // hex
   createdAt: number
   updatedAt: number
@@ -348,7 +365,7 @@ export async function fetchAgentProfileOnChain(
   let o = 0
 
   const handleRead = readString(buf, o); o = handleRead.next
-  const displayName = readString(buf, o); o = displayName.next
+  const displayNameRead = readString(buf, o); o = displayNameRead.next
   const did = new PublicKey(buf.subarray(o, o + 32)); o += 32
   const wallet = new PublicKey(buf.subarray(o, o + 32)); o += 32
   const score = buf.readUInt32LE(o); o += 4
@@ -358,6 +375,9 @@ export async function fetchAgentProfileOnChain(
   const totalEarned = buf.readBigUInt64LE(o); o += 8
   const isVerified = buf.readUInt8(o) === 1; o += 1
   const isSuspended = buf.readUInt8(o) === 1; o += 1
+  const permissions = buf.readUInt8(o); o += 1
+  const fulfilledContracts = buf.readBigUInt64LE(o); o += 8
+  const totalContracts = buf.readBigUInt64LE(o); o += 8
   const hash = Buffer.from(buf.subarray(o, o + 32)); o += 32
   const createdAt = Number(buf.readBigInt64LE(o)); o += 8
   const updatedAt = Number(buf.readBigInt64LE(o)); o += 8
@@ -366,16 +386,22 @@ export async function fetchAgentProfileOnChain(
 
   return {
     handle: handleRead.value,
-    displayName: displayName.value,
+    displayName: displayNameRead.value,
     didPubkey: did,
     wallet,
     reputationScore: score,
     completedContracts: completed,
     failedContracts: failed,
-    disputes: disputes,
+    disputes,
     totalEarned,
     isVerified,
     isSuspended,
+    permissions,
+    fulfilledContracts,
+    totalContracts,
+    fulfillmentRate: totalContracts > BigInt(0)
+      ? Number(fulfilledContracts) / Number(totalContracts)
+      : NaN,
     profileHash: hash.toString('hex'),
     createdAt,
     updatedAt,

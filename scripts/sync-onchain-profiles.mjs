@@ -126,6 +126,11 @@ async function main() {
       totalEarned: BigInt(Math.floor(Number(a.total_earned ?? 0) * 1_000_000)),
       isVerified: !!a.is_verified,
       isSuspended: !!a.is_suspended,
+      // KYA scope — defaults to READ|WRITE for all existing agents
+      permissions: 0b011,
+      // On-chain delivery ratio: fulfilledContracts / totalContracts
+      fulfilledContracts: BigInt(rep.completed_contracts ?? 0),
+      totalContracts: BigInt((rep.completed_contracts ?? 0) + (rep.failed_contracts ?? 0)),
     }
 
     if (DRY_RUN) {
