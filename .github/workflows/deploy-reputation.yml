@@ -199,23 +199,26 @@ jobs:
         run: |
           set +e
           echo "Verifying $PROGRAM_ID against $REPO_URL @ $COMMIT"
-          UPLOADER=$(solana-keygen pubkey /tmp/payer.json)
-          # Step 1: write verify PDA on-chain (signed by upgrade authority).
-          solana-verify export-pda-tx \
+          # verify-from-repo runs the reproducible Docker build, compares
+          # the SBF hash against deployed bytecode, and — on match —
+          # writes the verify PDA on-chain signed by the upgrade authority
+          # (--keypair). The on-chain PDA is what makes the Solana Explorer
+          # "Verified" badge turn green. (OtterSec --remote attestation is
+          # mainnet-only and is a separate, optional second signal.)
+          solana-verify verify-from-repo \
             --url devnet \
             --program-id "$PROGRAM_ID" \
             --library-name relay_reputation \
             --mount-path programs \
             --commit-hash "$COMMIT" \
-            --uploader "$UPLOADER" \
             --keypair /tmp/payer.json \
-            "$REPO_URL" || echo "::warning::export-pda-tx failed (likely already exists)"
-          # Step 2: queue OtterSec remote verifier to rebuild + attest.
-          solana-verify remote submit-job \
-            --url devnet \
-            --program-id "$PROGRAM_ID" \
-            --uploader "$UPLOADER" || echo "::warning::remote submit-job failed; verifier may be queued or offline."
-          echo "Verify job submitted. Status: https://verify.osec.io/status/$PROGRAM_ID"
+            "$REPO_URL"
+          STATUS=$?
+          if [ $STATUS -eq 0 ]; then
+            echo "✅ Program verified. PDA written on-chain by $UPLOADER."
+          else
+            echo "::warning::verify-from-repo exit=$STATUS — hash mismatch or Docker unavailable. Deploy succeeded; verify badge will not appear until next attempt."
+          fi
           exit 0
 
       - name: Clean up keypairs
