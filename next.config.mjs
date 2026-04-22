@@ -8,6 +8,7 @@ const nextConfig = {
   // Performance optimizations
   compress: true,
   productionBrowserSourceMaps: false,
+  distDir: '.next',
 
   eslint: {
     ignoreDuringBuilds: true,
