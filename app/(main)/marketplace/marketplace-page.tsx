@@ -226,11 +226,15 @@ export function MarketplacePage({
   const [jobSubmitting, setJobSubmitting] = useState(false)
   const [jobError, setJobError] = useState<string | null>(null)
   const [jobSuccess, setJobSuccess] = useState(false)
+  const [hasRelayApiKey, setHasRelayApiKey] = useState(false)
   const [userAgents, setUserAgents] = useState<Agent[]>([])
   const [selectedAgentId, setSelectedAgentId] = useState('')
 
   useEffect(() => {
     const run = async () => {
+      const apiKey = typeof window !== 'undefined' ? localStorage.getItem('relay_api_key') : null
+      setHasRelayApiKey(Boolean(apiKey))
+
       const supabase = createClient()
       const {
         data: { user },
@@ -258,7 +262,7 @@ export function MarketplacePage({
       setJobError('A valid budget is required')
       return
     }
-    if (!selectedAgentId) {
+    if (!selectedAgentId && !hasRelayApiKey) {
       setJobError('You need an agent to post a job. Create one first.')
       return
     }
@@ -284,7 +288,7 @@ export function MarketplacePage({
         method: 'POST',
         headers,
         body: JSON.stringify({
-          provider_id: selectedAgentId,
+          provider_id: selectedAgentId || null,
           title: jobTitle.trim(),
           description: jobDescription.trim() || null,
           budget: parseFloat(jobBudget),
@@ -492,7 +496,7 @@ export function MarketplacePage({
                 </div>
               )}
 
-              {userAgents.length === 0 ? (
+              {userAgents.length === 0 && !hasRelayApiKey ? (
                 <div className="text-center py-6">
                   <p className="text-muted-foreground mb-4">You need an agent to post a job.</p>
                   <Button asChild>
@@ -501,20 +505,26 @@ export function MarketplacePage({
                 </div>
               ) : (
                 <>
-                  <div className="space-y-2">
-                    <Label>Posting as</Label>
-                    <select
-                      value={selectedAgentId}
-                      onChange={(e) => setSelectedAgentId(e.target.value)}
-                      className="w-full h-10 px-3 rounded-md border bg-background text-sm"
-                    >
-                      {userAgents.map((agent) => (
-                        <option key={agent.id} value={agent.id}>
-                          @{agent.handle} — {agent.display_name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  {userAgents.length > 0 ? (
+                    <div className="space-y-2">
+                      <Label>Posting as</Label>
+                      <select
+                        value={selectedAgentId}
+                        onChange={(e) => setSelectedAgentId(e.target.value)}
+                        className="w-full h-10 px-3 rounded-md border bg-background text-sm"
+                      >
+                        {userAgents.map((agent) => (
+                          <option key={agent.id} value={agent.id}>
+                            @{agent.handle} — {agent.display_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <div className="rounded-md border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+                      Posting with API key authentication.
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <Label htmlFor="job-title">Job Title *</Label>
                     <Input
