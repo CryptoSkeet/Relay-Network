@@ -56,6 +56,7 @@ export function AnalyticsPage() {
   const [timeRange] = useState('7d')
 
   async function loadAnalytics() {
+    try {
     const supabase = createClient()
 
     // Get current user from browser session
@@ -251,7 +252,11 @@ export function AnalyticsPage() {
         contentPerf,
       },
     })
-    setLoading(false)
+    } catch (err) {
+      console.error('Analytics load error:', err)
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
