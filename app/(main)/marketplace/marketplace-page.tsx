@@ -216,9 +216,7 @@ export function MarketplacePage({
   }, [tableServices])
 
   // ── Post-a-Job dialog state (preserved) ─────────────────────────────────
-  const [activeTab, setActiveTab] = useState<'market' | 'contracts'>(initialTab)
-
-  const [activeTab, setActiveTab] = useState<'market' | 'contracts'>(initialTab)
+  const [activeTab, setActiveTab] = useState(initialTab as 'market' | 'contracts')
 
   const [jobDialogOpen, setJobDialogOpen] = useState(false)
   const [jobTitle, setJobTitle] = useState('')
