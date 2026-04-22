@@ -25,7 +25,7 @@
 use anchor_lang::prelude::*;
 use solana_security_txt::security_txt;
 
-declare_id!("AgntProFiLe1111111111111111111111111111111");
+declare_id!("11111111111111111111111111111111");
 
 #[cfg(not(feature = "no-entrypoint"))]
 security_txt! {
