@@ -1,16 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { Briefcase, Check, Sparkles, FileText } from 'lucide-react'
+import { Briefcase, FileText } from 'lucide-react'
 import { ContractsPage } from '../contracts/contracts-page'
-import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { createClient } from '@/lib/supabase/client'
 import type { Agent } from '@/lib/types'
 import { MarketDashboard, type LeaderboardEntry, type TickerEntry } from './market-dashboard'
 import { AllServicesTable, type AllServicesService } from './all-services-table'
@@ -113,7 +107,6 @@ export function MarketplacePage({
 }: MarketplacePageProps) {
   void _capabilityTags
   void agents
-  const router = useRouter()
 
   // ── Aggregates for the dashboard ────────────────────────────────────────
   const dashboardData = useMemo(() => {
@@ -215,107 +208,8 @@ export function MarketplacePage({
     return Array.from(set)
   }, [tableServices])
 
-  // ── Post-a-Job dialog state (preserved) ─────────────────────────────────
+  // ── Active view state ────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState(initialTab as 'market' | 'contracts')
-
-  const [jobDialogOpen, setJobDialogOpen] = useState(false)
-  const [jobTitle, setJobTitle] = useState('')
-  const [jobDescription, setJobDescription] = useState('')
-  const [jobBudget, setJobBudget] = useState('')
-  const [jobDeadline, setJobDeadline] = useState('')
-  const [jobSubmitting, setJobSubmitting] = useState(false)
-  const [jobError, setJobError] = useState<string | null>(null)
-  const [jobSuccess, setJobSuccess] = useState(false)
-  const [hasRelayApiKey, setHasRelayApiKey] = useState(false)
-  const [userAgents, setUserAgents] = useState<Agent[]>([])
-  const [selectedAgentId, setSelectedAgentId] = useState('')
-
-  useEffect(() => {
-    const run = async () => {
-      const apiKey = typeof window !== 'undefined' ? localStorage.getItem('relay_api_key') : null
-      setHasRelayApiKey(Boolean(apiKey))
-
-      const supabase = createClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) return
-      const { data } = await supabase
-        .from('agents')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-      if (data && data.length > 0) {
-        setUserAgents(data)
-        setSelectedAgentId(data[0].id)
-      }
-    }
-    run()
-  }, [])
-
-  const handlePostJob = async () => {
-    if (!jobTitle.trim()) {
-      setJobError('Job title is required')
-      return
-    }
-    if (!jobBudget || parseFloat(jobBudget) <= 0) {
-      setJobError('A valid budget is required')
-      return
-    }
-    if (!selectedAgentId && !hasRelayApiKey) {
-      setJobError('You need an agent to post a job. Create one first.')
-      return
-    }
-    setJobSubmitting(true)
-    setJobError(null)
-    try {
-      const supabase = createClient()
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-      const apiKey = typeof window !== 'undefined' ? localStorage.getItem('relay_api_key') : null
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-      if (session?.access_token) {
-        headers['Authorization'] = `Bearer ${session.access_token}`
-      } else if (apiKey) {
-        headers['x-relay-api-key'] = apiKey
-      } else {
-        setJobError('Please sign in to post a job.')
-        setJobSubmitting(false)
-        return
-      }
-      const response = await fetch('/api/contracts', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          provider_id: selectedAgentId || null,
-          title: jobTitle.trim(),
-          description: jobDescription.trim() || null,
-          budget: parseFloat(jobBudget),
-          timeline_days: jobDeadline
-            ? Math.max(1, Math.ceil((new Date(jobDeadline).getTime() - Date.now()) / 86400000))
-            : 30,
-          requirements: [],
-        }),
-      })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.error || 'Failed to post job')
-      setJobSuccess(true)
-      setTimeout(() => {
-        setJobDialogOpen(false)
-        setJobTitle('')
-        setJobDescription('')
-        setJobBudget('')
-        setJobDeadline('')
-        setJobSuccess(false)
-        setActiveTab('contracts')
-      }, 1500)
-    } catch (err) {
-      setJobError(err instanceof Error ? err.message : 'Failed to post job')
-    } finally {
-      setJobSubmitting(false)
-    }
-  }
 
   return (
     <div className="flex-1">
@@ -352,14 +246,10 @@ export function MarketplacePage({
                 <Button
                   size="sm"
                   className="gap-1.5 h-8"
-                  onClick={() => {
-                    setJobDialogOpen(true)
-                    setJobError(null)
-                    setJobSuccess(false)
-                  }}
+                  onClick={() => setActiveTab('contracts')}
                 >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  Post a Job
+                  <FileText className="w-3.5 h-3.5" />
+                  New Contract
                 </Button>
               </div>
             )}
@@ -457,132 +347,6 @@ export function MarketplacePage({
           serverStats={contractsData?.serverStats}
         />
       )}
-
-      {/* ── Post a Job Dialog ────────────────────────────────────────── */}
-      <Dialog
-        open={jobDialogOpen}
-        onOpenChange={(open) => {
-          setJobDialogOpen(open)
-          if (!open) {
-            setJobError(null)
-            setJobSuccess(false)
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Briefcase className="w-5 h-5 text-primary" />
-              Post a Job
-            </DialogTitle>
-            <DialogDescription>
-              Describe the work you need done. Agents will be able to pick it up.
-            </DialogDescription>
-          </DialogHeader>
-
-          {jobSuccess ? (
-            <div className="flex flex-col items-center gap-3 py-6">
-              <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center">
-                <Check className="w-6 h-6 text-green-500" />
-              </div>
-              <p className="font-semibold">Job posted successfully!</p>
-              <p className="text-sm text-muted-foreground">Redirecting to contracts...</p>
-            </div>
-          ) : (
-            <div className="space-y-4 pt-2">
-              {jobError && (
-                <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
-                  {jobError}
-                </div>
-              )}
-
-              {userAgents.length === 0 && !hasRelayApiKey ? (
-                <div className="text-center py-6">
-                  <p className="text-muted-foreground mb-4">You need an agent to post a job.</p>
-                  <Button asChild>
-                    <Link href="/create">Create an Agent</Link>
-                  </Button>
-                </div>
-              ) : (
-                <>
-                  {userAgents.length > 0 ? (
-                    <div className="space-y-2">
-                      <Label>Posting as</Label>
-                      <select
-                        value={selectedAgentId}
-                        onChange={(e) => setSelectedAgentId(e.target.value)}
-                        className="w-full h-10 px-3 rounded-md border bg-background text-sm"
-                      >
-                        {userAgents.map((agent) => (
-                          <option key={agent.id} value={agent.id}>
-                            @{agent.handle} — {agent.display_name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  ) : (
-                    <div className="rounded-md border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
-                      Posting with API key authentication.
-                    </div>
-                  )}
-                  <div className="space-y-2">
-                    <Label htmlFor="job-title">Job Title *</Label>
-                    <Input
-                      id="job-title"
-                      placeholder="e.g. Build a Solana trading bot"
-                      value={jobTitle}
-                      onChange={(e) => setJobTitle(e.target.value)}
-                      maxLength={100}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="job-desc">Description</Label>
-                    <Textarea
-                      id="job-desc"
-                      placeholder="Describe the job — requirements, deliverables, expectations..."
-                      className="min-h-[100px] resize-none"
-                      value={jobDescription}
-                      onChange={(e) => setJobDescription(e.target.value)}
-                      maxLength={2000}
-                    />
-                    <p className="text-xs text-muted-foreground">{jobDescription.length}/2000</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="job-budget">Budget (RELAY) *</Label>
-                      <Input
-                        id="job-budget"
-                        type="number"
-                        placeholder="1000"
-                        min="1"
-                        value={jobBudget}
-                        onChange={(e) => setJobBudget(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="job-deadline">Deadline</Label>
-                      <Input
-                        id="job-deadline"
-                        type="date"
-                        value={jobDeadline}
-                        onChange={(e) => setJobDeadline(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <div className="flex justify-end gap-2 pt-2">
-                    <Button variant="ghost" onClick={() => setJobDialogOpen(false)}>
-                      Cancel
-                    </Button>
-                    <Button onClick={handlePostJob} disabled={jobSubmitting}>
-                      {jobSubmitting ? 'Posting…' : 'Post Job'}
-                    </Button>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
