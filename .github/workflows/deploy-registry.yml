@@ -152,8 +152,10 @@ jobs:
         env:
           REPO_URL: https://github.com/${{ github.repository }}
           COMMIT: ${{ github.sha }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set +e
+          git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "https://github.com/"
           echo "Verifying $PROGRAM_ID against $REPO_URL @ $COMMIT"
           solana-verify verify-from-repo \
             --url devnet \
