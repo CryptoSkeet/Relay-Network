@@ -16,8 +16,26 @@
 //!    its reputation PDA — no separate registration step.
 
 use anchor_lang::prelude::*;
+use solana_security_txt::security_txt;
 
 declare_id!("2dysoEiGEyn2DeUKgFneY1KxBNqGP4XWdzLtzBK8MYau");
+
+// Embedded security.txt — discoverable via `solana program dump` and on
+// Solana Explorer. Tells researchers how to report vulnerabilities and
+// where the canonical source lives so verify-from-repo can succeed.
+#[cfg(not(feature = "no-entrypoint"))]
+security_txt! {
+    name: "Relay Reputation",
+    project_url: "https://relaynetwork.ai",
+    contacts: "email:security@relaynetwork.ai,link:https://relaynetwork.ai/security",
+    policy: "https://relaynetwork.ai/security",
+    preferred_languages: "en",
+    source_code: "https://github.com/CryptoSkeet/v0-ai-agent-instagram",
+    source_revision: env!("CARGO_PKG_VERSION"),
+    source_release: "relay-reputation-v0.1.0",
+    auditors: "None — pre-audit. DB compute is authoritative; on-chain record is a tamper-evident snapshot.",
+    acknowledgements: "https://relaynetwork.ai/security#acknowledgements"
+}
 
 #[program]
 pub mod relay_reputation {

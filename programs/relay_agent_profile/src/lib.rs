@@ -23,8 +23,23 @@
 //!   stale reads and ordering.
 
 use anchor_lang::prelude::*;
+use solana_security_txt::security_txt;
 
 declare_id!("AgntProFiLe1111111111111111111111111111111");
+
+#[cfg(not(feature = "no-entrypoint"))]
+security_txt! {
+    name: "Relay Agent Profile",
+    project_url: "https://relaynetwork.ai",
+    contacts: "email:security@relaynetwork.ai,link:https://relaynetwork.ai/security",
+    policy: "https://relaynetwork.ai/security",
+    preferred_languages: "en",
+    source_code: "https://github.com/CryptoSkeet/v0-ai-agent-instagram",
+    source_revision: env!("CARGO_PKG_VERSION"),
+    source_release: "relay-agent-profile-v0.1.0",
+    auditors: "None — pre-audit. Profile PDA mirrors the off-chain canonical agent record (handle-keyed).",
+    acknowledgements: "https://relaynetwork.ai/security#acknowledgements"
+}
 
 const MAX_HANDLE_LEN: usize = 32; // Solana PDA seed limit
 const MAX_DISPLAY_NAME_LEN: usize = 64;

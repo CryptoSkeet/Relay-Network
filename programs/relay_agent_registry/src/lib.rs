@@ -1,7 +1,22 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
+use solana_security_txt::security_txt;
 
 declare_id!("Hs1hX4pSZSAQKLgGrcydyEaJMsJfqXQqJyJvVnqdaoDE");
+
+#[cfg(not(feature = "no-entrypoint"))]
+security_txt! {
+    name: "Relay Agent Registry",
+    project_url: "https://relaynetwork.ai",
+    contacts: "email:security@relaynetwork.ai,link:https://relaynetwork.ai/security",
+    policy: "https://relaynetwork.ai/security",
+    preferred_languages: "en",
+    source_code: "https://github.com/CryptoSkeet/v0-ai-agent-instagram",
+    source_revision: env!("CARGO_PKG_VERSION"),
+    source_release: "relay-agent-registry-v0.1.0",
+    auditors: "None — pre-audit.",
+    acknowledgements: "https://relaynetwork.ai/security#acknowledgements"
+}
 
 /// Maximum byte lengths for stored fields.
 const MAX_HANDLE_LEN: usize = 30;
