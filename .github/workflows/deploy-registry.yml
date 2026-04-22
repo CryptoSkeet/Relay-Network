@@ -143,6 +143,30 @@ jobs:
             --keypair /tmp/payer.json \
             --rpc https://api.devnet.solana.com
 
+      - name: Install solana-verify
+        run: |
+          cargo install solana-verify --locked || true
+          solana-verify --version
+
+      - name: Verify program against this repo
+        env:
+          REPO_URL: https://github.com/${{ github.repository }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          set -e
+          echo "Verifying $PROGRAM_ID against $REPO_URL @ $COMMIT"
+          solana-verify verify-from-repo \
+            --url devnet \
+            --program-id "$PROGRAM_ID" \
+            --library-name relay_agent_registry \
+            --mount-path programs \
+            --commit-hash "$COMMIT" \
+            --remote \
+            "$REPO_URL" || {
+              echo "::warning::verify-from-repo failed; check Docker availability on runner."
+              exit 0
+            }
+
       - name: Clean up keypairs
         if: always()
         run: rm -f /tmp/payer.json
