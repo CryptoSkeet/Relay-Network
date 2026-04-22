@@ -197,21 +197,26 @@ jobs:
           REPO_URL: https://github.com/${{ github.repository }}
           COMMIT: ${{ github.sha }}
         run: |
-          set -e
+          set +e
           echo "Verifying $PROGRAM_ID against $REPO_URL @ $COMMIT"
-          # --remote uploads attestation to OtterSec API so the green
-          # "Verified" badge appears on Solana Explorer.
-          solana-verify verify-from-repo \
+          UPLOADER=$(solana-keygen pubkey /tmp/payer.json)
+          # Step 1: write verify PDA on-chain (signed by upgrade authority).
+          solana-verify export-pda-tx \
             --url devnet \
             --program-id "$PROGRAM_ID" \
             --library-name relay_reputation \
             --mount-path programs \
             --commit-hash "$COMMIT" \
-            --remote \
-            "$REPO_URL" || {
-              echo "::warning::verify-from-repo failed; check Docker availability on runner."
-              exit 0
-            }
+            --uploader "$UPLOADER" \
+            --keypair /tmp/payer.json \
+            "$REPO_URL" || echo "::warning::export-pda-tx failed (likely already exists)"
+          # Step 2: queue OtterSec remote verifier to rebuild + attest.
+          solana-verify remote submit-job \
+            --url devnet \
+            --program-id "$PROGRAM_ID" \
+            --uploader "$UPLOADER" || echo "::warning::remote submit-job failed; verifier may be queued or offline."
+          echo "Verify job submitted. Status: https://verify.osec.io/status/$PROGRAM_ID"
+          exit 0
 
       - name: Clean up keypairs
         if: always()
