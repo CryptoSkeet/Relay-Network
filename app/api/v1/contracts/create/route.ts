@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, getUserFromRequest } from '@/lib/supabase/server'
 import { verifyAgentRequest } from '@/lib/auth'
 import { triggerWebhooks } from '@/lib/webhooks'
+import { contractRateLimit, checkRateLimit, rateLimitResponse } from '@/lib/ratelimit'
+import { issueContractMandate } from '@/lib/services/contract-mandate'
+import { getSolanaConnection } from '@/lib/solana/quicknode'
+import { loadPayerKeypair } from '@/lib/agent-factory'
 
 // POST /v1/contracts/create - Create a new contract offer
 export async function POST(request: NextRequest) {
@@ -33,6 +37,9 @@ export async function POST(request: NextRequest) {
         error: 'Unauthorized. Provide a user session (Authorization: Bearer <token>) or agent credentials (X-Agent-ID / X-Agent-Signature / X-Timestamp).'
       }, { status: 401 })
     }
+
+    const rl = await checkRateLimit(contractRateLimit, `contract-create:${agentId}`)
+    if (!rl.success) return rateLimitResponse(rl.retryAfter)
 
     const agent = { id: agentId }
 
@@ -122,6 +129,49 @@ export async function POST(request: NextRequest) {
       // Rollback contract
       await supabase.from('contracts').delete().eq('id', contract.id)
       return NextResponse.json({ error: 'Failed to create deliverables' }, { status: 500 })
+    }
+
+    // ── AP2 signed mandate ────────────────────────────────────────────────
+    // Cryptographically bind hiring agent + scope + escrow + criteria + ts;
+    // anchor the hash on Solana via commit_model. Best-effort — failures here
+    // do not block contract creation.
+    let mandateBlock: {
+      mandate_hash: string
+      signature: string
+      signer_pubkey: string
+      onchain_tx: string | null
+      onchain_pda: string | null
+    } | null = null
+    try {
+      const allCriteria = deliverableInserts.flatMap(
+        (d: { acceptance_criteria?: string[]; title: string }) =>
+          d.acceptance_criteria && d.acceptance_criteria.length > 0
+            ? d.acceptance_criteria
+            : [d.title],
+      )
+      const result = await issueContractMandate(
+        supabase,
+        getSolanaConnection(),
+        loadPayerKeypair(),
+        {
+          contract_id: contract.id,
+          hiring_agent_id: agent.id,
+          title,
+          description,
+          deliverables: deliverableInserts.map((d: { title: string }) => d.title),
+          amount_relay: payment_amount,
+          completion_criteria: allCriteria,
+        },
+      )
+      mandateBlock = {
+        mandate_hash: result.signed.mandate_hash,
+        signature: result.signed.signature,
+        signer_pubkey: result.signed.signer_pubkey,
+        onchain_tx: result.onchain.tx,
+        onchain_pda: result.onchain.pda,
+      }
+    } catch (err) {
+      console.warn('[contract-create] mandate issuance failed (non-fatal):', err)
     }
 
     // Create escrow entry (funds locked)
@@ -235,6 +285,7 @@ export async function POST(request: NextRequest) {
         ...contract,
         deliverables: deliverableInserts,
       },
+      mandate: mandateBlock,
     })
 
   } catch (error) {

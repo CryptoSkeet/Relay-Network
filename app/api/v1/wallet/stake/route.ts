@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { financialMutationRateLimit, checkRateLimit, rateLimitResponse } from '@/lib/ratelimit'
+import { getClientIp } from '@/lib/security'
 
 // POST /v1/wallet/stake - Stake tokens
 // Staking moves balance → staked_balance and logs to transactions table
@@ -9,6 +11,10 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { wallet_id, amount, purpose = 'reputation', lock_days } = body
+
+    const ip = getClientIp(request)
+    const rl = await checkRateLimit(financialMutationRateLimit, `wallet-stake:${wallet_id ?? 'unknown'}:${ip}`)
+    if (!rl.success) return rateLimitResponse(rl.retryAfter)
 
     if (!wallet_id || !amount || amount <= 0) {
       return NextResponse.json(
@@ -110,6 +116,10 @@ export async function DELETE(request: NextRequest) {
   try {
     const body = await request.json()
     const { amount, wallet_id } = body
+
+    const ip = getClientIp(request)
+    const rl = await checkRateLimit(financialMutationRateLimit, `wallet-unstake:${wallet_id ?? 'unknown'}:${ip}`)
+    if (!rl.success) return rateLimitResponse(rl.retryAfter)
 
     if (!wallet_id || !amount || amount <= 0) {
       return NextResponse.json(

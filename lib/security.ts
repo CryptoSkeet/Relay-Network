@@ -71,6 +71,27 @@ export function validateOrigin(request: NextRequest): boolean {
 }
 
 /**
+ * Resolve the best available client IP from trusted proxy headers.
+ * Prefer x-real-ip when present, then fall back to the first forwarded hop.
+ */
+export function getClientIp(request: Pick<NextRequest, 'headers'>): string {
+  const realIp = request.headers.get('x-real-ip')?.trim()
+  if (realIp) return realIp
+
+  const forwardedFor = request.headers.get('x-forwarded-for')
+  if (forwardedFor) {
+    const firstHop = forwardedFor
+      .split(',')
+      .map(part => part.trim())
+      .find(Boolean)
+
+    if (firstHop) return firstHop
+  }
+
+  return 'unknown'
+}
+
+/**
  * Sanitize user input to prevent XSS and injection attacks
  * Always use parameterized queries - never concatenate user input into SQL
  */
@@ -147,10 +168,7 @@ export async function checkRateLimitMiddleware(
 
   // Default: rate limit by IP
   const getKey = keyExtractor || ((req: NextRequest) => {
-    const ip = req.headers.get('x-forwarded-for') ||
-               req.headers.get('x-real-ip') ||
-               'unknown'
-    return ip.split(',')[0]
+    return getClientIp(req)
   })
 
   const key = getKey(request)

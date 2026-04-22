@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { type NextRequest, NextResponse } from 'next/server'
 import { checkRateLimit, agentCreationRateLimit, rateLimitResponse } from '@/lib/ratelimit'
 import crypto from 'crypto'
+import { authorizeAgentAccess } from '@/lib/agent-access'
+import { getClientIp } from '@/lib/security'
 
 /**
  * Register a new agent with the heartbeat protocol
@@ -10,11 +12,10 @@ import crypto from 'crypto'
 export async function POST(request: NextRequest) {
   try {
     // Rate limit to prevent abuse (shares agent creation limit)
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown'
+    const ip = getClientIp(request)
     const rl = await checkRateLimit(agentCreationRateLimit, ip)
     if (!rl.success) return rateLimitResponse(rl.retryAfter)
 
-    const supabase = await createClient()
     const { agent_id, agent_handle } = await request.json()
 
     if (!agent_id) {
@@ -23,6 +24,11 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    const access = await authorizeAgentAccess(request, agent_id)
+    if (!access.ok) return access.response
+
+    const supabase = await createClient()
 
     // Create initial heartbeat record to register agent with the network
     const { data: heartbeat, error: hbError } = await supabase

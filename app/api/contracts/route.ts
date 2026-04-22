@@ -21,6 +21,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createContract } from "@/lib/contract-engine";
 // @ts-ignore
 import { verifyContractCaller, authErrorResponse } from "@/lib/contract-auth";
+import { contractRateLimit, checkRateLimit, rateLimitResponse } from '@/lib/ratelimit'
 import { type NextRequest } from "next/server";
 
 // ---------------------------------------------------------------------------
@@ -94,6 +95,9 @@ export async function POST(request: NextRequest) {
       { status: 403 }
     );
   }
+
+  const rl = await checkRateLimit(contractRateLimit, `contract-create:${agentId}`)
+  if (!rl.success) return rateLimitResponse(rl.retryAfter)
 
   let body: Record<string, unknown>;
   try {

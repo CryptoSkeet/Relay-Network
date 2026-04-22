@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { triggerWebhooks } from '@/lib/webhooks'
+import { authenticateAgentCaller, authorizeAgentAccess } from '@/lib/agent-access'
+import { getClientIp } from '@/lib/security'
 
 // Minimum heartbeat interval: 30 minutes
 const MIN_HEARTBEAT_INTERVAL = 30 * 60 * 1000
@@ -85,8 +87,31 @@ export async function POST(request: NextRequest) {
       capabilities,
       heartbeat_interval_ms 
     } = body
+
+    const agentCaller = await authenticateAgentCaller(request)
+    if (agentCaller?.ok === false) return agentCaller.response
+
+    let resolvedAgentId = agent_id as string | undefined
+    if (agentCaller?.ok) {
+      resolvedAgentId = resolvedAgentId ?? agentCaller.agentId
+      if (resolvedAgentId !== agentCaller.agentId) {
+        return NextResponse.json(
+          { success: false, error: 'Forbidden' },
+          { status: 403 }
+        )
+      }
+    } else {
+      if (!resolvedAgentId) {
+        return NextResponse.json(
+          { success: false, error: 'Unauthorized' },
+          { status: 401 }
+        )
+      }
+      const access = await authorizeAgentAccess(request, resolvedAgentId)
+      if (!access.ok) return access.response
+    }
     
-    if (!agent_id) {
+    if (!resolvedAgentId) {
       return NextResponse.json(
         { success: false, error: 'agent_id is required' },
         { status: 400 }
@@ -94,7 +119,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Validate agent_id is a valid UUID
-    if (!isValidUUID(agent_id)) {
+    if (!isValidUUID(resolvedAgentId)) {
       return NextResponse.json(
         { success: false, error: 'agent_id must be a valid UUID (e.g., "550e8400-e29b-41d4-a716-446655440000")' },
         { status: 400 }
@@ -119,14 +144,14 @@ export async function POST(request: NextRequest) {
     }
     
     // Get client info
-    const ip_address = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
+    const ip_address = getClientIp(request)
     const user_agent = request.headers.get('user-agent') || 'unknown'
     
     // Record the heartbeat
     const { data: heartbeat, error: heartbeatError } = await supabase
       .from('agent_heartbeats')
       .insert({
-        agent_id,
+        agent_id: resolvedAgentId,
         status,
         current_task,
         mood_signal,
@@ -144,7 +169,7 @@ export async function POST(request: NextRequest) {
     const { error: statusError } = await supabase
       .from('agent_online_status')
       .upsert({
-        agent_id,
+        agent_id: resolvedAgentId,
         is_online: true,
         last_heartbeat: new Date().toISOString(),
         consecutive_misses: 0,
@@ -158,8 +183,8 @@ export async function POST(request: NextRequest) {
     if (statusError) throw statusError
     
     // Trigger webhooks for relevant events
-    await triggerWebhooks(supabase, agent_id, 'heartbeat', {
-      agent_id,
+    await triggerWebhooks(supabase, resolvedAgentId, 'heartbeat', {
+      agent_id: resolvedAgentId,
       status,
       current_task,
       mood_signal,
@@ -204,7 +229,7 @@ export async function POST(request: NextRequest) {
           .from('contracts')
           .select('id, title, description, budget_min, budget_max, price_relay, deadline, client_id, seller_agent_id')
           .in('status', ['open', 'OPEN'])
-          .neq('client_id', agent_id)
+          .neq('client_id', resolvedAgentId)
           .in('id', matchedIds)
           .order('created_at', { ascending: false })
           .limit(5)
@@ -217,7 +242,7 @@ export async function POST(request: NextRequest) {
           .from('contracts')
           .select('id, title, description, budget_min, budget_max, price_relay, deadline, client_id, seller_agent_id')
           .in('status', ['open', 'OPEN'])
-          .neq('client_id', agent_id)
+          .neq('client_id', resolvedAgentId)
           .order('created_at', { ascending: false })
           .limit(5)
         matchingContracts = fallback || []
@@ -247,7 +272,7 @@ export async function POST(request: NextRequest) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          agent_id,
+          agent_id: resolvedAgentId,
           task: `You have ${matchingContracts.length} open contract(s) matching your capabilities (${capList}). The most recent is "${topContract.title}" (ID: ${topContract.id}). Read the full contract details, check the client reputation, and decide whether to accept, request clarification, or pass.`,
           tools: ['read_contract', 'check_reputation', 'post_to_feed', 'request_clarification', 'stop_agent'],
           taskType: 'contract-evaluation',

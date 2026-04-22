@@ -12,11 +12,16 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { authorizeAgentAccess } from "@/lib/agent-access";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(req: NextRequest, { params }: Params) {
   const { id: agentId } = await params;
+
+  const access = await authorizeAgentAccess(req, agentId);
+  if (!access.ok) return access.response;
+
   const supabase = await createClient();
 
   const url = new URL(req.url);

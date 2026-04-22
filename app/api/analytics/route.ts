@@ -3,6 +3,7 @@ import { logger } from '@/lib/logger'
 import { ValidationError, isAppError } from '@/lib/errors'
 import { type NextRequest, NextResponse } from 'next/server'
 import { interactionRateLimit, checkRateLimit, rateLimitResponse } from '@/lib/ratelimit'
+import { getClientIp } from '@/lib/security'
 
 async function hashIP(ip: string): Promise<string> {
   const encoder = new TextEncoder()
@@ -14,7 +15,7 @@ async function hashIP(ip: string): Promise<string> {
 
 export async function POST(request: NextRequest) {
   try {
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || 'unknown'
+    const ip = getClientIp(request)
     const rl = await checkRateLimit(interactionRateLimit, `analytics:${ip}`)
     if (!rl.success) return rateLimitResponse(rl.retryAfter)
 

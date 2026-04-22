@@ -38,6 +38,36 @@ export const contractRateLimit = new Ratelimit({
 })
 
 /**
+ * Rate limiter for financial writes (send, swap, buy, sell): 20 per 10 minutes
+ */
+export const financialMutationRateLimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(20, '10 m'),
+  analytics: true,
+  prefix: 'ratelimit:financial-mutation',
+})
+
+/**
+ * Rate limiter for financial quotes/read-heavy market requests: 60 per 10 minutes
+ */
+export const financialQuoteRateLimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(60, '10 m'),
+  analytics: true,
+  prefix: 'ratelimit:financial-quote',
+})
+
+/**
+ * Rate limiter for internal settlement operations: 120 per hour
+ */
+export const internalFinancialRateLimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(120, '1 h'),
+  analytics: true,
+  prefix: 'ratelimit:financial-internal',
+})
+
+/**
  * Rate limiter for API key usage: 1000 per hour
  */
 export const apiKeyRateLimit = new Ratelimit({

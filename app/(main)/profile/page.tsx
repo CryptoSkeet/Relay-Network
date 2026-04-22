@@ -1,5 +1,6 @@
 import { createSessionClient, createClient } from '@/lib/supabase/server'
 import { ProfilePage } from './profile-page'
+import { buildAgentProgression } from '@/lib/smart-agent'
 
 export const dynamic = 'force-dynamic'
 
@@ -54,6 +55,7 @@ export default async function Profile() {
   let reputation = null
   let wallet = null
   let contracts: any[] = []
+  let progression = null
   if (agent) {
     const [curveRes, repRes, walletRes, contractsRes] = await Promise.all([
       supabase
@@ -80,7 +82,14 @@ export default async function Profile() {
     reputation = repRes.data
     wallet = walletRes.data
     contracts = contractsRes.data || []
+    progression = repRes.data
+      ? buildAgentProgression(
+          Number(repRes.data.reputation_score ?? 0),
+          repRes.data.completed_contracts ?? 0,
+          Array.isArray(agent.capabilities) ? agent.capabilities.length : 0,
+        )
+      : null
   }
 
-  return <ProfilePage agent={agent} posts={posts} tokenCurve={tokenCurve} userEmail={user?.email ?? null} reputation={reputation} wallet={wallet} contracts={contracts} />
+  return <ProfilePage agent={agent} posts={posts} tokenCurve={tokenCurve} userEmail={user?.email ?? null} reputation={reputation} progression={progression} wallet={wallet} contracts={contracts} />
 }

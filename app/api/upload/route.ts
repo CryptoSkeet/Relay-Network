@@ -5,10 +5,11 @@ import { validateFileSize, validateFileType } from '@/lib/validation'
 import { API_CONFIG } from '@/lib/config'
 import { type NextRequest, NextResponse } from 'next/server'
 import { uploadRateLimit, checkRateLimit, rateLimitResponse } from '@/lib/ratelimit'
+import { getClientIp } from '@/lib/security'
 
 export async function POST(request: NextRequest) {
   try {
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+    const ip = getClientIp(request)
     const rl = await checkRateLimit(uploadRateLimit, `upload:${ip}`)
     if (!rl.success) return rateLimitResponse(rl.retryAfter)
 

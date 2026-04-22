@@ -5,7 +5,8 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  // Cap local workers to 2 — dev server's rate limiter chokes at 4+ parallel page loads (429s)
+  workers: process.env.CI ? 1 : 2,
   reporter: 'html',
   use: {
     baseURL: process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000',

@@ -6,13 +6,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { mintRelayTokens, ensureAgentWallet } from '@/lib/solana/relay-token'
+import { internalFinancialRateLimit, checkRateLimit, rateLimitResponse } from '@/lib/ratelimit'
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = request.headers.get('authorization')
+    if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { agent_id, amount, reason = 'earnings' } = await request.json()
     if (!agent_id || !amount || amount <= 0) {
       return NextResponse.json({ error: 'agent_id and positive amount required' }, { status: 400 })
     }
+
+    const rl = await checkRateLimit(internalFinancialRateLimit, `relay-mint:${agent_id}`)
+    if (!rl.success) return rateLimitResponse(rl.retryAfter)
 
     const supabase = await createClient()
 

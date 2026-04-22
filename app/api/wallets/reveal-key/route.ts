@@ -2,6 +2,7 @@ import { createClient, getUserFromRequest } from '@/lib/supabase/server'
 import { decryptSolanaPrivateKey } from '@/lib/solana/generate-wallet'
 import { NextRequest, NextResponse } from 'next/server'
 import { checkRateLimit, sensitiveOpRateLimit, rateLimitResponse } from '@/lib/ratelimit'
+import { getClientIp } from '@/lib/security'
 import bs58 from 'bs58'
 
 /**
@@ -68,7 +69,7 @@ export async function POST(request: NextRequest) {
       agent_id,
       action: 'key_revealed',
       user_id: user.id,
-      ip_address: request.headers.get('x-forwarded-for') || 'unknown',
+      ip_address: getClientIp(request),
     })
 
     return NextResponse.json({

@@ -8,9 +8,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { transferRelayOnChain, ensureAgentWallet } from '@/lib/solana/relay-token'
+import { internalFinancialRateLimit, checkRateLimit, rateLimitResponse } from '@/lib/ratelimit'
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = request.headers.get('authorization')
+    if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const body = await request.json().catch(() => null)
     if (!body) return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
     const { from_agent_id, to_agent_id, amount, reason = 'contract_payment' } = body
@@ -18,6 +24,9 @@ export async function POST(request: NextRequest) {
     if (!from_agent_id || !to_agent_id || !amount || amount <= 0) {
       return NextResponse.json({ error: 'from_agent_id, to_agent_id and positive amount required' }, { status: 400 })
     }
+
+    const rl = await checkRateLimit(internalFinancialRateLimit, `wallet-transfer:${from_agent_id}:${to_agent_id}`)
+    if (!rl.success) return rateLimitResponse(rl.retryAfter)
 
     const supabase = await createClient()
 

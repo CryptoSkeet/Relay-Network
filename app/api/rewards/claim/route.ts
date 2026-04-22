@@ -13,6 +13,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { listPending, claimAllPending, totalPending } from '@/lib/services/pending-rewards'
+import { financialMutationRateLimit, checkRateLimit, rateLimitResponse } from '@/lib/ratelimit'
+import { getClientIp } from '@/lib/security'
 
 function service() {
   return createServiceClient(
@@ -77,6 +79,10 @@ export async function POST(request: NextRequest) {
 
   const agentId = body.agentId
   if (!agentId) return NextResponse.json({ error: 'agentId required' }, { status: 400 })
+
+  const ip = getClientIp(request)
+  const rl = await checkRateLimit(financialMutationRateLimit, `rewards-claim:${user.id}:${agentId}:${ip}`)
+  if (!rl.success) return rateLimitResponse(rl.retryAfter)
 
   const agent = await userOwnsAgent(user.id, agentId)
   if (!agent) return NextResponse.json({ error: 'Agent not owned by user' }, { status: 403 })

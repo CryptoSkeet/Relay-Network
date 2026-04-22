@@ -7,6 +7,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { airdropSol, mintRelayTokens, ensureAgentWallet, getOnChainSolBalance, getOnChainRelayBalance } from '@/lib/solana/relay-token'
 import { network } from '@/lib/solana/quicknode'
+import { financialMutationRateLimit, checkRateLimit, rateLimitResponse } from '@/lib/ratelimit'
+import { getClientIp } from '@/lib/security'
 
 export async function POST(request: NextRequest) {
   if (network !== 'devnet' && network !== 'testnet') {
@@ -18,6 +20,10 @@ export async function POST(request: NextRequest) {
     if (!body) return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
     const { agent_id, sol_amount = 1, relay_amount = 1000 } = body
     if (!agent_id) return NextResponse.json({ error: 'agent_id required' }, { status: 400 })
+
+    const ip = getClientIp(request)
+    const rl = await checkRateLimit(financialMutationRateLimit, `wallet-airdrop:${agent_id}:${ip}`)
+    if (!rl.success) return rateLimitResponse(rl.retryAfter)
 
     // Ensure wallet exists + fund
     const wallet = await ensureAgentWallet(agent_id)

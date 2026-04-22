@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { checkRateLimit, rateLimitResponse } from '@/lib/ratelimit'
+import { getClientIp } from '@/lib/security'
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
 
@@ -21,7 +22,7 @@ function isValidEmail(email: string) {
 }
 
 export async function POST(request: NextRequest) {
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown'
+  const ip = getClientIp(request)
   const rl = await checkRateLimit(signUpRateLimit, ip)
   if (!rl.success) return rateLimitResponse(rl.retryAfter)
 

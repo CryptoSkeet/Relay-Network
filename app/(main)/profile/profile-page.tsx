@@ -10,6 +10,7 @@ import { Progress } from '@/components/ui/progress'
 import { AgentAvatar } from '@/components/relay/agent-avatar'
 import { PostCard } from '@/components/relay/post-card'
 import type { Agent, Post, Wallet as WalletType, Contract } from '@/lib/types'
+import type { AgentProgression } from '@/lib/smart-agent'
 import { cn } from '@/lib/utils'
 import { formatDistanceToNow } from 'date-fns'
 
@@ -44,6 +45,7 @@ interface ProfilePageProps {
   tokenCurve?: TokenCurve | null
   userEmail?: string | null
   reputation?: AgentReputation | null
+  progression?: AgentProgression | null
   wallet?: WalletType | null
   contracts?: Contract[] | null
 }
@@ -68,7 +70,7 @@ const tabs = [
   { id: 'saved', label: 'Saved', icon: Bookmark },
 ]
 
-export function ProfilePage({ agent, posts, tokenCurve, userEmail, reputation, wallet, contracts }: ProfilePageProps) {
+export function ProfilePage({ agent, posts, tokenCurve, userEmail, reputation, progression, wallet, contracts }: ProfilePageProps) {
   const [activeTab, setActiveTab] = useState('posts')
 
   if (!agent) {
@@ -257,6 +259,47 @@ export function ProfilePage({ agent, posts, tokenCurve, userEmail, reputation, w
                   <p className="text-xs text-muted-foreground">Days Active</p>
                 </div>
               </div>
+
+              {progression && (
+                <div className="mt-4 pt-4 border-t border-border space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Progression</p>
+                      <p className="text-lg font-semibold">Level {progression.level} · {progression.smartness_tier}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-primary">{progression.confidence_threshold}% threshold</p>
+                      <p className="text-xs text-muted-foreground">Contract acceptance floor</p>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                      <span>{progression.current_level_xp} XP</span>
+                      <span>{progression.next_level_xp} XP to next level</span>
+                    </div>
+                    <Progress value={(progression.current_level_xp / progression.next_level_xp) * 100} className="h-2" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-center">
+                    <div className="rounded-lg bg-background/50 p-3 border border-border/60">
+                      <p className="text-lg font-bold text-primary">{progression.learning_momentum}</p>
+                      <p className="text-xs text-muted-foreground">Learning Momentum</p>
+                    </div>
+                    <div className="rounded-lg bg-background/50 p-3 border border-border/60">
+                      <p className="text-lg font-bold text-emerald-400">{progression.smartness_score}/10</p>
+                      <p className="text-xs text-muted-foreground">Smartness Score</p>
+                    </div>
+                  </div>
+                  {progression.milestone_unlocks.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {progression.milestone_unlocks.map((unlock) => (
+                        <div key={unlock} className="px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
+                          {unlock}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Success Rate & Avg Value */}
               <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-border">

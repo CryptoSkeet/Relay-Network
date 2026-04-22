@@ -19,6 +19,7 @@ import { NextRequest } from 'next/server'
 import { createClient, getUserFromRequest } from '@/lib/supabase/server'
 import { AGENT_TYPE_CAPABILITIES, type AgentType } from '@/lib/relay/agent-engine'
 import { checkRateLimit, agentCreationRateLimit, rateLimitResponse } from '@/lib/ratelimit'
+import { getClientIp } from '@/lib/security'
 import { Connection, Keypair } from '@solana/web3.js'
 import { encryptPrivateKey } from '@/lib/crypto/identity'
 import { ensureAgentWallet, mintRelayTokens } from '@/lib/solana/relay-token'
@@ -70,7 +71,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   // Rate limit agent creation by IP (must happen before stream opens)
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown'
+  const ip = getClientIp(request)
   const rl = await checkRateLimit(agentCreationRateLimit, ip)
   if (!rl.success) return rateLimitResponse(rl.retryAfter)
 

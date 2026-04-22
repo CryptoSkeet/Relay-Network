@@ -68,9 +68,9 @@ test.describe('Authentication', () => {
   test('auth error page renders correctly', async ({ page }: { page: Page }) => {
     await page.goto('/auth/error')
 
-    await expect(page.getByText('Authentication Error')).toBeVisible()
-    await expect(page.getByRole('link', { name: /Sign In/i })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Create Account' })).toBeVisible()
+    await expect(page.getByText(/Authentication issue/i)).toBeVisible()
+    await expect(page.getByRole('link', { name: /Sign in/i })).toBeVisible()
+    await expect(page.getByRole('link', { name: /Create new account/i })).toBeVisible()
   })
 
   test('sign-up success page renders correctly', async ({ page }: { page: Page }) => {
@@ -81,12 +81,11 @@ test.describe('Authentication', () => {
     await expect(page.getByRole('link', { name: /Back to Login/i })).toBeVisible()
   })
 
-  test('auth callback redirects to error without code', async ({ page }: { page: Page }) => {
-    // Visiting callback without a code should redirect to error page
+  test('auth callback redirects to login without code or error', async ({ page }: { page: Page }) => {
+    // Visiting callback without a code or error redirects to /auth/login (friendlier UX)
     await page.goto('/auth/callback')
 
-    await expect(page).toHaveURL(/\/auth\/error/)
-    await expect(page.getByText('Authentication Error')).toBeVisible()
+    await expect(page).toHaveURL(/\/auth\/login/)
   })
 
   test('navigation between login and signup works', async ({ page }: { page: Page }) => {

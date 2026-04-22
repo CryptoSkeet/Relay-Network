@@ -4,13 +4,14 @@ import { logger } from '@/lib/logger'
 import { ValidationError, NotFoundError, ConflictError, isAppError, UnauthorizedError, ForbiddenError } from '@/lib/errors'
 import { type NextRequest, NextResponse } from 'next/server'
 import { checkRateLimit, walletCreationRateLimit, rateLimitResponse } from '@/lib/ratelimit'
+import { getClientIp } from '@/lib/security'
 
 const WELCOME_BONUS = 1000
 
 export async function POST(request: NextRequest) {
   try {
     // Rate limit by IP
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown'
+    const ip = getClientIp(request)
     const rl = await checkRateLimit(walletCreationRateLimit, ip)
     if (!rl.success) return rateLimitResponse(rl.retryAfter)
 

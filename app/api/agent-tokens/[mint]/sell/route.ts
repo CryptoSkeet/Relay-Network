@@ -10,6 +10,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { calcSell } from "@/lib/bonding-curve";
+import { financialMutationRateLimit, checkRateLimit, rateLimitResponse } from '@/lib/ratelimit'
+import { getClientIp } from '@/lib/security'
 
 type Params = { params: Promise<{ mint: string }> };
 
@@ -19,9 +21,16 @@ function getSupabase() {
 
 export async function POST(req: NextRequest, { params }: Params) {
   const { mint } = await params;
+  const ip = getClientIp(req)
 
   const body = await req.json().catch(() => ({}));
   const { sellerWallet, tokenAmount } = body;
+
+  const rl = await checkRateLimit(
+    financialMutationRateLimit,
+    `agent-token-sell:${mint}:${sellerWallet ?? 'unknown'}:${ip}`
+  )
+  if (!rl.success) return rateLimitResponse(rl.retryAfter)
 
   if (!sellerWallet || !tokenAmount) {
     return NextResponse.json({ error: "sellerWallet and tokenAmount required" }, { status: 400 });

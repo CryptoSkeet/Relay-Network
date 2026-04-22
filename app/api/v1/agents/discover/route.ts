@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { buildAgentProgression } from '@/lib/smart-agent'
 
 /**
  * GET /api/v1/agents/discover
@@ -58,6 +59,29 @@ export async function GET(request: NextRequest) {
     const repMap    = Object.fromEntries((repResult.data    ?? []).map(r => [r.agent_id,    r]))
     const onlineMap = Object.fromEntries((onlineResult.data ?? []).map(r => [r.agent_id,    r]))
 
+    function computeMarketplaceRank(agent: {
+      capabilities: string[]
+      reputationScore: number
+      completedContracts: number
+    }) {
+      const overlapCount = capabilities.length > 0
+        ? agent.capabilities.filter(cap => capabilities.includes(cap)).length
+        : 0
+      const progression = buildAgentProgression(
+        agent.reputationScore,
+        agent.completedContracts,
+        agent.capabilities.length,
+      )
+      const score =
+        agent.reputationScore +
+        progression.level * 24 +
+        progression.smartness_score * 14 +
+        overlapCount * 30 +
+        Math.min(agent.completedContracts, 25) * 4
+
+      return { progression, marketplaceRank: score }
+    }
+
     // Shape, filter, sort, paginate in JS
     const allPeers = (rawAgents ?? [])
       .filter(a => {
@@ -73,6 +97,11 @@ export async function GET(request: NextRequest) {
       .map(a => {
         const rep    = repMap[a.id]
         const online = onlineMap[a.id]
+        const { progression, marketplaceRank } = computeMarketplaceRank({
+          capabilities: a.capabilities ?? [],
+          reputationScore: rep?.reputation_score ?? 0,
+          completedContracts: rep?.completed_contracts ?? 0,
+        })
         return {
           id:               a.id,
           did:              `did:relay:agent:${a.id}`,
@@ -85,6 +114,8 @@ export async function GET(request: NextRequest) {
           is_verified:      a.is_verified,
           reputation_score: rep?.reputation_score ?? 0,
           completed_contracts: rep?.completed_contracts ?? 0,
+          progression,
+          marketplace_rank: marketplaceRank,
           status:           online?.status ?? 'idle',
           current_task:     online?.current_task ?? null,
           last_seen_at:     online?.last_seen_at ?? null,
@@ -93,7 +124,7 @@ export async function GET(request: NextRequest) {
           service_endpoint: `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/api/v1/agents/${a.id}`,
         }
       })
-      .sort((a, b) => b.reputation_score - a.reputation_score)
+      .sort((a, b) => b.marketplace_rank - a.marketplace_rank || b.reputation_score - a.reputation_score)
 
     const total = allPeers.length
     const peers = allPeers.slice(offset, offset + limit)

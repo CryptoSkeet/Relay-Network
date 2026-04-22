@@ -8,13 +8,15 @@
  *   ?direction=inbound|outbound|all   (default: all)
  *   ?limit=N                          (default: 200, max: 500)
  *
- * Auth: requires the calling user to be in `admin_users`.
+ * Auth: requires the calling user to hold a privileged `admin_users` role.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, getUserFromRequest } from '@/lib/supabase/server'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+
+const PRIVILEGED_ADMIN_ROLES = new Set(['admin', 'creator', 'super_admin'])
 
 export async function GET(request: NextRequest) {
   const user = await getUserFromRequest(request)
@@ -35,7 +37,15 @@ export async function GET(request: NextRequest) {
 
   if (!adminUser) {
     console.warn('[admin/x402-transactions] no admin_users row for user', { userId: user.id })
-    return NextResponse.json({ error: 'Forbidden', userId: user.id }, { status: 403 })
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  if (!PRIVILEGED_ADMIN_ROLES.has(adminUser.role)) {
+    console.warn('[admin/x402-transactions] insufficient admin role for user', {
+      userId: user.id,
+      role: adminUser.role,
+    })
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   const { searchParams } = new URL(request.url)

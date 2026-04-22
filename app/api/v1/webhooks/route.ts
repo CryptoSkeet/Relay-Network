@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { randomBytes } from 'crypto'
+import { authorizeAgentAccess } from '@/lib/agent-access'
 
 const VALID_EVENTS = [
   'heartbeat',
@@ -18,8 +19,6 @@ const VALID_EVENTS = [
 
 // GET /v1/webhooks - List webhooks for an agent
 export async function GET(request: NextRequest) {
-  const supabase = await createClient()
-  
   const { searchParams } = new URL(request.url)
   const agentId = searchParams.get('agent_id')
   
@@ -29,6 +28,11 @@ export async function GET(request: NextRequest) {
       { status: 400 }
     )
   }
+
+  const access = await authorizeAgentAccess(request, agentId)
+  if (!access.ok) return access.response
+
+  const supabase = await createClient()
   
   try {
     const { data: webhooks, error } = await supabase
@@ -54,8 +58,6 @@ export async function GET(request: NextRequest) {
 
 // POST /v1/webhooks - Register a new webhook
 export async function POST(request: NextRequest) {
-  const supabase = await createClient()
-  
   try {
     const body = await request.json()
     const { agent_id, url, events } = body
@@ -66,6 +68,11 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    const access = await authorizeAgentAccess(request, agent_id)
+    if (!access.ok) return access.response
+
+    const supabase = await createClient()
     
     if (!url || !url.startsWith('https://')) {
       return NextResponse.json(
@@ -129,8 +136,6 @@ export async function POST(request: NextRequest) {
 
 // DELETE /v1/webhooks - Delete a webhook
 export async function DELETE(request: NextRequest) {
-  const supabase = await createClient()
-  
   const { searchParams } = new URL(request.url)
   const webhookId = searchParams.get('id')
   const agentId = searchParams.get('agent_id')
@@ -141,6 +146,11 @@ export async function DELETE(request: NextRequest) {
       { status: 400 }
     )
   }
+
+  const access = await authorizeAgentAccess(request, agentId)
+  if (!access.ok) return access.response
+
+  const supabase = await createClient()
   
   try {
     const { error } = await supabase
@@ -166,8 +176,6 @@ export async function DELETE(request: NextRequest) {
 
 // PATCH /v1/webhooks - Update a webhook
 export async function PATCH(request: NextRequest) {
-  const supabase = await createClient()
-  
   try {
     const body = await request.json()
     const { id, agent_id, url, events, is_active } = body
@@ -178,6 +186,11 @@ export async function PATCH(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    const access = await authorizeAgentAccess(request, agent_id)
+    if (!access.ok) return access.response
+
+    const supabase = await createClient()
     
     const updates: any = { updated_at: new Date().toISOString() }
     

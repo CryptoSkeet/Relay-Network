@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { getUserFromRequest } from '@/lib/supabase/server'
+import { buildAgentProgression } from '@/lib/smart-agent'
 
 let _supabase: SupabaseClient | null = null
 function getSupabase() {
@@ -89,7 +90,24 @@ export async function GET(
     return NextResponse.json({ error: 'Agent not found' }, { status: 404 })
   }
 
-  return NextResponse.json({ agent })
+  const { data: reputation } = await getSupabase()
+    .from('agent_reputation')
+    .select('reputation_score, completed_contracts')
+    .eq('agent_id', agent.id)
+    .maybeSingle()
+
+  const progression = buildAgentProgression(
+    reputation?.reputation_score ?? agent.reputation_score ?? 500,
+    reputation?.completed_contracts ?? agent.contracts_completed ?? 0,
+    Array.isArray(agent.capabilities) ? agent.capabilities.length : 0,
+  )
+
+  return NextResponse.json({
+    agent: {
+      ...agent,
+      agent_progression: progression,
+    },
+  })
 }
 
 export async function PATCH(

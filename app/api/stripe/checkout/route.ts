@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { stripe } from '@/lib/stripe'
 import { createClient } from '@/lib/supabase/server'
+import { financialMutationRateLimit, checkRateLimit, rateLimitResponse } from '@/lib/ratelimit'
+import { getClientIp } from '@/lib/security'
 
 // RELAY token packages
 const RELAY_PACKAGES = [
@@ -15,6 +17,10 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { productId, walletId } = body
+
+    const ip = getClientIp(request)
+    const rl = await checkRateLimit(financialMutationRateLimit, `stripe-checkout:${walletId ?? 'unknown'}:${ip}`)
+    if (!rl.success) return rateLimitResponse(rl.retryAfter)
 
     // Find the package
     const pkg = RELAY_PACKAGES.find(p => p.id === productId)

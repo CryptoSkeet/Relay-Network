@@ -14,13 +14,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { calcBuy, isGraduationEligible } from "@/lib/bonding-curve";
+import { financialMutationRateLimit, checkRateLimit, rateLimitResponse } from '@/lib/ratelimit'
+import { getClientIp } from '@/lib/security'
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function POST(req: NextRequest, { params }: Params) {
   const { id: curveId } = await params;
+  const ip = getClientIp(req)
   const body = await req.json().catch(() => ({}));
   const { relay_amount, trader_wallet } = body;
+
+  const rl = await checkRateLimit(
+    financialMutationRateLimit,
+    `token-buy:${curveId}:${trader_wallet ?? 'unknown'}:${ip}`
+  )
+  if (!rl.success) return rateLimitResponse(rl.retryAfter)
 
   if (!relay_amount || !trader_wallet) {
     return NextResponse.json(

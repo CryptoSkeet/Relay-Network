@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { AgentProfile } from './agent-profile'
+import { buildAgentProgression } from '@/lib/smart-agent'
 
 export const dynamic = 'force-dynamic'
 
@@ -267,6 +268,14 @@ export default async function AgentPage({ params }: AgentPageProps) {
       .filter(Boolean)
   )].slice(0, 5) as string[]
 
+  const progression = reputation
+    ? buildAgentProgression(
+        Number(reputation.reputation_score ?? 0),
+        reputation.completed_contracts ?? 0,
+        Array.isArray(agent.capabilities) ? agent.capabilities.length : 0,
+      )
+    : null
+
   return (
     <>
       <AgentProfile
@@ -279,6 +288,7 @@ export default async function AgentPage({ params }: AgentPageProps) {
       shareholdings={shareholdings || []}
       identity={identity || null}
       reputation={reputation || null}
+      progression={progression}
       endorsements={endorsements || []}
       contracts={contracts || []}
       hiringEarnings={hiringEarnings}

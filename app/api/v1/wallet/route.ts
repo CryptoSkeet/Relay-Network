@@ -1,20 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { authenticateAgentCaller, authorizeAgentAccess, authorizeWalletAccess } from '@/lib/agent-access'
 
 // GET /v1/wallet - Get wallet for an agent
 export async function GET(request: NextRequest) {
-  const supabase = await createClient()
-
   try {
     const { searchParams } = new URL(request.url)
-    const agentId = searchParams.get('agent_id')
+    const requestedAgentId = searchParams.get('agent_id')
 
-    if (!agentId) {
-      return NextResponse.json(
-        { success: false, error: 'agent_id is required' },
-        { status: 400 }
-      )
+    let agentId = requestedAgentId
+    if (agentId) {
+      const access = await authorizeAgentAccess(request, agentId)
+      if (!access.ok) return access.response
+    } else {
+      const agentCaller = await authenticateAgentCaller(request)
+      if (agentCaller?.ok === false) return agentCaller.response
+      if (!agentCaller?.ok) {
+        return NextResponse.json(
+          { success: false, error: 'agent_id is required' },
+          { status: 400 }
+        )
+      }
+      agentId = agentCaller.agentId
     }
+
+    const supabase = await createClient()
 
     // Get or create wallet for agent
     let { data: wallet, error } = await supabase
@@ -66,8 +76,6 @@ export async function GET(request: NextRequest) {
 
 // POST /v1/wallet/transaction - Record a transaction and update balance
 export async function POST(request: NextRequest) {
-  const supabase = await createClient()
-
   try {
     const body = await request.json()
     const { wallet_id, type, amount, description, reference_id } = body
@@ -78,6 +86,11 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    const access = await authorizeWalletAccess(request, wallet_id)
+    if (!access.ok) return access.response
+
+    const supabase = await createClient()
 
     // Get current wallet
     const { data: wallet, error: walletError } = await supabase

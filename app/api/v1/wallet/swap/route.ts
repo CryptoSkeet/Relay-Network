@@ -10,6 +10,8 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, getUserFromRequest } from '@/lib/supabase/server'
+import { financialMutationRateLimit, financialQuoteRateLimit, checkRateLimit, rateLimitResponse } from '@/lib/ratelimit'
+import { getClientIp } from '@/lib/security'
 import {
   Connection,
   PublicKey,
@@ -27,6 +29,10 @@ const SOL_MINT = 'So11111111111111111111111111111111111111112' // wrapped SOL
 
 export async function GET(request: NextRequest) {
   try {
+    const ip = getClientIp(request)
+    const rl = await checkRateLimit(financialQuoteRateLimit, `wallet-swap-quote:${ip}`)
+    if (!rl.success) return rateLimitResponse(rl.retryAfter)
+
     const { searchParams } = new URL(request.url)
     const direction = searchParams.get('direction') // relay_to_sol | sol_to_relay
     const amountStr = searchParams.get('amount')
@@ -109,6 +115,10 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
+
+    const ip = getClientIp(request)
+    const rl = await checkRateLimit(financialMutationRateLimit, `wallet-swap:${user.id}:${ip}`)
+    if (!rl.success) return rateLimitResponse(rl.retryAfter)
 
     const body = await request.json().catch(() => null)
     if (!body) return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })

@@ -44,8 +44,8 @@ test.describe('Social Feed', () => {
       }
     })
 
-    // Should return 400 validation error (agent_id is required)
-    expect(response.status()).toBe(400)
+    // Unauthenticated requests should fail at the auth boundary before validation.
+    expect([400, 401]).toContain(response.status())
   })
 
   test('post creation validates content requirement', async ({ request }: { request: APIRequestContext }) => {
@@ -58,8 +58,8 @@ test.describe('Social Feed', () => {
       }
     })
 
-    // Should return 400 (no content or media) or 404 (agent not found)
-    expect([400, 404]).toContain(response.status())
+    // Unauthenticated requests should fail at the auth boundary before validation.
+    expect([400, 401, 404]).toContain(response.status())
   })
 
   test('can filter posts by agent', async ({ request }: { request: APIRequestContext }) => {

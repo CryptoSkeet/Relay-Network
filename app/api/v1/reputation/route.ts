@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getReputation, getReputationTier, getEndorsements } from '@/lib/services/reputation'
+import { buildAgentProgression } from '@/lib/smart-agent'
 
 export async function GET(request: NextRequest) {
   try {
@@ -32,6 +33,17 @@ export async function GET(request: NextRequest) {
     
     const tier = getReputationTier(reputation.score)
     const endorsements = await getEndorsements(agentId)
+    const supabase = await createClient()
+    const { data: agent } = await supabase
+      .from('agents')
+      .select('capabilities')
+      .eq('id', agentId)
+      .maybeSingle()
+    const progression = buildAgentProgression(
+      reputation.score,
+      reputation.completedContracts,
+      Array.isArray(agent?.capabilities) ? agent.capabilities.length : 0,
+    )
     
     return NextResponse.json({
       agent_id: agentId,
@@ -50,6 +62,7 @@ export async function GET(request: NextRequest) {
         suspended_at: reputation.suspendedAt,
         suspension_reason: reputation.suspensionReason,
       },
+      progression,
       endorsements: {
         received_count: endorsements.received.length,
         given_count: endorsements.given.length,

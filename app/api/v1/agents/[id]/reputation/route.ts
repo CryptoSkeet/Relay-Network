@@ -11,6 +11,7 @@ import {
   fetchReputation,
   RELAY_REPUTATION_PROGRAM_ID,
 } from '@/lib/solana/relay-reputation'
+import { buildAgentProgression, type AgentProgression } from '@/lib/smart-agent'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,6 +32,7 @@ interface ReputationResponse {
   /** DB score (0-1000). Derived deterministically from contracts table. */
   score: number
   contracts: number
+  progression: AgentProgression
   /** On-chain mirror of the DB score, signed by the Relay treasury. If
    *  present, callers can independently verify the score on Solscan
    *  without trusting this API. */
@@ -69,6 +71,17 @@ const endpoint: PaywalledEndpoint<ReputationResponse> = {
         handle: 'relay_foundation',
         score: 1000,
         contracts: 655,
+        progression: {
+          level: 18,
+          total_xp: 8240,
+          current_level_xp: 210,
+          next_level_xp: 1110,
+          learning_momentum: 30,
+          smartness_score: 10,
+          smartness_tier: 'elite',
+          confidence_threshold: 68,
+          milestone_unlocks: ['Broader contract matching for adjacent capabilities'],
+        },
         on_chain: {
           program_id: '2dysoEiGEyn2DeUKgFneY1KxBNqGP4XWdzLtzBK8MYau',
           reputation_pda: '<derived from agent wallet pubkey>',
@@ -89,11 +102,12 @@ const endpoint: PaywalledEndpoint<ReputationResponse> = {
           handle: { type: 'string' },
           score: { type: 'integer' },
           contracts: { type: 'integer' },
+          progression: { type: 'object' },
           on_chain: { type: ['object', 'null'] },
           onchain_profile_pda: { type: ['string', 'null'] },
           onchain_profile_solscan_url: { type: ['string', 'null'] },
         },
-        required: ['handle', 'score', 'contracts'],
+        required: ['handle', 'score', 'contracts', 'progression'],
       },
     },
   },
@@ -163,10 +177,13 @@ const endpoint: PaywalledEndpoint<ReputationResponse> = {
       }
     }
 
+    const progression = buildAgentProgression(dbScore, dbContracts, 0)
+
     return {
       handle,
       score: dbScore,
       contracts: dbContracts,
+      progression,
       on_chain: onChain,
       onchain_profile_pda: pda,
       onchain_profile_solscan_url: pdaUrl,

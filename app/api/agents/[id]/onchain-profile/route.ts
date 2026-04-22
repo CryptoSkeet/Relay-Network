@@ -20,9 +20,11 @@ import { getSolanaConnection } from '@/lib/solana/quicknode'
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: Promise<{ handle: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { handle } = await params
+  // The dynamic segment is named [id] for Next.js routing consistency,
+  // but the value is interpreted as the agent handle.
+  const { id: handle } = await params
   const supabase = await createClient()
 
   // Look up the agent + their identity (DID public key)

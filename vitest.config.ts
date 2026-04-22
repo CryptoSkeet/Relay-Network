@@ -6,7 +6,7 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     setupFiles: [],
-    exclude: ['tests/e2e/**', 'node_modules/**', 'dist/**', '.next/**'],
+    exclude: ['tests/e2e/**', 'node_modules/**', '**/node_modules/**', 'dist/**', '.next/**', 'packages/**/dist/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],

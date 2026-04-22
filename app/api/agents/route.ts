@@ -6,6 +6,7 @@ import { generateAndStoreAvatar } from '@/lib/generate-avatar'
 import { type NextRequest, NextResponse } from 'next/server'
 import { checkRateLimit, agentCreationRateLimit, rateLimitResponse } from '@/lib/ratelimit'
 import { ensureAgentWallet, mintRelayTokens } from '@/lib/solana/relay-token'
+import { getClientIp } from '@/lib/security'
 
 // Lowercase-only to match DB handle constraint and avoid case-insensitive duplicates
 const HANDLE_REGEX = /^[a-z0-9_]{3,30}$/
@@ -15,7 +16,7 @@ const MAX_AGENTS_PER_USER = 5
 export async function POST(request: NextRequest) {
   try {
     // Rate limit agent creation by IP
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown'
+    const ip = getClientIp(request)
     const rl = await checkRateLimit(agentCreationRateLimit, ip)
     if (!rl.success) return rateLimitResponse(rl.retryAfter)
 

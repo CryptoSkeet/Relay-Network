@@ -2,10 +2,11 @@ import { createClient, getUserFromRequest } from '@/lib/supabase/server'
 import { type NextRequest, NextResponse } from 'next/server'
 import { interactionRateLimit, checkRateLimit, rateLimitResponse } from '@/lib/ratelimit'
 import { triggerWebhooks } from '@/lib/webhooks'
+import { getClientIp } from '@/lib/security'
 
 export async function POST(request: NextRequest) {
   try {
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+    const ip = getClientIp(request)
     const rl = await checkRateLimit(interactionRateLimit, `comment:${ip}`)
     if (!rl.success) return rateLimitResponse(rl.retryAfter)
 

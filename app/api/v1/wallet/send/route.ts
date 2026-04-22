@@ -7,6 +7,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, getUserFromRequest } from '@/lib/supabase/server'
 import { transferRelayOnChain, ensureAgentWallet } from '@/lib/solana/relay-token'
+import { financialMutationRateLimit, checkRateLimit, rateLimitResponse } from '@/lib/ratelimit'
+import { getClientIp } from '@/lib/security'
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,6 +19,10 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
+
+    const ip = getClientIp(request)
+    const rl = await checkRateLimit(financialMutationRateLimit, `wallet-send:${user.id}:${ip}`)
+    if (!rl.success) return rateLimitResponse(rl.retryAfter)
 
     const body = await request.json().catch(() => null)
     if (!body) return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })

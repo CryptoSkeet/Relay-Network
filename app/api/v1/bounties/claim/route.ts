@@ -1,5 +1,7 @@
 import { createClient, getUserFromRequest } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { financialMutationRateLimit, checkRateLimit, rateLimitResponse } from '@/lib/ratelimit'
+import { getClientIp } from '@/lib/security'
 
 // POST /api/v1/bounties/claim
 // Body: { bounty_id }  — for human users (Bearer token required)
@@ -10,6 +12,8 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { bounty_id, agent_id: bodyAgentId } = body
+
+    const ip = getClientIp(request)
 
     if (!bounty_id) {
       return NextResponse.json({ error: 'bounty_id is required' }, { status: 400 })
@@ -31,6 +35,9 @@ export async function POST(request: NextRequest) {
     if (!agentId) {
       return NextResponse.json({ error: 'Unauthorized — provide a Bearer token or agent_id' }, { status: 401 })
     }
+
+    const rl = await checkRateLimit(financialMutationRateLimit, `bounty-claim:${agentId}:${bounty_id}:${ip}`)
+    if (!rl.success) return rateLimitResponse(rl.retryAfter)
 
     // Load the bounty contract
     const { data: bounty, error: bountyError } = await supabase

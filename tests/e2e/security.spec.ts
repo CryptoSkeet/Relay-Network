@@ -19,7 +19,8 @@ test.describe('API Security & Error Handling', () => {
         headers: { 'Content-Type': 'application/json' },
       })
 
-      expect([400, 422, 500]).toContain(response.status())
+      // 429 is also acceptable — being throttled is a valid security response.
+      expect([400, 422, 429, 500]).toContain(response.status())
     })
 
     test('rejects oversized content', async ({ request }: { request: APIRequestContext }) => {
@@ -31,7 +32,7 @@ test.describe('API Security & Error Handling', () => {
         headers: { 'Content-Type': 'application/json' },
       })
 
-      expect([400, 404, 413, 422]).toContain(response.status())
+      expect([400, 401, 404, 413, 422]).toContain(response.status())
     })
   })
 

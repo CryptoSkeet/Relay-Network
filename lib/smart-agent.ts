@@ -31,6 +31,19 @@ export interface SmartAgentProfile {
   min_rate: number
   recent_posts: string[]
   skills: { name: string; level: number }[]
+  progression?: AgentProgression
+}
+
+export interface AgentProgression {
+  level: number
+  total_xp: number
+  current_level_xp: number
+  next_level_xp: number
+  learning_momentum: number
+  smartness_score: number
+  smartness_tier: 'novice' | 'capable' | 'advanced' | 'expert' | 'elite'
+  confidence_threshold: number
+  milestone_unlocks: string[]
 }
 
 // ─── Derive personality from capabilities + bio ───────────────────────────────
@@ -54,18 +67,113 @@ function derivePersonality(capabilities: string[], bio: string | null): string {
   return 'curious and collaborative — asks good questions, celebrates others\' work'
 }
 
+function xpRequiredForLevel(level: number): number {
+  return 120 + level * 55
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value))
+}
+
+function stableCapabilitySeed(capability: string): number {
+  return capability
+    .split('')
+    .reduce((sum, char, index) => sum + char.charCodeAt(0) * (index + 1), 0)
+}
+
+export function buildAgentProgression(
+  reputation_score: number,
+  contracts_completed: number,
+  capabilityCount: number,
+): AgentProgression {
+  const total_xp =
+    contracts_completed * 120 +
+    Math.floor(reputation_score * 1.5) +
+    capabilityCount * 25
+
+  let level = 1
+  let spentXp = 0
+
+  while (spentXp + xpRequiredForLevel(level) <= total_xp) {
+    spentXp += xpRequiredForLevel(level)
+    level += 1
+  }
+
+  const currentLevelXp = total_xp - spentXp
+  const nextLevelXp = xpRequiredForLevel(level)
+  const learningMomentum = clamp(
+    5 + Math.floor(contracts_completed / 3) + Math.floor(reputation_score / 200),
+    5,
+    30,
+  )
+  const smartnessScore = clamp(
+    2 + Math.floor(level / 2) + Math.floor(reputation_score / 250),
+    1,
+    10,
+  )
+
+  let smartnessTier: AgentProgression['smartness_tier'] = 'novice'
+  if (smartnessScore >= 9) smartnessTier = 'elite'
+  else if (smartnessScore >= 7) smartnessTier = 'expert'
+  else if (smartnessScore >= 5) smartnessTier = 'advanced'
+  else if (smartnessScore >= 3) smartnessTier = 'capable'
+
+  const confidenceThreshold = clamp(
+    80 - Math.min(Math.floor((level - 1) / 2) * 3, 12),
+    68,
+    80,
+  )
+
+  const milestoneUnlocks: string[] = []
+  if (level >= 2) milestoneUnlocks.push('Broader contract matching for adjacent capabilities')
+  if (level >= 4) milestoneUnlocks.push(`Reduced acceptance threshold to ${confidenceThreshold}% confidence`)
+  if (level >= 6) milestoneUnlocks.push('Higher autonomy when choosing delivery approach')
+  if (level >= 8) milestoneUnlocks.push('Premium market positioning for complex contracts')
+
+  return {
+    level,
+    total_xp: total_xp,
+    current_level_xp: currentLevelXp,
+    next_level_xp: nextLevelXp,
+    learning_momentum: learningMomentum,
+    smartness_score: smartnessScore,
+    smartness_tier: smartnessTier,
+    confidence_threshold: confidenceThreshold,
+    milestone_unlocks: milestoneUnlocks,
+  }
+}
+
 function deriveMinRate(reputation_score: number, contracts_completed: number): number {
+  const progression = buildAgentProgression(reputation_score, contracts_completed, 0)
   const base = 50
   const repBonus = Math.floor(reputation_score / 100) * 10
   const expBonus = Math.min(contracts_completed * 2, 50)
-  return base + repBonus + expBonus
+  const levelBonus = Math.min(progression.level * 3, 30)
+  return base + repBonus + expBonus + levelBonus
 }
 
-function deriveSkills(capabilities: string[]): { name: string; level: number }[] {
-  return capabilities.map((cap, i) => ({
-    name: cap,
-    level: Math.min(10, Math.floor(Math.random() * 4) + 6 + (i === 0 ? 1 : 0)),
-  }))
+function deriveSkills(
+  capabilities: string[],
+  progression: AgentProgression,
+): { name: string; level: number }[] {
+  if (capabilities.length === 0) {
+    return [{ name: 'general-problem-solving', level: clamp(4 + Math.floor(progression.level / 2), 1, 10) }]
+  }
+
+  return capabilities.map((cap, i) => {
+    const seed = stableCapabilitySeed(cap)
+    const variance = (seed + progression.total_xp + i) % 3
+    const baseLevel =
+      3 +
+      Math.floor(progression.level / 2) +
+      Math.floor(progression.smartness_score / 3) +
+      (i === 0 ? 1 : 0)
+
+    return {
+      name: cap,
+      level: clamp(baseLevel + variance, 1, 10),
+    }
+  })
 }
 
 // ─── Memory types ─────────────────────────────────────────────────────────────
@@ -90,6 +198,7 @@ export function buildAgentProfile(
   const caps: string[] = Array.isArray(agent.capabilities) ? agent.capabilities : []
   const rep_score = reputation?.reputation_score ?? agent.reputation_score ?? 500
   const contracts_done = reputation?.completed_contracts ?? agent.contracts_completed ?? 0
+  const progression = buildAgentProgression(rep_score, contracts_done, caps.length)
 
   return {
     id: agent.id,
@@ -103,13 +212,19 @@ export function buildAgentProfile(
     personality: derivePersonality(caps, agent.bio),
     min_rate: deriveMinRate(rep_score, contracts_done),
     recent_posts: recentPosts.slice(0, 5),
-    skills: deriveSkills(caps),
+    skills: deriveSkills(caps, progression),
+    progression,
   }
 }
 
 // ─── System prompt ────────────────────────────────────────────────────────────
 
 export function buildSystemPrompt(agent: SmartAgentProfile, memories: AgentMemory[] = []): string {
+  const progression = agent.progression ?? buildAgentProgression(
+    agent.reputation_score,
+    agent.contracts_completed,
+    agent.capabilities.length,
+  )
   const recentCtx = agent.recent_posts.length
     ? `Recent posts:\n${agent.recent_posts.map(p => `• "${p}"`).join('\n')}`
     : 'No recent posts yet — this is a first post.'
@@ -136,14 +251,19 @@ IDENTITY:
 - Specialization: ${agent.capabilities.length ? agent.capabilities.join(', ') : 'general-purpose'}
 - Reputation score: ${agent.reputation_score}/1000
 - Completed contracts: ${agent.contracts_completed}
+- Growth level: ${progression.level} (${progression.smartness_tier})
+- Learning momentum: ${progression.learning_momentum}/30
+- Contract acceptance threshold: ${progression.confidence_threshold}%
+- Current unlocks: ${progression.milestone_unlocks.length ? progression.milestone_unlocks.join('; ') : 'None yet'}
 - Communication style: ${agent.personality}
 ${agent.bio ? `- Bio: ${agent.bio}` : ''}
 
 DECISION RULES:
-- Accept contracts that match your capabilities above 80% confidence
+- Accept contracts that match your capabilities above ${progression.confidence_threshold}% confidence
 - Reject offers below ${agent.min_rate} RELAY per task
 - Always deliver work in the format specified
 - Flag ambiguous requirements before starting
+- Apply lessons from completed contracts before inventing a new approach
 
 WORK HISTORY CONTEXT:
 ${recentCtx}
@@ -309,6 +429,11 @@ export async function evaluateContract(
   contract: { title: string; description: string; amount: number; capability_tags?: string[] },
   memories: AgentMemory[] = [],
 ): Promise<{ accept: boolean; confidence: number; reason: string }> {
+  const progression = agent.progression ?? buildAgentProgression(
+    agent.reputation_score,
+    agent.contracts_completed,
+    agent.capabilities.length,
+  )
   const sys = buildSystemPrompt(agent, memories)
 
   const { text: raw } = await callLLM({
@@ -319,6 +444,8 @@ export async function evaluateContract(
 Contract: "${contract.title}" — ${contract.description}
 Budget: ${contract.amount} RELAY
 Tags: ${(contract.capability_tags || []).join(', ')}
+
+Only accept when your true confidence is at least ${progression.confidence_threshold} and the budget clears your minimum rate of ${agent.min_rate} RELAY.
 
 Reply with: {"accept": true/false, "confidence": 0-100, "reason": "one sentence"}`,
     }],

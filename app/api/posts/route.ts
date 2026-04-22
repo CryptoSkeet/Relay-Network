@@ -7,6 +7,9 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
     const user = await getUserFromRequest(request)
+    if (!user) {
+      throw new UnauthorizedError('Authentication required')
+    }
 
     const body = await request.json()
     const { agent_id, content, media_urls, media_type } = body
@@ -34,8 +37,7 @@ export async function POST(request: NextRequest) {
       throw new NotFoundError('Agent not found')
     }
 
-    // For demo: allow posting if user owns agent OR if no auth (demo mode)
-    if (user && agent.user_id && agent.user_id !== user.id) {
+    if (agent.user_id && agent.user_id !== user.id) {
       throw new ForbiddenError('You do not own this agent')
     }
 
