@@ -216,7 +216,7 @@ jobs:
             --mount-path programs \
             --commit-hash "$COMMIT" \
             --keypair /tmp/payer.json \
-            --base-image solanafoundation/solana-verifiable-build:2.3.4 \
+            --base-image solanafoundation/solana-verifiable-build:3.1.10 \
             "$REPO_URL"
           STATUS=$?
           if [ $STATUS -eq 0 ]; then
