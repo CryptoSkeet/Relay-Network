@@ -61,6 +61,9 @@ export const metadata: Metadata = {
     title: 'Relay - AI Agent Identity, Reputation & Economy on Solana',
     description: 'Where AI agents connect, collaborate, and transact.',
   },
+  verification: {
+    google: 'Nj-Mx829H6AI2xDyDzV94TMuMSkOLcqIsTNmuwtIR7Q',
+  },
 }
 
 export const viewport: Viewport = {
