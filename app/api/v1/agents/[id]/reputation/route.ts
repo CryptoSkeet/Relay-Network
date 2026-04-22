@@ -32,6 +32,14 @@ interface ReputationResponse {
   /** DB score (0-1000). Derived deterministically from contracts table. */
   score: number
   contracts: number
+  /**
+   * On-chain delivery ratio mirror. `fulfilled_contracts / total_contracts` is
+   * the same value persisted to the agent's profile PDA after every settle /
+   * cancel, so callers can verify the rate on Solscan independently.
+   */
+  fulfilled_contracts: number
+  total_contracts: number
+  fulfillment_rate: number
   progression: AgentProgression
   /** On-chain mirror of the DB score, signed by the Relay treasury. If
    *  present, callers can independently verify the score on Solscan
@@ -71,6 +79,9 @@ const endpoint: PaywalledEndpoint<ReputationResponse> = {
         handle: 'relay_foundation',
         score: 1000,
         contracts: 655,
+        fulfilled_contracts: 655,
+        total_contracts: 655,
+        fulfillment_rate: 1.0,
         progression: {
           level: 18,
           total_xp: 8240,
@@ -102,6 +113,9 @@ const endpoint: PaywalledEndpoint<ReputationResponse> = {
           handle: { type: 'string' },
           score: { type: 'integer' },
           contracts: { type: 'integer' },
+          fulfilled_contracts: { type: 'integer' },
+          total_contracts: { type: 'integer' },
+          fulfillment_rate: { type: 'number' },
           progression: { type: 'object' },
           on_chain: { type: ['object', 'null'] },
           onchain_profile_pda: { type: ['string', 'null'] },
@@ -130,13 +144,18 @@ const endpoint: PaywalledEndpoint<ReputationResponse> = {
 
     let dbScore = 0
     let dbContracts = 0
+    let fulfilledContracts = 0
+    let totalContracts = 0
+    let fulfillmentRate = 0
     let walletAddress: string | null = null
     try {
       const supabase = await createClient()
       const [{ data: rep }, { data: agent }] = await Promise.all([
         supabase
           .from('agent_reputation_view')
-          .select('score,completed_contracts')
+          .select(
+            'score,completed_contracts,fulfilled_contracts,total_contracts,fulfillment_rate',
+          )
           .eq('handle', handle)
           .maybeSingle(),
         supabase
@@ -147,6 +166,9 @@ const endpoint: PaywalledEndpoint<ReputationResponse> = {
       ])
       dbScore = rep?.score ?? 0
       dbContracts = rep?.completed_contracts ?? 0
+      fulfilledContracts = rep?.fulfilled_contracts ?? dbContracts
+      totalContracts = rep?.total_contracts ?? dbContracts
+      fulfillmentRate = rep?.fulfillment_rate ?? (totalContracts > 0 ? fulfilledContracts / totalContracts : 0)
       walletAddress = agent?.wallet_address ?? null
     } catch {
       /* fall through to return what we have */
@@ -183,6 +205,9 @@ const endpoint: PaywalledEndpoint<ReputationResponse> = {
       handle,
       score: dbScore,
       contracts: dbContracts,
+      fulfilled_contracts: fulfilledContracts,
+      total_contracts: totalContracts,
+      fulfillment_rate: fulfillmentRate,
       progression,
       on_chain: onChain,
       onchain_profile_pda: pda,
