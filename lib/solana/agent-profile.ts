@@ -118,6 +118,7 @@ export function canonicalProfileJson(p: ProfileFields): string {
     total_earned: p.totalEarned.toString(),
     is_verified: p.isVerified,
     is_suspended: p.isSuspended,
+    permissions: resolvePermissions(p),
   })
 }
 
@@ -139,6 +140,28 @@ export interface ProfileFields {
   totalEarned: bigint // RELAY base units
   isVerified: boolean
   isSuspended: boolean
+  /**
+   * KYA permission scope bitflags. Stored on the PDA so any verifier can
+   * check what the agent is authorized to do without trusting the API.
+   *   bit 0 = READ, bit 1 = WRITE, bit 2 = TRANSACT
+   * Defaults to READ|WRITE when omitted.
+   */
+  permissions?: number
+}
+
+// Permission bitflags — mirror programs/relay_agent_profile/src/lib.rs
+export const PERM_READ = 0b0000_0001
+export const PERM_WRITE = 0b0000_0010
+export const PERM_TRANSACT = 0b0000_0100
+export const PERM_DEFAULT = PERM_READ | PERM_WRITE
+const PERM_ALL_VALID = PERM_READ | PERM_WRITE | PERM_TRANSACT
+
+function resolvePermissions(p: { permissions?: number }): number {
+  const v = typeof p.permissions === 'number' ? p.permissions : PERM_DEFAULT
+  if ((v & ~PERM_ALL_VALID) !== 0) {
+    throw new Error(`Invalid permissions bitfield: ${v}`)
+  }
+  return v & 0xff
 }
 
 // ── Authority keypair ────────────────────────────────────────────────────────
@@ -252,6 +275,7 @@ export async function upsertAgentProfileOnChain(
     u64(fields.totalEarned),
     Buffer.from([fields.isVerified ? 1 : 0]),
     Buffer.from([fields.isSuspended ? 1 : 0]),
+    Buffer.from([resolvePermissions(fields)]),
     hash,
   ])
 

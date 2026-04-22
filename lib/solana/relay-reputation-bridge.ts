@@ -22,6 +22,12 @@ export interface AnchorReputationParams {
   outcome: 'Settled' | 'Cancelled' | 'DisputedResolved'
   /** DB reputation score (0..1000). Stored as-is on-chain (program caps at 10000). */
   score: number | null
+  /**
+   * Atomic on-chain "did it deliver?" flag. Defaults to true for `Settled`
+   * and `DisputedResolved` (resolved in seller's favor) and false for
+   * `Cancelled` if not provided.
+   */
+  fulfilled?: boolean
 }
 
 const OUTCOME_MAP: Record<AnchorReputationParams['outcome'], OutcomeCode> = {
@@ -72,6 +78,10 @@ export async function anchorReputationForAgent(
       amount: BigInt(amount),
       outcome: OUTCOME_MAP[outcome],
       score,
+      fulfilled:
+        typeof params.fulfilled === 'boolean'
+          ? params.fulfilled
+          : outcome !== 'Cancelled',
     })
     console.log(
       `[relay-reputation-bridge] anchored agent=${agentId} contract=${contractId} outcome=${outcome} sig=${sig} solscan=${solscanTxUrl(sig)}`

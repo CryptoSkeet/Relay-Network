@@ -29,6 +29,22 @@ declare_id!("AgntProFiLe1111111111111111111111111111111");
 const MAX_HANDLE_LEN: usize = 32; // Solana PDA seed limit
 const MAX_DISPLAY_NAME_LEN: usize = 64;
 
+// Permission bitflags — agents prove what they're authorized to do.
+// Stored as u8 on the AgentProfile PDA so any verifier can derive the PDA
+// and check authorization without trusting the API layer.
+pub const PERM_READ:     u8 = 0b0000_0001;
+pub const PERM_WRITE:    u8 = 0b0000_0010;
+pub const PERM_TRANSACT: u8 = 0b0000_0100;
+pub const PERM_ALL_VALID: u8 = PERM_READ | PERM_WRITE | PERM_TRANSACT;
+
+// Permission bitflags — agents prove what they're authorized to do.
+// Stored as u8 on the AgentProfile PDA so any verifier can derive the PDA
+// and check authorization without trusting the API layer.
+pub const PERM_READ:     u8 = 0b0000_0001;
+pub const PERM_WRITE:    u8 = 0b0000_0010;
+pub const PERM_TRANSACT: u8 = 0b0000_0100;
+pub const PERM_ALL_VALID: u8 = PERM_READ | PERM_WRITE | PERM_TRANSACT;
+
 #[program]
 pub mod relay_agent_profile {
     use super::*;
@@ -68,6 +84,7 @@ pub mod relay_agent_profile {
         total_earned: u64,
         is_verified: bool,
         is_suspended: bool,
+        permissions: u8,
         profile_hash: [u8; 32],
     ) -> Result<()> {
         require!(!handle.is_empty(), ProfileError::HandleEmpty);
@@ -77,6 +94,10 @@ pub mod relay_agent_profile {
             ProfileError::DisplayNameTooLong
         );
         require!(reputation_score <= 10_000, ProfileError::ScoreOutOfRange);
+        require!(
+            permissions & !PERM_ALL_VALID == 0,
+            ProfileError::InvalidPermissions
+        );
         require_keys_eq!(
             ctx.accounts.authority.key(),
             ctx.accounts.config.authority,
@@ -105,6 +126,7 @@ pub mod relay_agent_profile {
         profile.total_earned = total_earned;
         profile.is_verified = is_verified;
         profile.is_suspended = is_suspended;
+        profile.permissions = permissions;
         profile.profile_hash = profile_hash;
         profile.updated_at = now;
         profile.version = profile.version.saturating_add(1);
@@ -120,6 +142,7 @@ pub mod relay_agent_profile {
             total_earned,
             is_verified,
             is_suspended,
+            permissions,
             profile_hash,
             version: profile.version,
             updated_at: now,
@@ -210,6 +233,7 @@ pub struct AgentProfile {
     pub total_earned: u64,          // 8 (RELAY base units)
     pub is_verified: bool,          // 1
     pub is_suspended: bool,         // 1
+    pub permissions: u8,            // 1   bitflags: READ|WRITE|TRANSACT (KYA scope)
     pub profile_hash: [u8; 32],     // 32  sha256 of canonical profile JSON
     pub created_at: i64,            // 8
     pub updated_at: i64,            // 8
@@ -224,7 +248,7 @@ impl AgentProfile {
         + 32 + 32                    // did_pubkey + wallet
         + 4 + 4 + 4 + 4              // counters
         + 8                          // total_earned
-        + 1 + 1                      // verified, suspended
+        + 1 + 1 + 1                  // verified, suspended, permissions
         + 32                         // profile_hash
         + 8 + 8 + 8                  // created_at, updated_at, version
         + 1; // bump
@@ -244,6 +268,7 @@ pub struct ProfileUpserted {
     pub total_earned: u64,
     pub is_verified: bool,
     pub is_suspended: bool,
+    pub permissions: u8,
     pub profile_hash: [u8; 32],
     pub version: u64,
     pub updated_at: i64,
@@ -265,4 +290,6 @@ pub enum ProfileError {
     HandleMismatch,
     #[msg("Signer is not the configured profile authority")]
     Unauthorized,
+    #[msg("Permissions bitfield contains unsupported flags")]
+    InvalidPermissions,
 }

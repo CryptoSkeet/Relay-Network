@@ -49,6 +49,10 @@ pub mod relay_reputation {
     /// `contract_id_hash` is sha256(contract_uuid) — keeps DB IDs off-chain.
     /// `score` is the recomputed reputation in basis points (0..=10_000).
     /// `amount` is RELAY base units transferred for this settlement.
+    /// `fulfilled` is the atomic "did it deliver?" flag: true iff the
+    /// contract's deliverables were accepted by the buyer. Indexers can
+    /// stream the `ReputationRecorded` event and verify per-contract
+    /// outcome without trusting the API layer.
     pub fn record_settlement(
         ctx: Context<RecordSettlement>,
         agent_did: Pubkey,
@@ -56,6 +60,7 @@ pub mod relay_reputation {
         amount: u64,
         outcome: u8,
         score: u32,
+        fulfilled: bool,
     ) -> Result<()> {
         require!(outcome <= 2, ReputationError::InvalidOutcome);
         require!(score <= 10_000, ReputationError::ScoreOutOfRange);
@@ -94,6 +99,10 @@ pub mod relay_reputation {
         rep.score = score;
         rep.last_outcome_hash = contract_id_hash;
         rep.last_outcome = outcome;
+        rep.last_fulfilled = fulfilled;
+        if fulfilled {
+            rep.fulfilled_count = rep.fulfilled_count.saturating_add(1);
+        }
         rep.last_updated = now;
 
         emit!(ReputationRecorded {
@@ -102,9 +111,11 @@ pub mod relay_reputation {
             outcome,
             amount,
             score,
+            fulfilled,
             settled_count: rep.settled_count,
             cancelled_count: rep.cancelled_count,
             disputed_count: rep.disputed_count,
+            fulfilled_count: rep.fulfilled_count,
             total_volume: rep.total_volume,
             recorded_at: now,
         });
@@ -187,16 +198,18 @@ pub struct AgentReputation {
     pub settled_count: u64,          // 8
     pub cancelled_count: u64,        // 8
     pub disputed_count: u64,         // 8
+    pub fulfilled_count: u64,        // 8   atomic "did it deliver?" tally
     pub total_volume: u128,          // 16 (RELAY base units)
     pub score: u32,                  // 4  (basis points)
     pub last_outcome: u8,            // 1
+    pub last_fulfilled: bool,        // 1   last contract's delivery flag
     pub last_outcome_hash: [u8; 32], // 32
     pub last_updated: i64,           // 8
     pub bump: u8,                    // 1
 }
 
 impl AgentReputation {
-    pub const SIZE: usize = 32 + 8 + 8 + 8 + 16 + 4 + 1 + 32 + 8 + 1;
+    pub const SIZE: usize = 32 + 8 + 8 + 8 + 8 + 16 + 4 + 1 + 1 + 32 + 8 + 1;
 }
 
 // ── Events ───────────────────────────────────────────────────────────────────
@@ -208,9 +221,11 @@ pub struct ReputationRecorded {
     pub outcome: u8,
     pub amount: u64,
     pub score: u32,
+    pub fulfilled: bool,
     pub settled_count: u64,
     pub cancelled_count: u64,
     pub disputed_count: u64,
+    pub fulfilled_count: u64,
     pub total_volume: u128,
     pub recorded_at: i64,
 }

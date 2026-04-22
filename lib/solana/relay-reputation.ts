@@ -118,12 +118,22 @@ export interface RecordSettlementParams {
   amount: bigint | number // RELAY base units
   outcome: OutcomeCode
   score: number // basis points 0..10000
+  /**
+   * Atomic on-chain "did it deliver?" flag. Defaults to true for `Settled`
+   * and false for `Cancelled` if not provided. The reputation program records
+   * this per contract in `ReputationRecorded` and increments `fulfilled_count`.
+   */
+  fulfilled?: boolean
 }
 
 export async function recordSettlementOnChain(
   params: RecordSettlementParams
 ): Promise<string> {
   const { agentDid, contractId, amount, outcome, score } = params
+  const fulfilled =
+    typeof params.fulfilled === 'boolean'
+      ? params.fulfilled
+      : outcome === 0 /* Settled */
 
   if (score < 0 || score > 10_000) {
     throw new Error(`score out of range: ${score}`)
@@ -142,7 +152,7 @@ export async function recordSettlementOnChain(
 
   // Build instruction data
   // Layout: [disc(8), agent_did(32), contract_id_hash(32), amount(u64 LE),
-  //          outcome(u8), score(u32 LE)]
+  //          outcome(u8), score(u32 LE), fulfilled(u8)]
   const amountBuf = Buffer.alloc(8)
   amountBuf.writeBigUInt64LE(BigInt(amount), 0)
 
@@ -156,6 +166,7 @@ export async function recordSettlementOnChain(
     amountBuf,
     Buffer.from([outcome]),
     scoreBuf,
+    Buffer.from([fulfilled ? 1 : 0]),
   ])
 
   const ix = new TransactionInstruction({
@@ -180,9 +191,11 @@ export interface OnChainReputation {
   settledCount: bigint
   cancelledCount: bigint
   disputedCount: bigint
+  fulfilledCount: bigint
   totalVolume: bigint
   score: number
   lastOutcome: number
+  lastFulfilled: boolean
   lastOutcomeHash: Buffer
   lastUpdated: number
   bump: number
@@ -204,12 +217,14 @@ export async function fetchReputation(
   const settled = buf.readBigUInt64LE(o); o += 8
   const cancelled = buf.readBigUInt64LE(o); o += 8
   const disputed = buf.readBigUInt64LE(o); o += 8
+  const fulfilled = buf.readBigUInt64LE(o); o += 8
   // u128 LE — read low and high u64
   const lo = buf.readBigUInt64LE(o); o += 8
   const hi = buf.readBigUInt64LE(o); o += 8
   const totalVolume = (hi << BigInt(64)) | lo
   const score = buf.readUInt32LE(o); o += 4
   const lastOutcome = buf.readUInt8(o); o += 1
+  const lastFulfilled = buf.readUInt8(o) === 1; o += 1
   const lastOutcomeHash = Buffer.from(buf.subarray(o, o + 32)); o += 32
   const lastUpdated = Number(buf.readBigInt64LE(o)); o += 8
   const bump = buf.readUInt8(o)
@@ -219,9 +234,11 @@ export async function fetchReputation(
     settledCount: settled,
     cancelledCount: cancelled,
     disputedCount: disputed,
+    fulfilledCount: fulfilled,
     totalVolume,
     score,
     lastOutcome,
+    lastFulfilled,
     lastOutcomeHash,
     lastUpdated,
     bump,
