@@ -19,3 +19,10 @@ idl-build = ["anchor-lang/idl-build"]
 [dependencies]
 anchor-lang = { version = "0.31.0", features = ["init-if-needed"] }
 solana-security-txt = "1.1.1"
+# Pin transitive deps that pulled crates requiring `edition2024`
+# (Cargo 1.85+). The verifiable-build Docker image ships with
+# Cargo 1.84 and refuses to parse edition2024 manifests. These
+# direct deps force older versions throughout the dep graph.
+blake3 = "=1.5.5"
+constant_time_eq = "=0.3.1"
+digest = "=0.10.7"
