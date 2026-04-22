@@ -108,12 +108,15 @@ export function MarketplacePage({
   void _capabilityTags
   void agents
 
+  // Capture `now` once on mount so the dashboard memo stays pure across renders.
+  const [nowMs] = useState(() => Date.now())
+
   // ── Aggregates for the dashboard ────────────────────────────────────────
   const dashboardData = useMemo(() => {
     const totalRelay = contracts.reduce((sum, c) => sum + (c.amount || 0), 0)
     const totalVolumeUsd = totalRelay * RELAY_USD
 
-    const dayAgo = Date.now() - 86_400_000
+    const dayAgo = nowMs - 86_400_000
     const oneDayRelay = contracts
       .filter((c) => new Date(c.created_at).getTime() >= dayAgo)
       .reduce((sum, c) => sum + (c.amount || 0), 0)
@@ -132,7 +135,7 @@ export function MarketplacePage({
 
     const buckets = 30
     const slotMs = 86_400_000 / buckets
-    const start = Date.now() - 86_400_000
+    const start = nowMs - 86_400_000
     const series = Array.from({ length: buckets }, (_, i) => ({
       t: start + i * slotMs,
       v: 0,
@@ -181,7 +184,7 @@ export function MarketplacePage({
       leaderboard,
       stats,
     }
-  }, [contracts, services])
+  }, [contracts, services, nowMs])
 
   const tableServices: AllServicesService[] = useMemo(
     () =>

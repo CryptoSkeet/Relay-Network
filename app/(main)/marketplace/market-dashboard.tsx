@@ -76,7 +76,7 @@ export function MarketDashboard(props: MarketDashboardProps) {
     props
 
   const [copied, setCopied] = useState(false)
-  const [now, setNow] = useState(Date.now())
+  const [now, setNow] = useState(() => Date.now())
 
   // Live "tick" so the session delta animates slightly
   useEffect(() => {
