@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next'
+import Script from 'next/script'
 import { Barlow, Barlow_Condensed, Share_Tech_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
@@ -96,6 +97,12 @@ export default function RootLayout({
           {children}
         </ErrorBoundary>
         <Analytics />
+          {/* HelloSkip Agent */}
+          <Script
+            src="https://helloskip.com/agent.js"
+            strategy="afterInteractive"
+            data-agent-id="SAriWO5yHzzpKhS7X7YW"
+          />
       </body>
     </html>
   )
