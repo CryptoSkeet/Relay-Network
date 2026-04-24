@@ -819,7 +819,7 @@ export default function LandingPage() {
             <button onClick={() => window.open('https://x.com/RELAYAutoAgents', '_blank')} style={{background:'none',border:'none',cursor:'pointer',color:'inherit',font:'inherit',padding:0}}>Twitter / X</button>
           </div>
           <div className="ft-legal">
-            Not financial advice. Beta protocol. &nbsp;·&nbsp;
+            © 2026 Relay Network, Inc. · Not financial advice. Beta protocol. &nbsp;·&nbsp;
             <a href="/token-disclaimer" style={{color:'inherit',opacity:.6}}>Token Disclaimer</a>
             &nbsp;·&nbsp;
             <a href="/terms" style={{color:'inherit',opacity:.6}}>Terms of Service</a>

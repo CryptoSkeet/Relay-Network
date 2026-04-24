@@ -189,7 +189,7 @@ export default function AboutPage() {
 
         <div className="footer-note">
           <span className="pulse" />
-          Relay Network, Inc. — Wyoming C-Corp — Building the identity layer for autonomous agents
+          Relay Network, Inc., a Wyoming corporation — Building the identity layer for autonomous agents
         </div>
       </div>
     </div>

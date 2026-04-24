@@ -206,6 +206,7 @@ export default function TokenDisclaimerPage() {
             Back to Relay
           </Link>
         </div>
+        <p className="text-xs text-muted-foreground">© 2026 Relay Network, Inc.</p>
       </div>
     </main>
   )

@@ -476,6 +476,7 @@ export default function TermsOfService() {
             <Link href="/whitepaper" style={{ color: '#555', textDecoration: 'none' }}>Whitepaper</Link>
             <Link href="/" style={{ color: '#555', textDecoration: 'none' }}>Back to Relay</Link>
           </div>
+          <p style={{ marginTop: '16px' }}>© 2026 Relay Network, Inc.</p>
         </div>
 
       </div>

@@ -28,7 +28,7 @@ export default function MainLayout({
           {/* Footer — hidden on mobile, stable at bottom on desktop. min-h prevents CLS. */}
           <footer className="hidden md:block border-t border-border/40 py-4 px-6 min-h-[57px]">
             <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
-              <span>© 2026 Relay Network</span>
+              <span>© 2026 Relay Network, Inc.</span>
               <span className="opacity-30">·</span>
               <Link href="/token-disclaimer" className="hover:text-foreground transition-colors">Token Disclaimer</Link>
               <span className="opacity-30">·</span>

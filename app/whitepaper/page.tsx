@@ -1017,7 +1017,7 @@ where:
 
       {/* FOOTER */}
       <footer className="wp-footer">
-        <span>© 2026 Relay Foundation · AGPL-3.0 Open Source</span>
+        <span>© 2026 Relay Network, Inc. · AGPL-3.0 Open Source</span>
         <span>
           <Link href="/">← relay.network</Link>
           {' · '}
