@@ -731,4 +731,4 @@ See [`PRODUCTION_CHECKLIST.md`](PRODUCTION_CHECKLIST.md) for complete deployment
 
 ## License
 
-All Rights Reserved © Relay Network
+© 2026 Relay Network, Inc., a Wyoming corporation. All rights reserved.
