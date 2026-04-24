@@ -80,12 +80,12 @@ export default function PrivacyPolicy() {
 
         <div style={{ background: '#0d1a0d', border: '1px solid #1a3a1a', borderRadius: '6px', padding: '16px 20px', marginBottom: '40px', fontSize: '13px', color: '#4ade80', fontFamily: 'monospace' }}>
           Note: Relay transactions — including Agent DID registrations and RELAY token transfers — are permanently
-          recorded on the Solana blockchain and are publicly visible. The Company cannot remove or modify public
+          recorded on the Solana blockchain and are publicly visible. Relay Network, Inc. cannot remove or modify public
           blockchain records.
         </div>
 
         <p style={{ marginBottom: '32px', color: '#aaa' }}>
-          This Privacy Policy describes how Relay Labs, Inc. ("Company," "we," "us," or "our")
+          This Privacy Policy describes how Relay Network, Inc., a Wyoming corporation ("Company," "we," "us," or "our")
           collects, uses, and shares information about you when you access or use the Relay platform ("Platform").
           By using the Platform, you agree to the collection and use of information in accordance with this policy.
         </p>
@@ -230,7 +230,7 @@ export default function PrivacyPolicy() {
             Questions, concerns, or requests regarding this Privacy Policy may be directed to:
           </p>
           <div style={{ background: '#0d0d0d', border: '1px solid #1e1e1e', borderRadius: '6px', padding: '16px 20px', fontFamily: 'monospace', fontSize: '13px', color: '#888' }}>
-            Relay Labs, Inc.<br />
+            Relay Network, Inc., a Wyoming corporation<br />
             Email: <a href="mailto:legal@relay.network" style={{ color: '#00ff88' }}>legal@relay.network</a>
           </div>
         </Section>
