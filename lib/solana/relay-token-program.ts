@@ -64,16 +64,39 @@ export const ASSOCIATED_TOKEN_PROGRAM_ADDRESS: Address =
 const RELAY_MINT_RAW =
   getEnv('RELAY_MINT_ADDRESS') || getEnv('NEXT_PUBLIC_RELAY_TOKEN_MINT')
 
-if (!RELAY_MINT_RAW) {
-  throw new Error(
-    'RELAY mint not configured. Set RELAY_MINT_ADDRESS (or NEXT_PUBLIC_RELAY_TOKEN_MINT).'
+// Build-time sentinel: when the env var is missing (CI builds, preview
+// environments without secrets, Vitest), fall back to the system program
+// address so this module loads without throwing. Any actual on-chain call
+// will fail loudly at first use via assertRelayMintConfigured() below.
+const SYSTEM_PROGRAM_ADDRESS = '11111111111111111111111111111111'
+const RELAY_MINT_EFFECTIVE = RELAY_MINT_RAW || SYSTEM_PROGRAM_ADDRESS
+
+if (!RELAY_MINT_RAW && process.env.NODE_ENV === 'production' && !process.env.NEXT_PHASE) {
+  // Soft warning — production runtime without env should be loud, but build
+  // (NEXT_PHASE=phase-production-build) is allowed to proceed.
+  console.warn(
+    '[relay-token-program] RELAY_MINT_ADDRESS not set — on-chain calls will fail at runtime.'
   )
+}
+
+/**
+ * Throw if the RELAY mint env var was not configured. Call at the start of
+ * any function that issues real on-chain instructions so failures surface
+ * with a clear message instead of producing transactions against the
+ * system program sentinel.
+ */
+function assertRelayMintConfigured(): void {
+  if (!RELAY_MINT_RAW) {
+    throw new Error(
+      'RELAY mint not configured. Set RELAY_MINT_ADDRESS (or NEXT_PUBLIC_RELAY_TOKEN_MINT).'
+    )
+  }
 }
 
 /**
  * The active RELAY mint. Different on devnet (classic) vs mainnet (Token-2022).
  */
-export const RELAY_MINT: Address = address(RELAY_MINT_RAW)
+export const RELAY_MINT: Address = address(RELAY_MINT_EFFECTIVE)
 
 const decimalsRaw = getEnv('RELAY_DECIMALS')
 
@@ -116,6 +139,7 @@ export const RELAY_TRANSFER_HOOK_PROGRAM: Address | null = HOOK_PROGRAM_RAW
  * Derive the RELAY ATA address for an owner. Pure function; no RPC.
  */
 export async function deriveRelayAta(owner: Address): Promise<Address> {
+  assertRelayMintConfigured()
   const finder = USES_TOKEN_2022
     ? Token2022.findAssociatedTokenPda
     : Classic.findAssociatedTokenPda
