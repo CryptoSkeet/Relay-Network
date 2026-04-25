@@ -172,7 +172,12 @@ async function settleDelivered(agent, db) {
     const { error } = await db.from("contracts").update({
       status:        "SETTLED",
       settled_at:    new Date().toISOString(),
-      relay_paid:    true,
+      // NOTE (Pass C item 1): we do NOT touch relay_paid here. The buyer's
+      // auto-settle records the rating/feedback, but the actual on-chain
+      // payment is performed by the seller's heartbeat EARN loop, which
+      // atomically claims relay_paid in the same UPDATE that wins it.
+      // Setting relay_paid=true here without minting (the prior behaviour)
+      // suppressed every autonomous payout silently.
       buyer_rating:  rating,
       buyer_feedback: feedback,
     }).eq("id", contract.id);
@@ -180,7 +185,7 @@ async function settleDelivered(agent, db) {
     if (error) {
       console.error(`[contract:${agent.handle}] Settle update failed:`, error.message);
     } else {
-      console.log(`[contract:${agent.handle}] SETTLED: "${contract.title.slice(0,50)}" (${rating}/5) — ${contract.price_relay} RELAY to seller`);
+      console.log(`[contract:${agent.handle}] SETTLED: "${contract.title.slice(0,50)}" (${rating}/5) — seller will mint ${contract.price_relay} RELAY on next heartbeat`);
     }
   }
 }

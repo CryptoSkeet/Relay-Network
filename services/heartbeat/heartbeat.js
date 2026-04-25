@@ -25,7 +25,7 @@ import { buildReceipt } from "./inference-receipt.js";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://relaynetwork.ai";
 const CRON_SECRET = process.env.CRON_SECRET || "";
 
-async function mintRelayViaAPI(agentId, amount, reason = "contract_earnings") {
+async function mintRelayViaAPI(agentId, amount, reason = "contract_earnings", contractId = null) {
   try {
     const res = await fetch(`${APP_URL}/api/v1/relay-token/mint`, {
       method: "POST",
@@ -33,7 +33,7 @@ async function mintRelayViaAPI(agentId, amount, reason = "contract_earnings") {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${CRON_SECRET}`,
       },
-      body: JSON.stringify({ agent_id: agentId, amount, reason }),
+      body: JSON.stringify({ agent_id: agentId, amount, reason, contract_id: contractId }),
     });
     if (!res.ok) {
       const text = await res.text();
@@ -162,31 +162,126 @@ async function agentHeartbeat(agent) {
     // 6. Run contract cycle (accept/deliver/settle/initiate/offer)
     await runContractCycle(agent, supabase);
 
-    // 6a. EARN: Check for completed/settled contracts → mint RELAY tokens
+    // 6a. EARN: Check for completed/settled contracts → mint RELAY tokens.
+    //
+    // Concurrency model (Pass C item 1):
+    //   1. Atomic claim: UPDATE contracts SET relay_paid=true WHERE id=$1
+    //      AND COALESCE(relay_paid,FALSE)=FALSE RETURNING id. Zero rows back
+    //      means another worker (engine path or a parallel heartbeat) already
+    //      claimed it — we silently skip.
+    //   2. Pre-insert a `pending` transactions row keyed by contract_id. The
+    //      DB has a partial unique index (uniq_contract_payment_in_flight)
+    //      that rejects a second pending/processing/completed row for the
+    //      same contract — defense-in-depth if the relay_paid claim somehow
+    //      raced (e.g. column reverted manually).
+    //   3. Mint on-chain.
+    //   4. Flip the pending row to `completed` (with sig) or `failed`
+    //      (preserving the error in metadata for ops). We deliberately do
+    //      NOT reset relay_paid on failure — operator inspects the failed
+    //      transactions row and decides whether to retry manually.
     try {
-      const { data: completedContracts } = await supabase
+      // Pass C item 2: orphan-payee guard. If THIS agent's wallet is
+      // unsignable (key_orphaned_at IS NOT NULL), there is no path for an
+      // on-chain mint to ever succeed. Skip the EARN block entirely —
+      // the back-fill migration moved historical orphan-payee contracts to
+      // PAYMENT_BLOCKED, and any new ones should not accumulate as ghost
+      // mint attempts. Operator restores the wallet (clear key_orphaned_at)
+      // before the contract becomes payable again.
+      const { data: orphanCheck } = await supabase
+        .from("solana_wallets")
+        .select("key_orphaned_at")
+        .eq("agent_id", agent.id)
+        .maybeSingle();
+
+      if (!orphanCheck?.key_orphaned_at) {
+        const { data: completedContracts } = await supabase
         .from("contracts")
-        .select("id, budget_max, price_relay, status, relay_paid")
+        .select("id, budget_max, price_relay, status, relay_paid, buyer_agent_id, client_id, seller_agent_id")
         .eq("provider_id", agent.id)
         .in("status", ["completed", "SETTLED"])
-        .eq("relay_paid", false);
+        .not("relay_paid", "is", true);
 
       if (completedContracts?.length) {
         for (const contract of completedContracts) {
           const amount = contract.price_relay ?? contract.budget_max ?? 100;
-          const sig = await mintRelayViaAPI(agent.id, amount, "contract_earnings");
-          // Always mark relay_paid to prevent retries — DB wallet is authoritative
-          await supabase
+
+          // 1. Atomic claim. Another worker may have flipped this in the
+          //    sub-second between the SELECT above and now — that's OK.
+          const { data: claimed, error: claimErr } = await supabase
             .from("contracts")
             .update({ relay_paid: true })
-            .eq("id", contract.id);
+            .eq("id", contract.id)
+            .not("relay_paid", "is", true)
+            .select("id")
+            .maybeSingle();
+
+          if (claimErr) {
+            console.warn(`${tag} Claim failed for contract ${contract.id}:`, claimErr.message);
+            continue;
+          }
+          if (!claimed) {
+            // Race lost — another worker is paying it. Silent skip.
+            continue;
+          }
+
+          // 2. Pre-insert pending transactions row.
+          const memo = `relay:contract:${contract.id}:settled`;
+          const { data: pendingTx, error: insErr } = await supabase
+            .from("transactions")
+            .insert({
+              from_agent_id: contract.buyer_agent_id ?? contract.client_id ?? null,
+              to_agent_id:   contract.seller_agent_id ?? agent.id,
+              contract_id:   contract.id,
+              amount,
+              currency:      "RELAY",
+              type:          "payment",
+              status:        "pending",
+              description:   `Heartbeat earn: ${memo}`,
+              metadata:      { memo, source: "heartbeat" },
+            })
+            .select("id")
+            .single();
+
+          if (insErr) {
+            // Unique-violation = idempotency guard fired. Treat as success;
+            // a peer already inserted the canonical row.
+            if (insErr.code === "23505") {
+              console.log(`${tag} Idempotency guard hit for contract ${contract.id} — already in flight`);
+              continue;
+            }
+            console.warn(`${tag} Pending tx insert failed for ${contract.id}:`, insErr.message);
+            continue;
+          }
+
+          // 3. Mint on-chain.
+          let sig = null;
+          let mintErr = null;
+          try {
+            sig = await mintRelayViaAPI(agent.id, amount, "contract_earnings", contract.id);
+          } catch (e) {
+            mintErr = e?.message || String(e);
+          }
+
+          // 4. Flip pending → completed | failed.
+          await supabase
+            .from("transactions")
+            .update({
+              status:       sig ? "completed" : "failed",
+              tx_hash:      sig,
+              reference:    sig,
+              completed_at: new Date().toISOString(),
+              metadata:     { memo, source: "heartbeat", mint_error: mintErr },
+            })
+            .eq("id", pendingTx.id);
+
           if (sig) {
             console.log(`${tag} Earned ${amount} RELAY for contract ${contract.id}: ${sig}`);
           } else {
-            console.warn(`${tag} Mint failed for contract ${contract.id}, marked relay_paid to prevent double-mint`);
+            console.warn(`${tag} Mint failed for contract ${contract.id} (relay_paid=true held; tx=${pendingTx.id} marked failed): ${mintErr ?? 'no signature returned'}`);
           }
         }
       }
+      } // end orphan-payee guard
     } catch (earnErr) {
       console.warn(`${tag} RELAY earn error:`, earnErr.message);
     }

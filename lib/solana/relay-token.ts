@@ -33,11 +33,55 @@ import {
   getAssociatedTokenAddress,
   TokenAccountNotFoundError,
 } from '@solana/spl-token'
+import {
+  address,
+  createKeyPairFromBytes,
+  createSignerFromKeyPair,
+  type TransactionSigner,
+} from '@solana/kit'
+import { getAddMemoInstruction } from '@solana-program/memo'
 import crypto from 'crypto'
 import { getSolanaConnection, network } from './quicknode'
 import { getKeypairFromStorage, generateSolanaKeypair, decryptSolanaPrivateKey } from './generate-wallet'
 import { createClient } from '@/lib/supabase/server'
 import { getEnv } from '../config'
+import { sendAndConfirm } from './send'
+import {
+  RELAY_DECIMALS,
+  buildCreateAtaIdempotentIx,
+  buildMintToIx,
+  deriveRelayAta,
+} from './relay-token-program'
+
+// ── Treasury kit signer (RELAY_PAYER_SECRET_KEY → @solana/kit signer) ────────
+// Cached as a promise so concurrent calls share one CryptoKey import.
+// The plaintext byte buffer is zeroized after the import — only the
+// non-extractable CryptoKeyPair reference lives on.
+
+let _treasurySigner: Promise<TransactionSigner> | null = null
+
+export function getTreasurySigner(): Promise<TransactionSigner> {
+  if (_treasurySigner) return _treasurySigner
+  _treasurySigner = (async () => {
+    const raw = getEnv('RELAY_PAYER_SECRET_KEY')
+    if (!raw) throw new Error('RELAY_PAYER_SECRET_KEY not set')
+    const bytes = new Uint8Array(raw.split(',').map(Number))
+    if (bytes.length !== 64) {
+      throw new Error(`RELAY_PAYER_SECRET_KEY: expected 64 bytes, got ${bytes.length}`)
+    }
+    try {
+      const kp = await createKeyPairFromBytes(bytes)
+      return createSignerFromKeyPair(kp)
+    } finally {
+      bytes.fill(0)
+    }
+  })().catch((err) => {
+    // Don't poison the cache on transient import failures.
+    _treasurySigner = null
+    throw err
+  })
+  return _treasurySigner
+}
 
 // ── Mint authority keypair ─────────────────────────────────────────────────────
 
@@ -189,63 +233,65 @@ export function invalidateBalanceCache(walletAddress: string): void {
 
 // ── Mint RELAY tokens to an agent wallet (admin/system only) ─────────────────
 
+/**
+ * Mint RELAY to a recipient wallet. Treasury (RELAY_PAYER_SECRET_KEY) is both
+ * fee payer and mint authority. The transaction bundles three instructions:
+ *
+ *   1. Idempotent ATA creation for the recipient — no-op if it already exists,
+ *      and the ATA program now handles uninitialized System-owned recipient
+ *      accounts itself, so the legacy manual rent pre-fund is gone.
+ *   2. MintToChecked — checked variant catches mint/decimals mismatches at
+ *      the program rather than silently moving wrong amounts.
+ *   3. Memo — defaults to `relay:mint:<recipient-prefix>:<amount>`. Callers
+ *      that need idempotency (signup bonus, contract settlement) should pass
+ *      a stable `memo` like `relay:signup:<agentId>` and gate the call on
+ *      a prior-row check before invoking.
+ *
+ * Routes through `sendAndConfirm` so we get CU estimation + p75 priority
+ * fees + blockhash-expired error mapping for free.
+ *
+ * Public signature is preserved (memo is an optional 3rd arg) so the 6
+ * existing call sites (route.ts, contract-engine, agent-tools,
+ * graduation-engine, pending-rewards, /create) are untouched unless they
+ * opt in to the memo.
+ */
 export async function mintRelayTokens(
   recipientPublicKey: string,
   amount: number, // human-readable RELAY amount (e.g. 1000)
+  memo?: string,
 ): Promise<string> {
-  const connection = getSolanaConnection()
-  const mint = await getRelayMint()
-  const mintAuthority = getMintAuthorityKeypair()
-  const recipient = new PublicKey(recipientPublicKey)
+  const treasury = await getTreasurySigner()
+  const recipient = address(recipientPublicKey)
 
-  // Ensure mint authority has SOL for tx fees
-  const authorityBalance = await connection.getBalance(mintAuthority.publicKey)
-  if (authorityBalance < 0.01 * LAMPORTS_PER_SOL && (network === 'devnet' || network === 'testnet')) {
-    try { await fundWalletDevnet(mintAuthority.publicKey.toString()) } catch { /* non-fatal */ }
-  }
+  // Convert to base units. RELAY_DECIMALS is sourced from env (default 6) and
+  // is verified against the on-chain mint by assertRelayMintMatchesEnv() at
+  // boot — so a wrong env value can't silently mint at the wrong scale here.
+  const rawAmount = BigInt(Math.round(amount * 10 ** RELAY_DECIMALS))
 
-  // Ensure recipient account exists on-chain (owned by System Program).
-  // The Associated Token Program requires the owner to be a System-owned account.
-  // Wallets with 0 lamports don't exist on Solana, causing "Provided owner is not allowed".
-  const recipientBalance = await connection.getBalance(recipient)
-  if (recipientBalance === 0) {
-    const MIN_RENT = 890_880 // ~0.00089 SOL — minimum to make account exist
-    const fundTx = new Transaction().add(
-      SystemProgram.transfer({
-        fromPubkey: mintAuthority.publicKey,
-        toPubkey: recipient,
-        lamports: MIN_RENT,
-      })
-    )
-    try {
-      await sendAndConfirmTransaction(connection, fundTx, [mintAuthority])
-    } catch (fundErr) {
-      console.warn(`[relay-token] Failed to fund recipient ${recipientPublicKey} (non-fatal):`, fundErr)
-    }
-  }
+  const ata = await deriveRelayAta(recipient)
 
-  // Get or create associated token account for recipient
-  const tokenAccount = await getOrCreateAssociatedTokenAccount(
-    connection,
-    mintAuthority,  // payer for ATA creation
-    mint,
-    recipient,
-    true, // allowOwnerOffCurve — safety net for edge-case wallet addresses
-  )
+  const createAtaIx = await buildCreateAtaIdempotentIx({
+    feePayer: treasury,
+    owner: recipient,
+  })
 
-  // Mint tokens (convert to raw units with 6 decimals)
-  const rawAmount = BigInt(Math.round(amount * 1_000_000))
-  const sig = await mintTo(
-    connection,
-    mintAuthority,
-    mint,
-    tokenAccount.address,
-    mintAuthority,
-    rawAmount,
-  )
+  const mintIx = buildMintToIx({
+    mintAuthority: treasury,
+    destinationAta: ata,
+    amount: rawAmount,
+  })
+
+  // Default memo gives forensic auditability; callers pass an explicit memo
+  // when they need idempotency (e.g. `relay:signup:<agentId>`). Solana memos
+  // are capped at ~566 bytes; we never get close.
+  const memoIx = getAddMemoInstruction({
+    memo: memo ?? `relay:mint:${recipientPublicKey.slice(0, 8)}:${amount}`,
+  })
+
+  const result = await sendAndConfirm([createAtaIx, mintIx, memoIx], treasury)
 
   invalidateBalanceCache(recipientPublicKey)
-  return sig
+  return result.signature as string
 }
 
 // ── Transfer RELAY between two agent wallets ──────────────────────────────────

@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { agent_id, amount, reason = 'earnings' } = await request.json()
+    const { agent_id, amount, reason = 'earnings', contract_id } = await request.json()
     if (!agent_id || !amount || amount <= 0) {
       return NextResponse.json({ error: 'agent_id and positive amount required' }, { status: 400 })
     }
@@ -28,8 +28,16 @@ export async function POST(request: NextRequest) {
     // Ensure agent has a wallet
     const wallet = await ensureAgentWallet(agent_id)
 
+    // Per-contract memo gives forensic auditability AND lets downstream
+    // callers de-dupe by memo (combined with item 1's atomic claim).
+    // Falls back to a stable agent-level marker for non-contract mints
+    // (admin grants, signup bonuses go through their own dedicated path).
+    const memo = contract_id
+      ? `relay:contract:${contract_id}:settled`
+      : `relay:earn:${agent_id}:${reason}`
+
     // Mint on-chain
-    const sig = await mintRelayTokens(wallet.publicKey, amount)
+    const sig = await mintRelayTokens(wallet.publicKey, amount, memo)
 
     // Credit in DB
     const { data: dbWallet } = await supabase
