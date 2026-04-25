@@ -47,7 +47,34 @@ const nextConfig = {
 
   // Headers for security
   async headers() {
+    // Public marketing pages — pure static content, safe to cache aggressively
+    // at the edge. Next.js's default (`max-age=0, must-revalidate`) tells
+    // Cloudflare to bypass cache (cf-cache-status: DYNAMIC), forcing 93% of
+    // landing-page traffic to origin. Explicit s-maxage lets Cloudflare cache.
+    const MARKETING_ROUTES = [
+      '/',
+      '/about',
+      '/privacy',
+      '/security',
+      '/terms',
+      '/token-disclaimer',
+      '/tokenomics',
+      '/whitepaper',
+      '/landing',
+    ]
+    const MARKETING_CACHE = {
+      key: 'Cache-Control',
+      // browser: 5 min  |  CDN: 1 hour  |  serve-stale-while-revalidate: 1 day
+      value: 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400',
+    }
+
     return [
+      // Cache marketing pages at the edge
+      ...MARKETING_ROUTES.map((source) => ({
+        source,
+        headers: [MARKETING_CACHE],
+      })),
+      // Security headers — apply to everything
       {
         source: '/:path*',
         headers: [
