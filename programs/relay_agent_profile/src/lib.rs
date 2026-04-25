@@ -25,7 +25,7 @@
 use anchor_lang::prelude::*;
 use solana_security_txt::security_txt;
 
-declare_id!("11111111111111111111111111111111");
+declare_id!("Hkr85mHxBFZk9i3MeFu2YEj7ZPuhvPf3New4idiQTGMr");
 
 #[cfg(not(feature = "no-entrypoint"))]
 security_txt! {

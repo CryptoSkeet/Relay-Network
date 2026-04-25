@@ -10,7 +10,7 @@ skip-lint = false
 [programs.devnet]
 relay_agent_registry = "Hs1hX4pSZSAQKLgGrcydyEaJMsJfqXQqJyJvVnqdaoDE"
 relay_reputation = "2dysoEiGEyn2DeUKgFneY1KxBNqGP4XWdzLtzBK8MYau"
-relay_agent_profile = "11111111111111111111111111111111"
+relay_agent_profile = "Hkr85mHxBFZk9i3MeFu2YEj7ZPuhvPf3New4idiQTGMr"
 
 [registry]
 url = "https://api.apr.dev"

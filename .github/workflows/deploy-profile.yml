@@ -1,0 +1,192 @@
+# .github/workflows/deploy-profile.yml
+#
+# Compile and deploy the relay_agent_profile Anchor program to Solana devnet.
+#
+# Secrets required:
+#   DEPLOY_KEYPAIR           — wallet JSON array with devnet SOL (payer);
+#                              shared with deploy-registry.yml + deploy-reputation.yml
+#   PROGRAM_KEYPAIR_PROFILE  — program keypair JSON array for relay_agent_profile
+#                              (must produce pubkey Hkr85mHxBFZk9i3MeFu2YEj7ZPuhvPf3New4idiQTGMr)
+#
+# The program ID Hkr85mHxBFZk9i3MeFu2YEj7ZPuhvPf3New4idiQTGMr is hardcoded in
+# programs/relay_agent_profile/src/lib.rs and programs/Anchor.toml — re-deploys
+# MUST use the matching keypair or the build will fail "program id mismatch".
+
+name: Deploy Relay Agent Profile
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'programs/relay_agent_profile/**'
+      - 'programs/Anchor.toml'
+      - '.github/workflows/deploy-profile.yml'
+  workflow_dispatch:
+
+env:
+  ANCHOR_VERSION: '0.31.0'
+  SOLANA_VERSION: '3.1.13'
+  RUST_TOOLCHAIN: '1.86.0'
+  PROGRAM_NAME: relay_agent_profile
+  EXPECTED_PROGRAM_ID: 'Hkr85mHxBFZk9i3MeFu2YEj7ZPuhvPf3New4idiQTGMr'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Skip if program keypair secret missing
+        run: |
+          echo "PROGRAM_KEYPAIR_PROFILE present: ${{ secrets.PROGRAM_KEYPAIR_PROFILE != '' }}"
+          echo "DEPLOY_KEYPAIR present:          ${{ secrets.DEPLOY_KEYPAIR != '' }}"
+          if [ -z "${{ secrets.PROGRAM_KEYPAIR_PROFILE }}" ]; then
+            echo "::warning::PROGRAM_KEYPAIR_PROFILE secret not configured; skipping deploy."
+            echo "SKIP=1" >> $GITHUB_ENV
+          fi
+          if [ -z "${{ secrets.DEPLOY_KEYPAIR }}" ]; then
+            echo "::warning::DEPLOY_KEYPAIR secret not configured; skipping deploy."
+            echo "SKIP=1" >> $GITHUB_ENV
+          fi
+
+      - name: Install Rust toolchain
+        if: env.SKIP != '1'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          components: rustfmt, clippy
+
+      - name: Setup Node.js
+        if: env.SKIP != '1'
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Cache Rust/Cargo
+        if: env.SKIP != '1'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            programs/relay_agent_profile/target
+          key: ${{ runner.os }}-cargo-prof-${{ hashFiles('programs/relay_agent_profile/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-prof-
+
+      - name: Install Solana CLI
+        if: env.SKIP != '1'
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5; do
+            if sh -c "$(curl -sSfL https://release.anza.xyz/v${{ env.SOLANA_VERSION }}/install)"; then
+              break
+            fi
+            echo "Solana installer attempt $attempt failed — retrying in 10s"
+            sleep 10
+          done
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+          "$HOME/.local/share/solana/install/active_release/bin/solana" --version
+
+      - name: Cache Anchor CLI
+        if: env.SKIP != '1'
+        id: cache-anchor
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/anchor
+            ~/.cargo/.crates.toml
+            ~/.cargo/.crates2.json
+          key: ${{ runner.os }}-anchor-${{ env.ANCHOR_VERSION }}
+
+      - name: Install Anchor CLI
+        if: env.SKIP != '1' && steps.cache-anchor.outputs.cache-hit != 'true'
+        run: |
+          cargo install --git https://github.com/coral-xyz/anchor --tag v${{ env.ANCHOR_VERSION }} anchor-cli --locked --force
+
+      - name: Verify toolchain
+        if: env.SKIP != '1'
+        run: |
+          solana --version
+          anchor --version
+          rustc --version
+
+      - name: Configure Solana CLI
+        if: env.SKIP != '1'
+        run: |
+          solana config set --url devnet
+          echo '${{ secrets.DEPLOY_KEYPAIR }}' > /tmp/payer.json
+          solana config set --keypair /tmp/payer.json
+
+      - name: Write program keypair
+        if: env.SKIP != '1'
+        run: |
+          mkdir -p programs/relay_agent_profile/deploy
+          echo '${{ secrets.PROGRAM_KEYPAIR_PROFILE }}' > programs/relay_agent_profile/deploy/relay_agent_profile-keypair.json
+
+      - name: Seed program keypair for Anchor build
+        if: env.SKIP != '1'
+        working-directory: programs
+        run: |
+          rm -f Cargo.lock
+          mkdir -p target/deploy
+          cp relay_agent_profile/deploy/relay_agent_profile-keypair.json target/deploy/relay_agent_profile-keypair.json
+
+      - name: Build program
+        if: env.SKIP != '1'
+        working-directory: programs
+        run: |
+          # Same transitive-dep pin pattern as deploy-reputation.yml — Solana
+          # 3.1.13's bundled rustc cannot compile blake3 1.8+ / constant_time_eq 0.4+.
+          cargo generate-lockfile
+          cargo update -p blake3 --precise 1.5.5 || true
+          cargo update -p constant_time_eq --precise 0.3.1 || true
+          anchor build -p relay_agent_profile
+
+      - name: Verify program ID matches declared
+        if: env.SKIP != '1'
+        working-directory: programs
+        run: |
+          PROGRAM_ID=$(solana-keygen pubkey relay_agent_profile/deploy/relay_agent_profile-keypair.json)
+          echo "Program ID: $PROGRAM_ID (expected $EXPECTED_PROGRAM_ID)"
+          if [ "$PROGRAM_ID" != "$EXPECTED_PROGRAM_ID" ]; then
+            echo "::error::Program keypair pubkey does not match declared program ID"
+            exit 1
+          fi
+          echo "PROGRAM_ID=$PROGRAM_ID" >> $GITHUB_ENV
+
+      - name: Deploy program
+        if: env.SKIP != '1'
+        working-directory: programs
+        run: |
+          echo "Deploying to devnet..."
+          solana program deploy \
+            --program-id relay_agent_profile/deploy/relay_agent_profile-keypair.json \
+            --keypair /tmp/payer.json \
+            --url devnet \
+            target/deploy/relay_agent_profile.so
+
+      - name: Verify deployment
+        if: env.SKIP != '1'
+        run: |
+          solana program show "$PROGRAM_ID" --url devnet
+
+      - name: Upload IDL on-chain
+        if: env.SKIP != '1'
+        working-directory: programs
+        run: |
+          echo "Uploading IDL for $PROGRAM_ID..."
+          npm install --no-save @solana/kit @solana-program/program-metadata
+          npx @solana-program/program-metadata write idl \
+            "$PROGRAM_ID" \
+            target/idl/relay_agent_profile.json \
+            --keypair /tmp/payer.json \
+            --rpc https://api.devnet.solana.com
+
+      - name: Clean up keypairs
+        if: always()
+        run: |
+          rm -f /tmp/payer.json
+          rm -f programs/relay_agent_profile/deploy/relay_agent_profile-keypair.json
+          rm -f programs/target/deploy/relay_agent_profile-keypair.json
