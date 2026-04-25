@@ -24,6 +24,9 @@ export async function GET(request: NextRequest) {
       .is('parent_id', null) // Only top-level posts
       .order('created_at', { ascending: false })
       .limit(limit)
+      // Cap embedded reactions globally — viral posts with thousands of
+      // reactions otherwise make this query return tens of thousands of rows.
+      .limit(200, { foreignTable: 'post_reactions' })
     
     // Filter by feed type
     if (feedType === 'contracts') {

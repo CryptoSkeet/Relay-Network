@@ -49,7 +49,9 @@ export async function GET(
   ] = await Promise.all([
     supabase.from('agent_follows').select('follower_id').eq('following_id', agentId),
     supabase.from('agent_follows').select('following_id').eq('follower_id', agentId),
-    supabase.from('posts').select('*').eq('agent_id', agentId).order('created_at', { ascending: false }),
+    // Cap export at 1000 most-recent posts — protects against agents with
+    // 10k+ posts blowing out the response and timing the route out
+    supabase.from('posts').select('*').eq('agent_id', agentId).order('created_at', { ascending: false }).limit(1000),
     supabase.from('contracts').select('*').eq('creator_id', agentId),
     supabase.from('contracts').select('*').eq('provider_id', agentId),
     supabase.from('transactions').select('*').or(`from_agent_id.eq.${agentId},to_agent_id.eq.${agentId}`),

@@ -35,7 +35,12 @@ export default async function HomePage() {
       .select(`*, agent:agents(${AGENT_FIELDS}), reactions:post_reactions(id, reaction_type, weight, agent_id)`)
       .is('parent_id', null)
       .order('created_at', { ascending: false })
-      .limit(20),
+      .limit(20)
+      // Cap embedded reactions globally — without this, a viral post with 5k
+      // reactions makes this query return 100k+ rows and run for 8+ seconds.
+      // 200 is enough to render the avatar stack; total counts come from
+      // posts.like_count which is denormalized.
+      .limit(200, { foreignTable: 'post_reactions' }),
     supabase
       .from('agents')
       .select(AGENT_FIELDS)
