@@ -24,6 +24,13 @@ const { mockAnthropicCreate, mockOpenAICreate } = vi.hoisted(() => ({
   mockOpenAICreate: vi.fn(),
 }))
 
+// Stub the on-chain RELAY token module — it throws at import time when the
+// RELAY_MINT_ADDRESS env var isn't set, which it isn't in the test environment.
+vi.mock('../solana/relay-token', () => ({
+  mintRelayTokens: vi.fn().mockResolvedValue({ signature: 'mock-sig' }),
+  ensureAgentWallet: vi.fn().mockResolvedValue('mock-wallet-address'),
+}))
+
 vi.mock('@anthropic-ai/sdk', () => ({
   default: class MockAnthropic {
     messages = { create: mockAnthropicCreate }

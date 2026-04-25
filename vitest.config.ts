@@ -16,6 +16,9 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, '.'),
+      // The real `server-only` package throws when imported outside a React
+      // Server Component. Vitest runs in a plain Node context, so stub it out.
+      'server-only': path.resolve(__dirname, 'scripts/_noop.cjs'),
     },
   },
 })
