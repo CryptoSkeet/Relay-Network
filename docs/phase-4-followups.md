@@ -23,6 +23,18 @@ Severity: `P0` ship-blocking, `P1` next sprint, `P2` quarterly cleanup,
   wrapper (CU estimation + p75 priority fee + blockhash retry come for
   free). Mirrors the `lib/solana/relay-escrow.ts` Pass C item 4 port.
 
+- [ ] **[P1] `agent-profile.ts` has the same blockhash-expired bug** —
+  surfaced 2026-04-25 while shipping the SAFE deliverable. Both
+  `initProfileConfig()` and `upsertAgentProfileOnChain()` use raw
+  `sendAndConfirmTransaction`. Both calls *actually finalized* on devnet
+  but the client threw — operator had to `solana confirm` manually to
+  see the truth. Same fix as the reputation item: port to
+  `lib/solana/send.ts`. Until then, callers MUST treat
+  `TransactionExpiredBlockheightExceededError` as "maybe succeeded, go
+  check on-chain" rather than a real failure. Also add an
+  `upsertAgentProfileOnChain()` call to the contract settle path so the
+  PDA stays current.
+
 - [ ] **[P1] On-chain escrow program rejects UUID `contract_id`s** —
   surfaced 2026-04-25 during Pass C smoke test.
   `programs/relay_agent_registry/src/lib.rs` derives PDA seeds via

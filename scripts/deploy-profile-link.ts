@@ -92,16 +92,15 @@ async function main() {
   if (TARGET_HANDLE) {
     const { data, error } = await sb
       .from('agents')
-      .select('id, handle, name, did_pubkey, wallet_address, reputation_score, completed_contracts, failed_contracts, disputes, total_earned, is_verified, is_suspended, fulfilled_contracts, total_contracts')
+      .select('id, handle, display_name, did, public_key, wallet_address, reputation_score, total_earned, is_verified, status')
       .eq('handle', TARGET_HANDLE)
       .single()
     if (error || !data) throw new Error(`agent handle=${TARGET_HANDLE} not found: ${error?.message}`)
     agent = data
   } else {
-    // Pick any agent that has a wallet and a handle ≤ 32 bytes.
     const { data, error } = await sb
       .from('agents')
-      .select('id, handle, name, did_pubkey, wallet_address, reputation_score, completed_contracts, failed_contracts, disputes, total_earned, is_verified, is_suspended, fulfilled_contracts, total_contracts')
+      .select('id, handle, display_name, did, public_key, wallet_address, reputation_score, total_earned, is_verified, status')
       .not('wallet_address', 'is', null)
       .not('handle', 'is', null)
       .order('created_at', { ascending: true })
@@ -116,28 +115,28 @@ async function main() {
   console.log(`[deploy-profile-link] ✓ chose agent: ${agent.handle} (${agent.id})`)
 
   // Some columns are nullable / loosely typed — coerce defensively.
-  const didPubkey = agent.did_pubkey
-    ? new PublicKey(agent.did_pubkey)
+  const didPubkey = agent.public_key
+    ? new PublicKey(agent.public_key)
     : new PublicKey(agent.wallet_address)
   const wallet = new PublicKey(agent.wallet_address)
-  const totalEarned = BigInt(agent.total_earned ?? 0)
-  const fulfilled = BigInt(agent.fulfilled_contracts ?? 0)
-  const total = BigInt(agent.total_contracts ?? 0)
+  const totalEarned = BigInt(Math.floor(Number(agent.total_earned ?? 0)))
+  const fulfilled = BigInt(0)
+  const total = BigInt(0)
 
   // ── 4. Upsert profile ──────────────────────────────────────────────────────
   console.log('[deploy-profile-link] upsertAgentProfileOnChain()...')
   const result = await upsertAgentProfileOnChain({
     handle: agent.handle,
-    displayName: agent.name ?? agent.handle,
+    displayName: agent.display_name ?? agent.handle,
     didPubkey,
     wallet,
-    reputationScore: Number(agent.reputation_score ?? 0),
-    completedContracts: Number(agent.completed_contracts ?? 0),
-    failedContracts: Number(agent.failed_contracts ?? 0),
-    disputes: Number(agent.disputes ?? 0),
+    reputationScore: Math.min(10000, Math.max(0, Math.floor(Number(agent.reputation_score ?? 0)))),
+    completedContracts: 0,
+    failedContracts: 0,
+    disputes: 0,
     totalEarned,
     isVerified: !!agent.is_verified,
-    isSuspended: !!agent.is_suspended,
+    isSuspended: agent.status === 'suspended',
     fulfilledContracts: fulfilled,
     totalContracts: total,
   })
@@ -176,12 +175,11 @@ data.
 | Field | Value |
 |---|---|
 | Handle | \`${agent.handle}\` |
-| Display name | ${agent.name ?? agent.handle} |
+| Display name | ${agent.display_name ?? agent.handle} |
 | Agent ID (DB) | \`${agent.id}\` |
 | Wallet | \`${wallet.toBase58()}\` |
 | DID pubkey | \`${didPubkey.toBase58()}\` |
-| Reputation score | ${Number(agent.reputation_score ?? 0)} bps |
-| Completed contracts | ${Number(agent.completed_contracts ?? 0)} |
+| Reputation score | ${Math.min(10000, Math.max(0, Math.floor(Number(agent.reputation_score ?? 0))))} bps |
 | Total earned | ${totalEarned.toString()} (RELAY base units) |
 | Profile content hash (sha256) | \`${result.profileHash}\` |
 | Upsert tx | [\`${result.signature}\`](${solscanTxUrl(result.signature)}) |
