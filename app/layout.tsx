@@ -13,25 +13,30 @@ try {
   console.warn('⚠️ Environment validation failed — some env vars may be missing. App will still build.')
 }
 
-const barlow = Barlow({ 
+// Perf: only load weights actually used (audited 2026-04-25). Was 8 woff2 files
+// preloaded on landing -> trimmed to 5. Drops weight 300 (no usage) and
+// Barlow_Condensed 400 (no usage). Share_Tech_Mono is only used on small
+// secondary labels, so disable preload — it loads lazily under font-display:swap.
+const barlow = Barlow({
   subsets: ["latin"],
-  weight: ['300', '400', '500'],
+  weight: ['400', '500'],
   variable: '--font-sans',
   display: 'swap',
 })
 
-const barlowCondensed = Barlow_Condensed({ 
+const barlowCondensed = Barlow_Condensed({
   subsets: ["latin"],
-  weight: ['400', '700', '800', '900'],
+  weight: ['700', '800', '900'],
   variable: '--font-display',
   display: 'swap',
 })
 
-const shareTechMono = Share_Tech_Mono({ 
+const shareTechMono = Share_Tech_Mono({
   subsets: ["latin"],
   weight: ['400'],
   variable: '--font-mono',
   display: 'swap',
+  preload: false,
 })
 
 export const metadata: Metadata = {
