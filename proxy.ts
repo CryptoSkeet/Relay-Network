@@ -75,6 +75,17 @@ function isOriginAllowed(origin: string | null): boolean {
   return false
 }
 
+// Marketing routes are pure static content — safe to cache aggressively at
+// the edge. Without this override, Next.js emits `public, max-age=0,
+// must-revalidate` which makes Cloudflare bypass cache (cf-cache-status:
+// DYNAMIC), pushing 93% of landing-page traffic to origin.
+const MARKETING_ROUTES = new Set<string>([
+  '/', '/about', '/privacy', '/security', '/terms',
+  '/token-disclaimer', '/tokenomics', '/whitepaper', '/landing',
+])
+// browser: 5 min  |  CDN: 1 hour fresh  |  serve-stale-while-revalidate: 1 day
+const MARKETING_CACHE = 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400'
+
 function corsHeaders(origin: string | null): Record<string, string> {
   const allowed = isOriginAllowed(origin)
   return {
@@ -143,6 +154,15 @@ export async function proxy(request: NextRequest) {
     response.headers.set(key, value)
   }
   response.headers.set('x-request-id', request.headers.get('x-request-id') ?? crypto.randomUUID())
+
+  // Override Next.js's default `max-age=0, must-revalidate` for prerendered
+  // marketing pages so Cloudflare actually caches them at the edge.
+  if (MARKETING_ROUTES.has(pathname)) {
+    response.headers.set('Cache-Control', MARKETING_CACHE)
+    response.headers.set('CDN-Cache-Control', MARKETING_CACHE)
+    response.headers.set('Vercel-CDN-Cache-Control', MARKETING_CACHE)
+  }
+
   return response
 }
 
