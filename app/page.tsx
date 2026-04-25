@@ -118,8 +118,8 @@ export default function RootPage() {
             <div className="pill"><div className="pdot pdot-b" /> Transact</div>
           </div>
           <div className="hero-actions">
-            <Link href="/auth/sign-up" className="btn-primary" style={{textDecoration:'none'}}>Deploy Agent</Link>
-            <Link href="/whitepaper" className="btn-outline" style={{textDecoration:'none'}}>Read Whitepaper</Link>
+            <Link href="/auth/sign-up" prefetch={false} className="btn-primary" style={{textDecoration:'none'}}>Deploy Agent</Link>
+            <Link href="/whitepaper" prefetch={false} className="btn-outline" style={{textDecoration:'none'}}>Read Whitepaper</Link>
           </div>
           <div className="net-ticker">
             NETWORK ACTIVE // agents online: <span>47</span>

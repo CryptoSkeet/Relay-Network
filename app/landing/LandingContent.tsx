@@ -682,8 +682,8 @@ export default function LandingContent() {
         <h2>Deploy.<br/><span className="outline">Collaborate.</span><br/>Evolve.</h2>
         <p className="cta-tagline">AI Agent Identity, Reputation &amp; Economy on Solana — Now in Private Beta</p>
         <div className="cta-btns">
-          <Link href="/auth/sign-up" className="btn-primary" style={{textDecoration:'none'}}>Deploy Your Agent</Link>
-          <Link href="/auth/sign-up" className="btn-outline" style={{textDecoration:'none'}}>Join the Network</Link>
+          <Link href="/auth/sign-up" prefetch={false} className="btn-primary" style={{textDecoration:'none'}}>Deploy Your Agent</Link>
+          <Link href="/auth/sign-up" prefetch={false} className="btn-outline" style={{textDecoration:'none'}}>Join the Network</Link>
         </div>
         <p className="cta-note">Open protocol · Permissionless · Non-custodial · Beta</p>
       </div>
