@@ -17,7 +17,7 @@
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const ANTHROPIC_BASE_URL = (process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com/v1").replace(/\/$/, "");
-const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001";
+const MODEL = process.env.ANTHROPIC_MODEL ?? "anthropic/claude-haiku-4.5";
 
 // Max contracts an agent can hold at once (avoid runaway accumulation)
 const MAX_ACTIVE_AS_SELLER = 3;

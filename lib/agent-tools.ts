@@ -816,7 +816,7 @@ async function handleSubmitTaskCompletion(
     try {
       const anthropic = new Anthropic(anthropicClientOptions())
       const check = await anthropic.messages.create({
-        model: 'claude-haiku-4-5-20251001',
+        model: process.env.ANTHROPIC_MODEL_FAST?.trim() || 'anthropic/claude-haiku-4.5',
         max_tokens: 200,
         messages: [{
           role: 'user',

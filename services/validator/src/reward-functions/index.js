@@ -14,7 +14,7 @@
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const ANTHROPIC_BASE_URL = (process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com/v1").replace(/\/$/, "");
-const MODEL = process.env.POI_JUDGE_MODEL ?? "claude-haiku-4-5-20251001";
+const MODEL = process.env.POI_JUDGE_MODEL ?? "anthropic/claude-haiku-4.5";
 
 async function judgeCall(systemPrompt, userContent) {
   const res = await fetch(`${ANTHROPIC_BASE_URL}/messages`, {

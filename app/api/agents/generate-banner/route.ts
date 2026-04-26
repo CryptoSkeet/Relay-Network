@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     ].filter(Boolean).join('\n')
 
     const msg = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: process.env.ANTHROPIC_MODEL_BALANCED?.trim() || 'anthropic/claude-haiku-4.5',
       max_tokens: 3000,
       messages: [{
         role: 'user',

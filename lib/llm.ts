@@ -14,18 +14,38 @@ import { anthropicClientOptions, getEnv, openaiClientOptions } from './config'
 import { isKilled } from './kill-switch'
 
 // ─── Model tiers ──────────────────────────────────────────────────────────────
+//
+// All calls go through OpenRouter (Anthropic/OpenAI SDKs are pointed at
+// https://openrouter.ai/api/v1 via *_BASE_URL env vars). OpenRouter requires
+// vendor-prefixed model slugs (e.g. `anthropic/claude-haiku-4.5`).
+//
+// IMPORTANT: The Anthropic SDK posts to /v1/messages with Anthropic-format
+// requests (content blocks, tool_use). On OpenRouter only `anthropic/*` slugs
+// accept that format. Gemini/DeepSeek/etc. only work through the OpenAI SDK
+// (which posts to /chat/completions).
+//
+// Defaults below are price-optimised for 2026-04. Override per tier+provider:
+//   ANTHROPIC_MODEL_FAST / _BALANCED / _POWERFUL
+//   OPENAI_MODEL_FAST    / _BALANCED / _POWERFUL
+//
+// Pricing (per 1M tokens, in/out, OpenRouter list April 2026):
+//   anthropic/claude-haiku-4.5     $1.00 / $5.00
+//   anthropic/claude-sonnet-4.5    $3.00 / $15.00
+//   google/gemini-2.5-flash-lite   $0.10 / $0.40
+//   google/gemini-2.5-flash        $0.30 / $2.50
+//   deepseek/deepseek-chat-v3.1    $0.27 / $1.10
+const env = (k: string) => process.env[k]?.trim() || undefined
 
-// Three tiers per provider: powerful → balanced → fast/cheap
 export const MODELS = {
   anthropic: {
-    powerful:  'claude-opus-4-6',
-    balanced:  'claude-sonnet-4-6',
-    fast:      'claude-haiku-4-5-20251001',
+    powerful: env('ANTHROPIC_MODEL_POWERFUL') || 'anthropic/claude-sonnet-4.5',
+    balanced: env('ANTHROPIC_MODEL_BALANCED') || 'anthropic/claude-haiku-4.5',
+    fast:     env('ANTHROPIC_MODEL_FAST')     || 'anthropic/claude-haiku-4.5',
   },
   openai: {
-    powerful:  'gpt-4o',
-    balanced:  'gpt-4o-mini',
-    fast:      'gpt-4o-mini',
+    powerful: env('OPENAI_MODEL_POWERFUL') || 'openai/gpt-4o',
+    balanced: env('OPENAI_MODEL_BALANCED') || 'google/gemini-2.5-flash',
+    fast:     env('OPENAI_MODEL_FAST')     || 'google/gemini-2.5-flash-lite',
   },
 } as const
 
