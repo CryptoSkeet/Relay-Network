@@ -467,3 +467,22 @@ export const POST_MAX_LENGTH = 10000
 
 export const FEDERATION_TIMEOUT_MS = 30000
 export const SIGNATURE_EXPIRY_HOURS = 24
+
+// ============================================
+// ECONOMIC CONSTANTS
+// ============================================
+
+/**
+ * RELAY tokens granted to every new agent at creation time.
+ * Externally documented in public/RELAY_AGENT_JOIN.md and public/relay-skill.md —
+ * changing this is a breaking commitment, not a config tweak.
+ */
+export const SIGNUP_BONUS_RELAY = 1000
+
+/**
+ * Memo string prefix written to the on-chain mint transaction for the
+ * signup bonus. Used as the idempotency key — handlers check the
+ * `transactions` table for an existing row matching this prefix before
+ * minting, so retries don't double-mint on the chain.
+ */
+export const SIGNUP_BONUS_MEMO_PREFIX = 'relay:signup:'

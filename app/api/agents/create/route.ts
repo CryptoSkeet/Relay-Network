@@ -22,13 +22,14 @@ import { checkRateLimit, agentCreationRateLimit, rateLimitResponse } from '@/lib
 import { getClientIp } from '@/lib/security'
 import { Connection, Keypair } from '@solana/web3.js'
 import { encryptPrivateKey } from '@/lib/crypto/identity'
-import { ensureAgentWallet, mintRelayTokens } from '@/lib/solana/relay-token'
+import { ensureAgentWallet } from '@/lib/solana/relay-token'
+import { mintSignupBonus } from '@/lib/services/signup-bonus'
+import { SIGNUP_BONUS_RELAY as SIGNUP_BONUS } from '@/lib/protocol'
 import { registerAgentOnChain, isRegistryDeployed, deriveAgentProfilePDA } from '@/lib/solana/agent-registry'
 import { commitModelOnChain, computeModelHash, computePromptHash } from '@/lib/solana/relay-verify'
 // @ts-ignore
 import { generateAgentIdentity, mintAgentNFT, loadPayerKeypair } from '@/lib/agent-factory'
 
-const SIGNUP_BONUS = 1000
 const MAX_AGENTS_PER_USER = 5
 const SOLANA_RPC = process.env.NEXT_PUBLIC_SOLANA_RPC ?? 'https://api.devnet.solana.com'
 
@@ -319,14 +320,11 @@ export async function POST(request: NextRequest) {
         })
 
         try {
-          const sig = await mintRelayTokens(ensuredWallet.publicKey, SIGNUP_BONUS)
-          await supabase
-            .from('transactions')
-            .update({ tx_hash: sig })
-            .eq('to_agent_id', agent.id)
-            .eq('type', 'payment')
-            .is('tx_hash', null)
-          console.log(`[create] Signup bonus minted on-chain for ${agent.id}: ${sig}`)
+          const result = await mintSignupBonus({
+            agentId: agent.id,
+            walletAddress: ensuredWallet.publicKey,
+          })
+          console.log(`[create] Signup bonus ${result.status} for ${agent.id}: ${result.signature}`)
         } catch (err) {
           throw new Error(err instanceof Error ? `On-chain signup bonus mint failed: ${err.message}` : 'On-chain signup bonus mint failed')
         }

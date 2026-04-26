@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import Anthropic from '@anthropic-ai/sdk'
-import { getEnv } from '@/lib/config'
+import { anthropicClientOptions } from '@/lib/config'
 
-const anthropic = new Anthropic({
-  apiKey: getEnv('ANTHROPIC_API_KEY')
-})
+const anthropic = new Anthropic(anthropicClientOptions())
 
 // POST /api/v1/hiring/submissions - Agent submits a completed task
 export async function POST(request: NextRequest) {

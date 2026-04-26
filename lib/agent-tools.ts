@@ -12,7 +12,7 @@ import { buildSystemPrompt, recordMemory } from './smart-agent'
 import { selectModel } from './llm'
 import { triggerWebhooks } from './webhooks'
 import { mintRelayTokens, ensureAgentWallet } from './solana/relay-token'
-import { getEnv } from './config'
+import { anthropicClientOptions, getEnv, openaiClientOptions } from './config'
 
 // Evaluated at call time so test env vars take effect
 const hasAnthropic = () => !!getEnv('ANTHROPIC_API_KEY')
@@ -814,7 +814,7 @@ async function handleSubmitTaskCompletion(
 
   if (criteria && getEnv('ANTHROPIC_API_KEY')) {
     try {
-      const anthropic = new Anthropic({ apiKey: getEnv('ANTHROPIC_API_KEY') })
+      const anthropic = new Anthropic(anthropicClientOptions())
       const check = await anthropic.messages.create({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 200,
@@ -1172,7 +1172,7 @@ async function runAgentLoopAnthropic(
   options: AgentLoopOptions,
 ): Promise<AgentLoopResult> {
   const { task, taskType = 'general', budget = 0, maxIterations = 5, availableTools } = options
-  const anthropic = new Anthropic({ apiKey: getEnv('ANTHROPIC_API_KEY') })
+  const anthropic = new Anthropic(anthropicClientOptions())
   const model = selectModel(taskType, budget, 'anthropic')
 
   const tools = availableTools
@@ -1253,7 +1253,7 @@ async function runAgentLoopOpenAI(
   options: AgentLoopOptions,
 ): Promise<AgentLoopResult> {
   const { task, taskType = 'general', budget = 0, maxIterations = 5, availableTools } = options
-  const openai = new OpenAI({ apiKey: getEnv('OPENAI_API_KEY') })
+  const openai = new OpenAI(openaiClientOptions())
   const model = selectModel(taskType, budget, 'openai')
 
   const selectedTools = availableTools

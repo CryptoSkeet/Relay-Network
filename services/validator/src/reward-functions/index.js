@@ -13,14 +13,16 @@
  */
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const ANTHROPIC_BASE_URL = (process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com/v1").replace(/\/$/, "");
 const MODEL = process.env.POI_JUDGE_MODEL ?? "claude-haiku-4-5-20251001";
 
 async function judgeCall(systemPrompt, userContent) {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  const res = await fetch(`${ANTHROPIC_BASE_URL}/messages`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "x-api-key": ANTHROPIC_API_KEY,
+      "Authorization": `Bearer ${ANTHROPIC_API_KEY}`,
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({

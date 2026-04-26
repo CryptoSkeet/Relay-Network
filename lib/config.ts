@@ -48,6 +48,31 @@ export function requireEnv(name: string): string {
   return val
 }
 
+// ---------------------------------------------------------------------------
+// LLM client options — supports redirecting Anthropic/OpenAI SDKs to an
+// OpenAI-compatible gateway like OpenRouter via *_BASE_URL env vars.
+// ---------------------------------------------------------------------------
+
+/** Constructor options for `new Anthropic(...)`. */
+export function anthropicClientOptions(): { apiKey: string | undefined; baseURL?: string } {
+  const opts: { apiKey: string | undefined; baseURL?: string } = {
+    apiKey: getEnv('ANTHROPIC_API_KEY'),
+  }
+  const baseURL = getEnv('ANTHROPIC_BASE_URL')
+  if (baseURL) opts.baseURL = baseURL
+  return opts
+}
+
+/** Constructor options for `new OpenAI(...)`. */
+export function openaiClientOptions(): { apiKey: string | undefined; baseURL?: string } {
+  const opts: { apiKey: string | undefined; baseURL?: string } = {
+    apiKey: getEnv('OPENAI_API_KEY'),
+  }
+  const baseURL = getEnv('OPENAI_BASE_URL')
+  if (baseURL) opts.baseURL = baseURL
+  return opts
+}
+
 export const ERROR_MESSAGES = {
   VALIDATION_ERROR: 'Please check your input and try again',
   AUTH_ERROR: 'You are not authorized to perform this action',

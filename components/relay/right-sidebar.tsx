@@ -175,7 +175,7 @@ export function RightSidebar({
           <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
           <Link href="/terms" className="hover:text-foreground">Terms</Link>
         </div>
-        <p>© 2026 Relay Network</p>
+        <p>© 2026 Relay Network, Inc.</p>
       </div>
     </aside>
   )

@@ -10,7 +10,7 @@
 
 import Anthropic from '@anthropic-ai/sdk'
 import OpenAI from 'openai'
-import { getEnv } from './config'
+import { anthropicClientOptions, getEnv, openaiClientOptions } from './config'
 import { isKilled } from './kill-switch'
 
 // ─── Model tiers ──────────────────────────────────────────────────────────────
@@ -152,7 +152,7 @@ async function callProvider(
   const model = MODELS[provider][tier]
 
   if (provider === 'anthropic') {
-    const client = new Anthropic({ apiKey: getEnv('ANTHROPIC_API_KEY') })
+    const client = new Anthropic(anthropicClientOptions())
     const res = await client.messages.create({
       model,
       max_tokens: maxTokens,
@@ -162,7 +162,7 @@ async function callProvider(
     const text = (res.content[0] as { type: string; text: string }).text.trim()
     return { text, provider: 'anthropic', model, tier }
   } else {
-    const client = new OpenAI({ apiKey: getEnv('OPENAI_API_KEY') })
+    const client = new OpenAI(openaiClientOptions())
     const res = await client.chat.completions.create({
       model,
       max_tokens: maxTokens,

@@ -5,7 +5,9 @@ import { generateKeypair, generateDID, encryptPrivateKey } from '@/lib/crypto/id
 import { generateAndStoreAvatar } from '@/lib/generate-avatar'
 import { type NextRequest, NextResponse } from 'next/server'
 import { checkRateLimit, agentCreationRateLimit, rateLimitResponse } from '@/lib/ratelimit'
-import { ensureAgentWallet, mintRelayTokens } from '@/lib/solana/relay-token'
+import { ensureAgentWallet } from '@/lib/solana/relay-token'
+import { mintSignupBonus } from '@/lib/services/signup-bonus'
+import { SIGNUP_BONUS_RELAY } from '@/lib/protocol'
 import { getClientIp } from '@/lib/security'
 
 // Lowercase-only to match DB handle constraint and avoid case-insensitive duplicates
@@ -116,11 +118,11 @@ export async function POST(request: NextRequest) {
       .from('wallets')
       .insert({
         agent_id: agent.id,
-        balance: 1000,
+        balance: SIGNUP_BONUS_RELAY,
         currency: 'RELAY',
         staked_balance: 0,
         locked_balance: 0,
-        lifetime_earned: 1000,
+        lifetime_earned: SIGNUP_BONUS_RELAY,
         lifetime_spent: 0,
       })
 
@@ -133,10 +135,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Pre-insert a pending transactions row so mintSignupBonus can patch the
+    // tx_hash in after the on-chain mint confirms. The helper falls back to
+    // inserting a completed row if no pending row is found, so this is a
+    // best-effort step — don't await its error.
     await supabase.from('transactions').insert({
       from_agent_id: null,
       to_agent_id: agent.id,
-      amount: 1000,
+      amount: SIGNUP_BONUS_RELAY,
       currency: 'RELAY',
       type: 'payment',
       status: 'completed',
@@ -185,17 +191,21 @@ export async function POST(request: NextRequest) {
     }
 
     if (canonicalWalletAddress) {
+      // Idempotent on-chain mint. Failures are logged + swallowed because
+      // the agent row already exists — surfacing a 500 here would leave
+      // the user unable to retry (handle is taken). A future admin cron
+      // can re-call mintSignupBonus(agentId, wallet) safely; the helper's
+      // tx-row check prevents double-minting.
       try {
-        const sig = await mintRelayTokens(canonicalWalletAddress, 1000)
-        await supabase
-          .from('transactions')
-          .update({ tx_hash: sig })
-          .eq('to_agent_id', agent.id)
-          .eq('type', 'payment')
-          .is('tx_hash', null)
-        logger.info('Signup bonus minted on-chain', { agentId: agent.id, sig })
+        await mintSignupBonus({
+          agentId: agent.id,
+          walletAddress: canonicalWalletAddress,
+        })
       } catch (err) {
-        logger.warn('On-chain signup bonus mint failed', err)
+        logger.warn('On-chain signup bonus mint failed', {
+          agentId: agent.id,
+          err: err instanceof Error ? err.message : String(err),
+        })
       }
     }
 
@@ -266,7 +276,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ 
       success: true, 
       agent,
-      message: 'Agent created successfully with 1000 RELAY welcome bonus!'
+      message: `Agent created successfully with ${SIGNUP_BONUS_RELAY} RELAY welcome bonus!`
     }, { status: 201 })
 
   } catch (error) {
