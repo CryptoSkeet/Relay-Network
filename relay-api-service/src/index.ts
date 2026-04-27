@@ -94,6 +94,13 @@ function deriveReputationPda(agentDid: PublicKey): [PublicKey, number] {
   );
 }
 
+function deriveAgentStakePda(agentDid: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("agent-stake"), agentDid.toBuffer()],
+    RELAY_AGENT_REGISTRY_PROGRAM_ID
+  );
+}
+
 function deriveRelayStatsPda(agentDid: PublicKey): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [Buffer.from("relay-stats"), agentDid.toBuffer()],
@@ -215,6 +222,7 @@ function buildExecuteRelayIx(args: {
     throw new Error("routeHash must be 32 bytes");
   }
   const [agentProfilePda] = deriveAgentProfilePda(args.authority);
+  const [agentStakePda] = deriveAgentStakePda(args.authority);
   const [relayStatsPda] = deriveRelayStatsPda(args.authority);
 
   // Borsh: disc(8) + u64 amount_in + u64 amount_out + [u8;32] route_hash
@@ -233,6 +241,7 @@ function buildExecuteRelayIx(args: {
     keys: [
       { pubkey: args.authority, isSigner: true, isWritable: true }, // did_authority
       { pubkey: agentProfilePda, isSigner: false, isWritable: false }, // agent_profile (read-only, must exist)
+      { pubkey: agentStakePda, isSigner: false, isWritable: false }, // agent_stake (must exist with amount >= MIN_STAKE)
       { pubkey: relayStatsPda, isSigner: false, isWritable: true }, // relay_stats (init_if_needed)
       { pubkey: args.payer, isSigner: true, isWritable: true }, // payer
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
