@@ -1,9 +1,19 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Token, TokenAccount, Transfer};
+use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 use solana_security_txt::security_txt;
 use sha2::{Sha256, Digest};
 
 declare_id!("Hs1hX4pSZSAQKLgGrcydyEaJMsJfqXQqJyJvVnqdaoDE");
+
+// ── Staking constants (v1) ────────────────────────────────────────────────────
+/// RELAY SPL mint on devnet (also used on mainnet via deterministic deploy).
+pub const RELAY_MINT: Pubkey = pubkey!("C2RqcjvrN4JEPidkf8qBSYzujFmL99rHhmmE8k1kfRzZ");
+/// Hard-coded admin (= program upgrade authority) for one-time stake-vault bootstrap.
+pub const STAKE_ADMIN: Pubkey = pubkey!("GafmHBZRd4VkAA3eAirKWfYvwfDTGoPwaF4vffemwZkV");
+/// Minimum stake to register an agent (1,000 RELAY at 6 decimals).
+pub const MIN_STAKE: u64 = 1_000 * 1_000_000;
+/// Cooldown between request_unstake and withdraw_stake (14 days).
+pub const UNSTAKE_COOLDOWN_SECONDS: i64 = 14 * 24 * 60 * 60;
 
 #[cfg(not(feature = "no-entrypoint"))]
 security_txt! {
@@ -39,33 +49,6 @@ fn hash_contract_id(contract_id: &str) -> [u8; 32] {
 #[program]
 pub mod relay_agent_registry {
     use super::*;
-
-    /// Register a new agent profile PDA keyed by the agent's DID pubkey.
-    pub fn register_agent(
-        ctx: Context<RegisterAgent>,
-        handle: String,
-        capabilities_hash: [u8; 32],
-    ) -> Result<()> {
-        require!(handle.len() <= MAX_HANDLE_LEN, RegistryError::HandleTooLong);
-        require!(!handle.is_empty(), RegistryError::HandleEmpty);
-
-        let profile = &mut ctx.accounts.agent_profile;
-        profile.did_pubkey = ctx.accounts.did_authority.key();
-        profile.handle = handle;
-        profile.capabilities_hash = capabilities_hash;
-        profile.created_at = Clock::get()?.unix_timestamp;
-        profile.updated_at = Clock::get()?.unix_timestamp;
-        profile.bump = ctx.bumps.agent_profile;
-
-        emit!(AgentRegistered {
-            did_pubkey: profile.did_pubkey,
-            handle: profile.handle.clone(),
-            capabilities_hash,
-            created_at: profile.created_at,
-        });
-
-        Ok(())
-    }
 
     /// Update capabilities hash (only the DID authority can call this).
     pub fn update_capabilities(
@@ -245,6 +228,164 @@ pub mod relay_agent_registry {
         Ok(())
     }
 
+    // ── Staking instructions (v1) ───────────────────────────────────────
+
+    /// One-time bootstrap: create the program-owned RELAY token vault.
+    /// Gated by `STAKE_ADMIN` (= program upgrade authority).
+    pub fn initialize_stake_vault(_ctx: Context<InitializeStakeVault>) -> Result<()> {
+        // Vault account is created via Anchor `init` constraint with
+        // token::authority = stake_vault, so the PDA owns its own tokens.
+        // Admin signature is enforced by the `address = STAKE_ADMIN` constraint.
+        Ok(())
+    }
+
+    /// Stake MIN_STAKE RELAY and create AgentProfile + RelayStats + AgentStake
+    /// in one atomic transaction. Replaces the old `register_agent` for new
+    /// agents that don't yet have any registry accounts.
+    pub fn stake_and_register(
+        ctx: Context<StakeAndRegister>,
+        handle: String,
+        capabilities_hash: [u8; 32],
+    ) -> Result<()> {
+        require!(handle.len() <= MAX_HANDLE_LEN, RegistryError::HandleTooLong);
+        require!(!handle.is_empty(), RegistryError::HandleEmpty);
+
+        // Transfer stake from agent's RELAY ATA to program-owned vault.
+        token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.agent_token_account.to_account_info(),
+                    to: ctx.accounts.stake_vault.to_account_info(),
+                    authority: ctx.accounts.did_authority.to_account_info(),
+                },
+            ),
+            MIN_STAKE,
+        )?;
+
+        let now = Clock::get()?.unix_timestamp;
+        let agent_did = ctx.accounts.did_authority.key();
+
+        // Initialize stake.
+        let stake = &mut ctx.accounts.agent_stake;
+        stake.agent = agent_did;
+        stake.amount = MIN_STAKE;
+        stake.locked_at = now;
+        stake.unlock_requested_at = 0;
+        stake.bump = ctx.bumps.agent_stake;
+
+        // Initialize profile.
+        let profile = &mut ctx.accounts.agent_profile;
+        profile.did_pubkey = agent_did;
+        profile.handle = handle.clone();
+        profile.capabilities_hash = capabilities_hash;
+        profile.created_at = now;
+        profile.updated_at = now;
+        profile.bump = ctx.bumps.agent_profile;
+
+        // Initialize relay_stats (empty counters; last_relay_at = 0 means "never").
+        let stats = &mut ctx.accounts.relay_stats;
+        stats.agent_did = agent_did;
+        stats.bump = ctx.bumps.relay_stats;
+
+        emit!(AgentStakedAndRegistered {
+            agent: agent_did,
+            handle,
+            stake_amount: MIN_STAKE,
+            timestamp: now,
+        });
+
+        Ok(())
+    }
+
+    /// Migration path for agents already registered before v1 (existing
+    /// AgentProfile + RelayStats). Transfers stake and creates AgentStake only.
+    pub fn stake_existing_agent(ctx: Context<StakeExistingAgent>) -> Result<()> {
+        token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.agent_token_account.to_account_info(),
+                    to: ctx.accounts.stake_vault.to_account_info(),
+                    authority: ctx.accounts.did_authority.to_account_info(),
+                },
+            ),
+            MIN_STAKE,
+        )?;
+
+        let now = Clock::get()?.unix_timestamp;
+        let agent_did = ctx.accounts.did_authority.key();
+
+        let stake = &mut ctx.accounts.agent_stake;
+        stake.agent = agent_did;
+        stake.amount = MIN_STAKE;
+        stake.locked_at = now;
+        stake.unlock_requested_at = 0;
+        stake.bump = ctx.bumps.agent_stake;
+
+        emit!(AgentStakedAndRegistered {
+            agent: agent_did,
+            handle: ctx.accounts.agent_profile.handle.clone(),
+            stake_amount: MIN_STAKE,
+            timestamp: now,
+        });
+
+        Ok(())
+    }
+
+    /// Begin the unstake cooldown timer. Does not move tokens.
+    pub fn request_unstake(ctx: Context<RequestUnstake>) -> Result<()> {
+        let stake = &mut ctx.accounts.agent_stake;
+        require!(stake.unlock_requested_at == 0, RegistryError::UnstakeAlreadyRequested);
+
+        stake.unlock_requested_at = Clock::get()?.unix_timestamp;
+
+        emit!(UnstakeRequested {
+            agent: ctx.accounts.did_authority.key(),
+            timestamp: stake.unlock_requested_at,
+        });
+
+        Ok(())
+    }
+
+    /// Withdraw stake after cooldown. Closes AgentStake (refunds rent to agent).
+    /// Caller loses ability to relay (execute_relay requires AgentStake).
+    pub fn withdraw_stake(ctx: Context<WithdrawStake>) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+        let stake = &ctx.accounts.agent_stake;
+
+        require!(stake.unlock_requested_at > 0, RegistryError::UnstakeNotRequested);
+        require!(
+            now - stake.unlock_requested_at >= UNSTAKE_COOLDOWN_SECONDS,
+            RegistryError::CooldownNotElapsed,
+        );
+
+        let amount = stake.amount;
+        let vault_bump = ctx.bumps.stake_vault;
+        let vault_seeds: &[&[u8]] = &[b"stake-vault", &[vault_bump]];
+
+        token::transfer(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.stake_vault.to_account_info(),
+                    to: ctx.accounts.agent_token_account.to_account_info(),
+                    authority: ctx.accounts.stake_vault.to_account_info(),
+                },
+                &[vault_seeds],
+            ),
+            amount,
+        )?;
+
+        emit!(StakeWithdrawn {
+            agent: ctx.accounts.did_authority.key(),
+            amount,
+            timestamp: now,
+        });
+
+        Ok(())
+    }
+
     /// Execute a relay (mock swap) on behalf of an agent.
     ///
     /// Demo behavior:
@@ -345,29 +486,6 @@ impl ModelCommitment {
 }
 
 #[derive(Accounts)]
-pub struct RegisterAgent<'info> {
-    /// The DID key owner — must sign to prove control of the DID.
-    #[account(mut)]
-    pub did_authority: Signer<'info>,
-
-    /// PDA derived from the DID pubkey. Created on first registration.
-    #[account(
-        init,
-        payer = payer,
-        space = AgentProfile::SIZE,
-        seeds = [b"agent-profile", did_authority.key().as_ref()],
-        bump,
-    )]
-    pub agent_profile: Account<'info, AgentProfile>,
-
-    /// Transaction fee payer (can be the backend relay payer).
-    #[account(mut)]
-    pub payer: Signer<'info>,
-
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
 pub struct UpdateAgent<'info> {
     /// Only the original DID authority can update.
     #[account(mut)]
@@ -439,6 +557,189 @@ impl RelayStats {
     pub const SIZE: usize = 8 + 32 + 8 + 16 + 16 + 8 + 8 + 32 + 8 + 1;
 }
 
+/// PDA: seeds = [b"agent-stake", agent.as_ref()]
+/// Per-agent staking record. Existence + amount >= MIN_STAKE gates relays.
+#[account]
+pub struct AgentStake {
+    pub agent: Pubkey,            // 32
+    pub amount: u64,              // 8
+    pub locked_at: i64,           // 8
+    pub unlock_requested_at: i64, // 8 (0 = not requested)
+    pub bump: u8,                 // 1
+}
+
+impl AgentStake {
+    /// 8 (discriminator) + 32 + 8 + 8 + 8 + 1 = 65 bytes
+    pub const SIZE: usize = 8 + 32 + 8 + 8 + 8 + 1;
+}
+
+#[derive(Accounts)]
+pub struct InitializeStakeVault<'info> {
+    /// Must be the program upgrade authority. Hard-coded.
+    #[account(mut, address = STAKE_ADMIN @ RegistryError::Unauthorized)]
+    pub admin: Signer<'info>,
+
+    #[account(address = RELAY_MINT)]
+    pub relay_mint: Account<'info, Mint>,
+
+    #[account(
+        init,
+        payer = admin,
+        seeds = [b"stake-vault"],
+        bump,
+        token::mint = relay_mint,
+        token::authority = stake_vault,
+    )]
+    pub stake_vault: Account<'info, TokenAccount>,
+
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
+    pub rent: Sysvar<'info, Rent>,
+}
+
+#[derive(Accounts)]
+pub struct StakeAndRegister<'info> {
+    /// Agent's DID key — signs and pays rent.
+    #[account(mut)]
+    pub did_authority: Signer<'info>,
+
+    /// Optional separate fee payer (can be backend). Same as did_authority is fine.
+    #[account(mut)]
+    pub payer: Signer<'info>,
+
+    #[account(
+        mut,
+        constraint = agent_token_account.owner == did_authority.key(),
+        constraint = agent_token_account.mint == RELAY_MINT,
+    )]
+    pub agent_token_account: Account<'info, TokenAccount>,
+
+    #[account(
+        mut,
+        seeds = [b"stake-vault"],
+        bump,
+    )]
+    pub stake_vault: Account<'info, TokenAccount>,
+
+    #[account(
+        init,
+        payer = payer,
+        space = AgentStake::SIZE,
+        seeds = [b"agent-stake", did_authority.key().as_ref()],
+        bump,
+    )]
+    pub agent_stake: Account<'info, AgentStake>,
+
+    #[account(
+        init,
+        payer = payer,
+        space = AgentProfile::SIZE,
+        seeds = [b"agent-profile", did_authority.key().as_ref()],
+        bump,
+    )]
+    pub agent_profile: Account<'info, AgentProfile>,
+
+    #[account(
+        init,
+        payer = payer,
+        space = RelayStats::SIZE,
+        seeds = [b"relay-stats", did_authority.key().as_ref()],
+        bump,
+    )]
+    pub relay_stats: Account<'info, RelayStats>,
+
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
+    pub rent: Sysvar<'info, Rent>,
+}
+
+#[derive(Accounts)]
+pub struct StakeExistingAgent<'info> {
+    #[account(mut)]
+    pub did_authority: Signer<'info>,
+
+    #[account(mut)]
+    pub payer: Signer<'info>,
+
+    #[account(
+        mut,
+        constraint = agent_token_account.owner == did_authority.key(),
+        constraint = agent_token_account.mint == RELAY_MINT,
+    )]
+    pub agent_token_account: Account<'info, TokenAccount>,
+
+    #[account(
+        mut,
+        seeds = [b"stake-vault"],
+        bump,
+    )]
+    pub stake_vault: Account<'info, TokenAccount>,
+
+    #[account(
+        seeds = [b"agent-profile", did_authority.key().as_ref()],
+        bump = agent_profile.bump,
+        constraint = agent_profile.did_pubkey == did_authority.key() @ RegistryError::Unauthorized,
+    )]
+    pub agent_profile: Account<'info, AgentProfile>,
+
+    #[account(
+        init,
+        payer = payer,
+        space = AgentStake::SIZE,
+        seeds = [b"agent-stake", did_authority.key().as_ref()],
+        bump,
+    )]
+    pub agent_stake: Account<'info, AgentStake>,
+
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
+    pub rent: Sysvar<'info, Rent>,
+}
+
+#[derive(Accounts)]
+pub struct RequestUnstake<'info> {
+    pub did_authority: Signer<'info>,
+
+    #[account(
+        mut,
+        seeds = [b"agent-stake", did_authority.key().as_ref()],
+        bump = agent_stake.bump,
+        constraint = agent_stake.agent == did_authority.key() @ RegistryError::Unauthorized,
+    )]
+    pub agent_stake: Account<'info, AgentStake>,
+}
+
+#[derive(Accounts)]
+pub struct WithdrawStake<'info> {
+    #[account(mut)]
+    pub did_authority: Signer<'info>,
+
+    #[account(
+        mut,
+        close = did_authority,
+        seeds = [b"agent-stake", did_authority.key().as_ref()],
+        bump = agent_stake.bump,
+        constraint = agent_stake.agent == did_authority.key() @ RegistryError::Unauthorized,
+    )]
+    pub agent_stake: Account<'info, AgentStake>,
+
+    #[account(
+        mut,
+        constraint = agent_token_account.owner == did_authority.key(),
+        constraint = agent_token_account.mint == RELAY_MINT,
+    )]
+    pub agent_token_account: Account<'info, TokenAccount>,
+
+    #[account(
+        mut,
+        seeds = [b"stake-vault"],
+        bump,
+    )]
+    pub stake_vault: Account<'info, TokenAccount>,
+
+    pub token_program: Program<'info, Token>,
+}
+
 #[derive(Accounts)]
 pub struct ExecuteRelay<'info> {
     /// The agent's DID key — must sign to authorize the relay.
@@ -452,6 +753,23 @@ pub struct ExecuteRelay<'info> {
         constraint = agent_profile.did_pubkey == did_authority.key() @ RegistryError::Unauthorized,
     )]
     pub agent_profile: Account<'info, AgentProfile>,
+
+    /// Agent must have an active stake (>= MIN_STAKE) to execute a relay.
+    /// v1 enforces stake-gated participation. Closing the stake (via withdraw)
+    /// removes this account, blocking further relays.
+    ///
+    /// Note: the `amount >= MIN_STAKE` check is unreachable in v1 because
+    /// every stake mutation writes exactly MIN_STAKE (no top-up, no partial
+    /// unstake). It's kept as defense-in-depth for v2 variable-stake amounts.
+    /// Today, the AccountNotInitialized error (3012) fires first when stake
+    /// is missing.
+    #[account(
+        seeds = [b"agent-stake", did_authority.key().as_ref()],
+        bump = agent_stake.bump,
+        constraint = agent_stake.agent == did_authority.key() @ RegistryError::Unauthorized,
+        constraint = agent_stake.amount >= MIN_STAKE @ RegistryError::InsufficientStake,
+    )]
+    pub agent_stake: Account<'info, AgentStake>,
 
     /// Per-agent relay stats PDA, lazily created on first relay.
     #[account(
@@ -480,6 +798,14 @@ pub enum RegistryError {
     Unauthorized,
     #[msg("Relay amount_in must be greater than zero")]
     ZeroRelayAmount,
+    #[msg("Stake amount below minimum")]
+    InsufficientStake,
+    #[msg("Unstake already requested")]
+    UnstakeAlreadyRequested,
+    #[msg("Unstake not requested")]
+    UnstakeNotRequested,
+    #[msg("Cooldown period has not elapsed")]
+    CooldownNotElapsed,
 }
 
 #[error_code]
@@ -640,11 +966,24 @@ pub struct RefundEscrow<'info> {
 }
 
 #[event]
-pub struct AgentRegistered {
-    pub did_pubkey: Pubkey,
+pub struct AgentStakedAndRegistered {
+    pub agent: Pubkey,
     pub handle: String,
-    pub capabilities_hash: [u8; 32],
-    pub created_at: i64,
+    pub stake_amount: u64,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct UnstakeRequested {
+    pub agent: Pubkey,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct StakeWithdrawn {
+    pub agent: Pubkey,
+    pub amount: u64,
+    pub timestamp: i64,
 }
 
 #[event]
