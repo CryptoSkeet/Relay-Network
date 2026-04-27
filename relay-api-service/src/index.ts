@@ -8,6 +8,10 @@
  *  - POST /agents/register            → builds an unsigned register_agent ix (devnet)
  *  - GET  /agents/:pubkey/reputation  → reads AgentReputation PDA from devnet
  *  - GET  /agents/:pubkey/profile     → reads AgentProfile PDA from devnet
+ *  - GET  /agents/:pubkey/stake       → reads AgentStake PDA from devnet
+ *  - GET  /agents/:pubkey/score       → off-chain reputation_v1 score with inputs
+ *  - GET  /leaderboard?limit=N        → top N agents by score
+ *  - GET  /protocol/reputation-formula→ JSON spec for the active formula
  */
 
 import axios from "axios";
@@ -31,6 +35,9 @@ import {
   AgentReputation,
   UnsignedInstruction,
 } from "./types";
+import { logVolume, totalUsdByAgent } from "./volume-log";
+import { computeScore, REPUTATION_FORMULA_DOC } from "./score";
+import { lookupToken } from "./token-registry";
 
 dotenv.config();
 
@@ -250,6 +257,30 @@ function buildExecuteRelayIx(args: {
   });
 
   return { ix, agentProfilePda, relayStatsPda };
+}
+
+/** Decode the AgentStake PDA. Layout: 32 agent + 8 amount + 8 locked_at + 8 unlock_requested_at + 1 bump. */
+function decodeAgentStake(data: Buffer): {
+  agent: string;
+  amount: string;
+  lockedAt: string;
+  unlockRequestedAt: string;
+  bump: number;
+} {
+  let o = 8;
+  const agent = new PublicKey(data.subarray(o, o + 32));
+  o += 32;
+  const amount = data.readBigUInt64LE(o); o += 8;
+  const lockedAt = data.readBigInt64LE(o); o += 8;
+  const unlockRequestedAt = data.readBigInt64LE(o); o += 8;
+  const bump = data.readUInt8(o);
+  return {
+    agent: agent.toBase58(),
+    amount: amount.toString(),
+    lockedAt: lockedAt.toString(),
+    unlockRequestedAt: unlockRequestedAt.toString(),
+    bump,
+  };
 }
 
 /** Decode the RelayStats PDA. Layout matches programs/relay_agent_registry. */
@@ -520,6 +551,30 @@ app.post("/relay", async (req: Request<{}, {}, RelayRequest>, res: Response) => 
       cluster: "devnet",
       programId: RELAY_AGENT_REGISTRY_PROGRAM_ID.toBase58(),
     };
+
+    // Log USD volume off-chain for reputation_v1 score aggregation. Best-effort
+    // — failure to price (unknown mint, network blip) records 0 USD rather than
+    // failing the request.
+    try {
+      const tok = lookupToken(inputMint);
+      let usd = 0;
+      if (tok && tok.coingeckoId) {
+        const usdPerToken = await coingecko.getPrice(tok.coingeckoId);
+        const human = Number(amountIn) / 10 ** tok.decimals;
+        usd = human * usdPerToken;
+      }
+      logVolume({
+        ts: Math.floor(Date.now() / 1000),
+        pubkey: authority.toBase58(),
+        inputMint,
+        amountRaw: amountIn.toString(),
+        decimals: tok?.decimals ?? 0,
+        usd,
+      });
+    } catch {
+      // Logging must never block the relay response.
+    }
+
     res.json(out);
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -699,6 +754,153 @@ app.get("/agents/:pubkey/profile", async (req, res) => {
   }
 });
 
+// ── Agent stake: read on-chain AgentStake PDA ───────────────────────────────
+app.get("/agents/:pubkey/stake", async (req, res) => {
+  try {
+    const authority = new PublicKey(req.params.pubkey);
+    const [stakePda] = deriveAgentStakePda(authority);
+    const account = await devnetConn.getAccountInfo(stakePda);
+
+    if (!account) {
+      return res.json({
+        pubkey: authority.toBase58(),
+        agentStakePda: stakePda.toBase58(),
+        exists: false,
+        cluster: "devnet",
+      });
+    }
+
+    const stake = decodeAgentStake(Buffer.from(account.data));
+    const COOLDOWN_S = 14 * 24 * 60 * 60;
+    const unlockReq = Number(stake.unlockRequestedAt);
+    const canWithdrawAt = unlockReq > 0 ? unlockReq + COOLDOWN_S : null;
+    const now = Math.floor(Date.now() / 1000);
+
+    res.json({
+      pubkey: authority.toBase58(),
+      agentStakePda: stakePda.toBase58(),
+      exists: true,
+      cluster: "devnet",
+      stake,
+      cooldownSeconds: COOLDOWN_S,
+      canWithdrawAt, // unix seconds, null if no unstake requested
+      canWithdrawNow: canWithdrawAt !== null && now >= canWithdrawAt,
+      programId: RELAY_AGENT_REGISTRY_PROGRAM_ID.toBase58(),
+    });
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+// ── Agent score: derive reputation_v1 from on-chain stats + off-chain volume ──
+app.get("/agents/:pubkey/score", async (req, res) => {
+  try {
+    const authority = new PublicKey(req.params.pubkey);
+    const [relayStatsPda] = deriveRelayStatsPda(authority);
+    const account = await devnetConn.getAccountInfo(relayStatsPda);
+
+    let relayCount = 0;
+    let lastRelayAt = 0;
+    if (account) {
+      const stats = decodeRelayStats(Buffer.from(account.data));
+      relayCount = Number(stats.relayCount);
+      lastRelayAt = Number(stats.lastRelayAt);
+    }
+
+    const volumeUsd = totalUsdByAgent().get(authority.toBase58()) ?? 0;
+    const now = Math.floor(Date.now() / 1000);
+
+    const result = computeScore({ relayCount, volumeUsd, lastRelayAt, now });
+
+    res.json({
+      pubkey: authority.toBase58(),
+      relayStatsPda: relayStatsPda.toBase58(),
+      relayStatsExists: !!account,
+      ...result,
+      cluster: "devnet",
+      programId: RELAY_AGENT_REGISTRY_PROGRAM_ID.toBase58(),
+    });
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+// ── Reputation formula: spec as JSON ─────────────────────────────────────────
+app.get("/protocol/reputation-formula", (_req, res) => {
+  res.json(REPUTATION_FORMULA_DOC);
+});
+
+// ── Leaderboard: top N agents by reputation_v1 score ─────────────────────────
+//
+// Strategy: enumerate all RelayStats accounts via getProgramAccounts (filtered
+// by Anchor discriminator), decode each, join with off-chain USD volume, score,
+// sort, slice. With ~dozens of agents this is fine. At thousands, page or
+// cache. At ten-thousands, move to a DB.
+const RELAY_STATS_DISC = createHash("sha256")
+  .update("account:RelayStats")
+  .digest()
+  .subarray(0, 8);
+
+app.get("/leaderboard", async (req, res) => {
+  try {
+    const limit = Math.min(
+      Math.max(parseInt(String(req.query.limit ?? "25"), 10) || 25, 1),
+      200
+    );
+
+    const accounts = await devnetConn.getProgramAccounts(
+      RELAY_AGENT_REGISTRY_PROGRAM_ID,
+      {
+        commitment: "confirmed",
+        filters: [
+          { memcmp: { offset: 0, bytes: RELAY_STATS_DISC.toString("base64"), encoding: "base64" } } as any,
+        ],
+      }
+    );
+
+    const usdMap = totalUsdByAgent();
+    const now = Math.floor(Date.now() / 1000);
+
+    const rows = accounts
+      .map(({ account, pubkey }) => {
+        try {
+          const s = decodeRelayStats(Buffer.from(account.data));
+          const score = computeScore({
+            relayCount: Number(s.relayCount),
+            volumeUsd: usdMap.get(s.agentDid) ?? 0,
+            lastRelayAt: Number(s.lastRelayAt),
+            now,
+          });
+          return {
+            pubkey: s.agentDid,
+            relayStatsPda: pubkey.toBase58(),
+            score: score.score,
+            relayCount: s.relayCount,
+            volumeUsd: usdMap.get(s.agentDid) ?? 0,
+            lastRelayAt: s.lastRelayAt,
+            timeFactor: score.inputs.timeFactor,
+          };
+        } catch {
+          return null;
+        }
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit);
+
+    res.json({
+      formulaVersion: "reputation_v1",
+      total: accounts.length,
+      limit,
+      cluster: "devnet",
+      generatedAt: now,
+      leaderboard: rows,
+    });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
 // ── Boot ─────────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
@@ -717,6 +919,10 @@ app.listen(PORT, () => {
 ║    POST /agents/register                                       ║
 ║    GET  /agents/:pubkey/reputation                             ║
 ║    GET  /agents/:pubkey/profile                                ║
+║    GET  /agents/:pubkey/stake                                  ║
+║    GET  /agents/:pubkey/score                                  ║
+║    GET  /leaderboard?limit=N                                   ║
+║    GET  /protocol/reputation-formula                           ║
 ╚════════════════════════════════════════════════════════════════╝
   `);
 });
