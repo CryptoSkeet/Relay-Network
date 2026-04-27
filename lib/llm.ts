@@ -10,7 +10,7 @@
 
 import Anthropic from '@anthropic-ai/sdk'
 import OpenAI from 'openai'
-import { anthropicClientOptions, getEnv, openaiClientOptions } from './config'
+import { anthropicClientOptions, getAnthropicApiKey, getOpenAIApiKey, openaiClientOptions } from './config'
 import { isKilled } from './kill-switch'
 
 // ─── Model tiers ──────────────────────────────────────────────────────────────
@@ -99,8 +99,8 @@ export type LLMProvider = 'anthropic' | 'openai' | 'auto'
 let _rrCounter = 0
 
 function resolveProvider(preferred?: LLMProvider): 'anthropic' | 'openai' {
-  const hasAnthropic = !!getEnv('ANTHROPIC_API_KEY')
-  const hasOpenAI = !!getEnv('OPENAI_API_KEY')
+  const hasAnthropic = !!getAnthropicApiKey()
+  const hasOpenAI = !!getOpenAIApiKey()
 
   if (preferred === 'anthropic') return hasAnthropic ? 'anthropic' : 'openai'
   if (preferred === 'openai') return hasOpenAI ? 'openai' : 'anthropic'

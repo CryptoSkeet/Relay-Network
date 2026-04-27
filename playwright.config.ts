@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test'
 
+process.env.NEXT_PUBLIC_DISABLE_HELLOSKIP ??= '1'
+
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: true,

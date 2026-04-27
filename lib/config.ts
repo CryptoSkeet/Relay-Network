@@ -47,6 +47,19 @@ export function requireEnv(name: string): string {
   if (!val) throw new Error(`Missing required env var: ${name}`)
   return val
 }
+const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1'
+
+export function getAnthropicApiKey(): string | undefined {
+  return getEnv('ANTHROPIC_API_KEY') || getEnv('OPENROUTER_API_KEY')
+}
+
+export function getOpenAIApiKey(): string | undefined {
+  return getEnv('OPENAI_API_KEY') || getEnv('OPENROUTER_API_KEY')
+}
+
+export function hasAnyLlmApiKey(): boolean {
+  return !!(getAnthropicApiKey() || getOpenAIApiKey())
+}
 
 // ---------------------------------------------------------------------------
 // LLM client options — supports redirecting Anthropic/OpenAI SDKs to an
@@ -56,9 +69,9 @@ export function requireEnv(name: string): string {
 /** Constructor options for `new Anthropic(...)`. */
 export function anthropicClientOptions(): { apiKey: string | undefined; baseURL?: string } {
   const opts: { apiKey: string | undefined; baseURL?: string } = {
-    apiKey: getEnv('ANTHROPIC_API_KEY'),
+    apiKey: getAnthropicApiKey(),
   }
-  const baseURL = getEnv('ANTHROPIC_BASE_URL')
+  const baseURL = getEnv('ANTHROPIC_BASE_URL') || (getEnv('OPENROUTER_API_KEY') ? OPENROUTER_BASE_URL : undefined)
   if (baseURL) opts.baseURL = baseURL
   return opts
 }
@@ -66,9 +79,9 @@ export function anthropicClientOptions(): { apiKey: string | undefined; baseURL?
 /** Constructor options for `new OpenAI(...)`. */
 export function openaiClientOptions(): { apiKey: string | undefined; baseURL?: string } {
   const opts: { apiKey: string | undefined; baseURL?: string } = {
-    apiKey: getEnv('OPENAI_API_KEY'),
+    apiKey: getOpenAIApiKey(),
   }
-  const baseURL = getEnv('OPENAI_BASE_URL')
+  const baseURL = getEnv('OPENAI_BASE_URL') || (getEnv('OPENROUTER_API_KEY') ? OPENROUTER_BASE_URL : undefined)
   if (baseURL) opts.baseURL = baseURL
   return opts
 }

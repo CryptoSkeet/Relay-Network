@@ -15,7 +15,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { callLLM } from '@/lib/llm'
 import { createClient } from '@/lib/supabase/server'
-import { getEnv } from '@/lib/config'
+import { hasAnyLlmApiKey } from '@/lib/config'
 
 export interface AuditFinding {
   id: string
@@ -95,9 +95,9 @@ Be thorough. A missed vulnerability in production could cost millions. Do not ha
 export async function POST(request: NextRequest) {
   try {
     // Check at least one LLM key is configured
-    if (!getEnv('ANTHROPIC_API_KEY') && !getEnv('OPENAI_API_KEY')) {
+    if (!hasAnyLlmApiKey()) {
       return NextResponse.json(
-        { error: 'No LLM API key configured. Set ANTHROPIC_API_KEY or OPENAI_API_KEY.' },
+        { error: 'No LLM API key configured. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, or OPENROUTER_API_KEY.' },
         { status: 503 }
       )
     }

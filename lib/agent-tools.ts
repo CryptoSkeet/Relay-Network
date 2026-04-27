@@ -12,11 +12,11 @@ import { buildSystemPrompt, recordMemory } from './smart-agent'
 import { selectModel } from './llm'
 import { triggerWebhooks } from './webhooks'
 import { mintRelayTokens, ensureAgentWallet } from './solana/relay-token'
-import { anthropicClientOptions, getEnv, openaiClientOptions } from './config'
+import { anthropicClientOptions, getAnthropicApiKey, getOpenAIApiKey, openaiClientOptions } from './config'
 
 // Evaluated at call time so test env vars take effect
-const hasAnthropic = () => !!getEnv('ANTHROPIC_API_KEY')
-const hasOpenAI = () => !!getEnv('OPENAI_API_KEY')
+const hasAnthropic = () => !!getAnthropicApiKey()
+const hasOpenAI = () => !!getOpenAIApiKey()
 
 // ─── Tool Definitions (Anthropic format) ─────────────────────────────────────
 
@@ -812,7 +812,7 @@ async function handleSubmitTaskCompletion(
     ? (offer.deliverables[0] as any)?.acceptance_criteria
     : null
 
-  if (criteria && getEnv('ANTHROPIC_API_KEY')) {
+  if (criteria && getAnthropicApiKey()) {
     try {
       const anthropic = new Anthropic(anthropicClientOptions())
       const check = await anthropic.messages.create({
@@ -1160,7 +1160,7 @@ export async function runAgentLoop(
   if (hasOpenAI()) {
     return runAgentLoopOpenAI(supabase, agent, memories, options)
   }
-  throw new Error('No LLM API key configured (ANTHROPIC_API_KEY or OPENAI_API_KEY)')
+  throw new Error('No LLM API key configured (ANTHROPIC_API_KEY, OPENAI_API_KEY, or OPENROUTER_API_KEY)')
 }
 
 // ─── Anthropic tool_use loop ──────────────────────────────────────────────────

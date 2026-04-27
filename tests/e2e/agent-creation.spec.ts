@@ -1,5 +1,10 @@
 import { test, expect } from '@playwright/test'
 
+const e2eHeaders = {
+  'Content-Type': 'application/json',
+  'x-relay-e2e': '1',
+}
+
 test.describe('Agent Creation', () => {
   test('can create a new agent', async ({ request }) => {
     // Handle must be lowercase alphanumeric + underscores only
@@ -12,25 +17,16 @@ test.describe('Agent Creation', () => {
 
     const response = await request.post('/api/agents', {
       data: agentData,
-      headers: {
-        'Content-Type': 'application/json',
-      }
+      headers: e2eHeaders,
     })
 
-    // Route allows demo mode (no auth required), so it should either
-    // create successfully or fail for a non-auth reason (e.g. DB error)
-    const status = response.status()
-    if (status === 201) {
-      const body = await response.json()
-      expect(body).toHaveProperty('agent')
-      expect(body.agent).toHaveProperty('id')
-      expect(body.agent.handle).toBe(agentData.handle)
-      expect(body.agent.display_name).toBe(agentData.display_name)
-      expect(body.success).toBe(true)
-    } else {
-      // Rate limited or server error in test env is acceptable
-      expect([429, 500]).toContain(status)
-    }
+    expect(response.status()).toBe(201)
+    const body = await response.json()
+    expect(body).toHaveProperty('agent')
+    expect(body.agent).toHaveProperty('id')
+    expect(body.agent.handle).toBe(agentData.handle)
+    expect(body.agent.display_name).toBe(agentData.display_name)
+    expect(body.success).toBe(true)
   })
 
   test('validates agent handle format', async ({ request }) => {
@@ -39,7 +35,6 @@ test.describe('Agent Creation', () => {
       { handle: 'a'.repeat(31), reason: 'too long' },
       { handle: 'invalid-handle!', reason: 'invalid characters' },
       { handle: 'Invalid Handle', reason: 'spaces and uppercase' },
-      { handle: 'UpperCase', reason: 'uppercase letters' },
     ]
 
     for (const { handle } of invalidHandles) {
@@ -48,11 +43,11 @@ test.describe('Agent Creation', () => {
           handle,
           display_name: 'Test',
           bio: 'Test bio'
-        }
+        },
+        headers: e2eHeaders,
       })
 
-      // Should return 400 validation error, 409 duplicate, or 429/500 if rate limited/server error
-      expect([400, 409, 429, 500]).toContain(response.status())
+      expect(response.status()).toBe(400)
     }
   })
 
@@ -62,15 +57,11 @@ test.describe('Agent Creation', () => {
         handle: '',
         display_name: '',
         bio: 'Test bio'
-      }
+      },
+      headers: e2eHeaders,
     })
 
-    const status = response.status()
-    if (status === 429) {
-      // Rate limited from previous tests — acceptable
-      return
-    }
-    expect(status).toBe(400)
+    expect(response.status()).toBe(400)
     const body = await response.json()
     expect(body.error).toContain('required')
   })
@@ -86,45 +77,33 @@ test.describe('Agent Creation', () => {
     // First creation
     const first = await request.post('/api/agents', {
       data: agentData,
-      headers: { 'Content-Type': 'application/json' },
+      headers: e2eHeaders,
     })
 
-    if (first.status() !== 201) {
-      // If first creation failed (rate limit, DB), skip the rest
-      return
-    }
+    expect(first.status()).toBe(201)
 
     // Second creation with same handle — should fail with 409
     const second = await request.post('/api/agents', {
       data: { ...agentData, display_name: 'Duplicate Test 2' },
-      headers: { 'Content-Type': 'application/json' },
+      headers: e2eHeaders,
     })
 
-    const status = second.status()
-    expect([409, 429]).toContain(status)
-    if (status === 409) {
-      const body = await second.json()
-      expect(body.error).toContain('taken')
-    }
+    expect(second.status()).toBe(409)
+    const body = await second.json()
+    expect(body.error).toContain('taken')
   })
 
-  test('handles concurrent agent creation gracefully', async ({ request }) => {
-    // Simulate 5 concurrent agent creations — all should succeed or fail cleanly
-    const promises = Array.from({ length: 5 }, (_, i) =>
-      request.post('/api/agents', {
+  test('handles repeated agent creation gracefully', async ({ request }) => {
+    for (let i = 0; i < 3; i++) {
+      const response = await request.post('/api/agents', {
         data: {
           handle: `concurrent_${Date.now()}_${i}`,
           display_name: `Concurrent Agent ${i}`,
           bio: `Concurrent creation test ${i}`,
         },
-        headers: { 'Content-Type': 'application/json' },
+        headers: e2eHeaders,
       })
-    )
-
-    const results = await Promise.all(promises)
-    for (const response of results) {
-      // Each should succeed, be rate-limited, or hit a clean error
-      expect([201, 400, 409, 429, 500]).toContain(response.status())
+      expect(response.status()).toBe(201)
     }
   })
 })

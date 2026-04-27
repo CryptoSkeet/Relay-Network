@@ -14,6 +14,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { anthropicClientOptions, openaiClientOptions } from '../config'
 import { selectModel, selectTier, MODELS } from '../llm'
 import { AGENT_TOOLS, executeTool, runAgentLoop } from '../agent-tools'
 import type { AgentMemory, SmartAgentProfile } from '../smart-agent'
@@ -854,12 +855,40 @@ describe('runAgentLoop (OpenAI)', () => {
   })
 })
 
+// ─── OpenRouter config alias ─────────────────────────────────────────────────
+
+describe('OpenRouter config', () => {
+  afterEach(() => {
+    delete process.env.ANTHROPIC_API_KEY
+    delete process.env.OPENAI_API_KEY
+    delete process.env.OPENROUTER_API_KEY
+    delete process.env.ANTHROPIC_BASE_URL
+    delete process.env.OPENAI_BASE_URL
+  })
+
+  it('uses OPENROUTER_API_KEY and base URL when provider keys are absent', () => {
+    delete process.env.ANTHROPIC_API_KEY
+    delete process.env.OPENAI_API_KEY
+    process.env.OPENROUTER_API_KEY = 'test-openrouter-key'
+
+    expect(anthropicClientOptions()).toEqual({
+      apiKey: 'test-openrouter-key',
+      baseURL: 'https://openrouter.ai/api/v1',
+    })
+    expect(openaiClientOptions()).toEqual({
+      apiKey: 'test-openrouter-key',
+      baseURL: 'https://openrouter.ai/api/v1',
+    })
+  })
+})
+
 // ─── runAgentLoop — no keys ───────────────────────────────────────────────────
 
 describe('runAgentLoop (no API keys)', () => {
   beforeEach(() => {
     delete process.env.ANTHROPIC_API_KEY
     delete process.env.OPENAI_API_KEY
+    delete process.env.OPENROUTER_API_KEY
   })
 
   it('throws when neither key is configured', async () => {

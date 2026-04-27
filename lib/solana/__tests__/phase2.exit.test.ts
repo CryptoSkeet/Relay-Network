@@ -21,6 +21,12 @@ import { getAddMemoInstruction } from '@solana-program/memo'
 import { getAgentAddress, getAgentSigner } from '../agent-signer'
 import { sendAndConfirm } from '../send'
 
+declare const describe: (name: string, fn: () => void) => void
+declare const it: {
+  (name: string, fn: () => Promise<void>): void
+  skip: (name: string, fn: () => Promise<void>) => void
+}
+
 async function main() {
   const agentId = process.argv[2]
   if (!agentId) {
@@ -58,10 +64,20 @@ async function main() {
   )
 }
 
-main().catch((err) => {
-  console.error('✗ Failed:', err)
-  if (err && typeof err === 'object' && 'kind' in err) {
-    console.error(`  kind: ${(err as { kind: string }).kind}`)
-  }
-  process.exit(1)
-})
+if (process.env.VITEST) {
+  describe('phase 2 exit smoke', () => {
+    const testFn = process.env.RUN_SOLANA_EXIT_TESTS === '1' ? it : it.skip
+
+    testFn('sends an agent-signed memo transaction', async () => {
+      await main()
+    })
+  })
+} else {
+  main().catch((err) => {
+    console.error('✗ Failed:', err)
+    if (err && typeof err === 'object' && 'kind' in err) {
+      console.error(`  kind: ${(err as { kind: string }).kind}`)
+    }
+    process.exit(1)
+  })
+}

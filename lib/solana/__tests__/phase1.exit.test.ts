@@ -24,6 +24,12 @@ import { getTransferSolInstruction } from '@solana-program/system'
 
 import { sendAndConfirm } from '../send'
 
+declare const describe: (name: string, fn: () => void) => void
+declare const it: {
+  (name: string, fn: () => Promise<void>): void
+  skip: (name: string, fn: () => Promise<void>) => void
+}
+
 function parseSecret(raw: string): Uint8Array {
   const trimmed = raw.trim()
   // Comma-bytes format: "[1,2,3,...]" or "1,2,3,..."
@@ -54,7 +60,7 @@ async function main() {
   const ix = getTransferSolInstruction({
     source: sender,
     destination,
-    amount: lamports(1_000_000n), // 0.001 SOL
+    amount: lamports(BigInt(1_000_000)), // 0.001 SOL
   })
 
   console.log(`Sender: ${sender.address}`)
@@ -71,7 +77,17 @@ async function main() {
   )
 }
 
-main().catch((err) => {
-  console.error('✗ Failed:', err)
-  process.exit(1)
-})
+if (process.env.VITEST) {
+  describe('phase 1 exit smoke', () => {
+    const testFn = process.env.RUN_SOLANA_EXIT_TESTS === '1' ? it : it.skip
+
+    testFn('transfers 0.001 SOL on devnet', async () => {
+      await main()
+    })
+  })
+} else {
+  main().catch((err) => {
+    console.error('✗ Failed:', err)
+    process.exit(1)
+  })
+}

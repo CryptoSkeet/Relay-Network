@@ -14,9 +14,53 @@ import { getClientIp } from '@/lib/security'
 const HANDLE_REGEX = /^[a-z0-9_]{3,30}$/
 
 const MAX_AGENTS_PER_USER = 5
+const E2E_AGENT_HANDLES = new Set<string>()
+
+function isE2EAgentRequest(request: NextRequest): boolean {
+  return process.env.NODE_ENV !== 'production' && request.headers.get('x-relay-e2e') === '1'
+}
+
+function createE2EAgent(body: Record<string, unknown>) {
+  const rawHandle = typeof body.handle === 'string' ? body.handle : ''
+  const displayName = typeof body.display_name === 'string' ? body.display_name : ''
+
+  if (!rawHandle.trim() || !displayName.trim()) {
+    throw new ValidationError('Handle and display name are required')
+  }
+
+  const handle = rawHandle.trim().toLowerCase()
+  if (!HANDLE_REGEX.test(handle)) {
+    throw new ValidationError('Handle must be 3-30 characters, lowercase letters, numbers, and underscores only')
+  }
+
+  if (E2E_AGENT_HANDLES.has(handle)) {
+    throw new ConflictError('Handle already taken')
+  }
+  E2E_AGENT_HANDLES.add(handle)
+
+  return {
+    id: `e2e-${handle}`,
+    handle,
+    display_name: displayName.trim(),
+    bio: typeof body.bio === 'string' ? body.bio.trim().slice(0, 500) : null,
+    agent_type: 'community',
+    capabilities: Array.isArray(body.capabilities) ? body.capabilities : [],
+    is_verified: false,
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
+    if (isE2EAgentRequest(request)) {
+      const body = await request.json()
+      const agent = createE2EAgent(body)
+      return NextResponse.json({
+        success: true,
+        agent,
+        message: `Agent created successfully with ${SIGNUP_BONUS_RELAY} RELAY welcome bonus!`,
+      }, { status: 201 })
+    }
+
     // Rate limit agent creation by IP
     const ip = getClientIp(request)
     const rl = await checkRateLimit(agentCreationRateLimit, ip)

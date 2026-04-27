@@ -14,17 +14,20 @@
  */
 
 import {
-  Connection,
-  Keypair,
+  type Connection,
   PublicKey,
   SystemProgram,
-  TransactionInstruction,
-  Transaction,
-  sendAndConfirmTransaction,
 } from '@solana/web3.js'
+import {
+  AccountRole,
+  address,
+  type Address,
+  type Instruction,
+} from '@solana/kit'
 import { createHash } from 'crypto'
 import { getSolanaConnection } from './quicknode'
-import { getEnv } from '../config'
+import { getTreasurySigner } from './relay-token'
+import { sendAndConfirm } from './send'
 
 // ── Program ID ────────────────────────────────────────────────────────────────
 
@@ -67,13 +70,10 @@ export const Outcome = {
 } as const
 export type OutcomeCode = (typeof Outcome)[keyof typeof Outcome]
 
-// ── Authority keypair ────────────────────────────────────────────────────────
+// ── Kit instruction helpers ─────────────────────────────────────────────────
 
-function getAuthorityKeypair(): Keypair {
-  const raw = getEnv('RELAY_PAYER_SECRET_KEY')
-  if (!raw) throw new Error('RELAY_PAYER_SECRET_KEY not set')
-  const bytes = raw.split(',').map(Number)
-  return Keypair.fromSecretKey(Uint8Array.from(bytes))
+function toKitAddress(pubkey: PublicKey): Address {
+  return address(pubkey.toBase58())
 }
 
 // ── Hash helper (sha256(uuid)) ───────────────────────────────────────────────
@@ -86,8 +86,8 @@ export function contractIdHash(contractId: string): Buffer {
 
 export async function initReputationConfig(authority?: PublicKey): Promise<string> {
   const conn = getSolanaConnection()
-  const payer = getAuthorityKeypair()
-  const auth = authority ?? payer.publicKey
+  const payer = await getTreasurySigner()
+  const auth = authority ?? new PublicKey(payer.address)
   const [configPda] = deriveConfigPDA()
 
   // Idempotency: if already initialized, return existing tx marker.
@@ -96,18 +96,18 @@ export async function initReputationConfig(authority?: PublicKey): Promise<strin
 
   const data = Buffer.concat([IX_INIT_CONFIG, auth.toBuffer()])
 
-  const ix = new TransactionInstruction({
-    programId: RELAY_REPUTATION_PROGRAM_ID,
-    keys: [
-      { pubkey: configPda, isSigner: false, isWritable: true },
-      { pubkey: payer.publicKey, isSigner: true, isWritable: true },
-      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+  const ix: Instruction = {
+    programAddress: toKitAddress(RELAY_REPUTATION_PROGRAM_ID),
+    accounts: [
+      { address: toKitAddress(configPda), role: AccountRole.WRITABLE },
+      { address: payer.address, role: AccountRole.WRITABLE_SIGNER },
+      { address: toKitAddress(SystemProgram.programId), role: AccountRole.READONLY },
     ],
     data,
-  })
+  }
 
-  const sig = await sendAndConfirmTransaction(conn, new Transaction().add(ix), [payer])
-  return sig
+  const result = await sendAndConfirm([ix], payer)
+  return result.signature
 }
 
 // ── Record a settlement outcome ──────────────────────────────────────────────
@@ -140,7 +140,7 @@ export async function recordSettlementOnChain(
   }
 
   const conn = getSolanaConnection()
-  const authority = getAuthorityKeypair()
+  const authority = await getTreasurySigner()
   const [configPda] = deriveConfigPDA()
   const [reputationPda] = deriveReputationPDA(agentDid)
 
@@ -169,19 +169,20 @@ export async function recordSettlementOnChain(
     Buffer.from([fulfilled ? 1 : 0]),
   ])
 
-  const ix = new TransactionInstruction({
-    programId: RELAY_REPUTATION_PROGRAM_ID,
-    keys: [
-      { pubkey: configPda, isSigner: false, isWritable: false },
-      { pubkey: reputationPda, isSigner: false, isWritable: true },
-      { pubkey: authority.publicKey, isSigner: true, isWritable: false },
-      { pubkey: authority.publicKey, isSigner: true, isWritable: true }, // payer
-      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+  const ix: Instruction = {
+    programAddress: toKitAddress(RELAY_REPUTATION_PROGRAM_ID),
+    accounts: [
+      { address: toKitAddress(configPda), role: AccountRole.READONLY },
+      { address: toKitAddress(reputationPda), role: AccountRole.WRITABLE },
+      { address: authority.address, role: AccountRole.READONLY_SIGNER },
+      { address: authority.address, role: AccountRole.WRITABLE_SIGNER }, // payer
+      { address: toKitAddress(SystemProgram.programId), role: AccountRole.READONLY },
     ],
     data,
-  })
+  }
 
-  return sendAndConfirmTransaction(conn, new Transaction().add(ix), [authority])
+  const result = await sendAndConfirm([ix], authority)
+  return result.signature
 }
 
 // ── Read reputation PDA ──────────────────────────────────────────────────────

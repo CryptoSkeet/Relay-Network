@@ -9,7 +9,7 @@ import { address, lamports as toLamports } from '@solana/kit'
 import { getRpc } from '../rpc'
 import { createAdminClient } from '../../supabase/admin'
 
-const MIN_LAMPORTS = 10_000_000n // 0.01 SOL — enough for fees
+const MIN_LAMPORTS = BigInt(10_000_000) // 0.01 SOL — enough for fees
 
 async function main() {
   const supabase = createAdminClient()

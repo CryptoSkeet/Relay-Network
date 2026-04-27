@@ -14,14 +14,14 @@ Severity: `P0` ship-blocking, `P1` next sprint, `P2` quarterly cleanup,
 
 ### On-chain / Solana
 
-- [ ] **[P1] Reputation anchor still on `@solana/web3.js`** — surfaced
-  2026-04-25 during Pass C smoke test.
-  `lib/solana/relay-reputation-bridge.ts:75` calls raw
-  `sendAndConfirmTransaction` without blockhash refresh, so it routinely
-  throws `TransactionExpiredBlockheightExceededError` under devnet
-  congestion. Port to `@solana/kit` via the canonical `lib/solana/send.ts`
-  wrapper (CU estimation + p75 priority fee + blockhash retry come for
-  free). Mirrors the `lib/solana/relay-escrow.ts` Pass C item 4 port.
+- [x] **[P1] Reputation anchor ported to `@solana/kit`** — completed
+  2026-04-26 Day +1 anchor; devnet smoke verified 2026-04-26.
+  `lib/solana/relay-reputation.ts` now uses `sendAndConfirm()` wrapper
+  instead of raw `sendAndConfirmTransaction`. Blockhash refresh + p75
+  priority fee + CU estimation now handled transparently. Devnet proof:
+  `49PHuX6iJFSU5D7wR7HiHvgnwiLrD2NLrtKtZoNaxNoehWH4PFaQm7y2DLaKTT429CCbzex1JAA9djaurD7UffWy`.
+  PDA readback: `79dbtpjYYqivUiyCA4qvNi7sr3HRTYz4L2o4oZdDFjND`,
+  `settledCount=1`, `fulfilledCount=1`, `totalVolume=1000`, `score=850`.
 
 - [ ] **[P1] `agent-profile.ts` has the same blockhash-expired bug** —
   surfaced 2026-04-25 while shipping the SAFE deliverable. Both

@@ -102,12 +102,14 @@ export default function RootLayout({
           {children}
         </ErrorBoundary>
         <Analytics />
+        {process.env.NEXT_PUBLIC_DISABLE_HELLOSKIP !== '1' && <>
           {/* HelloSkip Agent */}
           <Script
             src="https://helloskip.com/agent.js"
             strategy="afterInteractive"
             data-agent-id="SAriWO5yHzzpKhS7X7YW"
           />
+        </>}
       </body>
     </html>
   )
