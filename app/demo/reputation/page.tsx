@@ -1,9 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { fetchReputation } from "../_lib/client";
+import { fetchReputation, fetchStake, fetchScore } from "../_lib/client";
 import { usePhantom } from "../_lib/phantom";
-import type { ReputationResponse } from "../_lib/types";
+import type {
+  ReputationResponse,
+  StakeResponse,
+  ScoreResponse,
+} from "../_lib/types";
 
 export default function ReputationPage() {
   const { pubkey } = usePhantom();
@@ -11,6 +15,8 @@ export default function ReputationPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ReputationResponse | null>(null);
+  const [stake, setStake] = useState<StakeResponse | null>(null);
+  const [score, setScore] = useState<ScoreResponse | null>(null);
 
   const effectivePubkey = pubkey || pubkeyInput;
 
@@ -18,14 +24,22 @@ export default function ReputationPage() {
     e.preventDefault();
     setError(null);
     setResult(null);
+    setStake(null);
+    setScore(null);
     if (!effectivePubkey) {
       setError("Connect Phantom or enter a pubkey.");
       return;
     }
     setLoading(true);
     try {
-      const r = await fetchReputation(effectivePubkey);
+      const [r, s, sc] = await Promise.all([
+        fetchReputation(effectivePubkey),
+        fetchStake(effectivePubkey).catch(() => null),
+        fetchScore(effectivePubkey).catch(() => null),
+      ]);
       setResult(r);
+      setStake(s);
+      setScore(sc);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -90,6 +104,94 @@ export default function ReputationPage() {
               value={result.relayStatsExists ? "yes" : "no (no relays yet)"}
             />
           </div>
+
+          {score && (
+            <div className="grid gap-3 rounded-lg border border-amber-800/40 bg-amber-950/10 p-5 text-xs sm:grid-cols-2">
+              <div className="sm:col-span-2 flex items-baseline justify-between">
+                <span className="text-[10px] font-medium uppercase tracking-wider text-amber-300">
+                  Activity score ({score.formulaVersion})
+                </span>
+                <span className="text-2xl font-bold text-amber-100">
+                  {score.score.toFixed(4)}
+                </span>
+              </div>
+              <Row
+                label="sqrt(relay_count)"
+                value={score.inputs.sqrtRelayCount.toFixed(4)}
+              />
+              <Row
+                label="log10(1 + volume_usd)"
+                value={score.inputs.log10Volume.toFixed(4)}
+              />
+              <Row
+                label="time_factor"
+                value={score.inputs.timeFactor.toFixed(4)}
+              />
+              <Row
+                label="days since last relay"
+                value={
+                  score.inputs.daysSinceLastRelay < 0
+                    ? "n/a"
+                    : score.inputs.daysSinceLastRelay.toFixed(2)
+                }
+              />
+              <Row label="relay_count" value={String(score.inputs.relayCount)} />
+              <Row
+                label="volume_usd (off-chain sum)"
+                value={`$${score.inputs.volumeUsd.toFixed(2)}`}
+              />
+              <div className="sm:col-span-2 text-[10px] text-amber-200/70">
+                score = sqrt(relay_count) × log10(1 + volume_usd) × time_factor.
+                Volume is summed off-chain from the backend's relay log
+                (CoinGecko priced at execution time).
+              </div>
+            </div>
+          )}
+
+          {stake && (
+            <div className="grid gap-3 rounded-lg border border-cyan-800/40 bg-cyan-950/10 p-5 text-xs sm:grid-cols-2">
+              <div className="sm:col-span-2 text-[10px] font-medium uppercase tracking-wider text-cyan-300">
+                Stake (relay_agent_registry · agent_stake PDA)
+              </div>
+              <Row label="Agent stake PDA" value={stake.agentStakePda} full />
+              <Row
+                label="Stake exists"
+                value={stake.exists ? "yes" : "no (agent must stake to relay)"}
+              />
+              {stake.exists && stake.stake && (
+                <>
+                  <Row
+                    label="Amount staked (raw)"
+                    value={stake.stake.amount}
+                  />
+                  <Row
+                    label="Amount staked (RELAY)"
+                    value={(Number(stake.stake.amount) / 1e6).toLocaleString()}
+                  />
+                  <Row
+                    label="Locked at (unix s)"
+                    value={stake.stake.lockedAt}
+                  />
+                  <Row
+                    label="Unlock requested at"
+                    value={
+                      stake.stake.unlockRequestedAt === "0"
+                        ? "— (not requested)"
+                        : stake.stake.unlockRequestedAt
+                    }
+                  />
+                  {stake.canWithdrawAt !== null && stake.canWithdrawAt !== undefined && (
+                    <Row
+                      label="Can withdraw at"
+                      value={`${stake.canWithdrawAt} (${
+                        stake.canWithdrawNow ? "ready now" : "still in cooldown"
+                      })`}
+                    />
+                  )}
+                </>
+              )}
+            </div>
+          )}
 
           {result.relayStats ? (
             <div className="grid gap-3 rounded-lg border border-violet-800/40 bg-violet-950/10 p-5 text-xs sm:grid-cols-2">

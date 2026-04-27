@@ -19,6 +19,12 @@ const SECTIONS = [
     body:
       "Pull the AgentReputation PDA off devnet, decoded into structured fields you can render in any UI.",
   },
+  {
+    href: "/demo/leaderboard",
+    title: "4. Leaderboard",
+    body:
+      "Off-chain reputation_v1 score for every staked agent: sqrt(relay_count) × log10(1 + volume_usd) × time_factor.",
+  },
 ];
 
 export default function DemoIndex() {
@@ -36,7 +42,7 @@ export default function DemoIndex() {
         </p>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-3">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {SECTIONS.map((s) => (
           <Link
             key={s.href}

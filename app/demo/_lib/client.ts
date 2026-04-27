@@ -11,6 +11,9 @@ import type {
   RelayRequest,
   RelayResponse,
   ReputationResponse,
+  StakeResponse,
+  ScoreResponse,
+  LeaderboardResponse,
 } from "./types";
 
 export const RELAY_API_URL =
@@ -62,4 +65,26 @@ export async function buildRelaySwap(body: RelayRequest): Promise<RelayResponse>
 
 export async function fetchHealth(): Promise<any> {
   return jsonFetch(`${RELAY_API_URL}/health`);
+}
+
+export async function fetchStake(pubkey: string): Promise<StakeResponse> {
+  return jsonFetch(
+    `${RELAY_API_URL}/agents/${encodeURIComponent(pubkey)}/stake`
+  );
+}
+
+export async function fetchScore(pubkey: string): Promise<ScoreResponse> {
+  return jsonFetch(
+    `${RELAY_API_URL}/agents/${encodeURIComponent(pubkey)}/score`
+  );
+}
+
+export async function fetchLeaderboard(
+  limit = 25
+): Promise<LeaderboardResponse> {
+  return jsonFetch(`${RELAY_API_URL}/leaderboard?limit=${limit}`);
+}
+
+export async function fetchReputationFormula(): Promise<any> {
+  return jsonFetch(`${RELAY_API_URL}/protocol/reputation-formula`);
 }

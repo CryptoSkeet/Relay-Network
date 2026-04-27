@@ -87,3 +87,64 @@ export interface ReputationResponse {
   programId: string;
   registryProgramId: string;
 }
+
+export interface AgentStake {
+  agent: string;
+  amount: string;             // raw u64
+  lockedAt: string;           // unix seconds
+  unlockRequestedAt: string;  // unix seconds, "0" if never
+  bump: number;
+}
+
+export interface StakeResponse {
+  pubkey: string;
+  agentStakePda: string;
+  exists: boolean;
+  cluster: "devnet" | "mainnet-beta" | "testnet";
+  stake?: AgentStake;
+  cooldownSeconds?: number;
+  canWithdrawAt?: number | null;
+  canWithdrawNow?: boolean;
+  programId?: string;
+}
+
+export interface ScoreInputs {
+  relayCount: number;
+  volumeUsd: number;
+  lastRelayAt: number;
+  now: number;
+  daysSinceLastRelay: number;
+  sqrtRelayCount: number;
+  log10Volume: number;
+  timeFactor: number;
+}
+
+export interface ScoreResponse {
+  pubkey: string;
+  relayStatsPda: string;
+  relayStatsExists: boolean;
+  formulaVersion: "reputation_v1";
+  score: number;
+  inputs: ScoreInputs;
+  cluster: "devnet" | "mainnet-beta" | "testnet";
+  programId: string;
+}
+
+export interface LeaderboardRow {
+  pubkey: string;
+  relayStatsPda: string;
+  score: number;
+  relayCount: string;
+  volumeUsd: number;
+  lastRelayAt: string;
+  timeFactor: number;
+}
+
+export interface LeaderboardResponse {
+  formulaVersion: "reputation_v1";
+  total: number;
+  limit: number;
+  cluster: "devnet" | "mainnet-beta" | "testnet";
+  generatedAt: number;
+  leaderboard: LeaderboardRow[];
+}
