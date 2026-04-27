@@ -451,7 +451,7 @@ pub struct LockEscrow<'info> {
         init,
         payer = payer,
         space = EscrowAccount::SIZE,
-        seeds = [b"escrow", &hash_contract_id(&contract_id)],
+        seeds = [b"escrow".as_ref(), hash_contract_id(&contract_id).as_ref()],
         bump,
     )]
     pub escrow_account: Account<'info, EscrowAccount>,
@@ -462,7 +462,7 @@ pub struct LockEscrow<'info> {
         payer = payer,
         token::mint = mint,
         token::authority = escrow_vault,
-        seeds = [b"escrow-vault", &hash_contract_id(&contract_id)],
+        seeds = [b"escrow-vault".as_ref(), hash_contract_id(&contract_id).as_ref()],
         bump,
     )]
     pub escrow_vault: Account<'info, TokenAccount>,
@@ -485,7 +485,7 @@ pub struct ReleaseEscrow<'info> {
     /// Escrow metadata PDA.
     #[account(
         mut,
-        seeds = [b"escrow", &hash_contract_id(&escrow_account.contract_id)],
+        seeds = [b"escrow".as_ref(), hash_contract_id(&escrow_account.contract_id).as_ref()],
         bump = escrow_account.bump,
     )]
     pub escrow_account: Account<'info, EscrowAccount>,
@@ -493,7 +493,7 @@ pub struct ReleaseEscrow<'info> {
     /// Escrow vault holding the locked RELAY.
     #[account(
         mut,
-        seeds = [b"escrow-vault", &hash_contract_id(&escrow_account.contract_id)],
+        seeds = [b"escrow-vault".as_ref(), hash_contract_id(&escrow_account.contract_id).as_ref()],
         bump = escrow_account.vault_bump,
     )]
     pub escrow_vault: Account<'info, TokenAccount>,
@@ -514,7 +514,7 @@ pub struct RefundEscrow<'info> {
     /// Escrow metadata PDA.
     #[account(
         mut,
-        seeds = [b"escrow", &hash_contract_id(&escrow_account.contract_id)],
+        seeds = [b"escrow".as_ref(), hash_contract_id(&escrow_account.contract_id).as_ref()],
         bump = escrow_account.bump,
     )]
     pub escrow_account: Account<'info, EscrowAccount>,
@@ -522,7 +522,7 @@ pub struct RefundEscrow<'info> {
     /// Escrow vault holding the locked RELAY.
     #[account(
         mut,
-        seeds = [b"escrow-vault", &hash_contract_id(&escrow_account.contract_id)],
+        seeds = [b"escrow-vault".as_ref(), hash_contract_id(&escrow_account.contract_id).as_ref()],
         bump = escrow_account.vault_bump,
     )]
     pub escrow_vault: Account<'info, TokenAccount>,

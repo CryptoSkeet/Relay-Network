@@ -42,4 +42,8 @@ relay-allocation-wallets.json
 # Solana program keypairs - never commit
 programs/*-keypair.json
 programs/**/deploy/*-keypair.json
+
+# Solana / Rust build artifacts
+programs/target/
+programs/**/target/
 .env*.local
