@@ -25,23 +25,42 @@ import {
   type SolanaRpcSubscriptionsApi,
 } from '@solana/kit'
 
-function requireEnv(name: string): string {
-  const v = process.env[name]?.trim()
-  if (!v) throw new Error(`${name} is not set`)
-  return v.replace(/\\r|\\n|\r|\n/g, '')
+function clean(v: string | undefined): string | undefined {
+  const t = v?.trim().replace(/\\r|\\n|\r|\n/g, '')
+  return t || undefined
+}
+
+function resolveHttpRpcUrl(): string {
+  const url =
+    clean(process.env.SOLANA_RPC_URL) ||
+    clean(process.env.QUICKNODE_RPC_URL) ||
+    clean(process.env.HELIUS_RPC_URL) ||
+    clean(process.env.NEXT_PUBLIC_SOLANA_RPC)
+  if (!url) {
+    throw new Error('SOLANA_RPC_URL is not set (also tried QUICKNODE_RPC_URL, HELIUS_RPC_URL, NEXT_PUBLIC_SOLANA_RPC)')
+  }
+  return url
+}
+
+function resolveWssRpcUrl(): string {
+  const explicit = clean(process.env.SOLANA_RPC_WSS_URL)
+  if (explicit) return explicit
+  // Derive from the HTTP RPC URL — providers expose the same host on wss://.
+  const http = resolveHttpRpcUrl()
+  return http.replace(/^http(s?):\/\//i, (_, s) => `ws${s}://`)
 }
 
 let _rpc: Rpc<SolanaRpcApi> | undefined
 let _rpcSubscriptions: RpcSubscriptions<SolanaRpcSubscriptionsApi> | undefined
 
 export function getRpc(): Rpc<SolanaRpcApi> {
-  if (!_rpc) _rpc = createSolanaRpc(requireEnv('SOLANA_RPC_URL'))
+  if (!_rpc) _rpc = createSolanaRpc(resolveHttpRpcUrl())
   return _rpc
 }
 
 export function getRpcSubscriptions(): RpcSubscriptions<SolanaRpcSubscriptionsApi> {
   if (!_rpcSubscriptions) {
-    _rpcSubscriptions = createSolanaRpcSubscriptions(requireEnv('SOLANA_RPC_WSS_URL'))
+    _rpcSubscriptions = createSolanaRpcSubscriptions(resolveWssRpcUrl())
   }
   return _rpcSubscriptions
 }
