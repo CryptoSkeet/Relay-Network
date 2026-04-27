@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 use solana_security_txt::security_txt;
+use sha2::{Sha256, Digest};
 
 declare_id!("Hs1hX4pSZSAQKLgGrcydyEaJMsJfqXQqJyJvVnqdaoDE");
 
@@ -22,6 +23,18 @@ security_txt! {
 const MAX_HANDLE_LEN: usize = 30;
 /// Maximum contract ID length (UUID = 36 chars).
 const MAX_CONTRACT_ID_LEN: usize = 36;
+
+/// Hash contract_id (UUID) to 32 bytes for PDA seed derivation.
+/// Solana caps PDA seeds at 32 bytes; UUIDs are 36 bytes.
+/// Solution: SHA-256 hash reduces UUID to 32-byte seed.
+fn hash_contract_id(contract_id: &str) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(contract_id.as_bytes());
+    let result = hasher.finalize();
+    let mut hash = [0u8; 32];
+    hash.copy_from_slice(&result[..]);
+    hash
+}
 
 #[program]
 pub mod relay_agent_registry {
@@ -168,9 +181,9 @@ pub mod relay_agent_registry {
         let escrow = &ctx.accounts.escrow_account;
         require!(escrow.state == EscrowState::Locked, EscrowError::NotLocked);
 
-        let contract_id_bytes = ctx.accounts.escrow_account.contract_id.as_bytes();
+        let contract_id_hash = hash_contract_id(&ctx.accounts.escrow_account.contract_id);
         let vault_bump = ctx.accounts.escrow_account.vault_bump;
-        let seeds: &[&[u8]] = &[b"escrow-vault", contract_id_bytes, &[vault_bump]];
+        let seeds: &[&[u8]] = &[b"escrow-vault", &contract_id_hash, &[vault_bump]];
 
         // Transfer RELAY from escrow vault → seller ATA
         let cpi_accounts = Transfer {
@@ -203,9 +216,9 @@ pub mod relay_agent_registry {
         let escrow = &ctx.accounts.escrow_account;
         require!(escrow.state == EscrowState::Locked, EscrowError::NotLocked);
 
-        let contract_id_bytes = ctx.accounts.escrow_account.contract_id.as_bytes();
+        let contract_id_hash = hash_contract_id(&ctx.accounts.escrow_account.contract_id);
         let vault_bump = ctx.accounts.escrow_account.vault_bump;
-        let seeds: &[&[u8]] = &[b"escrow-vault", contract_id_bytes, &[vault_bump]];
+        let seeds: &[&[u8]] = &[b"escrow-vault", &contract_id_hash, &[vault_bump]];
 
         // Transfer RELAY from escrow vault → buyer ATA
         let cpi_accounts = Transfer {
@@ -438,7 +451,7 @@ pub struct LockEscrow<'info> {
         init,
         payer = payer,
         space = EscrowAccount::SIZE,
-        seeds = [b"escrow", contract_id.as_bytes()],
+        seeds = [b"escrow", &hash_contract_id(&contract_id)],
         bump,
     )]
     pub escrow_account: Account<'info, EscrowAccount>,
@@ -449,7 +462,7 @@ pub struct LockEscrow<'info> {
         payer = payer,
         token::mint = mint,
         token::authority = escrow_vault,
-        seeds = [b"escrow-vault", contract_id.as_bytes()],
+        seeds = [b"escrow-vault", &hash_contract_id(&contract_id)],
         bump,
     )]
     pub escrow_vault: Account<'info, TokenAccount>,
@@ -472,7 +485,7 @@ pub struct ReleaseEscrow<'info> {
     /// Escrow metadata PDA.
     #[account(
         mut,
-        seeds = [b"escrow", escrow_account.contract_id.as_bytes()],
+        seeds = [b"escrow", &hash_contract_id(&escrow_account.contract_id)],
         bump = escrow_account.bump,
     )]
     pub escrow_account: Account<'info, EscrowAccount>,
@@ -480,7 +493,7 @@ pub struct ReleaseEscrow<'info> {
     /// Escrow vault holding the locked RELAY.
     #[account(
         mut,
-        seeds = [b"escrow-vault", escrow_account.contract_id.as_bytes()],
+        seeds = [b"escrow-vault", &hash_contract_id(&escrow_account.contract_id)],
         bump = escrow_account.vault_bump,
     )]
     pub escrow_vault: Account<'info, TokenAccount>,
@@ -501,7 +514,7 @@ pub struct RefundEscrow<'info> {
     /// Escrow metadata PDA.
     #[account(
         mut,
-        seeds = [b"escrow", escrow_account.contract_id.as_bytes()],
+        seeds = [b"escrow", &hash_contract_id(&escrow_account.contract_id)],
         bump = escrow_account.bump,
     )]
     pub escrow_account: Account<'info, EscrowAccount>,
@@ -509,7 +522,7 @@ pub struct RefundEscrow<'info> {
     /// Escrow vault holding the locked RELAY.
     #[account(
         mut,
-        seeds = [b"escrow-vault", escrow_account.contract_id.as_bytes()],
+        seeds = [b"escrow-vault", &hash_contract_id(&escrow_account.contract_id)],
         bump = escrow_account.vault_bump,
     )]
     pub escrow_vault: Account<'info, TokenAccount>,

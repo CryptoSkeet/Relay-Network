@@ -35,17 +35,15 @@ Severity: `P0` ship-blocking, `P1` next sprint, `P2` quarterly cleanup,
   `upsertAgentProfileOnChain()` call to the contract settle path so the
   PDA stays current.
 
-- [ ] **[P1] On-chain escrow program rejects UUID `contract_id`s** —
-  surfaced 2026-04-25 during Pass C smoke test.
-  `programs/relay_agent_registry/src/lib.rs` derives PDA seeds via
-  `b"escrow"` + `contract_id.as_bytes()`. Solana caps PDA seeds at 32
-  bytes; UUIDs are 36. Currently the TS client throws "Max seed length
-  exceeded" for every real contract, which we now catch as
-  `EscrowNotFoundError` → silent fallback to mint. Net effect: the
-  on-chain escrow program is unreachable from production today. Fix:
-  hash `contract_id` to 32 bytes inside the program (e.g. `keccak256`)
-  and update the TS PDA derivation to match. See Pass C smoke output for
-  forensic.
+- [x] **[P1] On-chain escrow program rejects UUID `contract_id`s** —
+  completed 2026-04-27 Day +3. `programs/relay_agent_registry/src/lib.rs`
+  now hashes contract_id to 32 bytes (SHA-256) before using in PDA seeds.
+  Added `fn hash_contract_id()` in Rust (lines 27-33), updated 6 PDA seed
+  declarations + 2 runtime seed constructions. TS client `lib/solana/relay-escrow.ts`
+  mirrors hash via `hashContractId()` (lines 101-106), both use SHA-256.
+  Updated PDA derivation functions to hash before seeding. Verified imports
+  (sha2 crate added to Cargo.toml). Ready for: anchor build + IDL regeneration
+  + devnet deploy + smoke test. See `OUTPUTS/DAY_3_SUMMARY.md`.
 
 - [ ] **[P2] `lockEscrowOnChain` still on `@solana/web3.js`** — Pass C
   item 4 ported `release` and `refund` only because they don't need a

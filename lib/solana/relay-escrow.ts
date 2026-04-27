@@ -92,16 +92,25 @@ const REFUND_DISC = Buffer.from(
 
 // ── PDA derivation ────────────────────────────────────────────────────────────
 
+/**
+ * Hash contract_id (UUID) to 32 bytes for PDA seed derivation.
+ * Solana caps PDA seeds at 32 bytes; UUIDs are 36 bytes.
+ * Uses SHA-256 to match the Rust program's hash_contract_id logic.
+ */
+function hashContractId(contractId: string): Buffer {
+  return createHash('sha256').update(contractId).digest()
+}
+
 export function deriveEscrowPDA(contractId: string): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from('escrow'), Buffer.from(contractId)],
+    [Buffer.from('escrow'), hashContractId(contractId)],
     PROGRAM_ID,
   )
 }
 
 export function deriveEscrowVaultPDA(contractId: string): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from('escrow-vault'), Buffer.from(contractId)],
+    [Buffer.from('escrow-vault'), hashContractId(contractId)],
     PROGRAM_ID,
   )
 }
@@ -209,19 +218,14 @@ export async function releaseEscrowOnChain(
   contractId: string,
   sellerPublicKey: string,
 ): Promise<string> {
-  // PDA derivation can throw 'Max seed length exceeded' when contractId is
-  // > 32 bytes (e.g. a UUID string at 36 bytes). The on-chain program
-  // literally cannot have escrowed such a contract — treat as the same
-  // disambiguation case as a missing escrow PDA: no escrow, fall back to
-  // mint. Pass C item 3 + a latent on-chain seed-length quirk.
+  // Derive escrow PDAs. Contract IDs are hashed to 32 bytes on both client
+  // and on-chain, so UUID-length IDs are now properly supported.
   let escrowPDA: PublicKey, vaultPDA: PublicKey
   try {
     ;[escrowPDA] = deriveEscrowPDA(contractId)
     ;[vaultPDA] = deriveEscrowVaultPDA(contractId)
   } catch (e: any) {
-    if (String(e?.message ?? e).includes('Max seed length')) {
-      throw new EscrowNotFoundError(contractId)
-    }
+    // Unexpected PDA derivation error — propagate as-is.
     throw e
   }
 
@@ -280,15 +284,14 @@ export async function refundEscrowOnChain(
   contractId: string,
   buyerPublicKey: string,
 ): Promise<string> {
-  // See releaseEscrowOnChain note: UUID contractIds exceed PDA seed limit.
+  // Derive escrow PDAs. Contract IDs are hashed to 32 bytes on both client
+  // and on-chain, so UUID-length IDs are now properly supported.
   let escrowPDA: PublicKey, vaultPDA: PublicKey
   try {
     ;[escrowPDA] = deriveEscrowPDA(contractId)
     ;[vaultPDA] = deriveEscrowVaultPDA(contractId)
   } catch (e: any) {
-    if (String(e?.message ?? e).includes('Max seed length')) {
-      throw new EscrowNotFoundError(contractId)
-    }
+    // Unexpected PDA derivation error — propagate as-is.
     throw e
   }
 
