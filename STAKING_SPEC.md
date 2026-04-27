@@ -19,11 +19,16 @@ implementation deviates from this doc, update the doc first.
 
 - New `AgentStake` PDA per agent
 - New `stake_and_register` instruction (replaces current `register_agent`)
+- New `stake_existing_agent` instruction (migration helper for agents that
+  already have `AgentProfile` + `RelayStats` from the pre-v1 `register_agent`
+  flow — stakes them in-place without re-creating profile)
 - New `request_unstake` instruction
 - New `withdraw_stake` instruction
 - New `initialize_stake_vault` instruction (one-time bootstrap, see TODO)
 - New stake vault PDA (program-owned RELAY token account)
-- Add `last_relay_timestamp: i64` to `RelayStats`
+- Reuse existing `last_relay_at: i64` on `RelayStats` (no struct change —
+  field already present from pre-v1 deploy; spec originally called it
+  `last_relay_timestamp`, but the implementation uses the existing name)
 - Backend endpoints for stake operations
 
 **Out of scope (v1.5+):**
@@ -62,18 +67,12 @@ pub struct AgentStake {
 
 PDA seeds: `[b"agent-stake", agent.key().as_ref()]`
 
-### `RelayStats` (modified)
+### `RelayStats` (no change)
 
-Add field:
-
-```rust
-pub last_relay_timestamp: i64, // 8 bytes
-```
-
-> **Migration note.** This is a struct change. Existing devnet
-> `RelayStats` accounts will be invalidated on upgrade — agents
-> re-register through the new flow. Confirmed acceptable at current
-> scale (only two agents on devnet).
+The spec originally proposed adding `last_relay_timestamp: i64`. During
+implementation we discovered the existing `RelayStats` already has
+`last_relay_at: i64` written by the pre-v1 `execute_relay` handler.
+**Reuse the existing field** — no struct change, no migration cost.
 
 ### Stake vault (new, program-owned token account)
 
@@ -233,6 +232,64 @@ pub fn stake_and_register(ctx: Context<StakeAndRegister>) -> Result<()> {
 }
 ```
 
+### `stake_existing_agent` (migration helper)
+
+For agents already on devnet (have `AgentProfile` + `RelayStats` from the
+pre-v1 `register_agent` ix). Atomically:
+
+1. Transfers `MIN_STAKE` RELAY from agent ATA → stake vault
+2. Creates `AgentStake` only (profile + stats stay untouched)
+3. Emits `AgentStakedAndRegistered` (reuses existing handle from profile)
+
+**Accounts:**
+
+```rust
+#[derive(Accounts)]
+pub struct StakeExistingAgent<'info> {
+    #[account(mut)]
+    pub did_authority: Signer<'info>,
+
+    #[account(mut)]
+    pub payer: Signer<'info>,
+
+    #[account(
+        mut,
+        constraint = agent_token_account.owner == did_authority.key(),
+        constraint = agent_token_account.mint == RELAY_MINT,
+    )]
+    pub agent_token_account: Account<'info, TokenAccount>,
+
+    #[account(
+        mut,
+        seeds = [b"stake-vault"],
+        bump,
+    )]
+    pub stake_vault: Account<'info, TokenAccount>,
+
+    #[account(
+        seeds = [b"agent-profile", did_authority.key().as_ref()],
+        bump = agent_profile.bump,
+        constraint = agent_profile.did_pubkey == did_authority.key(),
+    )]
+    pub agent_profile: Account<'info, AgentProfile>,
+
+    #[account(
+        init,
+        payer = payer,
+        space = AgentStake::SIZE,
+        seeds = [b"agent-stake", did_authority.key().as_ref()],
+        bump,
+    )]
+    pub agent_stake: Account<'info, AgentStake>,
+
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
+    pub rent: Sysvar<'info, Rent>,
+}
+```
+
+Fails with `init`-collision if `AgentStake` already exists for this agent.
+
 ### `request_unstake`
 
 Agent requests to begin cooldown. Sets `unlock_requested_at = now`. Does
@@ -384,7 +441,10 @@ pub enum ErrorCode {
     // ... existing ...
 
     #[msg("Stake amount below minimum")]
-    InsufficientStake,             // 6010
+    InsufficientStake,             // 6010 — v1: unreachable in execute_relay
+                                   //  (every stake mutation writes exactly
+                                   //   MIN_STAKE; AccountNotInitialized fires
+                                   //   first). Kept defensively for v2.
     #[msg("Unstake already requested")]
     UnstakeAlreadyRequested,       // 6011
     #[msg("Unstake not requested")]
@@ -397,9 +457,13 @@ pub enum ErrorCode {
 ## Events
 
 ```rust
+// Renamed from `AgentRegistered` to avoid collision with the pre-v1 event
+// name used by the now-removed `register_agent` ix. Same shape — still emitted
+// by both `stake_and_register` and `stake_existing_agent`.
 #[event]
-pub struct AgentRegistered {
+pub struct AgentStakedAndRegistered {
     pub agent: Pubkey,
+    pub handle: String,
     pub stake_amount: u64,
     pub timestamp: i64,
 }
@@ -440,21 +504,24 @@ pub struct StakeWithdrawn {
 
 ## Devnet migration
 
-Existing devnet state on upgrade:
+**Executed 2026-04-27.** Because `RelayStats` was not modified, existing
+devnet state was preserved (no re-registration needed).
 
-- Current `AgentProfile` and `RelayStats` for both registered agents
-  (`Gafm…wZkV` and `6MAw…spo4`) are invalidated by the struct change
-- Both wallets re-register via new `stake_and_register`
-- Mint authority for RELAY is `Gafm…wZkV` (verified) — minting to test
-  wallets is unblocked
+Migration sequence as run:
 
-Migration sequence:
+1. Build + deploy program upgrade
+   (tx `2gEb4PLKsCJH9jXxaTQbY8i5Vi5dsVZG9NawijAp2P5854yCcmYX3WD6beuWsv4MWwRx19B8MVLPw4REUr44CPsT`)
+2. Call `initialize_stake_vault` once (admin = upgrade authority)
+   → vault PDA `JDbcyuZp9Mcm7bXynruJaDddUiAUA8jiW9gTkWUHU87B`
+3. Mint `MIN_STAKE` RELAY to each agent ATA (idempotent in script)
+4. Call `stake_existing_agent` for each pre-existing agent
+   → agent1 stake `FKUfMxUS2C2mbAu7mkLmvb1kKy4RPrBVwDMPySFV7oop`
+   → agent2 stake `3hroDU9xxK2aZUd1Z9GUiDNhP9PehPd48WSbHYmMeWrV`
+5. Verify with `attack-tests.mjs` + `boundary-tests.mjs` +
+   `atomicity-test.mjs` + `stake-gate-test.mjs` (all green).
 
-1. Mint 2,000 RELAY each to `Gafm…wZkV` and `6MAw…spo4` token accounts
-2. Build + deploy program upgrade
-3. Call `initialize_stake_vault` once (admin = upgrade authority)
-4. Each agent calls `stake_and_register`
-5. Verify with `attack-tests.mjs` regression suite + new stake tests
+All steps are idempotent and bundled in `scripts/bootstrap-staking.mjs`.
+For net-new agents (no existing profile), use `stake_and_register` instead.
 
 ## Test additions
 
