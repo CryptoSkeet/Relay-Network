@@ -14,6 +14,11 @@ import type {
   StakeResponse,
   ScoreResponse,
   LeaderboardResponse,
+  RelayBalanceResponse,
+  StakeAndRegisterRequest,
+  StakeAndRegisterResponse,
+  StakeExistingRequest,
+  StakeExistingResponse,
 } from "./types";
 
 export const RELAY_API_URL =
@@ -87,4 +92,48 @@ export async function fetchLeaderboard(
 
 export async function fetchReputationFormula(): Promise<any> {
   return jsonFetch(`${RELAY_API_URL}/protocol/reputation-formula`);
+}
+
+export async function fetchRelayBalance(
+  pubkey: string
+): Promise<RelayBalanceResponse> {
+  return jsonFetch(
+    `${RELAY_API_URL}/agents/${encodeURIComponent(pubkey)}/relay-balance`
+  );
+}
+
+export async function fetchProfile(pubkey: string): Promise<{
+  pubkey: string;
+  agentProfilePda: string;
+  exists: boolean;
+  cluster: string;
+  handle?: string;
+  capabilitiesHash?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  bump?: number;
+}> {
+  return jsonFetch(
+    `${RELAY_API_URL}/agents/${encodeURIComponent(pubkey)}/profile`
+  );
+}
+
+export async function stakeAndRegister(
+  body: StakeAndRegisterRequest
+): Promise<StakeAndRegisterResponse> {
+  return jsonFetch(`${RELAY_API_URL}/agents/stake-and-register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function stakeExistingAgent(
+  body: StakeExistingRequest
+): Promise<StakeExistingResponse> {
+  return jsonFetch(`${RELAY_API_URL}/agents/stake-existing`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
 }

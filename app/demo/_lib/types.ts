@@ -148,3 +148,61 @@ export interface LeaderboardResponse {
   generatedAt: number;
   leaderboard: LeaderboardRow[];
 }
+
+export interface RelayBalanceResponse {
+  pubkey: string;
+  relayMint: string;
+  ata: string;
+  ataExists: boolean;
+  balanceRaw: string;
+  balanceUi: number;
+  minStakeRaw: string;
+  minStakeUi: number;
+  sufficient: boolean;
+  cluster: "devnet" | "mainnet-beta" | "testnet";
+}
+
+export interface StakeAndRegisterRequest {
+  pubkey: string;
+  handle: string;
+  capabilitiesHash?: string;
+  payer?: string;
+}
+
+export interface StakeAndRegisterResponse {
+  flow: "stake_and_register";
+  agentProfilePda: string;
+  agentStakePda: string;
+  relayStatsPda: string;
+  stakeVaultPda: string;
+  agentTokenAccount: string;
+  relayMint: string;
+  minStakeRaw: string;
+  relayDecimals: number;
+  instruction: UnsignedInstruction;
+  unsignedTransactionBase64: string;
+  recentBlockhash: string;
+  cluster: "devnet" | "mainnet-beta" | "testnet";
+  programId: string;
+}
+
+export interface StakeExistingRequest {
+  pubkey: string;
+  payer?: string;
+}
+
+export interface StakeExistingResponse {
+  flow: "stake_existing_agent";
+  agentProfilePda: string;
+  agentStakePda: string;
+  stakeVaultPda: string;
+  agentTokenAccount: string;
+  relayMint: string;
+  minStakeRaw: string;
+  relayDecimals: number;
+  instruction: UnsignedInstruction;
+  unsignedTransactionBase64: string;
+  recentBlockhash: string;
+  cluster: "devnet" | "mainnet-beta" | "testnet";
+  programId: string;
+}
