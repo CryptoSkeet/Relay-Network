@@ -6,10 +6,13 @@
  *  - GET  /quote
  *  - POST /relay                      → builds an unsigned Jupiter swap tx (mainnet)
  *  - POST /agents/register            → builds an unsigned register_agent ix (devnet)
+ *  - POST /agents/stake-and-register  → atomic stake + AgentProfile + RelayStats (new agents)
+ *  - POST /agents/stake-existing      → migration helper for pre-v1 agents
  *  - GET  /agents/:pubkey/reputation  → reads AgentReputation PDA from devnet
  *  - GET  /agents/:pubkey/profile     → reads AgentProfile PDA from devnet
  *  - GET  /agents/:pubkey/stake       → reads AgentStake PDA from devnet
  *  - GET  /agents/:pubkey/score       → off-chain reputation_v1 score with inputs
+ *  - GET  /agents/:pubkey/relay-balance → ATA + RELAY balance vs MIN_STAKE
  *  - GET  /leaderboard?limit=N        → top N agents by score
  *  - GET  /protocol/reputation-formula→ JSON spec for the active formula
  */
@@ -21,7 +24,13 @@ import {
   TransactionInstruction,
   Transaction,
   SystemProgram,
+  SYSVAR_RENT_PUBKEY,
 } from "@solana/web3.js";
+import {
+  TOKEN_PROGRAM_ID,
+  getAssociatedTokenAddressSync,
+  getAccount,
+} from "@solana/spl-token";
 import NodeCache from "node-cache";
 import express, { Request, Response } from "express";
 import { createHash } from "crypto";
@@ -66,6 +75,13 @@ const RELAY_REPUTATION_PROGRAM_ID = new PublicKey(
   "2dysoEiGEyn2DeUKgFneY1KxBNqGP4XWdzLtzBK8MYau"
 );
 
+// Staking constants — must match programs/relay_agent_registry/src/lib.rs.
+const RELAY_MINT = new PublicKey(
+  "C2RqcjvrN4JEPidkf8qBSYzujFmL99rHhmmE8k1kfRzZ"
+);
+const MIN_STAKE_RAW = 1_000n * 1_000_000n; // 1000 RELAY @ 6 decimals
+const RELAY_DECIMALS = 6;
+
 const PRICE_CACHE_TTL = 60;
 const ROUTE_CACHE_TTL = 30;
 
@@ -104,6 +120,13 @@ function deriveReputationPda(agentDid: PublicKey): [PublicKey, number] {
 function deriveAgentStakePda(agentDid: PublicKey): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [Buffer.from("agent-stake"), agentDid.toBuffer()],
+    RELAY_AGENT_REGISTRY_PROGRAM_ID
+  );
+}
+
+function deriveStakeVaultPda(): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("stake-vault")],
     RELAY_AGENT_REGISTRY_PROGRAM_ID
   );
 }
@@ -167,6 +190,119 @@ function buildRegisterAgentIx(args: {
   });
 
   return { ix, agentProfilePda, bump };
+}
+
+/**
+ * Build the stake_and_register instruction (atomic stake + profile + stats
+ * creation for new agents). Borsh args: handle: String + capabilities_hash: [u8;32].
+ * Account list mirrors programs/relay_agent_registry/src/lib.rs::StakeAndRegister.
+ */
+function buildStakeAndRegisterIx(args: {
+  authority: PublicKey;
+  payer: PublicKey;
+  handle: string;
+  capabilitiesHash: Buffer;
+}): {
+  ix: TransactionInstruction;
+  agentProfilePda: PublicKey;
+  agentStakePda: PublicKey;
+  relayStatsPda: PublicKey;
+  agentTokenAccount: PublicKey;
+  stakeVaultPda: PublicKey;
+} {
+  if (args.capabilitiesHash.length !== 32) {
+    throw new Error("capabilitiesHash must be 32 bytes");
+  }
+  if (args.handle.length === 0 || args.handle.length > 30) {
+    throw new Error("handle must be 1–30 chars");
+  }
+
+  const [agentProfilePda] = deriveAgentProfilePda(args.authority);
+  const [agentStakePda] = deriveAgentStakePda(args.authority);
+  const [relayStatsPda] = deriveRelayStatsPda(args.authority);
+  const [stakeVaultPda] = deriveStakeVaultPda();
+  const agentTokenAccount = getAssociatedTokenAddressSync(
+    RELAY_MINT,
+    args.authority
+  );
+
+  const handleBytes = Buffer.from(args.handle, "utf-8");
+  const data = Buffer.alloc(8 + 4 + handleBytes.length + 32);
+  let o = 0;
+  anchorDisc("stake_and_register").copy(data, o);
+  o += 8;
+  data.writeUInt32LE(handleBytes.length, o);
+  o += 4;
+  handleBytes.copy(data, o);
+  o += handleBytes.length;
+  args.capabilitiesHash.copy(data, o);
+
+  const ix = new TransactionInstruction({
+    programId: RELAY_AGENT_REGISTRY_PROGRAM_ID,
+    keys: [
+      { pubkey: args.authority,        isSigner: true,  isWritable: true  },
+      { pubkey: args.payer,            isSigner: true,  isWritable: true  },
+      { pubkey: agentTokenAccount,     isSigner: false, isWritable: true  },
+      { pubkey: stakeVaultPda,         isSigner: false, isWritable: true  },
+      { pubkey: agentStakePda,         isSigner: false, isWritable: true  },
+      { pubkey: agentProfilePda,       isSigner: false, isWritable: true  },
+      { pubkey: relayStatsPda,         isSigner: false, isWritable: true  },
+      { pubkey: TOKEN_PROGRAM_ID,      isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      { pubkey: SYSVAR_RENT_PUBKEY,    isSigner: false, isWritable: false },
+    ],
+    data,
+  });
+
+  return {
+    ix,
+    agentProfilePda,
+    agentStakePda,
+    relayStatsPda,
+    agentTokenAccount,
+    stakeVaultPda,
+  };
+}
+
+/**
+ * Build the stake_existing_agent instruction (migration path for pre-v1
+ * agents that already have AgentProfile + RelayStats). Empty Borsh args.
+ */
+function buildStakeExistingAgentIx(args: {
+  authority: PublicKey;
+  payer: PublicKey;
+}): {
+  ix: TransactionInstruction;
+  agentProfilePda: PublicKey;
+  agentStakePda: PublicKey;
+  agentTokenAccount: PublicKey;
+  stakeVaultPda: PublicKey;
+} {
+  const [agentProfilePda] = deriveAgentProfilePda(args.authority);
+  const [agentStakePda] = deriveAgentStakePda(args.authority);
+  const [stakeVaultPda] = deriveStakeVaultPda();
+  const agentTokenAccount = getAssociatedTokenAddressSync(
+    RELAY_MINT,
+    args.authority
+  );
+
+  const ix = new TransactionInstruction({
+    programId: RELAY_AGENT_REGISTRY_PROGRAM_ID,
+    keys: [
+      { pubkey: args.authority,        isSigner: true,  isWritable: true  },
+      { pubkey: args.payer,            isSigner: true,  isWritable: true  },
+      { pubkey: agentTokenAccount,     isSigner: false, isWritable: true  },
+      { pubkey: stakeVaultPda,         isSigner: false, isWritable: true  },
+      { pubkey: agentProfilePda,       isSigner: false, isWritable: false },
+      { pubkey: agentStakePda,         isSigner: false, isWritable: true  },
+      { pubkey: TOKEN_PROGRAM_ID,      isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      { pubkey: SYSVAR_RENT_PUBKEY,    isSigner: false, isWritable: false },
+    ],
+    data: anchorDisc("stake_existing_agent"),
+  });
+
+  return { ix, agentProfilePda, agentStakePda, agentTokenAccount, stakeVaultPda };
 }
 
 /** Decode the AgentReputation PDA (Anchor 8-byte discriminator + struct). */
@@ -643,6 +779,155 @@ app.post(
   }
 );
 
+// ── stake_and_register: atomic stake + profile + stats for new agents ────────
+//
+// Body: { pubkey, handle, capabilitiesHash?, payer? }
+// The frontend should first GET /agents/:pubkey/relay-balance to confirm the
+// authority has an ATA with >= MIN_STAKE. If the ATA doesn't exist, the SPL
+// transfer inside this ix will fail.
+app.post("/agents/stake-and-register", async (req, res) => {
+  try {
+    const { pubkey, handle, capabilitiesHash, payer } = req.body ?? {};
+    if (!pubkey || !handle) {
+      return res
+        .status(400)
+        .json({ error: "Missing required fields: pubkey, handle" });
+    }
+
+    const authority = new PublicKey(pubkey);
+    const payerKey = payer ? new PublicKey(payer) : authority;
+
+    const capsBuf = capabilitiesHash
+      ? Buffer.from(String(capabilitiesHash).replace(/^0x/, ""), "hex")
+      : createHash("sha256")
+          .update(JSON.stringify({ caps: [], handle }))
+          .digest();
+    if (capsBuf.length !== 32) {
+      return res
+        .status(400)
+        .json({ error: "capabilitiesHash must decode to 32 bytes" });
+    }
+
+    const built = buildStakeAndRegisterIx({
+      authority,
+      payer: payerKey,
+      handle,
+      capabilitiesHash: capsBuf,
+    });
+
+    const { blockhash } = await devnetConn.getLatestBlockhash("confirmed");
+    const tx = new Transaction({
+      recentBlockhash: blockhash,
+      feePayer: payerKey,
+    }).add(built.ix);
+    const serialized = tx.serialize({
+      requireAllSignatures: false,
+      verifySignatures: false,
+    });
+
+    res.json({
+      flow: "stake_and_register",
+      agentProfilePda: built.agentProfilePda.toBase58(),
+      agentStakePda: built.agentStakePda.toBase58(),
+      relayStatsPda: built.relayStatsPda.toBase58(),
+      stakeVaultPda: built.stakeVaultPda.toBase58(),
+      agentTokenAccount: built.agentTokenAccount.toBase58(),
+      relayMint: RELAY_MINT.toBase58(),
+      minStakeRaw: MIN_STAKE_RAW.toString(),
+      relayDecimals: RELAY_DECIMALS,
+      instruction: instructionToJson(built.ix),
+      unsignedTransactionBase64: serialized.toString("base64"),
+      recentBlockhash: blockhash,
+      cluster: "devnet",
+      programId: RELAY_AGENT_REGISTRY_PROGRAM_ID.toBase58(),
+    });
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+// ── stake_existing_agent: migration path for pre-v1 agents ───────────────────
+//
+// Body: { pubkey, payer? }
+// Requires an existing AgentProfile + RelayStats (i.e. agent registered before
+// the v1 staking upgrade). For brand-new agents, use /agents/stake-and-register.
+app.post("/agents/stake-existing", async (req, res) => {
+  try {
+    const { pubkey, payer } = req.body ?? {};
+    if (!pubkey) {
+      return res.status(400).json({ error: "Missing required field: pubkey" });
+    }
+    const authority = new PublicKey(pubkey);
+    const payerKey = payer ? new PublicKey(payer) : authority;
+
+    const built = buildStakeExistingAgentIx({ authority, payer: payerKey });
+
+    const { blockhash } = await devnetConn.getLatestBlockhash("confirmed");
+    const tx = new Transaction({
+      recentBlockhash: blockhash,
+      feePayer: payerKey,
+    }).add(built.ix);
+    const serialized = tx.serialize({
+      requireAllSignatures: false,
+      verifySignatures: false,
+    });
+
+    res.json({
+      flow: "stake_existing_agent",
+      agentProfilePda: built.agentProfilePda.toBase58(),
+      agentStakePda: built.agentStakePda.toBase58(),
+      stakeVaultPda: built.stakeVaultPda.toBase58(),
+      agentTokenAccount: built.agentTokenAccount.toBase58(),
+      relayMint: RELAY_MINT.toBase58(),
+      minStakeRaw: MIN_STAKE_RAW.toString(),
+      relayDecimals: RELAY_DECIMALS,
+      instruction: instructionToJson(built.ix),
+      unsignedTransactionBase64: serialized.toString("base64"),
+      recentBlockhash: blockhash,
+      cluster: "devnet",
+      programId: RELAY_AGENT_REGISTRY_PROGRAM_ID.toBase58(),
+    });
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+// ── RELAY balance helper for the demo register UI ────────────────────────────
+//
+// Returns the agent's RELAY ATA address + current balance, plus a flag
+// indicating whether the balance meets MIN_STAKE. If the ATA does not exist
+// yet, balance is "0" and ataExists=false (the user needs to fund or mint
+// RELAY before staking).
+app.get("/agents/:pubkey/relay-balance", async (req, res) => {
+  try {
+    const authority = new PublicKey(req.params.pubkey);
+    const ata = getAssociatedTokenAddressSync(RELAY_MINT, authority);
+    let balance = 0n;
+    let ataExists = false;
+    try {
+      const acc = await getAccount(devnetConn, ata, "confirmed");
+      balance = acc.amount;
+      ataExists = true;
+    } catch {
+      // ATA does not exist; treat as zero balance.
+    }
+    res.json({
+      pubkey: authority.toBase58(),
+      relayMint: RELAY_MINT.toBase58(),
+      ata: ata.toBase58(),
+      ataExists,
+      balanceRaw: balance.toString(),
+      balanceUi: Number(balance) / 10 ** RELAY_DECIMALS,
+      minStakeRaw: MIN_STAKE_RAW.toString(),
+      minStakeUi: Number(MIN_STAKE_RAW) / 10 ** RELAY_DECIMALS,
+      sufficient: balance >= MIN_STAKE_RAW,
+      cluster: "devnet",
+    });
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
 // ── Agent reputation: read on-chain PDA ──────────────────────────────────────
 app.get("/agents/:pubkey/reputation", async (req, res) => {
   try {
@@ -917,10 +1202,13 @@ app.listen(PORT, () => {
 ║    GET  /quote?inputMint=...&outputMint=...&amount=...         ║
 ║    POST /relay                                                 ║
 ║    POST /agents/register                                       ║
+║    POST /agents/stake-and-register                             ║
+║    POST /agents/stake-existing                                 ║
 ║    GET  /agents/:pubkey/reputation                             ║
 ║    GET  /agents/:pubkey/profile                                ║
 ║    GET  /agents/:pubkey/stake                                  ║
 ║    GET  /agents/:pubkey/score                                  ║
+║    GET  /agents/:pubkey/relay-balance                          ║
 ║    GET  /leaderboard?limit=N                                   ║
 ║    GET  /protocol/reputation-formula                           ║
 ╚════════════════════════════════════════════════════════════════╝
