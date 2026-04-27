@@ -47,3 +47,5 @@ programs/**/deploy/*-keypair.json
 programs/target/
 programs/**/target/
 .env*.local
+
+.keys/
