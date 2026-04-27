@@ -41,6 +41,11 @@
     "packages",
     "supabase/functions",
     "playwright.config.ts",
-    "tests"
+    "tests",
+    "OUTPUTS",
+    "relay-engineer",
+    "relay-engineer-tests",
+    "relay-frontend",
+    "relay-api-service"
   ]
 }

@@ -49,3 +49,12 @@ programs/**/target/
 .env*.local
 
 .keys/
+
+OUTPUTS/
+relay-engineer/
+relay-engineer-tests/
+relay-frontend/
+*.skill
+.relay-api.log
+.relay-api.err.log
+
