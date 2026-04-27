@@ -244,6 +244,59 @@ pub mod relay_agent_registry {
 
         Ok(())
     }
+
+    /// Execute a relay (mock swap) on behalf of an agent.
+    ///
+    /// Demo behavior:
+    ///   * Verifies the agent's `agent_profile` PDA exists (constraint).
+    ///   * Lazily creates a `relay_stats` PDA on first call.
+    ///   * Increments `relay_count` and adds `amount_in` / `amount_out` to
+    ///     running totals.
+    ///   * Emits `RelayExecuted` for indexers.
+    ///
+    /// `route_hash` is sha256 of the off-chain route description (e.g. the
+    /// Jupiter quote JSON) — keeps the route auditable without bloating chain.
+    /// On mainnet this would CPI into Jupiter / a DEX program; on devnet it's
+    /// a counter + event so reputation has real on-chain data.
+    pub fn execute_relay(
+        ctx: Context<ExecuteRelay>,
+        amount_in: u64,
+        amount_out: u64,
+        route_hash: [u8; 32],
+    ) -> Result<()> {
+        require!(amount_in > 0, RegistryError::ZeroRelayAmount);
+
+        let stats = &mut ctx.accounts.relay_stats;
+        let now = Clock::get()?.unix_timestamp;
+        let agent_did = ctx.accounts.did_authority.key();
+
+        // First-touch initialization (init_if_needed).
+        if stats.agent_did == Pubkey::default() {
+            stats.agent_did = agent_did;
+            stats.bump = ctx.bumps.relay_stats;
+        }
+
+        stats.relay_count = stats.relay_count.saturating_add(1);
+        stats.total_volume_in = stats.total_volume_in.saturating_add(amount_in as u128);
+        stats.total_volume_out = stats.total_volume_out.saturating_add(amount_out as u128);
+        stats.last_route_hash = route_hash;
+        stats.last_amount_in = amount_in;
+        stats.last_amount_out = amount_out;
+        stats.last_relay_at = now;
+
+        emit!(RelayExecuted {
+            agent_did,
+            amount_in,
+            amount_out,
+            route_hash,
+            relay_count: stats.relay_count,
+            total_volume_in: stats.total_volume_in,
+            total_volume_out: stats.total_volume_out,
+            executed_at: now,
+        });
+
+        Ok(())
+    }
 }
 
 /// PDA: seeds = [b"agent-profile", did_pubkey.as_ref()]
@@ -367,6 +420,56 @@ pub struct UpdateCommitment<'info> {
     pub model_commitment: Account<'info, ModelCommitment>,
 }
 
+/// PDA: seeds = [b"relay-stats", did_pubkey.as_ref()]
+/// On-chain counter for relays executed by this agent.
+#[account]
+pub struct RelayStats {
+    pub agent_did: Pubkey,        // 32
+    pub relay_count: u64,         // 8
+    pub total_volume_in: u128,    // 16  raw input mint base units, summed
+    pub total_volume_out: u128,   // 16  raw output mint base units, summed
+    pub last_amount_in: u64,      // 8
+    pub last_amount_out: u64,     // 8
+    pub last_route_hash: [u8; 32],// 32  sha256(route description)
+    pub last_relay_at: i64,       // 8
+    pub bump: u8,                 // 1
+}
+
+impl RelayStats {
+    pub const SIZE: usize = 8 + 32 + 8 + 16 + 16 + 8 + 8 + 32 + 8 + 1;
+}
+
+#[derive(Accounts)]
+pub struct ExecuteRelay<'info> {
+    /// The agent's DID key — must sign to authorize the relay.
+    #[account(mut)]
+    pub did_authority: Signer<'info>,
+
+    /// Existing agent profile — required to exist (cannot relay before register).
+    #[account(
+        seeds = [b"agent-profile", did_authority.key().as_ref()],
+        bump = agent_profile.bump,
+        constraint = agent_profile.did_pubkey == did_authority.key() @ RegistryError::Unauthorized,
+    )]
+    pub agent_profile: Account<'info, AgentProfile>,
+
+    /// Per-agent relay stats PDA, lazily created on first relay.
+    #[account(
+        init_if_needed,
+        payer = payer,
+        space = RelayStats::SIZE,
+        seeds = [b"relay-stats", did_authority.key().as_ref()],
+        bump,
+    )]
+    pub relay_stats: Account<'info, RelayStats>,
+
+    /// Transaction fee + rent payer (can be the same as did_authority).
+    #[account(mut)]
+    pub payer: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
 #[error_code]
 pub enum RegistryError {
     #[msg("Handle exceeds 30 characters")]
@@ -375,6 +478,8 @@ pub enum RegistryError {
     HandleEmpty,
     #[msg("Only the DID authority can update this profile")]
     Unauthorized,
+    #[msg("Relay amount_in must be greater than zero")]
+    ZeroRelayAmount,
 }
 
 #[error_code]
@@ -578,4 +683,16 @@ pub struct EscrowRefunded {
     pub contract_id: String,
     pub buyer: Pubkey,
     pub amount: u64,
+}
+
+#[event]
+pub struct RelayExecuted {
+    pub agent_did: Pubkey,
+    pub amount_in: u64,
+    pub amount_out: u64,
+    pub route_hash: [u8; 32],
+    pub relay_count: u64,
+    pub total_volume_in: u128,
+    pub total_volume_out: u128,
+    pub executed_at: i64,
 }

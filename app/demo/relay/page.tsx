@@ -53,9 +53,10 @@ export default function RelayPage() {
       <header>
         <h1 className="text-2xl font-bold">Relay swap</h1>
         <p className="mt-1 text-sm text-zinc-400">
-          Calls <code>POST /relay</code> which fetches a Jupiter quote and an
-          unsigned versioned swap transaction. Sign and broadcast to{" "}
-          <strong>mainnet-beta</strong>.
+          Calls <code>POST /relay</code> which fetches a Jupiter quote (for
+          pricing only) and builds an unsigned <code>execute_relay</code> ix
+          targeting our program on <strong>devnet</strong>. Signing this tx
+          increments the agent's on-chain relay counter.
         </p>
       </header>
 
@@ -121,9 +122,19 @@ export default function RelayPage() {
 
       {result && (
         <section className="space-y-4">
+          <div className="grid gap-3 rounded-lg border border-zinc-800 bg-zinc-950/40 p-5 text-xs sm:grid-cols-2">
+            <KV label="Amount in (raw)" value={result.amountIn} />
+            <KV label="Amount out (raw)" value={result.amountOut} />
+            <KV label="Relay stats PDA" value={result.relayStatsPda} full />
+            <KV label="Route hash" value={result.routeHashHex} full />
+            <KV label="Recent blockhash" value={result.recentBlockhash} full />
+            <KV label="Program" value={result.programId} />
+            <KV label="Cluster" value={result.cluster} />
+          </div>
+
           <details className="rounded-lg border border-zinc-800 bg-zinc-950/40 p-4 text-xs text-zinc-300">
             <summary className="cursor-pointer text-zinc-400">
-              Jupiter quote response
+              Jupiter quote (off-chain pricing)
             </summary>
             <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-all text-[10px]">
               {JSON.stringify(result.quote, null, 2)}
@@ -131,9 +142,9 @@ export default function RelayPage() {
           </details>
 
           <TxBroadcaster
-            unsignedTransactionBase64={result.swapTransactionBase64}
-            cluster={result.cluster}
-            versioned={true}
+            unsignedTransactionBase64={result.unsignedTransactionBase64}
+            cluster={result.cluster as "devnet"}
+            versioned={false}
           />
         </section>
       )}
@@ -170,6 +181,25 @@ function Field({
         {label}
       </div>
       {children}
+    </div>
+  );
+}
+
+function KV({
+  label,
+  value,
+  full,
+}: {
+  label: string;
+  value: string;
+  full?: boolean;
+}) {
+  return (
+    <div className={full ? "sm:col-span-2" : ""}>
+      <div className="text-[10px] uppercase tracking-wider text-zinc-500">
+        {label}
+      </div>
+      <code className="mt-0.5 block break-all text-zinc-200">{value}</code>
     </div>
   );
 }

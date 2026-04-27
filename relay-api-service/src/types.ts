@@ -58,13 +58,21 @@ export interface RelayRequest {
 export interface RelayResponse {
   /** Jupiter quote payload (route, prices, etc.) for display. */
   quote: unknown;
-  /** Base64 VersionedTransaction returned by Jupiter /swap. The frontend
-   *  should deserialize, sign with the user's wallet, then broadcast. */
-  swapTransactionBase64: string;
-  /** RPC the unsigned tx was built against (Jupiter swaps are mainnet-beta). */
-  cluster: "mainnet-beta";
-  /** Last valid block height for the tx. */
-  lastValidBlockHeight: number;
+  /** Sha256 of the JSON-stringified Jupiter route, used as on-chain audit hash. */
+  routeHashHex: string;
+  /** Echo of the agent's chosen amount_in. */
+  amountIn: string;
+  /** Expected amount_out from the Jupiter quote. */
+  amountOut: string;
+  /** Unsigned legacy transaction calling our program's execute_relay ix on devnet. */
+  unsignedTransactionBase64: string;
+  /** Decoded ix metadata for display / debugging. */
+  instruction: UnsignedInstruction;
+  /** PDA where this agent's relay stats live. */
+  relayStatsPda: string;
+  recentBlockhash: string;
+  cluster: "devnet" | "mainnet-beta" | "testnet";
+  programId: string;
 }
 
 // ── /agents/:pubkey/reputation ───────────────────────────────────────────────
@@ -86,11 +94,29 @@ export interface AgentReputation {
   bump: number;
 }
 
+export interface RelayStats {
+  agentDid: string;
+  relayCount: string;
+  totalVolumeIn: string;
+  totalVolumeOut: string;
+  lastAmountIn: string;
+  lastAmountOut: string;
+  lastRouteHashHex: string;
+  lastRelayAt: string;
+  bump: number;
+}
+
 export interface ReputationResponse {
   pubkey: string;
   reputationPda: string;
   exists: boolean;
   reputation: AgentReputation | null;
+  /** New: on-chain relay counter from our own program (lazily created). */
+  relayStatsPda: string;
+  relayStatsExists: boolean;
+  relayStats: RelayStats | null;
   cluster: "devnet" | "mainnet-beta" | "testnet";
   programId: string;
+  /** Convenience: address of the agent registry program that owns relayStats. */
+  registryProgramId: string;
 }

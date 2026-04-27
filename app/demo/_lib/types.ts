@@ -37,9 +37,15 @@ export interface RelayRequest {
 
 export interface RelayResponse {
   quote: unknown;
-  swapTransactionBase64: string;
-  cluster: "mainnet-beta";
-  lastValidBlockHeight: number;
+  routeHashHex: string;
+  amountIn: string;
+  amountOut: string;
+  unsignedTransactionBase64: string;
+  instruction: UnsignedInstruction;
+  relayStatsPda: string;
+  recentBlockhash: string;
+  cluster: "devnet" | "mainnet-beta" | "testnet";
+  programId: string;
 }
 
 export interface AgentReputation {
@@ -57,11 +63,27 @@ export interface AgentReputation {
   bump: number;
 }
 
+export interface RelayStats {
+  agentDid: string;
+  relayCount: string;
+  totalVolumeIn: string;
+  totalVolumeOut: string;
+  lastAmountIn: string;
+  lastAmountOut: string;
+  lastRouteHashHex: string;
+  lastRelayAt: string;
+  bump: number;
+}
+
 export interface ReputationResponse {
   pubkey: string;
   reputationPda: string;
   exists: boolean;
   reputation: AgentReputation | null;
+  relayStatsPda: string;
+  relayStatsExists: boolean;
+  relayStats: RelayStats | null;
   cluster: "devnet" | "mainnet-beta" | "testnet";
   programId: string;
+  registryProgramId: string;
 }

@@ -94,6 +94,13 @@ function deriveReputationPda(agentDid: PublicKey): [PublicKey, number] {
   );
 }
 
+function deriveRelayStatsPda(agentDid: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("relay-stats"), agentDid.toBuffer()],
+    RELAY_AGENT_REGISTRY_PROGRAM_ID
+  );
+}
+
 function instructionToJson(ix: TransactionInstruction): UnsignedInstruction {
   return {
     programId: ix.programId.toBase58(),
@@ -188,6 +195,98 @@ function decodeAgentReputation(data: Buffer, bump: number): AgentReputation {
     lastFulfilled,
     lastOutcomeHashHex: lastOutcomeHash.toString("hex"),
     lastUpdated: lastUpdated.toString(),
+    bump,
+  };
+}
+
+/** Build the execute_relay instruction (mock swap + reputation increment). */
+function buildExecuteRelayIx(args: {
+  authority: PublicKey;
+  payer: PublicKey;
+  amountIn: bigint;
+  amountOut: bigint;
+  routeHash: Buffer; // exactly 32 bytes
+}): {
+  ix: TransactionInstruction;
+  agentProfilePda: PublicKey;
+  relayStatsPda: PublicKey;
+} {
+  if (args.routeHash.length !== 32) {
+    throw new Error("routeHash must be 32 bytes");
+  }
+  const [agentProfilePda] = deriveAgentProfilePda(args.authority);
+  const [relayStatsPda] = deriveRelayStatsPda(args.authority);
+
+  // Borsh: disc(8) + u64 amount_in + u64 amount_out + [u8;32] route_hash
+  const data = Buffer.alloc(8 + 8 + 8 + 32);
+  let o = 0;
+  anchorDisc("execute_relay").copy(data, o);
+  o += 8;
+  data.writeBigUInt64LE(args.amountIn, o);
+  o += 8;
+  data.writeBigUInt64LE(args.amountOut, o);
+  o += 8;
+  args.routeHash.copy(data, o);
+
+  const ix = new TransactionInstruction({
+    programId: RELAY_AGENT_REGISTRY_PROGRAM_ID,
+    keys: [
+      { pubkey: args.authority, isSigner: true, isWritable: true }, // did_authority
+      { pubkey: agentProfilePda, isSigner: false, isWritable: false }, // agent_profile (read-only, must exist)
+      { pubkey: relayStatsPda, isSigner: false, isWritable: true }, // relay_stats (init_if_needed)
+      { pubkey: args.payer, isSigner: true, isWritable: true }, // payer
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    data,
+  });
+
+  return { ix, agentProfilePda, relayStatsPda };
+}
+
+/** Decode the RelayStats PDA. Layout matches programs/relay_agent_registry. */
+function decodeRelayStats(data: Buffer): {
+  agentDid: string;
+  relayCount: string;
+  totalVolumeIn: string;
+  totalVolumeOut: string;
+  lastAmountIn: string;
+  lastAmountOut: string;
+  lastRouteHashHex: string;
+  lastRelayAt: string;
+  bump: number;
+} {
+  let o = 8; // skip Anchor discriminator
+  const agentDid = new PublicKey(data.subarray(o, o + 32));
+  o += 32;
+  const relayCount = data.readBigUInt64LE(o);
+  o += 8;
+  const inLo = data.readBigUInt64LE(o);
+  const inHi = data.readBigUInt64LE(o + 8);
+  const totalVolumeIn = (inHi << 64n) | inLo;
+  o += 16;
+  const outLo = data.readBigUInt64LE(o);
+  const outHi = data.readBigUInt64LE(o + 8);
+  const totalVolumeOut = (outHi << 64n) | outLo;
+  o += 16;
+  const lastAmountIn = data.readBigUInt64LE(o);
+  o += 8;
+  const lastAmountOut = data.readBigUInt64LE(o);
+  o += 8;
+  const lastRouteHash = Buffer.from(data.subarray(o, o + 32));
+  o += 32;
+  const lastRelayAt = data.readBigInt64LE(o);
+  o += 8;
+  const bump = data.readUInt8(o);
+
+  return {
+    agentDid: agentDid.toBase58(),
+    relayCount: relayCount.toString(),
+    totalVolumeIn: totalVolumeIn.toString(),
+    totalVolumeOut: totalVolumeOut.toString(),
+    lastAmountIn: lastAmountIn.toString(),
+    lastAmountOut: lastAmountOut.toString(),
+    lastRouteHashHex: lastRouteHash.toString("hex"),
+    lastRelayAt: lastRelayAt.toString(),
     bump,
   };
 }
@@ -349,25 +448,68 @@ app.post("/relay", async (req: Request<{}, {}, RelayRequest>, res: Response) => 
     if (!inputMint || !outputMint || !amount || !userAddress) {
       return res.status(400).json({ error: "Missing required fields" });
     }
-    // Sanity-check the user pubkey before calling Jupiter.
-    new PublicKey(userAddress);
+    const authority = new PublicKey(userAddress);
 
-    const quote = await jupiter.getQuote(
-      inputMint,
-      outputMint,
-      amount,
-      slippageBps ?? 50
-    );
-    const swap = await jupiter.buildSwapTransaction({
-      quoteResponse: quote,
-      userPublicKey: userAddress,
+    // Pull a Jupiter quote for a realistic amount_out (mainnet pricing only;
+    // we never broadcast the Jupiter swap — it informs the on-chain mock).
+    let quote: any = null;
+    let amountOut: bigint = 0n;
+    try {
+      quote = await jupiter.getQuote(
+        inputMint,
+        outputMint,
+        amount,
+        slippageBps ?? 50
+      );
+      if (quote?.outAmount) amountOut = BigInt(quote.outAmount);
+    } catch (jupErr) {
+      quote = { warning: (jupErr as Error).message };
+    }
+
+    const amountIn = BigInt(amount);
+    // route_hash = sha256(JSON route description) for on-chain audit trail.
+    const routeHash = createHash("sha256")
+      .update(
+        JSON.stringify({
+          inputMint,
+          outputMint,
+          amountIn: amountIn.toString(),
+          amountOut: amountOut.toString(),
+          slippageBps: slippageBps ?? 50,
+          quoteRoutePlan: quote?.routePlan ?? null,
+        })
+      )
+      .digest();
+
+    const { ix, relayStatsPda } = buildExecuteRelayIx({
+      authority,
+      payer: authority,
+      amountIn,
+      amountOut,
+      routeHash,
+    });
+
+    const { blockhash } = await devnetConn.getLatestBlockhash("confirmed");
+    const tx = new Transaction({
+      recentBlockhash: blockhash,
+      feePayer: authority,
+    }).add(ix);
+    const serialized = tx.serialize({
+      requireAllSignatures: false,
+      verifySignatures: false,
     });
 
     const out: RelayResponse = {
       quote,
-      swapTransactionBase64: swap.swapTransactionBase64,
-      cluster: "mainnet-beta",
-      lastValidBlockHeight: swap.lastValidBlockHeight,
+      routeHashHex: routeHash.toString("hex"),
+      amountIn: amountIn.toString(),
+      amountOut: amountOut.toString(),
+      unsignedTransactionBase64: serialized.toString("base64"),
+      instruction: instructionToJson(ix),
+      relayStatsPda: relayStatsPda.toBase58(),
+      recentBlockhash: blockhash,
+      cluster: "devnet",
+      programId: RELAY_AGENT_REGISTRY_PROGRAM_ID.toBase58(),
     };
     res.json(out);
   } catch (error) {
@@ -441,13 +583,21 @@ app.post(
 app.get("/agents/:pubkey/reputation", async (req, res) => {
   try {
     const authority = new PublicKey(req.params.pubkey);
-    const [reputationPda, bump] = deriveReputationPda(authority);
-    const account = await devnetConn.getAccountInfo(reputationPda);
+    const [reputationPda, repBump] = deriveReputationPda(authority);
+    const [relayStatsPda] = deriveRelayStatsPda(authority);
+
+    const [repAccount, statsAccount] = await Promise.all([
+      devnetConn.getAccountInfo(reputationPda),
+      devnetConn.getAccountInfo(relayStatsPda),
+    ]);
 
     let reputation: AgentReputation | null = null;
-    if (account) {
+    if (repAccount) {
       try {
-        reputation = decodeAgentReputation(Buffer.from(account.data), bump);
+        reputation = decodeAgentReputation(
+          Buffer.from(repAccount.data),
+          repBump
+        );
       } catch (decodeErr) {
         return res.status(500).json({
           error: `Failed to decode reputation account: ${
@@ -457,13 +607,30 @@ app.get("/agents/:pubkey/reputation", async (req, res) => {
       }
     }
 
+    let relayStats = null;
+    if (statsAccount) {
+      try {
+        relayStats = decodeRelayStats(Buffer.from(statsAccount.data));
+      } catch (decodeErr) {
+        return res.status(500).json({
+          error: `Failed to decode relay-stats account: ${
+            (decodeErr as Error).message
+          }`,
+        });
+      }
+    }
+
     const out: ReputationResponse = {
       pubkey: authority.toBase58(),
       reputationPda: reputationPda.toBase58(),
-      exists: !!account,
+      exists: !!repAccount,
       reputation,
+      relayStatsPda: relayStatsPda.toBase58(),
+      relayStatsExists: !!statsAccount,
+      relayStats,
       cluster: "devnet",
       programId: RELAY_REPUTATION_PROGRAM_ID.toBase58(),
+      registryProgramId: RELAY_AGENT_REGISTRY_PROGRAM_ID.toBase58(),
     };
     res.json(out);
   } catch (error) {
