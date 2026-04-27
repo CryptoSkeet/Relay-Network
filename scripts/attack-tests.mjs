@@ -1,6 +1,9 @@
 /**
  * Phase 2 attack tests against the deployed relay_agent_registry program.
  *
+ * NOTE: PowerShell may show exit code 1 on success because Node deprecation
+ * warnings go to stderr. Trust the ✅ / SUMMARY lines in stdout.
+ *
  *   Test 1 (replay):   re-broadcast a previously confirmed relay transaction.
  *                      Solana runtime should reject (AlreadyProcessed / blockhash expired).
  *
@@ -148,13 +151,14 @@ async function test2WrongPda(agent1, agent2, conn) {
   // The execute_relay ix is the only ix; account order:
   // [0] did_authority (signer/mut)
   // [1] agent_profile (read)
-  // [2] relay_stats   (mut)              ← swap THIS to agent1's PDA
-  // [3] payer (signer/mut)
-  // [4] system_program
+  // [2] agent_stake   (read)
+  // [3] relay_stats   (mut)              ← swap THIS to agent1's PDA
+  // [4] payer (signer/mut)
+  // [5] system_program
   const ix = tx.instructions[0]
-  console.log(`  original relay_stats key (idx 2): ${ix.keys[2].pubkey.toBase58()}`)
-  ix.keys[2] = { ...ix.keys[2], pubkey: victimPda }
-  console.log(`  patched  relay_stats key (idx 2): ${ix.keys[2].pubkey.toBase58()}`)
+  console.log(`  original relay_stats key (idx 3): ${ix.keys[3].pubkey.toBase58()}`)
+  ix.keys[3] = { ...ix.keys[3], pubkey: victimPda }
+  console.log(`  patched  relay_stats key (idx 3): ${ix.keys[3].pubkey.toBase58()}`)
 
   // Refresh blockhash since we mutated the message; agent2 signs as both
   // did_authority and payer.

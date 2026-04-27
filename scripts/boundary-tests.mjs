@@ -1,6 +1,10 @@
 /**
  * Phase 2 (Test 3 + Test 4) boundary attacks against execute_relay.
  *
+ * NOTE: When run under PowerShell, this script may exit with code 1 even on
+ * success (PS treats Node deprecation warnings on stderr as failure). Trust
+ * the ✅ lines in stdout, not the exit code.
+ *
  * Builds instructions locally so we can submit values the backend would refuse
  * to construct (amount=0, u64::MAX, missing signer, expired blockhash).
  *
@@ -46,6 +50,12 @@ function deriveAgentProfilePda(did) {
     PROGRAM_ID,
   )[0]
 }
+function deriveAgentStakePda(did) {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from('agent-stake'), did.toBuffer()],
+    PROGRAM_ID,
+  )[0]
+}
 function deriveRelayStatsPda(did) {
   return PublicKey.findProgramAddressSync(
     [Buffer.from('relay-stats'), did.toBuffer()],
@@ -66,6 +76,7 @@ function buildExecuteRelayIx({ authority, payer, amountIn, amountOut, routeHash 
     keys: [
       { pubkey: authority, isSigner: true,  isWritable: true  },
       { pubkey: deriveAgentProfilePda(authority), isSigner: false, isWritable: false },
+      { pubkey: deriveAgentStakePda(authority),   isSigner: false, isWritable: false },
       { pubkey: deriveRelayStatsPda(authority),   isSigner: false, isWritable: true  },
       { pubkey: payer, isSigner: true, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },

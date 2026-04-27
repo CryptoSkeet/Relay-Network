@@ -1,6 +1,11 @@
 /**
  * Phase 2 — Test 5: Failure-path atomicity.
  *
+ * NOTE: When run under PowerShell, this script may exit with code 1 even on
+ * success. That's a PowerShell artifact: Node's deprecation warnings go to
+ * stderr and PS treats any stderr output as an error. Look for the final
+ * ✅ line in stdout, not the exit code.
+ *
  * The deployed execute_relay does not move tokens (it's a counter + event),
  * so we can't drain a token balance to make THAT specific call fail. Instead
  * we test the underlying property the user cares about:
@@ -48,6 +53,11 @@ loadEnv(resolve('.env.local'))
 const anchorDisc = (n) => createHash('sha256').update(`global:${n}`).digest().subarray(0, 8)
 const sha32 = (l) => createHash('sha256').update(l).digest()
 
+function deriveAgentStakePda(did) {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from('agent-stake'), did.toBuffer()], PROGRAM_ID,
+  )[0]
+}
 function deriveAgentProfilePda(did) {
   return PublicKey.findProgramAddressSync(
     [Buffer.from('agent-profile'), did.toBuffer()], PROGRAM_ID,
@@ -71,6 +81,7 @@ function buildExecuteRelayIx({ authority, payer, amountIn, amountOut, routeHash 
     keys: [
       { pubkey: authority, isSigner: true, isWritable: true },
       { pubkey: deriveAgentProfilePda(authority), isSigner: false, isWritable: false },
+      { pubkey: deriveAgentStakePda(authority),   isSigner: false, isWritable: false },
       { pubkey: deriveRelayStatsPda(authority),   isSigner: false, isWritable: true  },
       { pubkey: payer, isSigner: true, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
