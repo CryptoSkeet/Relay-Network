@@ -2,9 +2,12 @@
  * Backend Service: Relay API integration layer.
  *
  *  - GET  /health
+ *  - GET  /metrics                    → in-process metrics snapshot
  *  - GET  /prices/:tokens
  *  - GET  /quote
- *  - POST /relay                      → builds an unsigned Jupiter swap tx (mainnet)
+ *  - POST /simulate                   → simulate any base64 legacy tx
+ *  - GET  /verify/:programId          → Solscan program verification
+ *  - POST /relay                      → unsigned Jupiter swap tx + risk + sim
  *  - POST /agents/register            → builds an unsigned register_agent ix (devnet)
  *  - POST /agents/stake-and-register  → atomic stake + AgentProfile + RelayStats (new agents)
  *  - POST /agents/stake-existing      → migration helper for pre-v1 agents
@@ -18,6 +21,8 @@
  */
 
 import axios from "axios";
+import { Agent as HttpAgent } from "http";
+import { Agent as HttpsAgent } from "https";
 import {
   Connection,
   PublicKey,
@@ -47,6 +52,11 @@ import {
 import { logVolume, totalUsdByAgent } from "./volume-log";
 import { computeScore, REPUTATION_FORMULA_DOC } from "./score";
 import { lookupToken } from "./token-registry";
+import { logger } from "./logger";
+import { metrics } from "./metrics";
+import { alertManager } from "./alerts";
+import { riskScorer } from "./risk-scorer";
+import { solscanVerifier } from "./solscan-verifier";
 
 dotenv.config();
 
@@ -87,6 +97,13 @@ const ROUTE_CACHE_TTL = 30;
 
 const priceCache = new NodeCache({ stdTTL: PRICE_CACHE_TTL });
 const routeCache = new NodeCache({ stdTTL: ROUTE_CACHE_TTL });
+
+// HTTP keep-alive pool — reuses sockets across CoinGecko/Jupiter/Solscan calls
+// to cut TLS handshake latency under sustained load.
+const httpAgent = new HttpAgent({ keepAlive: true, maxSockets: 50 });
+const httpsAgent = new HttpsAgent({ keepAlive: true, maxSockets: 50 });
+axios.defaults.httpAgent = httpAgent;
+axios.defaults.httpsAgent = httpsAgent;
 
 // ============================================================================
 // SOLANA HELPERS
@@ -566,6 +583,43 @@ app.use((_req, res, next) => {
 });
 app.options("*", (_req, res) => res.sendStatus(204));
 
+// ── Observability middleware ────────────────────────────────────────────────
+// Records per-request timing + success/error count for /metrics. Logs each
+// completed request to logger.info / logger.error.
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on("finish", () => {
+    const duration = Date.now() - start;
+    const success = res.statusCode < 400;
+    const route = (req.route && req.route.path) || req.path;
+    metrics.recordRequest(`${req.method} ${route}`, duration, success);
+    if (!success) {
+      metrics.recordError(`http_${res.statusCode}`);
+      logger.warn("Request error", {
+        method: req.method,
+        path: req.path,
+        status: res.statusCode,
+        durationMs: duration,
+      });
+    } else {
+      logger.info("Request", {
+        method: req.method,
+        path: req.path,
+        status: res.statusCode,
+        durationMs: duration,
+      });
+    }
+  });
+  next();
+});
+
+// Periodic threshold check — fires alerts via webhook when error rate or
+// latency cross. Unref'd so it never holds the event loop open.
+const alertTimer = setInterval(() => {
+  alertManager.checkAndAlert(metrics.getMetrics());
+}, 60_000);
+if (typeof alertTimer.unref === "function") alertTimer.unref();
+
 // ── Health ───────────────────────────────────────────────────────────────────
 app.get("/health", async (_req, res) => {
   try {
@@ -617,14 +671,62 @@ app.get("/quote", async (req, res) => {
   }
 });
 
+// ── Pre-flight tx simulation ─────────────────────────────────────────────────
+// POST /simulate  body: { transactionBase64: string, cluster?: "devnet"|"mainnet" }
+// Deserialises a legacy Transaction and runs simulateTransaction on the chosen
+// cluster's RPC. Returns success flag + computeUnits + raw error.
+app.post("/simulate", async (req, res) => {
+  try {
+    const { transactionBase64, cluster } = req.body ?? {};
+    if (!transactionBase64) {
+      return res.status(400).json({ error: "Missing transactionBase64" });
+    }
+    const conn = cluster === "mainnet" ? mainnetConn : devnetConn;
+    const tx = Transaction.from(Buffer.from(transactionBase64, "base64"));
+    const sim = await conn.simulateTransaction(tx);
+    res.json({
+      success: !sim.value.err,
+      error: sim.value.err ? JSON.stringify(sim.value.err) : null,
+      computeUnits: sim.value.unitsConsumed ?? null,
+      logs: sim.value.logs ?? [],
+      cluster: cluster === "mainnet" ? "mainnet" : "devnet",
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: (error as Error).message,
+    });
+  }
+});
+
+// ── Solscan program verification ─────────────────────────────────────────────
+// GET /verify/:programId
+app.get("/verify/:programId", async (req, res) => {
+  try {
+    // Validate it parses as a base58 pubkey before hitting Solscan.
+    new PublicKey(req.params.programId);
+    const result = await solscanVerifier.verifyProgram(req.params.programId);
+    res.json({ programId: req.params.programId, ...result });
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+// ── Metrics snapshot ─────────────────────────────────────────────────────────
+app.get("/metrics", (_req, res) => {
+  res.json(metrics.getMetrics());
+});
+
 // ── Relay: build unsigned Jupiter swap transaction ───────────────────────────
 app.post("/relay", async (req: Request<{}, {}, RelayRequest>, res: Response) => {
+  const t0 = Date.now();
   try {
     const { inputMint, outputMint, amount, userAddress, slippageBps } = req.body;
     if (!inputMint || !outputMint || !amount || !userAddress) {
       return res.status(400).json({ error: "Missing required fields" });
     }
     const authority = new PublicKey(userAddress);
+    logger.info("Relay request", { userAddress, inputMint, outputMint, amount });
 
     // Pull a Jupiter quote for a realistic amount_out (mainnet pricing only;
     // we never broadcast the Jupiter swap — it informs the on-chain mock).
@@ -688,6 +790,46 @@ app.post("/relay", async (req: Request<{}, {}, RelayRequest>, res: Response) => 
       programId: RELAY_AGENT_REGISTRY_PROGRAM_ID.toBase58(),
     };
 
+    // Pre-flight simulation + risk score. Both are best-effort: a simulation
+    // failure shouldn't block the unsigned-tx response, but it does feed the
+    // risk model so the UI can warn the user before they sign.
+    let simulation: {
+      success: boolean;
+      computeUnits: number | null;
+      error: string | null;
+    } = { success: true, computeUnits: null, error: null };
+    try {
+      const sim = await devnetConn.simulateTransaction(tx);
+      simulation = {
+        success: !sim.value.err,
+        computeUnits: sim.value.unitsConsumed ?? null,
+        error: sim.value.err ? JSON.stringify(sim.value.err) : null,
+      };
+    } catch (simErr) {
+      simulation = {
+        success: false,
+        computeUnits: null,
+        error: (simErr as Error).message,
+      };
+    }
+
+    // Verify the program executing the relay against Solscan. Treat unknown /
+    // unverified programs as a risk signal but never block.
+    const verify = await solscanVerifier.verifyProgram(
+      RELAY_AGENT_REGISTRY_PROGRAM_ID.toBase58()
+    );
+
+    const priceImpactPct = quote?.priceImpactPct
+      ? parseFloat(String(quote.priceImpactPct)) * 100
+      : 0;
+    const slippagePct = (slippageBps ?? 50) / 100;
+    const risk = riskScorer.score({
+      priceImpact: Number.isFinite(priceImpactPct) ? priceImpactPct : 0,
+      slippage: slippagePct,
+      computeUnits: simulation.computeUnits ?? 0,
+      unknownProgram: !verify.verified,
+    });
+
     // Log USD volume off-chain for reputation_v1 score aggregation. Best-effort
     // — failure to price (unknown mint, network blip) records 0 USD rather than
     // failing the request.
@@ -711,8 +853,17 @@ app.post("/relay", async (req: Request<{}, {}, RelayRequest>, res: Response) => 
       // Logging must never block the relay response.
     }
 
-    res.json(out);
+    res.json({
+      ...out,
+      simulation,
+      risk,
+      programVerified: verify.verified,
+    });
   } catch (error) {
+    logger.error("Relay failed", {
+      error: (error as Error).message,
+      durationMs: Date.now() - t0,
+    });
     res.status(500).json({ error: (error as Error).message });
   }
 });
@@ -1198,8 +1349,11 @@ app.listen(PORT, () => {
 ║                                                                ║
 ║  Endpoints:                                                    ║
 ║    GET  /health                                                ║
+║    GET  /metrics                                               ║
 ║    GET  /prices/:tokens                                        ║
 ║    GET  /quote?inputMint=...&outputMint=...&amount=...         ║
+║    POST /simulate                                              ║
+║    GET  /verify/:programId                                     ║
 ║    POST /relay                                                 ║
 ║    POST /agents/register                                       ║
 ║    POST /agents/stake-and-register                             ║

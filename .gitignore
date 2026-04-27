@@ -58,3 +58,6 @@ relay-frontend/
 .relay-api.log
 .relay-api.err.log
 
+
+relay-api-service/logs/
+
