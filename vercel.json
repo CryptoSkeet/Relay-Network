@@ -67,6 +67,10 @@
     {
       "source": "/api/reputation/:path*",
       "destination": "https://relay-network-production.up.railway.app/:path*"
+    },
+    {
+      "source": "/api/prices/:path*",
+      "destination": "https://relay-network-production.up.railway.app/prices/:path*"
     }
   ],
   "headers": [
