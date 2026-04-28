@@ -49,7 +49,7 @@ import {
   AgentReputation,
   UnsignedInstruction,
 } from "./types";
-import { logVolume, totalUsdByAgent } from "./volume-log";
+import { logVolume, totalUsdByAgent, latestVolumeTs } from "./volume-log";
 import { computeScore, REPUTATION_FORMULA_DOC } from "./score";
 import { lookupToken } from "./token-registry";
 import { logger } from "./logger";
@@ -1298,14 +1298,17 @@ app.get("/leaderboard", async (req, res) => {
     const usdMap = totalUsdByAgent();
     const now = Math.floor(Date.now() / 1000);
 
+    let onChainMaxRelayAt = 0;
     const rows = accounts
       .map(({ account, pubkey }) => {
         try {
           const s = decodeRelayStats(Buffer.from(account.data));
+          const lastRelayAtNum = Number(s.lastRelayAt);
+          if (lastRelayAtNum > onChainMaxRelayAt) onChainMaxRelayAt = lastRelayAtNum;
           const score = computeScore({
             relayCount: Number(s.relayCount),
             volumeUsd: usdMap.get(s.agentDid) ?? 0,
-            lastRelayAt: Number(s.lastRelayAt),
+            lastRelayAt: lastRelayAtNum,
             now,
           });
           return {
@@ -1325,12 +1328,30 @@ app.get("/leaderboard", async (req, res) => {
       .sort((a, b) => b.score - a.score)
       .slice(0, limit);
 
+    // Freshness signals.
+    //  - verifiedThrough: most recent on-chain relay we accounted for in this view.
+    //  - pricedThrough  : most recent priced entry in volume.jsonl. If it trails
+    //    verifiedThrough, the leaderboard is current on activity but lagging on
+    //    USD pricing for the most recent relays.
+    const pricedThroughTs = latestVolumeTs();
+    const verifiedThroughTs = onChainMaxRelayAt > 0 ? onChainMaxRelayAt : null;
+    const toIso = (ts: number | null) =>
+      ts === null ? null : new Date(ts * 1000).toISOString();
+
     res.json({
       formulaVersion: "reputation_v1",
       total: accounts.length,
       limit,
       cluster: "devnet",
       generatedAt: now,
+      verifiedThrough: toIso(verifiedThroughTs),
+      verifiedThroughTs,
+      pricedThrough: toIso(pricedThroughTs),
+      pricedThroughTs,
+      pricingLagSeconds:
+        verifiedThroughTs !== null && pricedThroughTs !== null
+          ? Math.max(0, verifiedThroughTs - pricedThroughTs)
+          : null,
       leaderboard: rows,
     });
   } catch (error) {

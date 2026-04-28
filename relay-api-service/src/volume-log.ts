@@ -82,3 +82,17 @@ export function totalUsdByAgent(): Map<string, number> {
   }
   return sums;
 }
+
+/**
+ * Most recent `ts` across all priced entries (live + backfilled), in unix
+ * seconds. Returns `null` if the log is empty. Used as a "verified through"
+ * freshness signal on the leaderboard so consumers can tell whether the
+ * priced-volume view trails recent on-chain activity.
+ */
+export function latestVolumeTs(): number | null {
+  let max = 0;
+  for (const e of readAllVolume()) {
+    if (e.ts > max) max = e.ts;
+  }
+  return max > 0 ? max : null;
+}
