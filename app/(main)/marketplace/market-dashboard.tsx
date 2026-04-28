@@ -19,6 +19,7 @@ import {
 } from 'recharts'
 import { Bot, Check, Copy } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { TokenPriceStrip } from '@/components/relay/token-price-strip'
 
 export interface TickerEntry {
   hash: string
@@ -95,6 +96,43 @@ export function MarketDashboard(props: MarketDashboardProps) {
     [series],
   )
 
+  // If the protocol-volume series has no actual movement (flat line — happens
+  // when there are no contracts in the last 24h), fall back to RELAY's USD
+  // price chart from CoinGecko. Keeps the headline chart populated even when
+  // marketplace activity is quiet.
+  const [fallbackChart, setFallbackChart] = useState<
+    Array<{ time: string; value: number }> | null
+  >(null)
+  const seriesIsFlat = useMemo(() => {
+    if (chartData.length < 2) return true
+    const min = Math.min(...chartData.map((d) => d.value))
+    const max = Math.max(...chartData.map((d) => d.value))
+    return max - min < 0.001
+  }, [chartData])
+  useEffect(() => {
+    if (!seriesIsFlat) return
+    let cancelled = false
+    fetch('/api/market-chart/relay/1', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.relay) return
+        setFallbackChart(
+          (data.relay as Array<[number, number]>).map(([t, v]) => ({
+            time: fmtTime(t),
+            value: v,
+          })),
+        )
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [seriesIsFlat])
+
+  const displayChart = seriesIsFlat && fallbackChart ? fallbackChart : chartData
+  const displayLabel =
+    seriesIsFlat && fallbackChart ? 'RELAY · USD · 24h' : 'Total Payment Volume'
+
   const copyCmd = async () => {
     try {
       await navigator.clipboard.writeText('npx skills add coinbase/agentic-wallet-skills')
@@ -107,6 +145,9 @@ export function MarketDashboard(props: MarketDashboardProps) {
 
   return (
     <div className="border-b border-border bg-background">
+      {/* ── Live token price strip (SOL / USDC / RELAY) ───────────────── */}
+      <TokenPriceStrip />
+
       {/* ── Ticker strip ─────────────────────────────────────────────────── */}
       <div className="border-b border-border bg-muted/30">
         <div className="max-w-7xl mx-auto px-4 py-2 flex items-center gap-6 overflow-x-auto text-xs font-mono">
@@ -159,15 +200,15 @@ export function MarketDashboard(props: MarketDashboardProps) {
             </span>
           </div>
           <div className="text-xs uppercase tracking-wider text-muted-foreground font-mono mb-4">
-            Total Payment Volume
+            {displayLabel}
           </div>
           <div className="h-56 -mx-2">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 5, right: 8, left: 0, bottom: 0 }}>
+              <AreaChart data={displayChart} margin={{ top: 5, right: 8, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="kpi-fill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.25} />
-                    <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                    <stop offset="0%" stopColor="#10b981" stopOpacity={0.35} />
+                    <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <XAxis
@@ -183,8 +224,15 @@ export function MarketDashboard(props: MarketDashboardProps) {
                   className="text-muted-foreground"
                   axisLine={false}
                   tickLine={false}
-                  width={40}
-                  tickFormatter={(v) => `$${typeof v === 'number' ? v.toFixed(2) : v}`}
+                  width={50}
+                  domain={['auto', 'auto']}
+                  tickFormatter={(v) =>
+                    typeof v === 'number'
+                      ? v >= 1
+                        ? `$${v.toFixed(2)}`
+                        : `$${v.toPrecision(2)}`
+                      : `${v}`
+                  }
                 />
                 <Tooltip
                   contentStyle={{
@@ -198,7 +246,7 @@ export function MarketDashboard(props: MarketDashboardProps) {
                 <Area
                   type="monotone"
                   dataKey="value"
-                  stroke="hsl(var(--primary))"
+                  stroke="#10b981"
                   strokeWidth={1.5}
                   fill="url(#kpi-fill)"
                   isAnimationActive={false}

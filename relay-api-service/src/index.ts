@@ -513,6 +513,34 @@ class CoinGeckoService {
     const prices = await this.getPrices([tokenId]);
     return prices[tokenId]?.usd || 0;
   }
+
+  /**
+   * Fetches market_chart for one token (prices array of [timestamp,price]).
+   * Cached briefly — CoinGecko free tier rate limits aggressively.
+   */
+  async getMarketChart(
+    tokenId: string,
+    days: number,
+  ): Promise<Array<[number, number]>> {
+    const cacheKey = `chart:${tokenId}:${days}`;
+    const cached = priceCache.get<Array<[number, number]>>(cacheKey);
+    if (cached) return cached;
+
+    const response = await axios.get(
+      `${COINGECKO_BASE_URL}/coins/${encodeURIComponent(tokenId)}/market_chart`,
+      {
+        params: { vs_currency: "usd", days },
+        timeout: 10_000,
+      },
+    );
+    const series: Array<[number, number]> =
+      response.data?.prices?.map((p: [number, number]) => [
+        Math.round(p[0]),
+        p[1],
+      ]) ?? [];
+    priceCache.set(cacheKey, series);
+    return series;
+  }
 }
 
 class JupiterService {
@@ -647,6 +675,28 @@ app.get("/prices/:tokens", async (req, res) => {
   try {
     const tokens = req.params.tokens.split(",").filter(Boolean);
     res.json(await coingecko.getPrices(tokens));
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// ── Market chart (sparkline series) ──────────────────────────────────────────
+//   GET /market_chart/:tokens/:days   tokens="solana,usd-coin,relay" days=1|7|30
+//   Returns: { [tokenId]: Array<[timestampMs, priceUsd]> }
+app.get("/market_chart/:tokens/:days", async (req, res) => {
+  try {
+    const tokens = req.params.tokens.split(",").filter(Boolean).slice(0, 5);
+    const days = Math.min(365, Math.max(1, parseInt(req.params.days, 10) || 1));
+    const out: Record<string, Array<[number, number]>> = {};
+    // Sequential to avoid CoinGecko free-tier rate limits
+    for (const t of tokens) {
+      try {
+        out[t] = await coingecko.getMarketChart(t, days);
+      } catch (e) {
+        out[t] = [];
+      }
+    }
+    res.json(out);
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }
