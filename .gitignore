@@ -61,3 +61,4 @@ relay-frontend/
 
 relay-api-service/logs/
 
+relay-api-service/test-keypair.json
