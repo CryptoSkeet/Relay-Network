@@ -28,6 +28,32 @@ const TOKENS = [
   { id: 'relay', ticker: 'RELAY', icon: '⚡', strokeUp: '#f59e0b', strokeDown: '#ef4444' },
 ] as const
 
+const LS_PRICES_KEY = 'relay:prices:v1'
+const LS_CHARTS_KEY = 'relay:charts:v1'
+const LS_TTL_MS = 10 * 60_000 // 10min — only used to skip very stale entries
+
+function readCache<T>(key: string): T | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(key)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as { ts: number; data: T }
+    if (!parsed?.ts || Date.now() - parsed.ts > LS_TTL_MS) return null
+    return parsed.data
+  } catch {
+    return null
+  }
+}
+
+function writeCache<T>(key: string, data: T) {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data }))
+  } catch {
+    /* quota / private mode — ignore */
+  }
+}
+
 function fmtUsd(n?: number) {
   if (typeof n !== 'number' || !isFinite(n)) return '—'
   if (n >= 1) return `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -44,8 +70,14 @@ function fmtCompact(n?: number) {
 }
 
 export function TokenPriceStrip() {
-  const [prices, setPrices] = useState<Prices>({})
-  const [charts, setCharts] = useState<Charts>({})
+  // Lazy-init from localStorage so the very first paint already has values
+  // on repeat visits (no waiting for the network round-trip).
+  const [prices, setPrices] = useState<Prices>(
+    () => readCache<Prices>(LS_PRICES_KEY) ?? {},
+  )
+  const [charts, setCharts] = useState<Charts>(
+    () => readCache<Charts>(LS_CHARTS_KEY) ?? {},
+  )
   const [error, setError] = useState<string | null>(null)
   const mounted = useRef(true)
 
@@ -67,6 +99,7 @@ export function TokenPriceStrip() {
         if (mounted.current) {
           setPrices(data)
           setError(null)
+          writeCache(LS_PRICES_KEY, data)
         }
       } catch (e) {
         if (mounted.current) setError((e as Error).message)
@@ -85,7 +118,10 @@ export function TokenPriceStrip() {
         const res = await fetch(`/api/market-chart/${ids}/1`, { cache: 'no-store' })
         if (!res.ok) return
         const data = (await res.json()) as Charts
-        if (mounted.current) setCharts(data)
+        if (mounted.current) {
+          setCharts(data)
+          writeCache(LS_CHARTS_KEY, data)
+        }
       } catch {
         /* silently degrade — sparkline is decorative */
       }

@@ -674,6 +674,12 @@ app.get("/health", async (_req, res) => {
 app.get("/prices/:tokens", async (req, res) => {
   try {
     const tokens = req.params.tokens.split(",").filter(Boolean);
+    // Edge-cache for 60s, stale-while-revalidate for 5m so Vercel/CDN serves
+    // hot data without waiting on Railway → CoinGecko.
+    res.setHeader(
+      "Cache-Control",
+      "public, max-age=30, s-maxage=60, stale-while-revalidate=300",
+    );
     res.json(await coingecko.getPrices(tokens));
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -688,14 +694,20 @@ app.get("/market_chart/:tokens/:days", async (req, res) => {
     const tokens = req.params.tokens.split(",").filter(Boolean).slice(0, 5);
     const days = Math.min(365, Math.max(1, parseInt(req.params.days, 10) || 1));
     const out: Record<string, Array<[number, number]>> = {};
-    // Sequential to avoid CoinGecko free-tier rate limits
-    for (const t of tokens) {
-      try {
-        out[t] = await coingecko.getMarketChart(t, days);
-      } catch (e) {
-        out[t] = [];
-      }
-    }
+    // Parallelize — CoinGecko free tier handles 3-5 concurrent fine and
+    // sequential adds 600-1500ms per token on cold cache.
+    const results = await Promise.allSettled(
+      tokens.map((t) => coingecko.getMarketChart(t, days)),
+    );
+    tokens.forEach((t, i) => {
+      const r = results[i];
+      out[t] = r.status === "fulfilled" ? r.value : [];
+    });
+    // Charts change slowly — cache hard at the edge for 5min.
+    res.setHeader(
+      "Cache-Control",
+      "public, max-age=120, s-maxage=300, stale-while-revalidate=900",
+    );
     res.json(out);
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
