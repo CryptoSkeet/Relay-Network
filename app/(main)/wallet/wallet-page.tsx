@@ -361,27 +361,27 @@ export function WalletPage({
   return (
     <div className="flex-1 max-w-6xl mx-auto">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border p-4">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <WalletIcon className="w-6 h-6 text-primary" />
-              RELAY Wallet
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border px-3 md:px-4 py-3 md:py-4">
+        <div className="flex items-center justify-between mb-3 md:mb-4 gap-2">
+          <div className="min-w-0">
+            <h1 className="text-lg md:text-2xl font-bold flex items-center gap-2 truncate">
+              <WalletIcon className="w-5 h-5 md:w-6 md:h-6 text-primary shrink-0" />
+              <span className="truncate">RELAY Wallet</span>
             </h1>
             <p className="text-muted-foreground text-sm hidden sm:block">Manage your tokens, stake for reputation, earn rewards</p>
           </div>
-          <div className="flex gap-2 shrink-0">
-            <Button variant="outline" size="sm" className="gap-2" onClick={() => { setSendResult(null); setShowSendModal(true) }}>
+          <div className="flex gap-1.5 md:gap-2 shrink-0">
+            <Button variant="outline" size="sm" className="gap-2 h-9 px-2.5 md:px-3" onClick={() => { setSendResult(null); setShowSendModal(true) }}>
               <Send className="w-4 h-4" />
               <span className="hidden sm:inline">Send</span>
             </Button>
-            <Button variant="outline" size="sm" className="gap-2" onClick={() => setActiveTab('swap')}>
+            <Button variant="outline" size="sm" className="gap-2 h-9 px-2.5 md:px-3" onClick={() => setActiveTab('swap')}>
               <ArrowRightLeft className="w-4 h-4" />
               <span className="hidden sm:inline">Swap</span>
             </Button>
             <Button
               size="sm"
-              className="gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+              className="gap-2 h-9 px-2.5 md:px-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
               onClick={handleBuyRelay}
               disabled={isPurchasing}
             >
@@ -396,67 +396,70 @@ export function WalletPage({
         </div>
 
         {/* Balance Overview */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
           <Card className="bg-gradient-to-br from-primary/20 to-primary/5 border-primary/20">
-            <CardContent className="p-4">
-              <p className="text-sm text-muted-foreground mb-1">Available Balance</p>
-              <p className="text-2xl font-bold">{formatAmount(totalAvailable)} <span className="text-sm font-normal text-muted-foreground">RELAY</span></p>
+            <CardContent className="p-3 md:p-4">
+              <p className="text-[11px] md:text-sm text-muted-foreground mb-1">Available</p>
+              <p className="text-lg md:text-2xl font-bold tabular-nums">
+                {formatCompact(totalAvailable)}
+                <span className="text-[10px] md:text-sm font-normal text-muted-foreground ml-1">RELAY</span>
+              </p>
             </CardContent>
           </Card>
           <Card className="bg-blue-500/10 border-blue-500/20">
-            <CardContent className="p-4">
-              <p className="text-sm text-muted-foreground mb-1 flex items-center gap-1">
+            <CardContent className="p-3 md:p-4">
+              <p className="text-[11px] md:text-sm text-muted-foreground mb-1 flex items-center gap-1">
                 <Lock className="w-3 h-3" /> Staked
               </p>
-              <p className="text-2xl font-bold text-blue-500">{formatAmount(totalStaked)}</p>
+              <p className="text-lg md:text-2xl font-bold text-blue-500 tabular-nums">{formatCompact(totalStaked)}</p>
             </CardContent>
           </Card>
           <Card className="bg-orange-500/10 border-orange-500/20">
-            <CardContent className="p-4">
-              <p className="text-sm text-muted-foreground mb-1 flex items-center gap-1">
-                <Timer className="w-3 h-3" /> In Escrow
+            <CardContent className="p-3 md:p-4">
+              <p className="text-[11px] md:text-sm text-muted-foreground mb-1 flex items-center gap-1">
+                <Timer className="w-3 h-3" /> Escrow
               </p>
-              <p className="text-2xl font-bold text-orange-500">{formatAmount(totalEscrow)}</p>
+              <p className="text-lg md:text-2xl font-bold text-orange-500 tabular-nums">{formatCompact(totalEscrow)}</p>
             </CardContent>
           </Card>
           <Card className="bg-green-500/10 border-green-500/20">
-            <CardContent className="p-4">
-              <p className="text-sm text-muted-foreground mb-1 flex items-center gap-1">
+            <CardContent className="p-3 md:p-4">
+              <p className="text-[11px] md:text-sm text-muted-foreground mb-1 flex items-center gap-1">
                 <Sparkles className="w-3 h-3" /> Pending
               </p>
-              <p className="text-2xl font-bold text-green-500">{formatAmount(totalPending)}</p>
+              <p className="text-lg md:text-2xl font-bold text-green-500 tabular-nums">{formatCompact(totalPending)}</p>
             </CardContent>
           </Card>
         </div>
       </div>
 
       {/* Content */}
-      <div className="p-4">
+      <div className="p-3 md:p-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid grid-cols-3 sm:grid-cols-6 w-full">
-            <TabsTrigger value="overview">
-              <LineChart className="w-4 h-4 mr-2" />
-              Overview
+          <TabsList className="flex md:grid md:grid-cols-6 w-full overflow-x-auto md:overflow-visible h-auto p-1 gap-1 justify-start md:justify-stretch scrollbar-hide">
+            <TabsTrigger value="overview" className="shrink-0 md:shrink gap-1.5 md:gap-2 px-3 md:px-2">
+              <LineChart className="w-4 h-4" />
+              <span>Overview</span>
             </TabsTrigger>
-            <TabsTrigger value="swap">
-              <ArrowRightLeft className="w-4 h-4 mr-2" />
-              Swap
+            <TabsTrigger value="swap" className="shrink-0 md:shrink gap-1.5 md:gap-2 px-3 md:px-2">
+              <ArrowRightLeft className="w-4 h-4" />
+              <span>Swap</span>
             </TabsTrigger>
-            <TabsTrigger value="stake">
-              <Lock className="w-4 h-4 mr-2" />
-              Stake
+            <TabsTrigger value="stake" className="shrink-0 md:shrink gap-1.5 md:gap-2 px-3 md:px-2">
+              <Lock className="w-4 h-4" />
+              <span>Stake</span>
             </TabsTrigger>
-            <TabsTrigger value="earn">
-              <Zap className="w-4 h-4 mr-2" />
-              Earn
+            <TabsTrigger value="earn" className="shrink-0 md:shrink gap-1.5 md:gap-2 px-3 md:px-2">
+              <Zap className="w-4 h-4" />
+              <span>Earn</span>
             </TabsTrigger>
-            <TabsTrigger value="wallets">
-              <WalletIcon className="w-4 h-4 mr-2" />
-              Wallets
+            <TabsTrigger value="wallets" className="shrink-0 md:shrink gap-1.5 md:gap-2 px-3 md:px-2">
+              <WalletIcon className="w-4 h-4" />
+              <span>Wallets</span>
             </TabsTrigger>
-            <TabsTrigger value="transactions">
-              <History className="w-4 h-4 mr-2" />
-              History
+            <TabsTrigger value="transactions" className="shrink-0 md:shrink gap-1.5 md:gap-2 px-3 md:px-2">
+              <History className="w-4 h-4" />
+              <span>History</span>
             </TabsTrigger>
           </TabsList>
 
