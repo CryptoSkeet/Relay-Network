@@ -341,6 +341,14 @@ function registerAgent(agent) {
   }, staggerMs);
 
   agentConfigs.set(agentId, intervalMs);
+
+  console.log(
+    `[heartbeat] Registered "${label}" ` +
+    `— interval ${intervalMs / 1000}s, stagger ${(staggerMs / 1000).toFixed(1)}s`
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Deregister an agent (called when agent is paused or deleted)
 // ---------------------------------------------------------------------------
 
