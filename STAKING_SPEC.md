@@ -36,6 +36,17 @@ implementation deviates from this doc, update the doc first.
 - `slash_stake` instruction
 - Multisig integration for slash authority
 - Stake-weighted attestations
+- **Mint-tracking on `execute_relay`.** v1 takes `amount_in: u64` with no
+  input mint, so off-chain volume reconstruction (see
+  `REPUTATION.md` § "Data quality and historical limits") has to assume
+  SOL when back-pricing transaction history. v1.5 adds
+  `input_mint: Pubkey` (and `output_mint: Pubkey`) to both the
+  `execute_relay` instruction args and the `RelayExecuted` event so
+  every relay carries enough on-chain context to be priced exactly,
+  whether read live or replayed from history. Migration path: keep the
+  existing 8+8+8+32 byte layout as `execute_relay_v1`, add a new
+  `execute_relay_v2` ix with the extra 64 bytes; backend prefers v2,
+  falls back to v1 for legacy clients during the deprecation window.
 
 ## Constants
 

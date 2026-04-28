@@ -142,6 +142,49 @@ See `STAKING_SPEC.md` for full account layouts and instruction signatures.
 The score endpoint shows its work — returns the number plus the inputs.
 No black box.
 
+## Data quality and historical limits
+
+The `volume_usd` axis is computed from off-chain records, not from chain
+state. We're upfront about what that means in v1.
+
+**Live volume store.** Every successful relay through `POST /relay` is
+appended to a JSONL file (`relay-api-service/data/volume.jsonl`, path
+overridable via `RELAY_VOLUME_LOG`). One line per relay:
+`{ts, pubkey, inputMint, amountRaw, decimals, usd, txSig?, source?}`.
+No database, no Redis, no in-memory cache. Single-writer assumption — do
+not horizontally scale the API process without migrating this to Postgres
+first. Re-read on every `/score` and `/leaderboard` call; fine at current
+volume, replace with a query layer at ~10k entries.
+
+**Historical backfill.** Agents that relayed before `POST /relay` existed
+(direct on-chain calls, test scripts, third-party SDKs) would otherwise
+show `volume_usd = 0` and rank last on the leaderboard despite real
+activity. To prevent that, `relay-api-service/src/scripts/backfill-volume.ts`
+scrapes each agent's `RelayStats` PDA transaction history, decodes
+`execute_relay` instruction data, and back-prices each `amount_in` at the
+transaction's `blockTime` via CoinGecko historical. Idempotent: keyed on
+`(pubkey, txSig)`. Entries written by the backfill carry `source:
+"backfill"` so they're distinguishable from live entries.
+
+**Known limitation: mint is unknown for backfilled entries.** The
+on-chain `execute_relay` instruction in v1 carries `amount_in: u64` and a
+`route_hash`, but no input mint. The emitted `RelayExecuted` event has
+the same shape — amount but no mint. So when reconstructing volume from
+history, the backfill script has no way to tell whether 1,000,000 raw
+units was 0.001 SOL, $1.00 USDC, or a different token entirely. The
+script assumes SOL (the historical default for our test traffic), which
+is correct for present devnet data but is a guess in general. Amounts
+above 100 SOL per relay are sanity-skipped to drop pre-v1 garbage data
+rather than poison the score with bogus values. v1.5 fixes this — see
+`STAKING_SPEC.md` § "Out of scope (v1.5+)" for the mint-tracking item.
+
+**What this means for consumers.** Two agents with identical real-world
+trading patterns can have meaningfully different `volume_usd` if one
+relayed only via `POST /relay` (priced live, every mint) and the other
+relayed directly on-chain pre-`/relay` (priced as SOL, all-or-nothing).
+The `score` endpoint exposes both `volumeUsd` and the contributing
+inputs so integrators can reason about this. We don't hide the gap.
+
 ## Composite reputation (forward-looking)
 
 When v1.5 and v2 ship, scores compose like this:
@@ -172,3 +215,8 @@ Exposed at `GET /protocol/reputation-formula`.
 
 - **v1.0 (2026-04-27)** — Initial. Activity score (sqrt × log × time decay)
   + stake-gated registration. Slashing roadmapped for v1.5.
+- **v1.0.1 (2026-04-27)** — No formula change. Documented the off-chain
+  volume store (JSONL), the historical backfill script, and the
+  mint-unknown limitation that makes backfilled entries assume SOL. v1.5
+  scope updated to add `input_mint` to `execute_relay` so backfills and
+  live writes can price all mints accurately.
