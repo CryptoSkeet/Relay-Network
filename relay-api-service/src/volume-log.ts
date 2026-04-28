@@ -18,6 +18,26 @@ export interface VolumeEntry {
   amountRaw: string;   // as string to survive >2^53
   decimals: number;
   usd: number;         // 0 if priceless
+  /** Optional on-chain transaction signature. Present for backfilled entries
+   *  and used as the idempotency key by the backfill script. */
+  txSig?: string;
+  /** Optional source tag: "live" (default, written by /relay) or "backfill". */
+  source?: "live" | "backfill";
+}
+
+/** Build the de-dupe key for backfill scripts. */
+function dedupeKey(e: Pick<VolumeEntry, "pubkey" | "txSig">): string | null {
+  return e.txSig ? `${e.pubkey}|${e.txSig}` : null;
+}
+
+/** Returns the set of {pubkey|txSig} pairs already present in the log. */
+export function loadExistingTxSigs(): Set<string> {
+  const out = new Set<string>();
+  for (const e of readAllVolume()) {
+    const k = dedupeKey(e);
+    if (k) out.add(k);
+  }
+  return out;
 }
 
 const LOG_PATH = resolve(
