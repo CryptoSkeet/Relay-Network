@@ -218,7 +218,7 @@ export function MarketplacePage({
     <div className="flex-1">
       {/* ── Unified marketplace header with Market | Contracts tabs ──── */}
       <div className="border-b border-border bg-background">
-        <div className="max-w-7xl mx-auto px-4">
+        <div className="max-w-7xl mx-auto px-3 md:px-4">
           {/* Top row: brand + CTA */}
           <div className="py-3 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3 min-w-0">
@@ -300,7 +300,7 @@ export function MarketplacePage({
 
           {/* ── Open contracts strip */}
           {contracts.length > 0 && (
-            <div className="max-w-7xl mx-auto px-4 pb-12">
+            <div className="max-w-7xl mx-auto px-3 md:px-4 pb-12">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold">Open Contracts</h2>
                 <button

@@ -55,7 +55,7 @@ export function AllServicesTable({ services, categories, networks = ['ALL', 'BAS
   }, [services, query, category, network])
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6">
+    <div className="max-w-7xl mx-auto px-3 md:px-4 py-4 md:py-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
         <h2 className="text-lg font-semibold">All Services</h2>
         <div className="flex flex-col sm:flex-row gap-2">
@@ -97,7 +97,8 @@ export function AllServicesTable({ services, categories, networks = ['ALL', 'BAS
       </div>
 
       <div className="border border-border rounded-md overflow-hidden">
-        <div className="grid grid-cols-[2.5rem_1fr_8rem_8rem_8rem] gap-2 px-4 py-2.5 text-[10px] uppercase tracking-wider text-muted-foreground font-mono border-b border-border bg-muted/20">
+        {/* Header (desktop only) */}
+        <div className="hidden md:grid grid-cols-[2.5rem_1fr_8rem_8rem_8rem] gap-2 px-4 py-2.5 text-[10px] uppercase tracking-wider text-muted-foreground font-mono border-b border-border bg-muted/20">
           <div>#</div>
           <div>Service</div>
           <div>Category</div>
@@ -111,9 +112,10 @@ export function AllServicesTable({ services, categories, networks = ['ALL', 'BAS
             {filtered.map((s, idx) => (
               <li
                 key={s.id}
-                className="grid grid-cols-[2.5rem_1fr_8rem_8rem_8rem] gap-2 px-4 py-2.5 items-center hover:bg-muted/30 transition-colors"
+                className="md:grid md:grid-cols-[2.5rem_1fr_8rem_8rem_8rem] md:gap-2 md:items-center px-3 md:px-4 py-3 md:py-2.5 hover:bg-muted/30 active:bg-muted/50 transition-colors"
               >
-                <span className="text-xs font-mono text-muted-foreground tabular-nums">
+                {/* Mobile: stacked card; Desktop: row */}
+                <span className="hidden md:block text-xs font-mono text-muted-foreground tabular-nums">
                   {String(idx + 1).padStart(2, '0')}
                 </span>
                 <div className="flex items-center gap-3 min-w-0">
@@ -122,36 +124,50 @@ export function AllServicesTable({ services, categories, networks = ['ALL', 'BAS
                     <img
                       src={s.agent_avatar}
                       alt=""
-                      className="w-7 h-7 rounded-md object-cover bg-muted shrink-0"
+                      className="w-8 h-8 md:w-7 md:h-7 rounded-md object-cover bg-muted shrink-0"
                     />
                   ) : (
-                    <div className="w-7 h-7 rounded-md bg-muted flex items-center justify-center shrink-0">
+                    <div className="w-8 h-8 md:w-7 md:h-7 rounded-md bg-muted flex items-center justify-center shrink-0">
                       <Bot className="w-4 h-4 text-muted-foreground" />
                     </div>
                   )}
-                  <Link
-                    href={`/marketplace/${s.id}`}
-                    className="font-medium text-sm hover:underline truncate"
-                  >
-                    {s.name}
-                  </Link>
-                  {s.featured && (
-                    <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/10 text-primary font-mono shrink-0">
-                      Featured
-                    </span>
-                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Link
+                        href={`/marketplace/${s.id}`}
+                        className="font-medium text-sm hover:underline truncate"
+                      >
+                        {s.name}
+                      </Link>
+                      {s.featured && (
+                        <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/10 text-primary font-mono shrink-0">
+                          Featured
+                        </span>
+                      )}
+                    </div>
+                    {/* Mobile-only meta row */}
+                    <div className="md:hidden flex items-center gap-2 mt-1 text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
+                      <span>{s.category}</span>
+                      <span className="opacity-40">·</span>
+                      <span>{s.network}</span>
+                      <span className="opacity-40">·</span>
+                      <span className="text-foreground tabular-nums">
+                        {s.avg_price_relay.toLocaleString()} RELAY
+                      </span>
+                    </div>
+                  </div>
                 </div>
                 <span
                   className={cn(
-                    'text-[10px] uppercase tracking-wider text-muted-foreground border border-border rounded-full px-2 py-0.5 w-fit',
+                    'hidden md:inline-block text-[10px] uppercase tracking-wider text-muted-foreground border border-border rounded-full px-2 py-0.5 w-fit',
                   )}
                 >
                   {s.category}
                 </span>
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground border border-border rounded-full px-2 py-0.5 w-fit font-mono">
+                <span className="hidden md:inline-block text-[10px] uppercase tracking-wider text-muted-foreground border border-border rounded-full px-2 py-0.5 w-fit font-mono">
                   {s.network}
                 </span>
-                <span className="text-sm font-mono text-right tabular-nums">
+                <span className="hidden md:block text-sm font-mono text-right tabular-nums">
                   {s.avg_price_relay.toLocaleString()} <span className="text-muted-foreground">RELAY</span>
                 </span>
               </li>

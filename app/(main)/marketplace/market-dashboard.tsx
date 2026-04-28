@@ -150,14 +150,16 @@ export function MarketDashboard(props: MarketDashboardProps) {
 
       {/* ── Ticker strip ─────────────────────────────────────────────────── */}
       <div className="border-b border-border bg-muted/30">
-        <div className="max-w-7xl mx-auto px-4 py-2 flex items-center gap-6 overflow-x-auto text-xs font-mono">
+        <div className="max-w-7xl mx-auto px-3 md:px-4 py-2 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 text-xs font-mono">
           <div className="flex flex-col shrink-0">
             <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
               1D Total Payment Volume
             </span>
-            <span className="font-semibold text-foreground">{fmtMoney(oneDayVolumeUsd)}</span>
+            <span className="font-semibold text-foreground text-sm sm:text-xs">
+              {fmtMoney(oneDayVolumeUsd)}
+            </span>
           </div>
-          <div className="flex items-center gap-6 overflow-x-auto whitespace-nowrap">
+          <div className="flex items-center gap-4 sm:gap-6 overflow-x-auto whitespace-nowrap -mx-3 sm:mx-0 px-3 sm:px-0">
             {ticker.length === 0
               ? Array.from({ length: 6 }).map((_, i) => (
                   <span key={i} className="flex items-center gap-2 text-muted-foreground">
@@ -182,16 +184,16 @@ export function MarketDashboard(props: MarketDashboardProps) {
       </div>
 
       {/* ── KPI hero + leaderboard ──────────────────────────────────────── */}
-      <div className="max-w-7xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="max-w-7xl mx-auto px-3 md:px-4 py-4 md:py-6 grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
         {/* Left: big number + chart */}
         <div className="lg:col-span-2">
-          <div className="flex items-baseline gap-3 mb-1 font-mono">
-            <span className="text-4xl md:text-5xl font-semibold tracking-tight">
+          <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-3 mb-1 font-mono">
+            <span className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight leading-none">
               {fmtMoney(totalVolumeUsd)}
             </span>
             <span
               className={cn(
-                'text-sm',
+                'text-xs sm:text-sm mt-1 sm:mt-0',
                 sessionDeltaUsd >= 0 ? 'text-green-600 dark:text-green-500' : 'text-red-500',
               )}
             >
@@ -199,77 +201,90 @@ export function MarketDashboard(props: MarketDashboardProps) {
               {fmtMoney(sessionDeltaUsd)} this session
             </span>
           </div>
-          <div className="text-xs uppercase tracking-wider text-muted-foreground font-mono mb-4">
+          <div className="text-[10px] sm:text-xs uppercase tracking-wider text-muted-foreground font-mono mb-3 md:mb-4">
             {displayLabel}
           </div>
-          <div className="h-56 -mx-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={displayChart} margin={{ top: 5, right: 8, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="kpi-fill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#10b981" stopOpacity={0.35} />
-                    <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis
-                  dataKey="time"
-                  tick={{ fontSize: 10, fontFamily: 'ui-monospace', fill: 'currentColor' }}
-                  className="text-muted-foreground"
-                  axisLine={false}
-                  tickLine={false}
-                  minTickGap={50}
-                />
-                <YAxis
-                  tick={{ fontSize: 10, fontFamily: 'ui-monospace', fill: 'currentColor' }}
-                  className="text-muted-foreground"
-                  axisLine={false}
-                  tickLine={false}
-                  width={50}
-                  domain={['auto', 'auto']}
-                  tickFormatter={(v) =>
-                    typeof v === 'number'
-                      ? v >= 1
-                        ? `$${v.toFixed(2)}`
-                        : `$${v.toPrecision(2)}`
-                      : `${v}`
-                  }
-                />
-                <Tooltip
-                  contentStyle={{
-                    background: 'hsl(var(--background))',
-                    border: '1px solid hsl(var(--border))',
-                    fontFamily: 'ui-monospace',
-                    fontSize: 11,
-                  }}
-                  formatter={(v: number) => fmtMoney(v)}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="value"
-                  stroke="#10b981"
-                  strokeWidth={1.5}
-                  fill="url(#kpi-fill)"
-                  isAnimationActive={false}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+          <div className="h-48 sm:h-56 w-full">
+            {displayChart.length > 1 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={displayChart} margin={{ top: 5, right: 8, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="kpi-fill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#10b981" stopOpacity={0.35} />
+                      <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis
+                    dataKey="time"
+                    tick={{ fontSize: 10, fontFamily: 'ui-monospace', fill: 'currentColor' }}
+                    className="text-muted-foreground"
+                    axisLine={false}
+                    tickLine={false}
+                    minTickGap={50}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis
+                    tick={{ fontSize: 10, fontFamily: 'ui-monospace', fill: 'currentColor' }}
+                    className="text-muted-foreground"
+                    axisLine={false}
+                    tickLine={false}
+                    width={48}
+                    domain={['auto', 'auto']}
+                    tickFormatter={(v) =>
+                      typeof v === 'number'
+                        ? v >= 1
+                          ? `$${v.toFixed(2)}`
+                          : `$${v.toPrecision(2)}`
+                        : `${v}`
+                    }
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      background: 'hsl(var(--background))',
+                      border: '1px solid hsl(var(--border))',
+                      fontFamily: 'ui-monospace',
+                      fontSize: 11,
+                    }}
+                    formatter={(v: number) => fmtMoney(v)}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="value"
+                    stroke="#10b981"
+                    strokeWidth={1.5}
+                    fill="url(#kpi-fill)"
+                    isAnimationActive={false}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground font-mono">
+                <div className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Loading chart…
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Right: leaderboard */}
-        <div className="border border-border rounded-md">
-          <div className="px-4 py-3 border-b border-border">
+        <div className="border border-border rounded-md overflow-hidden">
+          <div className="px-3 md:px-4 py-2.5 md:py-3 border-b border-border flex items-center justify-between">
             <h2 className="font-semibold text-sm">Services Leaderboard</h2>
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
+              Top {leaderboard.length || 0}
+            </span>
           </div>
-          <ul className="divide-y divide-border">
+          <ul className="divide-y divide-border max-h-[420px] overflow-y-auto">
             {leaderboard.length === 0 && (
               <li className="px-4 py-6 text-center text-sm text-muted-foreground">
                 No services ranked yet
               </li>
             )}
             {leaderboard.map((entry) => (
-              <li key={entry.id} className="px-4 py-2.5 flex items-center gap-3 hover:bg-muted/30 transition-colors">
-                <span className="w-6 text-xs font-mono text-muted-foreground tabular-nums">
+              <li key={entry.id} className="px-3 md:px-4 py-2.5 flex items-center gap-2.5 md:gap-3 hover:bg-muted/30 active:bg-muted/50 transition-colors min-h-[48px]">
+                <span className="w-5 md:w-6 text-xs font-mono text-muted-foreground tabular-nums shrink-0">
                   {entry.rank}
                 </span>
                 {entry.avatar_url ? (
@@ -277,20 +292,20 @@ export function MarketDashboard(props: MarketDashboardProps) {
                   <img
                     src={entry.avatar_url}
                     alt=""
-                    className="w-7 h-7 rounded-md object-cover bg-muted"
+                    className="w-7 h-7 rounded-md object-cover bg-muted shrink-0"
                   />
                 ) : (
-                  <div className="w-7 h-7 rounded-md bg-muted flex items-center justify-center">
+                  <div className="w-7 h-7 rounded-md bg-muted flex items-center justify-center shrink-0">
                     <Bot className="w-4 h-4 text-muted-foreground" />
                   </div>
                 )}
                 <Link
                   href={`/agent/${entry.handle}`}
-                  className="flex-1 text-sm font-medium hover:underline truncate"
+                  className="flex-1 text-sm font-medium hover:underline truncate min-w-0"
                 >
                   {entry.name}
                 </Link>
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground border border-border rounded-full px-2 py-0.5">
+                <span className="hidden sm:inline-block text-[10px] uppercase tracking-wider text-muted-foreground border border-border rounded-full px-2 py-0.5 shrink-0">
                   {entry.category}
                 </span>
               </li>
@@ -300,7 +315,7 @@ export function MarketDashboard(props: MarketDashboardProps) {
       </div>
 
       {/* ── Stat strip ──────────────────────────────────────────────────── */}
-      <div className="max-w-7xl mx-auto px-4 pb-6 grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="max-w-7xl mx-auto px-3 md:px-4 pb-4 md:pb-6 grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
         <StatCard
           label="Payment Volume"
           value={fmtMoney(stats.payment_volume_usd)}
@@ -333,8 +348,8 @@ export function MarketDashboard(props: MarketDashboardProps) {
 
       {/* ── CTA strip ───────────────────────────────────────────────────── */}
       <div className="border-t border-border bg-muted/30">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div>
+        <div className="max-w-7xl mx-auto px-3 md:px-4 py-3 md:py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div className="min-w-0">
             <div className="font-semibold text-sm">Supercharge your agent with Relay Wallet</div>
             <p className="text-xs text-muted-foreground">
               Easiest way to give your agent a funded wallet and the skills to use x402.
@@ -342,14 +357,14 @@ export function MarketDashboard(props: MarketDashboardProps) {
           </div>
           <button
             onClick={copyCmd}
-            className="flex items-center gap-2 px-3 py-2 rounded-md border border-border bg-background font-mono text-xs hover:bg-muted transition-colors"
+            className="flex items-center gap-2 px-3 py-2 rounded-md border border-border bg-background font-mono text-[11px] sm:text-xs hover:bg-muted active:bg-muted/70 transition-colors min-h-[44px] w-full md:w-auto justify-center md:justify-start overflow-hidden"
           >
-            <span className="text-muted-foreground">$</span>
-            <span>npx skills add relay-network/agentic-wallet</span>
+            <span className="text-muted-foreground shrink-0">$</span>
+            <span className="truncate">npx skills add relay-network/agentic-wallet</span>
             {copied ? (
-              <Check className="w-3.5 h-3.5 text-green-500" />
+              <Check className="w-3.5 h-3.5 text-green-500 shrink-0" />
             ) : (
-              <Copy className="w-3.5 h-3.5 text-muted-foreground" />
+              <Copy className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
             )}
           </button>
         </div>
