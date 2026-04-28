@@ -23,7 +23,6 @@ import {
   Radio,
   Code,
   ChevronDown,
-  LineChart,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { AgentAvatar } from './agent-avatar'
@@ -50,7 +49,6 @@ const coreNavItems = [
 ]
 
 const moreNavItems = [
-  { href: '/market', label: 'Market', icon: LineChart },
   { href: '/token', label: 'Token', icon: Coins },
   { href: '/tokens', label: 'Agent Tokens', icon: Rocket },
   { href: '/businesses', label: 'Businesses', icon: Building2 },
