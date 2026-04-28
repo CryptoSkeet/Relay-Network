@@ -71,6 +71,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 // ---------------------------------------------------------------------------
 
 const activeIntervals = new Map(); // agentId → intervalId
+const agentConfigs = new Map(); // agentId → last-known heartbeat_interval_ms (for reconciliation)
 
 // ---------------------------------------------------------------------------
 // Core: post one agent's heartbeat to the feed
@@ -194,10 +195,13 @@ async function agentHeartbeat(agent) {
         .maybeSingle();
 
       if (!orphanCheck?.key_orphaned_at) {
+        // Match either column: human-API contracts set provider_id; agent-
+        // generated contracts (via contract-agent.js) set only seller_agent_id.
+        // Querying just provider_id misses the agent-generated backlog.
         const { data: completedContracts } = await supabase
         .from("contracts")
         .select("id, budget_max, price_relay, status, relay_paid, buyer_agent_id, client_id, seller_agent_id")
-        .eq("provider_id", agent.id)
+        .or(`provider_id.eq.${agent.id},seller_agent_id.eq.${agent.id}`)
         .in("status", ["completed", "SETTLED"])
         .not("relay_paid", "is", true);
 
@@ -336,13 +340,7 @@ function registerAgent(agent) {
     activeIntervals.set(agentId, id);
   }, staggerMs);
 
-  console.log(
-    `[heartbeat] Registered "${label}" ` +
-    `— interval ${intervalMs / 1000}s, stagger ${(staggerMs / 1000).toFixed(1)}s`
-  );
-}
-
-// ---------------------------------------------------------------------------
+  agentConfigs.set(agentId, intervalMs);
 // Deregister an agent (called when agent is paused or deleted)
 // ---------------------------------------------------------------------------
 
@@ -352,6 +350,7 @@ function deregisterAgent(agentId) {
     activeIntervals.delete(agentId);
     console.log(`[heartbeat] Deregistered agent ${agentId}`);
   }
+  agentConfigs.delete(agentId);
 }
 
 // ---------------------------------------------------------------------------
@@ -386,10 +385,46 @@ async function loadAgents() {
 
 // ---------------------------------------------------------------------------
 // Supabase Realtime: react to agent config changes without restart
+//
+// Resilience strategy:
+//   1. Realtime is the fast path — react in <1s to UPDATE/INSERT/DELETE.
+//   2. On CHANNEL_ERROR / TIMED_OUT / CLOSED, tear down and reconnect with
+//      exponential backoff (capped at 5 min). No service restart required.
+//   3. A periodic reconciler (`reconcileAgents`) polls Supabase as a fallback
+//      so config changes are still picked up even if realtime stays broken.
 // ---------------------------------------------------------------------------
 
+let realtimeChannel = null;
+let realtimeReconnectAttempt = 0;
+let realtimeReconnectTimer = null;
+const REALTIME_BACKOFF_MAX_MS = 5 * 60 * 1000;
+const RECONCILE_INTERVAL_MS = parseInt(process.env.HEARTBEAT_RECONCILE_INTERVAL_MS ?? "60000");
+
+function scheduleRealtimeReconnect(reason) {
+  if (realtimeReconnectTimer) return; // already scheduled
+
+  realtimeReconnectAttempt += 1;
+  const delay = Math.min(
+    1000 * Math.pow(2, realtimeReconnectAttempt - 1),
+    REALTIME_BACKOFF_MAX_MS
+  );
+  console.warn(
+    `[realtime] Channel ${reason} — reconnecting in ${(delay / 1000).toFixed(0)}s ` +
+    `(attempt ${realtimeReconnectAttempt}). Polling reconciler remains active.`
+  );
+
+  realtimeReconnectTimer = setTimeout(async () => {
+    realtimeReconnectTimer = null;
+    if (realtimeChannel) {
+      try { await supabase.removeChannel(realtimeChannel); } catch { /* ignore */ }
+      realtimeChannel = null;
+    }
+    watchAgentChanges();
+  }, delay);
+}
+
 function watchAgentChanges() {
-  supabase
+  realtimeChannel = supabase
     .channel("agent-heartbeat-watch")
     .on(
       "postgres_changes",
@@ -422,14 +457,66 @@ function watchAgentChanges() {
     )
     .subscribe((status) => {
       if (status === 'SUBSCRIBED') {
-        console.log('[realtime] Watching agents table for config changes');
-      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-        if (!watchAgentChanges._warned) {
-          console.warn('[realtime] Channel unavailable — restart service to pick up agent config changes');
-          watchAgentChanges._warned = true;
+        if (realtimeReconnectAttempt > 0) {
+          console.log(`[realtime] Reconnected after ${realtimeReconnectAttempt} attempt(s)`);
+        } else {
+          console.log('[realtime] Watching agents table for config changes');
         }
+        realtimeReconnectAttempt = 0;
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        scheduleRealtimeReconnect(status.toLowerCase());
       }
     });
+}
+
+// ---------------------------------------------------------------------------
+// Polling reconciler — fallback for when Realtime is unavailable.
+// Compares the live `agents` table against our in-memory registry and
+// registers/deregisters/re-registers as needed.
+// ---------------------------------------------------------------------------
+
+async function reconcileAgents() {
+  const { data: agents, error } = await supabase
+    .from("agents")
+    .select("id, handle, display_name, bio, capabilities, model_family, heartbeat_interval_ms, heartbeat_enabled")
+    .eq("heartbeat_enabled", true);
+
+  if (error) {
+    console.warn("[reconcile] Failed to fetch agents:", error.message);
+    return;
+  }
+
+  const seen = new Set();
+  for (const agent of agents ?? []) {
+    seen.add(agent.id);
+    const prevInterval = agentConfigs.get(agent.id);
+    const nextInterval = agent.heartbeat_interval_ms ?? DEFAULT_INTERVAL_MS;
+
+    if (!activeIntervals.has(agent.id)) {
+      console.log(`[reconcile] Registering missing agent "${agent.display_name ?? agent.handle}"`);
+      registerAgent(agent);
+    } else if (prevInterval !== nextInterval) {
+      console.log(`[reconcile] Interval changed for "${agent.display_name ?? agent.handle}" (${prevInterval} → ${nextInterval}ms)`);
+      registerAgent(agent);
+    }
+  }
+
+  // Deregister anything no longer enabled or deleted
+  for (const agentId of activeIntervals.keys()) {
+    if (!seen.has(agentId)) {
+      console.log(`[reconcile] Deregistering stale agent ${agentId}`);
+      deregisterAgent(agentId);
+    }
+  }
+}
+
+function startReconciler() {
+  setInterval(() => {
+    reconcileAgents().catch((err) => {
+      console.warn("[reconcile] Unexpected error:", err.message);
+    });
+  }, RECONCILE_INTERVAL_MS);
+  console.log(`[reconcile] Polling reconciler running every ${RECONCILE_INTERVAL_MS / 1000}s`);
 }
 
 // ---------------------------------------------------------------------------
@@ -438,6 +525,14 @@ function watchAgentChanges() {
 
 function shutdown() {
   console.log("\n[heartbeat] Shutting down — clearing all intervals...");
+  if (realtimeReconnectTimer) {
+    clearTimeout(realtimeReconnectTimer);
+    realtimeReconnectTimer = null;
+  }
+  if (realtimeChannel) {
+    try { supabase.removeChannel(realtimeChannel); } catch { /* ignore */ }
+    realtimeChannel = null;
+  }
   for (const [agentId, id] of activeIntervals) {
     clearInterval(id);
     console.log(`[heartbeat] Stopped agent ${agentId}`);
@@ -461,5 +556,6 @@ console.log("=================================================");
 
 await loadAgents();
 watchAgentChanges();
+startReconciler();
 
 console.log("[heartbeat] Service running. Press Ctrl+C to stop.");
