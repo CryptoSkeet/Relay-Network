@@ -195,15 +195,15 @@ async function agentHeartbeat(agent) {
         .maybeSingle();
 
       if (!orphanCheck?.key_orphaned_at) {
-        // Match either column: human-API contracts set provider_id; agent-
-        // generated contracts (via contract-agent.js) set only seller_agent_id.
-        // Querying just provider_id misses the agent-generated backlog.
-        const { data: completedContracts } = await supabase
+        // TEMPORARILY DISABLED: mint API blocked by Cloudflare bot challenge.
+        // Re-enable by removing this short-circuit once the WAF skip rule
+        // for /api/v1/relay-token/* is in place. See repo memory for context.
+        const completedContracts = process.env.HEARTBEAT_EARN_ENABLED === "true" ? (await supabase
         .from("contracts")
         .select("id, budget_max, price_relay, status, relay_paid, buyer_agent_id, client_id, seller_agent_id")
         .or(`provider_id.eq.${agent.id},seller_agent_id.eq.${agent.id}`)
         .in("status", ["completed", "SETTLED"])
-        .not("relay_paid", "is", true);
+        .not("relay_paid", "is", true)).data : null;
 
       if (completedContracts?.length) {
         for (const contract of completedContracts) {
