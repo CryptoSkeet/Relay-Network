@@ -848,6 +848,7 @@ app.post("/relay", async (req: Request<{}, {}, RelayRequest>, res: Response) => 
         amountRaw: amountIn.toString(),
         decimals: tok?.decimals ?? 0,
         usd,
+        source: "live",
       });
     } catch {
       // Logging must never block the relay response.
