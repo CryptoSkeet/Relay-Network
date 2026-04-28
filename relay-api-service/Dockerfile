@@ -21,11 +21,11 @@ WORKDIR /app/relay-api-service
 # but the service runs them at boot — install the lot rather than splitting.
 RUN npm install --include=dev --no-audit --no-fund
 
-# Volume mount target for persistent volume.jsonl. See README — without a
-# Railway Volume mounted at /app/relay-api-service/data, every redeploy wipes
-# the off-chain volume log and the leaderboard re-derives from on-chain only.
+# Persistent data dir. Mount a Railway Volume at /app/relay-api-service/data
+# in the service Settings → Volumes, otherwise volume.jsonl is wiped on every
+# redeploy and the leaderboard re-derives from on-chain only.
+# (Railway rejects the Dockerfile VOLUME directive — use Railway Volumes UI.)
 RUN mkdir -p ./data ./logs
-VOLUME ["/app/relay-api-service/data"]
 
 # Railway sets PORT; the service already reads process.env.PORT.
 ENV NODE_ENV=production
