@@ -177,6 +177,21 @@ export async function lockEscrowOnChain(
   const [escrowPDA] = deriveEscrowPDA(contractId)
   const [vaultPDA] = deriveEscrowVaultPDA(contractId)
 
+  // Idempotency pre-flight: if the escrow PDA already exists on chain, this
+  // contract was locked by a previous attempt that may have CF/devnet-timed
+  // out before we could persist the signature. Recover the original signature
+  // instead of trying to re-allocate the same PDA (which would fail with
+  // "Allocate: account already in use" anyway).
+  const existing = await connection.getAccountInfo(escrowPDA)
+  if (existing) {
+    const sigs = await connection.getSignaturesForAddress(escrowPDA, { limit: 1 })
+    const recoveredSig = sigs[0]?.signature
+    if (recoveredSig) {
+      console.warn(`[escrow] PDA already exists for contract ${contractId} — recovering sig ${recoveredSig}`)
+      return recoveredSig
+    }
+  }
+
   const rawAmount = BigInt(Math.round(amount * 1_000_000))
   const data = buildLockEscrowData(contractId, rawAmount)
 
@@ -198,7 +213,52 @@ export async function lockEscrowOnChain(
   })
 
   const tx = new Transaction().add(ix)
-  const sig = await sendAndConfirmTransaction(connection, tx, [payer, buyerKeypair])
+  // Use explicit blockhash + commitment to give us a real expiry window
+  // and let us recover when sendAndConfirm times out but the tx actually
+  // landed (common on the public devnet fallback, which is slower than QN).
+  let sig: string
+  try {
+    sig = await sendAndConfirmTransaction(connection, tx, [payer, buyerKeypair], {
+      commitment: 'confirmed',
+      preflightCommitment: 'confirmed',
+      maxRetries: 3,
+    })
+  } catch (err: any) {
+    const msg = String(err?.message ?? err)
+    // sendAndConfirmTransaction throws TransactionExpiredBlockheightExceededError
+    // when the blockhash window closes before we see a confirmation. The tx
+    // may have STILL landed — check signature status before giving up.
+    const expired =
+      err?.name === 'TransactionExpiredBlockheightExceededError' ||
+      /block ?height exceeded/i.test(msg) ||
+      /signature .* has expired/i.test(msg)
+    if (!expired) throw err
+
+    // Extract the signature from the error if it carries one; otherwise we
+    // can't recover (web3.js sometimes embeds it in the message).
+    const sigMatch = msg.match(/Signature ([1-9A-HJ-NP-Za-km-z]{43,88})/)
+    const candidateSig: string | undefined = err?.signature ?? sigMatch?.[1]
+    if (!candidateSig) throw err
+
+    // Poll for up to ~12s — public devnet often finalizes 5-10s after our
+    // send returns. Cheaper than re-sending and re-paying fees.
+    let landed = false
+    for (let i = 0; i < 8; i++) {
+      const status = await connection.getSignatureStatus(candidateSig, {
+        searchTransactionHistory: true,
+      })
+      const v = status?.value
+      if (v && !v.err && (v.confirmationStatus === 'confirmed' || v.confirmationStatus === 'finalized')) {
+        landed = true
+        break
+      }
+      if (v?.err) throw new Error(`Tx ${candidateSig} failed on chain: ${JSON.stringify(v.err)}`)
+      await new Promise((r) => setTimeout(r, 1500))
+    }
+    if (!landed) throw err
+    sig = candidateSig
+    console.warn(`[escrow] sendAndConfirm timed out but tx ${sig} landed on chain — recovering`)
+  }
 
   invalidateBalanceCache(buyerKeypair.publicKey.toString())
   console.log(`[escrow] Locked ${amount} RELAY for contract ${contractId}: ${sig}`)
