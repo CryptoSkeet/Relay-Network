@@ -156,6 +156,36 @@ function buildLockEscrowData(contractId: string, amount: bigint): Buffer {
 }
 
 /**
+ * Decode `EscrowAccount.buyer` from raw account bytes WITHOUT pulling in
+ * the full Anchor IDL deserializer. Layout (Borsh):
+ *   [0..8)   discriminator
+ *   [8..12)  contract_id length (u32 LE)
+ *   [12..12+len)  contract_id (utf-8)
+ *   [12+len..12+len+32)  buyer pubkey       <-- target
+ *   ...
+ *
+ * SECURITY: the on-chain escrow PDA is seeded ONLY by contract_id, not by
+ * the buyer pubkey. That means an attacker who learns a contract_id (e.g.
+ * via a leaked DB row) can race ahead and call lock_escrow themselves with
+ * 1 raw unit, claiming the PDA + setting escrow.buyer = attacker. Without
+ * this check our idempotency recovery path would treat the squat as a
+ * successful self-lock and let `contract-engine` mark the contract PENDING
+ * against an attacker-owned escrow. So: before trusting an existing PDA,
+ * decode escrow.buyer and confirm it matches our buyer signer.
+ *
+ * Fix the seed scheme on the next program upgrade so this can't happen at
+ * all (seeds = [b"escrow", contract_id_hash, buyer.key()]).
+ */
+function decodeEscrowBuyer(data: Buffer | Uint8Array): PublicKey | null {
+  const buf = Buffer.isBuffer(data) ? data : Buffer.from(data)
+  if (buf.length < 12) return null
+  const idLen = buf.readUInt32LE(8)
+  const buyerOffset = 12 + idLen
+  if (buf.length < buyerOffset + 32) return null
+  return new PublicKey(buf.subarray(buyerOffset, buyerOffset + 32))
+}
+
+/**
  * Lock RELAY into on-chain escrow for a contract.
  *
  * The buyer's RELAY tokens are transferred from their ATA to a program-owned
@@ -182,12 +212,29 @@ export async function lockEscrowOnChain(
   // out before we could persist the signature. Recover the original signature
   // instead of trying to re-allocate the same PDA (which would fail with
   // "Allocate: account already in use" anyway).
+  //
+  // CRITICAL: validate escrow.buyer matches our buyer pubkey before trusting
+  // the existing PDA. See decodeEscrowBuyer comment for the squatting attack
+  // this guards against.
   const existing = await connection.getAccountInfo(escrowPDA)
   if (existing) {
+    const recordedBuyer = decodeEscrowBuyer(existing.data)
+    if (!recordedBuyer) {
+      throw new Error(
+        `Escrow PDA exists for contract ${contractId} but its data is unparseable — refusing to recover.`,
+      )
+    }
+    if (!recordedBuyer.equals(buyerKeypair.publicKey)) {
+      throw new Error(
+        `Escrow PDA for contract ${contractId} is owned by buyer ${recordedBuyer.toBase58()}, ` +
+          `not the expected buyer ${buyerKeypair.publicKey.toBase58()}. ` +
+          `This contract slot has been squatted on-chain — pick a new contract_id.`,
+      )
+    }
     const sigs = await connection.getSignaturesForAddress(escrowPDA, { limit: 1 })
     const recoveredSig = sigs[0]?.signature
     if (recoveredSig) {
-      console.warn(`[escrow] PDA already exists for contract ${contractId} — recovering sig ${recoveredSig}`)
+      console.warn(`[escrow] PDA already exists for contract ${contractId} (buyer verified) — recovering sig ${recoveredSig}`)
       return recoveredSig
     }
   }
