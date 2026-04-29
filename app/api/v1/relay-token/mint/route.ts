@@ -6,7 +6,51 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { mintRelayTokens, ensureAgentWallet } from '@/lib/solana/relay-token'
+import { RelaySendError } from '@/lib/solana/send'
 import { internalFinancialRateLimit, checkRateLimit, rateLimitResponse } from '@/lib/ratelimit'
+
+// Transient RPC failures (BLOCKHASH_EXPIRED, SEND_FAILED) account for the
+// residual ~10% mint failure rate after the heartbeat-UA fix. Retry these
+// classes — each retry gets a fresh blockhash inside sendAndConfirm.
+const TRANSIENT_KINDS = new Set(['BLOCKHASH_EXPIRED', 'SEND_FAILED'])
+const MAX_ATTEMPTS = 3
+const RETRY_BASE_MS = 400
+
+async function mintWithRetry(
+  publicKey: string,
+  amount: number,
+  memo: string,
+): Promise<{ sig: string; attempts: number }> {
+  let lastErr: unknown
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const sig = await mintRelayTokens(publicKey, amount, memo)
+      return { sig, attempts: attempt }
+    } catch (err) {
+      lastErr = err
+      const transient = err instanceof RelaySendError && TRANSIENT_KINDS.has(err.kind)
+      if (!transient || attempt === MAX_ATTEMPTS) break
+      // Exponential backoff with jitter.
+      const delay = RETRY_BASE_MS * 2 ** (attempt - 1) + Math.floor(Math.random() * 200)
+      await new Promise((r) => setTimeout(r, delay))
+    }
+  }
+  throw lastErr
+}
+
+function describeError(err: unknown): string {
+  if (err instanceof RelaySendError) {
+    const causeMsg =
+      err.cause instanceof Error
+        ? err.cause.message
+        : err.cause !== undefined
+          ? String(err.cause)
+          : null
+    return causeMsg ? `${err.kind}: ${err.message} — ${causeMsg}` : `${err.kind}: ${err.message}`
+  }
+  if (err instanceof Error) return err.message
+  return String(err)
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -36,8 +80,8 @@ export async function POST(request: NextRequest) {
       ? `relay:contract:${contract_id}:settled`
       : `relay:earn:${agent_id}:${reason}`
 
-    // Mint on-chain
-    const sig = await mintRelayTokens(wallet.publicKey, amount, memo)
+    // Mint on-chain (with retry for transient RPC failures)
+    const { sig, attempts } = await mintWithRetry(wallet.publicKey, amount, memo)
 
     // Credit in DB
     const { data: dbWallet } = await supabase
@@ -62,9 +106,10 @@ export async function POST(request: NextRequest) {
       on_chain_sig: sig,
       amount,
       wallet: wallet.publicKey,
+      attempts,
     })
   } catch (err) {
     console.error('Mint error:', err)
-    return NextResponse.json({ error: String(err) }, { status: 500 })
+    return NextResponse.json({ error: describeError(err) }, { status: 500 })
   }
 }
