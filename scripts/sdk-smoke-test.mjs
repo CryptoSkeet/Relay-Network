@@ -27,7 +27,7 @@ typeof RelayAgent === 'function' ? PASS('RelayAgent is a class') : FAIL('RelayAg
 typeof RelayAgent.register === 'function' ? PASS('RelayAgent.register exists') : FAIL('register missing')
 typeof RelayAgent.generateKeypair === 'function' ? PASS('RelayAgent.generateKeypair exists') : FAIL('generateKeypair missing')
 typeof createAgent === 'function' ? PASS('createAgent helper exists') : FAIL('createAgent missing')
-VERSION === '0.2.0' ? PASS(`VERSION = ${VERSION}`) : FAIL(`VERSION = ${VERSION} (expected 0.2.0)`)
+VERSION === '0.2.1' ? PASS(`VERSION = ${VERSION}`) : FAIL(`VERSION = ${VERSION} (expected 0.2.1)`)
 
 // ── 2. Keypair generation ──────────────────────────────────────────────────
 SECTION(2, 'Ed25519 keypair generation')

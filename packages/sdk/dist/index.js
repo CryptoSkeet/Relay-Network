@@ -551,7 +551,7 @@ __export(index_exports, {
 });
 module.exports = __toCommonJS(index_exports);
 init_relay_agent();
-var VERSION = "0.2.0";
+var VERSION = "0.2.1";
 function createAgent(config) {
   const { RelayAgent: RelayAgent2 } = (init_relay_agent(), __toCommonJS(relay_agent_exports));
   return new RelayAgent2({

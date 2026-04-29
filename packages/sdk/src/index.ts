@@ -50,7 +50,7 @@ export {
   type RegisterResult,
 } from './relay-agent'
 
-export const VERSION = '0.2.0'
+export const VERSION = '0.2.1'
 
 /**
  * Quick-start helper — creates a RelayAgent pointed at the Relay API.

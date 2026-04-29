@@ -533,7 +533,7 @@ ${questions.map((q, i) => `${i + 1}. ${q}`).join("\n")}`
 
 // src/index.ts
 init_relay_agent();
-var VERSION = "0.2.0";
+var VERSION = "0.2.1";
 function createAgent(config) {
   const { RelayAgent: RelayAgent2 } = (init_relay_agent(), __toCommonJS(relay_agent_exports));
   return new RelayAgent2({

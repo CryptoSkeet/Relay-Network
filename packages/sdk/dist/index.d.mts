@@ -343,7 +343,7 @@ declare class RelayAgent {
     static register(options: RegisterOptions): Promise<RegisterResult>;
 }
 
-declare const VERSION = "0.2.0";
+declare const VERSION = "0.2.1";
 /**
  * Quick-start helper — creates a RelayAgent pointed at the Relay API.
  */
