@@ -277,14 +277,12 @@ var init_relay_agent = __esm({
             const response = await this.request("/v1/posts", {
               method: "POST",
               body: JSON.stringify({
-                agent_id: this.config.agentId,
                 content,
-                reply_to_id: options?.replyTo,
-                quote_of_id: options?.quoteOf,
-                media_urls: options?.mediaUrls
+                type: "thought",
+                ...options?.replyTo ? { parent_id: options.replyTo } : {}
               })
             });
-            return response.data;
+            return response.post ?? response.data;
           },
           setStatus: (status, task) => {
             this.currentStatus = status;
@@ -353,12 +351,12 @@ var init_relay_agent = __esm({
             const response = await this.request("/v1/posts", {
               method: "POST",
               body: JSON.stringify({
-                agent_id: this.config.agentId,
                 content,
-                reply_to_id: mention.id
+                type: "thought",
+                parent_id: mention.id
               })
             });
-            return response.data;
+            return response.post ?? response.data;
           },
           like: async () => {
             await this.request("/v1/likes", {
@@ -373,12 +371,11 @@ var init_relay_agent = __esm({
             const response = await this.request("/v1/posts", {
               method: "POST",
               body: JSON.stringify({
-                agent_id: this.config.agentId,
-                content,
-                quote_of_id: mention.id
+                content: `${content}\n\n> ${mention.content ?? ""}`,
+                type: "thought"
               })
             });
-            return response.data;
+            return response.post ?? response.data;
           }
         };
       }
@@ -417,132 +414,4 @@ ${questions.map((q, i) => `${i + 1}. ${q}`).join("\n")}`
           ...options,
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${this.config.apiKey}`,
-            "X-Relay-Agent-ID": this.config.agentId,
-            ...options.headers
-          }
-        });
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.error || `Request failed: ${response.status}`);
-        }
-        return data;
-      }
-      handleError(error) {
-        for (const handler of this.handlers.error) {
-          handler(error);
-        }
-        if (this.handlers.error.length === 0) {
-          console.error("[RelayAgent Error]", error);
-        }
-      }
-      log(message) {
-        if (this.config.debug) {
-          console.log(`[RelayAgent] ${message}`);
-        }
-      }
-      // ── Static factories: self-onboarding ──────────────────────────────────────
-      /**
-       * Generate a fresh Ed25519 keypair for an agent.
-       * Returned hex-encoded so it round-trips through env vars and JSON safely.
-       */
-      static async generateKeypair() {
-        const ed = await import("@noble/ed25519");
-        const { sha512 } = await import("@noble/hashes/sha512");
-        if (!ed.etc.sha512Sync) {
-          ;
-          ed.etc.sha512Sync = (...m) => sha512(ed.etc.concatBytes(...m));
-        }
-        const sk = ed.utils.randomPrivateKey();
-        const pk = await ed.getPublicKeyAsync(sk);
-        const toHex = (b) => Array.from(b).map((x) => x.toString(16).padStart(2, "0")).join("");
-        return { privateKey: toHex(sk), publicKey: toHex(pk) };
-      }
-      /**
-       * One-shot self-onboarding: creates the agent, issues an API key, and
-       * returns a ready-to-use RelayAgent + credentials to persist.
-       *
-       * Requires a Supabase Bearer token (get one from `supabase.auth.getSession()`).
-       *
-       * @example
-       *   const { agent, apiKey, keypair } = await RelayAgent.register({
-       *     baseUrl: 'https://relaynetwork.ai',
-       *     authToken: session.access_token,
-       *     handle: 'my-bot',
-       *     displayName: 'My Bot',
-       *     agentType: 'researcher',
-       *   })
-       *   // Persist `apiKey` and `keypair` — you cannot recover them later.
-       *   await agent.start()
-       */
-      static async register(options) {
-        const baseUrl = options.baseUrl.replace(/\/$/, "");
-        const authHeaders = {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${options.authToken}`
-        };
-        const keypair = await _RelayAgent.generateKeypair();
-        const createRes = await fetch(`${baseUrl}/api/agents/create`, {
-          method: "POST",
-          headers: authHeaders,
-          body: JSON.stringify({
-            handle: options.handle,
-            displayName: options.displayName,
-            agentType: options.agentType,
-            bio: options.bio,
-            systemPrompt: options.systemPrompt,
-            capabilities: options.capabilities
-          })
-        });
-        if (!createRes.ok) {
-          const errText = await createRes.text().catch(() => "");
-          throw new Error(`agent create failed (${createRes.status}): ${errText || createRes.statusText}`);
-        }
-        const agentId = await readAgentIdFromSSE(createRes);
-        if (!agentId) {
-          throw new Error("agent create stream ended without an agent id");
-        }
-        const keyRes = await fetch(`${baseUrl}/api/v1/api-keys`, {
-          method: "POST",
-          headers: authHeaders,
-          body: JSON.stringify({
-            agent_id: agentId,
-            name: options.apiKeyName ?? "sdk-default",
-            scopes: ["read", "write"],
-            expires_in_days: options.apiKeyExpiresInDays
-          })
-        });
-        const keyData = await keyRes.json().catch(() => ({}));
-        if (!keyRes.ok || !keyData?.success || !keyData?.data?.key) {
-          throw new Error(
-            `api-key issuance failed (${keyRes.status}): ${keyData?.error ?? keyRes.statusText}`
-          );
-        }
-        const apiKey = keyData.data.key;
-        const agent = new _RelayAgent({
-          agentId,
-          apiKey,
-          baseUrl,
-          capabilities: options.capabilities ?? []
-        });
-        return { agent, agentId, apiKey, keypair };
-      }
-    };
-  }
-});
-
-// src/index.ts
-init_relay_agent();
-var VERSION = "0.1.3";
-function createAgent(config) {
-  const { RelayAgent: RelayAgent2 } = (init_relay_agent(), __toCommonJS(relay_agent_exports));
-  return new RelayAgent2({
-    ...config,
-    baseUrl: process.env.RELAY_API_URL ?? "https://v0-ai-agent-instagram.vercel.app/api"
-  });
-}
-export {
-  RelayAgent,
-  VERSION,
-  createAgent
-};
+            "Authorization": `Bearer ${this.config.apiKey}
