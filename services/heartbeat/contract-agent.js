@@ -21,9 +21,40 @@ const ANTHROPIC_BASE_URL = (process.env.ANTHROPIC_BASE_URL || "https://api.anthr
 // Default targets Anthropic direct (matches ANTHROPIC_BASE_URL default).
 const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001";
 
+// Production app base URL — heartbeat calls the API instead of writing to the
+// DB directly, so initiate/settle flow through contract-engine.js (which
+// performs on-chain escrow lock/release). Falls back to the public domain
+// if env is unset on Railway.
+const APP_BASE_URL = (process.env.APP_BASE_URL || "https://relaynetwork.ai").replace(/\/$/, "");
+const CRON_SECRET = process.env.CRON_SECRET;
+
 // Max contracts an agent can hold at once (avoid runaway accumulation)
 const MAX_ACTIVE_AS_SELLER = 3;
 const MAX_ACTIVE_AS_BUYER  = 2;
+
+// ---------------------------------------------------------------------------
+// API helper — service-token auth (CRON_SECRET) acting on behalf of `agentId`.
+// Matches the pattern in /api/v1/relay-token/mint. UA bypasses Cloudflare's
+// default-block on Node fetch from datacenter IPs (Railway).
+// ---------------------------------------------------------------------------
+
+async function callContractApi(path, agentId, init = {}) {
+  if (!CRON_SECRET) throw new Error("CRON_SECRET not set on heartbeat");
+  const res = await fetch(`${APP_BASE_URL}${path}`, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${CRON_SECRET}`,
+      "x-relay-agent-id": agentId,
+      "User-Agent": "RelayHeartbeatService/1.0",
+      ...(init.headers || {}),
+    },
+  });
+  const text = await res.text();
+  let body;
+  try { body = text ? JSON.parse(text) : null; } catch { body = text; }
+  return { status: res.status, ok: res.ok, body };
+}
 
 // ---------------------------------------------------------------------------
 // LLM helpers
@@ -159,38 +190,29 @@ async function settleDelivered(agent, db) {
       if (parsed.feedback) feedback = parsed.feedback;
     } catch { /* use defaults */ }
 
-    // Release escrow
-    await db.from("escrow_holds")
-      .update({ status: "RELEASED", released_at: new Date().toISOString() })
-      .eq("contract_id", contract.id);
+    // Release escrow + on-chain settle via the API (single source of truth).
+    // Replaces the old direct-DB-write path that bypassed on-chain escrow
+    // and was the reason 100% of contracts settled off-chain.
+    const r = await callContractApi(
+      `/api/contracts/${contract.id}/settle`,
+      agent.id,
+      {
+        method: "POST",
+        body: JSON.stringify({ rating, feedback }),
+      },
+    ).catch(e => ({ ok: false, status: 0, body: { error: e.message } }));
 
-    // Credit seller rewards (non-fatal)
-    try {
-      await db.rpc("credit_relay_reward", {
-        p_agent_id:    contract.seller_agent_id,
-        p_amount:      contract.price_relay ?? 10,
-        p_contract_id: contract.id,
-      });
-    } catch { /* RPC not yet available */ }
-
-    const { error } = await db.from("contracts").update({
-      status:        "SETTLED",
-      settled_at:    new Date().toISOString(),
-      // NOTE (Pass C item 1): we do NOT touch relay_paid here. The buyer's
-      // auto-settle records the rating/feedback, but the actual on-chain
-      // payment is performed by the seller's heartbeat EARN loop, which
-      // atomically claims relay_paid in the same UPDATE that wins it.
-      // Setting relay_paid=true here without minting (the prior behaviour)
-      // suppressed every autonomous payout silently.
-      buyer_rating:  rating,
-      buyer_feedback: feedback,
-    }).eq("id", contract.id);
-
-    if (error) {
-      console.error(`[contract:${agent.handle}] Settle update failed:`, error.message);
-    } else {
-      console.log(`[contract:${agent.handle}] SETTLED: "${contract.title.slice(0,50)}" (${rating}/5) — seller will mint ${contract.price_relay} RELAY on next heartbeat`);
+    if (!r.ok) {
+      console.error(
+        `[contract:${agent.handle}] SETTLE failed (${r.status}) for "${contract.title.slice(0,50)}":`,
+        r.body?.error || r.body,
+      );
+      continue;
     }
+
+    console.log(
+      `[contract:${agent.handle}] SETTLED via API: "${contract.title.slice(0,50)}" (${rating}/5)`,
+    );
   }
 }
 
@@ -220,38 +242,33 @@ async function initiateOpen(agent, db) {
 
   // Pick one at random
   const contract = open[Math.floor(Math.random() * open.length)];
-  const wallet = agent.creator_wallet ?? `Relay${agent.id.replace(/-/g,"").slice(0,38)}`;
 
-  // Lock escrow
-  const { data: escrow, error: escrowErr } = await db
-    .from("escrow_holds")
-    .insert({
-      contract_id:    contract.id,
-      buyer_agent_id: agent.id,
-      buyer_wallet:   wallet,
-      amount_relay:   contract.price_relay ?? 10,
-      status:         "LOCKED",
-      locked_at:      new Date().toISOString(),
-    })
-    .select("id")
-    .single();
+  // Initiate via the API — this calls contract-engine.initiateContract,
+  // which performs on-chain escrow lock (transfers RELAY from buyer ATA →
+  // program vault PDA) and only then writes the escrow_holds row. If the
+  // buyer's ATA is empty the API returns 400 — correct behaviour, broke
+  // agents shouldn't be able to commission paid work.
+  const r = await callContractApi(
+    `/api/contracts/${contract.id}`,
+    agent.id,
+    {
+      method: "PATCH",
+      body: JSON.stringify({}),
+    },
+  ).catch(e => ({ ok: false, status: 0, body: { error: e.message } }));
 
-  if (escrowErr) {
-    console.error(`[contract:${agent.handle}] Escrow error:`, escrowErr.message);
+  if (!r.ok) {
+    // Loud, not silent — these failures are now diagnostic signal, not noise.
+    console.warn(
+      `[contract:${agent.handle}] INITIATE failed (${r.status}) for "${contract.title.slice(0,50)}":`,
+      r.body?.error || r.body,
+    );
     return;
   }
 
-  const { error } = await db.from("contracts").update({
-    buyer_agent_id: agent.id,
-    buyer_wallet:   wallet,
-    escrow_id:      escrow.id,
-    status:         "PENDING",
-    initiated_at:   new Date().toISOString(),
-  }).eq("id", contract.id);
-
-  if (!error) {
-    console.log(`[contract:${agent.handle}] INITIATED: "${contract.title.slice(0,50)}" (${contract.price_relay} RELAY)`);
-  }
+  console.log(
+    `[contract:${agent.handle}] INITIATED via API: "${contract.title.slice(0,50)}" (${contract.price_relay} RELAY)`,
+  );
 }
 
 // ---------------------------------------------------------------------------
