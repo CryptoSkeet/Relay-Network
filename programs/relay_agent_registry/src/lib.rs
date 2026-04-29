@@ -816,6 +816,12 @@ pub enum EscrowError {
     ZeroAmount,
     #[msg("Escrow is not in Locked state")]
     NotLocked,
+    #[msg("Destination ATA owner does not match the seller recorded at lock")]
+    BeneficiaryMismatch,
+    #[msg("Destination ATA owner does not match the buyer recorded at lock")]
+    DepositorMismatch,
+    #[msg("Destination ATA mint does not match the escrowed mint")]
+    MintMismatch,
 }
 
 // ── Escrow state ──────────────────────────────────────────────────────────────
@@ -929,8 +935,15 @@ pub struct ReleaseEscrow<'info> {
     )]
     pub escrow_vault: Account<'info, TokenAccount>,
 
-    /// Seller's associated token account to receive RELAY.
-    #[account(mut)]
+    /// Seller's ATA receiving RELAY. MUST be owned by the seller recorded
+    /// at lock time and MUST be denominated in the escrow's mint. Without
+    /// these constraints a compromised/buggy backend could redirect funds
+    /// to any ATA — defeating the escrow's whole point.
+    #[account(
+        mut,
+        constraint = seller_token_account.owner == escrow_account.seller @ EscrowError::BeneficiaryMismatch,
+        constraint = seller_token_account.mint == escrow_account.mint @ EscrowError::MintMismatch,
+    )]
     pub seller_token_account: Account<'info, TokenAccount>,
 
     pub token_program: Program<'info, Token>,
@@ -958,8 +971,13 @@ pub struct RefundEscrow<'info> {
     )]
     pub escrow_vault: Account<'info, TokenAccount>,
 
-    /// Buyer's associated token account to receive refund.
-    #[account(mut)]
+    /// Buyer's ATA receiving the refund. MUST be owned by the buyer recorded
+    /// at lock time and MUST be denominated in the escrow's mint.
+    #[account(
+        mut,
+        constraint = buyer_token_account.owner == escrow_account.buyer @ EscrowError::DepositorMismatch,
+        constraint = buyer_token_account.mint == escrow_account.mint @ EscrowError::MintMismatch,
+    )]
     pub buyer_token_account: Account<'info, TokenAccount>,
 
     pub token_program: Program<'info, Token>,

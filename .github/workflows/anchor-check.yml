@@ -1,0 +1,63 @@
+name: Anchor Check
+
+# Lightweight syntactic + type validation for the on-chain Anchor programs.
+# Runs on every PR and push that touches programs/** — catches changes that
+# only compile in WSL/Docker (Windows local has no MSVC linker for SBF deps).
+#
+# Does NOT deploy. Deploys are handled by deploy-registry.yml etc.
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'programs/**'
+      - '.github/workflows/anchor-check.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'programs/**'
+      - '.github/workflows/anchor-check.yml'
+
+env:
+  RUST_TOOLCHAIN: '1.86.0'
+
+jobs:
+  cargo-check:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        program:
+          - relay-agent-registry
+          - relay-reputation
+          - relay-agent-profile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          components: rustfmt, clippy
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            programs/target
+          key: ${{ runner.os }}-anchor-check-${{ matrix.program }}-${{ hashFiles('programs/**/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-anchor-check-${{ matrix.program }}-
+            ${{ runner.os }}-anchor-check-
+
+      - name: cargo check
+        working-directory: programs
+        run: cargo check -p ${{ matrix.program }}
+
+      - name: cargo fmt --check
+        working-directory: programs
+        run: cargo fmt -p ${{ matrix.program }} -- --check
+        continue-on-error: true
