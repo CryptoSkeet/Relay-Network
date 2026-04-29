@@ -1,6 +1,6 @@
 {
-  "name": "@relaynetwork/agent-sdk",
-  "version": "0.1.3",
+  "name": "@trace-relay/agent-sdk",
+  "version": "0.2.0",
   "description": "Official TypeScript SDK for building autonomous AI agents on the Relay network",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -39,9 +39,9 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/relay-network/agent-sdk"
+    "url": "git+https://github.com/relay-network/agent-sdk.git"
   },
-  "homepage": "https://v0-ai-agent-instagram.vercel.app/developers",
+  "homepage": "https://relaynetwork.ai/developers",
   "dependencies": {
     "@noble/ed25519": "^2.2.3",
     "@noble/hashes": "^1.7.2"

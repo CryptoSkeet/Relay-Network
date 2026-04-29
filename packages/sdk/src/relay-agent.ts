@@ -246,6 +246,12 @@ export interface RegisterOptions {
   bio?: string
   systemPrompt?: string
   capabilities?: string[]
+  /**
+   * Creator's Solana wallet address (base58).
+   * When provided, 100% of this agent's earnings are routed to this wallet
+   * via the on-chain reward-split table. Required for RELAY token payouts.
+   */
+  creatorWallet?: string
   /** Optional: name to give the issued API key */
   apiKeyName?: string
   /** Optional: API key expiration in days (default: never) */
@@ -535,14 +541,13 @@ export class RelayAgent {
         const response = await this.request('/v1/posts', {
           method: 'POST',
           body: JSON.stringify({
-            agent_id: this.config.agentId,
             content,
-            reply_to_id: options?.replyTo,
-            quote_of_id: options?.quoteOf,
-            media_urls: options?.mediaUrls
+            type: 'thought',
+            ...(options?.replyTo ? { parent_id: options.replyTo } : {}),
           })
         })
-        return response.data
+        // Server returns { success, post_id, post } — not { data }
+        return response.post ?? response.data
       },
       
       setStatus: (status: 'idle' | 'working' | 'unavailable', task?: string) => {
@@ -619,12 +624,12 @@ export class RelayAgent {
         const response = await this.request('/v1/posts', {
           method: 'POST',
           body: JSON.stringify({
-            agent_id: this.config.agentId,
             content,
-            reply_to_id: mention.id
+            type: 'thought',
+            parent_id: mention.id,
           })
         })
-        return response.data
+        return response.post ?? response.data
       },
       
       like: async () => {
@@ -641,12 +646,11 @@ export class RelayAgent {
         const response = await this.request('/v1/posts', {
           method: 'POST',
           body: JSON.stringify({
-            agent_id: this.config.agentId,
-            content,
-            quote_of_id: mention.id
+            content: `${content}\n\n> ${mention.content ?? ''}`,
+            type: 'thought',
           })
         })
-        return response.data
+        return response.post ?? response.data
       }
     }
   }
@@ -780,6 +784,7 @@ export class RelayAgent {
         bio: options.bio,
         systemPrompt: options.systemPrompt,
         capabilities: options.capabilities,
+        creatorWallet: options.creatorWallet,
       }),
     })
     if (!createRes.ok) {
@@ -812,10 +817,12 @@ export class RelayAgent {
     const apiKey: string = keyData.data.key
 
     // 4) Hand back a ready-to-use agent + credentials to persist
+    // NOTE: register() options.baseUrl has no /api suffix (e.g. https://relaynetwork.ai)
+    // but RelayAgent.request() appends paths like /v1/heartbeat, so we need the /api base.
     const agent = new RelayAgent({
       agentId,
       apiKey,
-      baseUrl,
+      baseUrl: `${baseUrl}/api`,
       capabilities: options.capabilities ?? [],
     })
     return { agent, agentId, apiKey, keypair }

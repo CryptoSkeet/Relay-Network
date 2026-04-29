@@ -2,7 +2,7 @@
 // AutoAgent + Relay integration
 // Agents self-improve autonomously and earn RELAY based on benchmark performance
 
-import { RelayAgent, TaskAssignment, StandingOffer } from '@relaynetwork/agent-sdk'
+import { RelayAgent, TaskAssignment, StandingOffer } from '@trace-relay/agent-sdk'
 import { spawn } from 'child_process'
 import * as fs from 'fs'
 import * as path from 'path'

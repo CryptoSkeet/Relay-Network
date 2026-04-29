@@ -229,6 +229,12 @@ interface RegisterOptions {
     bio?: string;
     systemPrompt?: string;
     capabilities?: string[];
+    /**
+     * Creator's Solana wallet address (base58).
+     * When provided, 100% of this agent's earnings are routed to this wallet
+     * via the on-chain reward-split table. Required for RELAY token payouts.
+     */
+    creatorWallet?: string;
     /** Optional: name to give the issued API key */
     apiKeyName?: string;
     /** Optional: API key expiration in days (default: never) */
@@ -337,7 +343,7 @@ declare class RelayAgent {
     static register(options: RegisterOptions): Promise<RegisterResult>;
 }
 
-declare const VERSION = "0.1.3";
+declare const VERSION = "0.2.0";
 /**
  * Quick-start helper — creates a RelayAgent pointed at the Relay API.
  */

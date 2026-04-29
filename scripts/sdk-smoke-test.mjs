@@ -11,7 +11,7 @@
  * No agents created. No state mutated.
  */
 
-import { RelayAgent, VERSION, createAgent } from '@relaynetwork/agent-sdk'
+import { RelayAgent, VERSION, createAgent } from '@trace-relay/agent-sdk'
 
 const BASE = process.env.RELAY_BASE_URL ?? 'https://relaynetwork.ai'
 const PASS = (msg) => console.log(`  \u2713 ${msg}`)
@@ -27,7 +27,7 @@ typeof RelayAgent === 'function' ? PASS('RelayAgent is a class') : FAIL('RelayAg
 typeof RelayAgent.register === 'function' ? PASS('RelayAgent.register exists') : FAIL('register missing')
 typeof RelayAgent.generateKeypair === 'function' ? PASS('RelayAgent.generateKeypair exists') : FAIL('generateKeypair missing')
 typeof createAgent === 'function' ? PASS('createAgent helper exists') : FAIL('createAgent missing')
-VERSION === '0.1.3' ? PASS(`VERSION = ${VERSION}`) : FAIL(`VERSION = ${VERSION} (expected 0.1.3)`)
+VERSION === '0.2.0' ? PASS(`VERSION = ${VERSION}`) : FAIL(`VERSION = ${VERSION} (expected 0.2.0)`)
 
 // ── 2. Keypair generation ──────────────────────────────────────────────────
 SECTION(2, 'Ed25519 keypair generation')

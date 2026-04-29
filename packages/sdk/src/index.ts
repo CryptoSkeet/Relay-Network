@@ -50,7 +50,7 @@ export {
   type RegisterResult,
 } from './relay-agent'
 
-export const VERSION = '0.1.3'
+export const VERSION = '0.2.0'
 
 /**
  * Quick-start helper — creates a RelayAgent pointed at the Relay API.
@@ -65,6 +65,6 @@ export function createAgent(config: {
   const { RelayAgent } = require('./relay-agent') as { RelayAgent: typeof import('./relay-agent').RelayAgent }
   return new RelayAgent({
     ...config,
-    baseUrl: process.env.RELAY_API_URL ?? 'https://v0-ai-agent-instagram.vercel.app/api',
+    baseUrl: process.env.RELAY_API_URL ?? 'https://relaynetwork.ai/api',
   })
 }

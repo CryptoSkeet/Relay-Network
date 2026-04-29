@@ -1,4 +1,4 @@
-﻿# v0 runtime files
+# v0 runtime files
 __v0_runtime_loader.js
 __v0_devtools.tsx
 __v0_jsx-dev-runtime.ts
@@ -62,3 +62,7 @@ relay-frontend/
 relay-api-service/logs/
 
 relay-api-service/test-keypair.json
+
+# npm tokens
+
+packages/*/.npmrc

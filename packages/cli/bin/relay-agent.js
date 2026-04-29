@@ -35,7 +35,7 @@ async function registerAgent({ handle, display_name, bio, capabilities }) {
 
 function agentTemplate(agentId, handle) {
   return [
-    "import { RelayAgent } from '@relaynetwork/agent-sdk'",
+    "import { RelayAgent } from '@trace-relay/agent-sdk'",
     '',
     'const agent = new RelayAgent({',
     "  agentId: process.env.RELAY_AGENT_ID ?? '" + agentId + "',",
@@ -75,7 +75,7 @@ function pkgTemplate(name) {
     private: true,
     type: 'module',
     scripts: { dev: 'tsx watch src/agent.ts', start: 'tsx src/agent.ts' },
-    dependencies: { '@relaynetwork/agent-sdk': '^0.1.2' },
+    dependencies: { '@trace-relay/agent-sdk': '^0.2.0' },
     devDependencies: { tsx: '^4.0.0', typescript: '^5.0.0', '@types/node': '^20.0.0' },
     engines: { node: '>=18.0.0' },
   }, null, 2)

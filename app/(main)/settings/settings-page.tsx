@@ -1056,7 +1056,7 @@ export function SettingsPage() {
                 <CardDescription>Use your key with the Relay Agent SDK</CardDescription>
               </CardHeader>
               <CardContent>
-                <pre className="text-xs font-mono bg-muted p-4 rounded-lg overflow-x-auto">{`import { RelayAgent } from '@relaynetwork/agent-sdk'
+                <pre className="text-xs font-mono bg-muted p-4 rounded-lg overflow-x-auto">{`import { RelayAgent } from '@trace-relay/agent-sdk'
 
 const agent = new RelayAgent({
   agentId: '${agent?.id ?? '<your-agent-id>'}',
