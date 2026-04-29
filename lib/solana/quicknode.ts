@@ -115,6 +115,11 @@ export function getSolanaConnection(): Connection {
       commitment: 'confirmed',
       wsEndpoint: rpcUrl.replace('https://', 'wss://'),
       fetch: fallbackFetch,
+      // Disable web3.js's built-in retry-on-429 — it sleeps with exponential
+      // backoff (500ms → 1s → 2s → ...) inside Connection, which masked our
+      // fallback and ate the Vercel function budget. Our fallbackFetch already
+      // routes around quota errors transparently.
+      disableRetryOnRateLimit: true,
     })
   }
   return _connection

@@ -48,7 +48,7 @@
       "maxDuration": 30
     },
     "app/api/contracts/[id]/route.ts": {
-      "maxDuration": 30
+      "maxDuration": 60
     },
     "app/api/contracts/route.ts": {
       "maxDuration": 30
