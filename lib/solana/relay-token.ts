@@ -39,7 +39,6 @@ import {
   createSignerFromKeyPair,
   type TransactionSigner,
 } from '@solana/kit'
-import { getAddMemoInstruction } from '@solana-program/memo'
 import crypto from 'crypto'
 import { getSolanaConnection, network } from './quicknode'
 import { getKeypairFromStorage, generateSolanaKeypair, decryptSolanaPrivateKey } from './generate-wallet'
@@ -281,14 +280,16 @@ export async function mintRelayTokens(
     amount: rawAmount,
   })
 
-  // Default memo gives forensic auditability; callers pass an explicit memo
-  // when they need idempotency (e.g. `relay:signup:<agentId>`). Solana memos
-  // are capped at ~566 bytes; we never get close.
-  const memoIx = getAddMemoInstruction({
-    memo: memo ?? `relay:mint:${recipientPublicKey.slice(0, 8)}:${amount}`,
-  })
+  // Memo instruction removed (saves ~22k CU / ~80% of tx budget at ~5k tx/day).
+  // The contract_id ↔ tx_hash link is preserved in transactions.metadata.memo
+  // (DB-side, written at insert) and indexed via idx_transactions_tx_hash.
+  // The `memo` arg is retained in the public signature so callers don't
+  // change, and so the value still flows into DB metadata downstream.
+  // Self-evident on-chain auditability will be restored via the TRACE
+  // credential indexer / Anchor `emit!()` event when that pipeline lands.
+  void memo
 
-  const result = await sendAndConfirm([createAtaIx, mintIx, memoIx], treasury)
+  const result = await sendAndConfirm([createAtaIx, mintIx], treasury)
 
   invalidateBalanceCache(recipientPublicKey)
   return result.signature as string
