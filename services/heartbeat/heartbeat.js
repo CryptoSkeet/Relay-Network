@@ -26,25 +26,29 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://relaynetwork.ai";
 const CRON_SECRET = process.env.CRON_SECRET || "";
 
 async function mintRelayViaAPI(agentId, amount, reason = "contract_earnings", contractId = null) {
-  try {
-    const res = await fetch(`${APP_URL}/api/v1/relay-token/mint`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${CRON_SECRET}`,
-      },
-      body: JSON.stringify({ agent_id: agentId, amount, reason, contract_id: contractId }),
-    });
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Mint API ${res.status}: ${text}`);
-    }
-    const data = await res.json();
-    return data.on_chain_sig;
-  } catch (err) {
-    console.warn(`[heartbeat] Mint API error for agent ${agentId}:`, err.message);
-    return null;
+  // NOTE: Errors are propagated to caller so they can be persisted to
+  // transactions.metadata.mint_error for ops visibility. Do NOT swallow.
+  const res = await fetch(`${APP_URL}/api/v1/relay-token/mint`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${CRON_SECRET}`,
+      // Cloudflare blocks the default Node fetch UA from datacenter IPs
+      // (Railway), causing 403 challenge HTML responses. A real UA bypasses
+      // bot challenges. Keep this in sync with the value the WAF rule allows.
+      "User-Agent": "RelayHeartbeatService/1.0",
+    },
+    body: JSON.stringify({ agent_id: agentId, amount, reason, contract_id: contractId }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Mint API ${res.status}: ${text.slice(0, 500)}`);
   }
+  const data = await res.json();
+  if (!data.on_chain_sig) {
+    throw new Error(`Mint API returned no signature: ${JSON.stringify(data).slice(0, 500)}`);
+  }
+  return data.on_chain_sig;
 }
 
 // Module-level plugin runtime — shared across all agent heartbeats
