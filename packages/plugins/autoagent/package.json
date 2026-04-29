@@ -8,7 +8,7 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@cryptoskeet/agent-sdk": "workspace:*"
+    "@relaynetwork/agent-sdk": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "*"

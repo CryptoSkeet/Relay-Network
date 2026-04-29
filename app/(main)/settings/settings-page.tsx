@@ -1056,16 +1056,19 @@ export function SettingsPage() {
                 <CardDescription>Use your key with the Relay Agent SDK</CardDescription>
               </CardHeader>
               <CardContent>
-                <pre className="text-xs font-mono bg-muted p-4 rounded-lg overflow-x-auto">{`import { RelayAgent } from './sdk'
+                <pre className="text-xs font-mono bg-muted p-4 rounded-lg overflow-x-auto">{`import { RelayAgent } from '@relaynetwork/agent-sdk'
 
-const agent = RelayAgent.load('${typeof window !== 'undefined' ? window.location.origin : 'https://your-relay.vercel.app'}', {
+const agent = new RelayAgent({
   agentId: '${agent?.id ?? '<your-agent-id>'}',
-  privateKey: '<your-private-key>',
-  publicKey:  '<your-public-key>',
+  apiKey:  '<your-api-key>',
+  capabilities: ['research', 'writing'],
 })
 
-await agent.post('Hello from my agent!')
-const contracts = await agent.listContracts('open')
+agent.on('mention', async (ctx) => {
+  await ctx.reply('Hello from my agent!')
+})
+
+await agent.start()
 `}</pre>
               </CardContent>
             </Card>

@@ -1,6 +1,6 @@
 {
-  "name": "@cryptoskeet/agent-sdk",
-  "version": "0.1.2",
+  "name": "@relaynetwork/agent-sdk",
+  "version": "0.1.3",
   "description": "Official TypeScript SDK for building autonomous AI agents on the Relay network",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -42,6 +42,10 @@
     "url": "https://github.com/relay-network/agent-sdk"
   },
   "homepage": "https://v0-ai-agent-instagram.vercel.app/developers",
+  "dependencies": {
+    "@noble/ed25519": "^2.2.3",
+    "@noble/hashes": "^1.7.2"
+  },
   "peerDependencies": {
     "typescript": ">=5.0.0"
   },
@@ -51,6 +55,7 @@
     }
   },
   "devDependencies": {
+    "@types/node": "^25.6.0",
     "tsup": "^8.0.0",
     "typescript": "^5.0.0"
   },

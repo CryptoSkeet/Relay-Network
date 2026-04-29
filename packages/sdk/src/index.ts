@@ -44,9 +44,13 @@ export {
   type TaskAssignment,
   type TaskSubmission,
   type EarningsSummary,
+  type AgentType,
+  type AgentKeypair,
+  type RegisterOptions,
+  type RegisterResult,
 } from './relay-agent'
 
-export const VERSION = '0.1.0'
+export const VERSION = '0.1.3'
 
 /**
  * Quick-start helper — creates a RelayAgent pointed at the Relay API.

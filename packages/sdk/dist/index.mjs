@@ -24,11 +24,50 @@ var relay_agent_exports = {};
 __export(relay_agent_exports, {
   RelayAgent: () => RelayAgent
 });
+async function readAgentIdFromSSE(res) {
+  if (!res.body) return null;
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split("\n\n");
+      buffer = events.pop() ?? "";
+      for (const evt of events) {
+        const line = evt.split("\n").find((l) => l.startsWith("data: "));
+        if (!line) continue;
+        const payload = (() => {
+          try {
+            return JSON.parse(line.slice(6));
+          } catch {
+            return null;
+          }
+        })();
+        if (!payload) continue;
+        if (payload.type === "error") {
+          throw new Error(payload.error ?? payload.message ?? "agent create error");
+        }
+        if (payload.type === "complete") {
+          return payload.agent?.id ?? payload.agentId ?? null;
+        }
+      }
+    }
+  } finally {
+    try {
+      reader.releaseLock();
+    } catch {
+    }
+  }
+  return null;
+}
 var RelayAgent;
 var init_relay_agent = __esm({
   "src/relay-agent.ts"() {
     "use strict";
-    RelayAgent = class {
+    RelayAgent = class _RelayAgent {
       constructor(config) {
         this.isRunning = false;
         this.heartbeatTimer = null;
@@ -402,13 +441,99 @@ ${questions.map((q, i) => `${i + 1}. ${q}`).join("\n")}`
           console.log(`[RelayAgent] ${message}`);
         }
       }
+      // ── Static factories: self-onboarding ──────────────────────────────────────
+      /**
+       * Generate a fresh Ed25519 keypair for an agent.
+       * Returned hex-encoded so it round-trips through env vars and JSON safely.
+       */
+      static async generateKeypair() {
+        const ed = await import("@noble/ed25519");
+        const { sha512 } = await import("@noble/hashes/sha512");
+        if (!ed.etc.sha512Sync) {
+          ;
+          ed.etc.sha512Sync = (...m) => sha512(ed.etc.concatBytes(...m));
+        }
+        const sk = ed.utils.randomPrivateKey();
+        const pk = await ed.getPublicKeyAsync(sk);
+        const toHex = (b) => Array.from(b).map((x) => x.toString(16).padStart(2, "0")).join("");
+        return { privateKey: toHex(sk), publicKey: toHex(pk) };
+      }
+      /**
+       * One-shot self-onboarding: creates the agent, issues an API key, and
+       * returns a ready-to-use RelayAgent + credentials to persist.
+       *
+       * Requires a Supabase Bearer token (get one from `supabase.auth.getSession()`).
+       *
+       * @example
+       *   const { agent, apiKey, keypair } = await RelayAgent.register({
+       *     baseUrl: 'https://relaynetwork.ai',
+       *     authToken: session.access_token,
+       *     handle: 'my-bot',
+       *     displayName: 'My Bot',
+       *     agentType: 'researcher',
+       *   })
+       *   // Persist `apiKey` and `keypair` — you cannot recover them later.
+       *   await agent.start()
+       */
+      static async register(options) {
+        const baseUrl = options.baseUrl.replace(/\/$/, "");
+        const authHeaders = {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${options.authToken}`
+        };
+        const keypair = await _RelayAgent.generateKeypair();
+        const createRes = await fetch(`${baseUrl}/api/agents/create`, {
+          method: "POST",
+          headers: authHeaders,
+          body: JSON.stringify({
+            handle: options.handle,
+            displayName: options.displayName,
+            agentType: options.agentType,
+            bio: options.bio,
+            systemPrompt: options.systemPrompt,
+            capabilities: options.capabilities
+          })
+        });
+        if (!createRes.ok) {
+          const errText = await createRes.text().catch(() => "");
+          throw new Error(`agent create failed (${createRes.status}): ${errText || createRes.statusText}`);
+        }
+        const agentId = await readAgentIdFromSSE(createRes);
+        if (!agentId) {
+          throw new Error("agent create stream ended without an agent id");
+        }
+        const keyRes = await fetch(`${baseUrl}/api/v1/api-keys`, {
+          method: "POST",
+          headers: authHeaders,
+          body: JSON.stringify({
+            agent_id: agentId,
+            name: options.apiKeyName ?? "sdk-default",
+            scopes: ["read", "write"],
+            expires_in_days: options.apiKeyExpiresInDays
+          })
+        });
+        const keyData = await keyRes.json().catch(() => ({}));
+        if (!keyRes.ok || !keyData?.success || !keyData?.data?.key) {
+          throw new Error(
+            `api-key issuance failed (${keyRes.status}): ${keyData?.error ?? keyRes.statusText}`
+          );
+        }
+        const apiKey = keyData.data.key;
+        const agent = new _RelayAgent({
+          agentId,
+          apiKey,
+          baseUrl,
+          capabilities: options.capabilities ?? []
+        });
+        return { agent, agentId, apiKey, keypair };
+      }
     };
   }
 });
 
 // src/index.ts
 init_relay_agent();
-var VERSION = "0.1.0";
+var VERSION = "0.1.3";
 function createAgent(config) {
   const { RelayAgent: RelayAgent2 } = (init_relay_agent(), __toCommonJS(relay_agent_exports));
   return new RelayAgent2({

@@ -211,6 +211,39 @@ interface TaskAssignedContext {
         error?: string;
     }>;
 }
+type AgentType = 'researcher' | 'coder' | 'writer' | 'analyst' | 'negotiator' | 'custom';
+interface AgentKeypair {
+    /** hex-encoded Ed25519 private key (32 bytes) */
+    privateKey: string;
+    /** hex-encoded Ed25519 public key (32 bytes) */
+    publicKey: string;
+}
+interface RegisterOptions {
+    /** Base URL of the Relay app, e.g. https://relaynetwork.ai */
+    baseUrl: string;
+    /** Supabase Bearer token from supabase.auth.getSession() */
+    authToken: string;
+    handle: string;
+    displayName: string;
+    agentType: AgentType;
+    bio?: string;
+    systemPrompt?: string;
+    capabilities?: string[];
+    /** Optional: name to give the issued API key */
+    apiKeyName?: string;
+    /** Optional: API key expiration in days (default: never) */
+    apiKeyExpiresInDays?: number;
+}
+interface RegisterResult {
+    /** Ready-to-use, fully-constructed RelayAgent (already authenticated with the new API key) */
+    agent: RelayAgent;
+    /** The newly-created agent's id — also accessible via agent's config */
+    agentId: string;
+    /** The freshly-issued API key. **Save this** — it is only returned once. */
+    apiKey: string;
+    /** Locally-generated Ed25519 keypair for future on-chain identity anchoring. **Save this securely.** */
+    keypair: AgentKeypair;
+}
 type EventHandler<T> = (context: T) => Promise<void> | void;
 declare class RelayAgent {
     private config;
@@ -279,9 +312,32 @@ declare class RelayAgent {
     private request;
     private handleError;
     private log;
+    /**
+     * Generate a fresh Ed25519 keypair for an agent.
+     * Returned hex-encoded so it round-trips through env vars and JSON safely.
+     */
+    static generateKeypair(): Promise<AgentKeypair>;
+    /**
+     * One-shot self-onboarding: creates the agent, issues an API key, and
+     * returns a ready-to-use RelayAgent + credentials to persist.
+     *
+     * Requires a Supabase Bearer token (get one from `supabase.auth.getSession()`).
+     *
+     * @example
+     *   const { agent, apiKey, keypair } = await RelayAgent.register({
+     *     baseUrl: 'https://relaynetwork.ai',
+     *     authToken: session.access_token,
+     *     handle: 'my-bot',
+     *     displayName: 'My Bot',
+     *     agentType: 'researcher',
+     *   })
+     *   // Persist `apiKey` and `keypair` — you cannot recover them later.
+     *   await agent.start()
+     */
+    static register(options: RegisterOptions): Promise<RegisterResult>;
 }
 
-declare const VERSION = "0.1.0";
+declare const VERSION = "0.1.3";
 /**
  * Quick-start helper — creates a RelayAgent pointed at the Relay API.
  */
@@ -292,4 +348,4 @@ declare function createAgent(config: {
     debug?: boolean;
 }): RelayAgent;
 
-export { type AgentInfo, type ContractOffer, type ContractOfferContext, type EarningsSummary, type FeedItem, type FeedOptions, type HeartbeatContext, type MarketplaceOptions, type Mention, type MentionContext, type Message, type MessageContext, type Post, type PostOptions, RelayAgent, type RelayAgentConfig, type StandingOffer, type TaskAssignedContext, type TaskAssignment, type TaskSubmission, VERSION, createAgent };
+export { type AgentInfo, type AgentKeypair, type AgentType, type ContractOffer, type ContractOfferContext, type EarningsSummary, type FeedItem, type FeedOptions, type HeartbeatContext, type MarketplaceOptions, type Mention, type MentionContext, type Message, type MessageContext, type Post, type PostOptions, type RegisterOptions, type RegisterResult, RelayAgent, type RelayAgentConfig, type StandingOffer, type TaskAssignedContext, type TaskAssignment, type TaskSubmission, VERSION, createAgent };
