@@ -55,29 +55,54 @@ function isQuotaError(status: number, bodyText: string): boolean {
   return false
 }
 
+// Once we detect quota exhaustion on the primary, skip it for this many
+// milliseconds so we don't pay the latency cost of primary→429→fallback on
+// every single RPC call (a single lockEscrowOnChain may trigger 5+ RPCs;
+// 5×~500ms wasted on doomed primary calls = Cloudflare 504).
+const PRIMARY_COOLDOWN_MS = 60_000
+let primaryDownUntil = 0
 let lastFallbackAt = 0
+
 function logFallback(reason: string): void {
   const now = Date.now()
   // Throttle the log line to once per 5s so we don't spam Vercel.
   if (now - lastFallbackAt < 5000) return
   lastFallbackAt = now
-  console.warn(`[solana-rpc] primary RPC quota hit (${reason}) — falling back to ${fallbackUrl}`)
+  console.warn(`[solana-rpc] primary RPC quota hit (${reason}) — falling back to ${fallbackUrl} for ${PRIMARY_COOLDOWN_MS / 1000}s`)
 }
 
 const fallbackFetch: FetchLike = async (input, init) => {
-  const primaryRes = await fetch(input, init)
-  if (!fallbackEnabled) return primaryRes
+  if (!fallbackEnabled) return fetch(input, init)
 
-  // Inspect response for quota errors. We must clone() because Connection
-  // will read the body itself once we return.
-  const clone = primaryRes.clone()
-  const bodyText = await clone.text().catch(() => '')
+  // Hot path: primary is known-down → go straight to fallback.
+  if (Date.now() < primaryDownUntil) {
+    return fetch(fallbackUrl, init)
+  }
+
+  const primaryRes = await fetch(input, init)
+
+  // Fast-path success: most JSON-RPC calls return 200. We still need to
+  // catch QuickNode's 200+JSON-RPC-error quota response, but we cap the
+  // body inspection size so we don't buffer huge getProgramAccounts
+  // responses just to check for "-32003".
+  let bodyText = ''
+  if (primaryRes.status >= 400) {
+    bodyText = await primaryRes.clone().text().catch(() => '')
+  } else if (primaryRes.status === 200) {
+    // QN quota error bodies are tiny (~250B). Peek at the first 1KB only.
+    const peek = primaryRes.clone()
+    const reader = peek.body?.getReader()
+    if (reader) {
+      const { value } = await reader.read().catch(() => ({ value: undefined as Uint8Array | undefined }))
+      reader.cancel().catch(() => {})
+      if (value) bodyText = new TextDecoder().decode(value.slice(0, 1024))
+    }
+  }
+
   if (!isQuotaError(primaryRes.status, bodyText)) return primaryRes
 
+  primaryDownUntil = Date.now() + PRIMARY_COOLDOWN_MS
   logFallback(`status=${primaryRes.status}`)
-
-  // Re-issue against fallback. `input` is the primary URL; replace it.
-  // We keep the same method / headers / body.
   return fetch(fallbackUrl, init)
 }
 
