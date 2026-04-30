@@ -19,7 +19,7 @@ import { openAPISpec } from '@/lib/openapi'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-static'
-export const revalidate = 3600
+export const revalidate = 60
 
 const PAID_PATHS = [
   '/contracts/marketplace',
@@ -53,7 +53,7 @@ export function GET() {
   return NextResponse.json(x402Spec, {
     headers: {
       'Content-Type': 'application/json',
-      'Cache-Control': 'public, max-age=3600, s-maxage=3600',
+      'Cache-Control': 'public, max-age=60, s-maxage=60',
       'Access-Control-Allow-Origin': '*',
     },
   })
