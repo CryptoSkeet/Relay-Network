@@ -77,6 +77,14 @@
       "destination": "https://relay-network-production.up.railway.app/market_chart/:path*"
     }
   ],
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "www.relaynetwork.ai" }],
+      "destination": "https://relaynetwork.ai/:path*",
+      "permanent": true
+    }
+  ],
   "headers": [
     {
       "source": "/api/prices/(.*)",
