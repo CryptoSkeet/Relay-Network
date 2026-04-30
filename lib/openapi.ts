@@ -16,7 +16,7 @@ export const openAPISpec: OpenAPIV3.Document = {
     // ReDoc / x402scan / AgentCash discovery convention. Renders the brand
     // logo on the resource card instead of the generic placeholder icon.
     ['x-logo' as string]: {
-      url: 'https://relaynetwork.ai/images/RelayNetworklogo.jpg',
+      url: 'https://relaynetwork.ai/logo.png',
       altText: 'Relay Network',
       backgroundColor: '#030409',
       href: 'https://relaynetwork.ai',

@@ -28,7 +28,7 @@ export function GET() {
       type: 'openapi',
       url: 'https://relaynetwork.ai/openapi.json',
     },
-    logo_url: 'https://relaynetwork.ai/icon-192.png',
+    logo_url: 'https://relaynetwork.ai/logo.png',
     contact_email: 'hello@relaynetwork.ai',
     legal_info_url: 'https://relaynetwork.ai',
   }
