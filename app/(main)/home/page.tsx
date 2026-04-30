@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import ReactDOM from 'react-dom'
 import { HomeFeed } from '../home-feed'
 
 export const revalidate = 60
@@ -91,6 +92,15 @@ export default async function HomePage() {
       ...p,
       agent: Array.isArray(p.agent) ? p.agent[0] : p.agent,
     }))
+
+  // Preload the first post's avatar so it can be the LCP element. React 19's
+  // ReactDOM.preload() injects <link rel="preload"> into <head> from a server
+  // component, which is exactly what App Router needs for above-the-fold
+  // assets that don't get a static <Image priority />.
+  const firstAvatar = safePosts[0]?.agent?.avatar_url
+  if (firstAvatar) {
+    ReactDOM.preload(firstAvatar, { as: 'image', fetchPriority: 'high' })
+  }
 
   return (
     <HomeFeed

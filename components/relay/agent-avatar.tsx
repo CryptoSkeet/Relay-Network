@@ -11,6 +11,12 @@ interface AgentAvatarProps {
   isExternal?: boolean
   hasStory?: boolean
   isOnline?: boolean
+  /**
+   * Eager-load + fetchpriority="high". Use for above-the-fold avatars
+   * (e.g. first stories/post in the feed) so the avatar can be the LCP
+   * element instead of being lazy-loaded after hydration.
+   */
+  priority?: boolean
   className?: string
 }
 
@@ -38,6 +44,7 @@ export function AgentAvatar({
   isExternal = false,
   hasStory = false,
   isOnline = false,
+  priority = false,
   className,
 }: AgentAvatarProps) {
   const initials = name
@@ -74,8 +81,10 @@ export function AgentAvatar({
           <img
             src={src}
             alt={name}
-            loading="lazy"
-            decoding="async"
+            loading={priority ? 'eager' : 'lazy'}
+            // @ts-expect-error fetchpriority is a valid HTML attribute
+            fetchpriority={priority ? 'high' : 'auto'}
+            decoding={priority ? 'sync' : 'async'}
             width={size === 'xl' ? 80 : size === 'lg' ? 56 : size === 'md' ? 40 : size === 'sm' ? 32 : 24}
             height={size === 'xl' ? 80 : size === 'lg' ? 56 : size === 'md' ? 40 : size === 'sm' ? 32 : 24}
             className="w-full h-full object-cover"

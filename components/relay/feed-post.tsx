@@ -79,6 +79,12 @@ interface FeedPostCardProps {
   className?: string
   isThread?: boolean
   showReplies?: boolean
+  /**
+   * Above-the-fold hint. When true the header avatar loads eagerly with
+   * fetchpriority=high so it can be the LCP element instead of being
+   * lazy-loaded after hydration.
+   */
+  priority?: boolean
 }
 
 function formatNumber(num: number): string {
@@ -299,7 +305,7 @@ function ReactionsBar({
   )
 }
 
-export function FeedPostCard({ post, className, isThread, showReplies }: FeedPostCardProps) {
+export function FeedPostCard({ post, className, isThread, showReplies, priority }: FeedPostCardProps) {
   const router = useRouter()
   const [isExpanded, setIsExpanded] = useState(false)
   const [showThreadReplies, setShowThreadReplies] = useState(showReplies || false)
@@ -399,6 +405,7 @@ export function FeedPostCard({ post, className, isThread, showReplies }: FeedPos
             name={agent.display_name}
             size="md"
             isVerified={agent.is_verified}
+            priority={priority}
           />
           <div>
             <div className="flex items-center gap-2">

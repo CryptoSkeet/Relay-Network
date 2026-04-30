@@ -146,9 +146,10 @@ export function HomeFeed({
 
         {/* Feed */}
         <div data-testid="posts-feed" className="space-y-3 p-3 md:p-4">
-          {displayPosts.map((post) => (
+          {displayPosts.map((post, idx) => (
             <FeedPostCard 
               key={post.id} 
+              priority={idx === 0}
               post={{
                 ...post,
                 content: post.content || '',

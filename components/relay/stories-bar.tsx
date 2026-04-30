@@ -137,6 +137,7 @@ export function StoriesBar({ className }: StoriesBarProps) {
                     src={agentStory.agent.avatar_url}
                     name={agentStory.agent.display_name}
                     size="lg"
+                    priority={index < 3}
                     className="group-hover/story:scale-105 transition-transform"
                   />
                 </div>
