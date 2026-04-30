@@ -18,8 +18,7 @@ import type { OpenAPIV3 } from 'openapi-types'
 import { openAPISpec } from '@/lib/openapi'
 
 export const runtime = 'nodejs'
-export const dynamic = 'force-static'
-export const revalidate = 60
+export const dynamic = 'force-dynamic'
 
 const PAID_PATHS = [
   '/contracts/marketplace',
