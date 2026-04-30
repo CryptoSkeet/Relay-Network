@@ -101,16 +101,16 @@ function hashContractId(contractId: string): Buffer {
   return createHash('sha256').update(contractId).digest()
 }
 
-export function deriveEscrowPDA(contractId: string): [PublicKey, number] {
+export function deriveEscrowPDA(contractId: string, buyer: PublicKey): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from('escrow'), hashContractId(contractId)],
+    [Buffer.from('escrow'), hashContractId(contractId), buyer.toBuffer()],
     PROGRAM_ID,
   )
 }
 
-export function deriveEscrowVaultPDA(contractId: string): [PublicKey, number] {
+export function deriveEscrowVaultPDA(contractId: string, buyer: PublicKey): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from('escrow-vault'), hashContractId(contractId)],
+    [Buffer.from('escrow-vault'), hashContractId(contractId), buyer.toBuffer()],
     PROGRAM_ID,
   )
 }
@@ -164,17 +164,13 @@ function buildLockEscrowData(contractId: string, amount: bigint): Buffer {
  *   [12+len..12+len+32)  buyer pubkey       <-- target
  *   ...
  *
- * SECURITY: the on-chain escrow PDA is seeded ONLY by contract_id, not by
- * the buyer pubkey. That means an attacker who learns a contract_id (e.g.
- * via a leaked DB row) can race ahead and call lock_escrow themselves with
- * 1 raw unit, claiming the PDA + setting escrow.buyer = attacker. Without
- * this check our idempotency recovery path would treat the squat as a
- * successful self-lock and let `contract-engine` mark the contract PENDING
- * against an attacker-owned escrow. So: before trusting an existing PDA,
- * decode escrow.buyer and confirm it matches our buyer signer.
- *
- * Fix the seed scheme on the next program upgrade so this can't happen at
- * all (seeds = [b"escrow", contract_id_hash, buyer.key()]).
+ * SECURITY (legacy note): the on-chain escrow PDA used to be seeded ONLY
+ * by contract_id, allowing an attacker who learned a contract_id to squat
+ * the PDA via a 1-unit lock and become escrow.buyer. The current program
+ * binds seeds to (contract_id, buyer) which makes that attack impossible:
+ * an attacker would derive a different PDA. We keep this buyer-equality
+ * check as belt-and-suspenders in case the program is ever rolled back or
+ * the seed scheme regresses.
  */
 function decodeEscrowBuyer(data: Buffer | Uint8Array): PublicKey | null {
   const buf = Buffer.isBuffer(data) ? data : Buffer.from(data)
@@ -204,8 +200,8 @@ export async function lockEscrowOnChain(
   const sellerPubkey = new PublicKey(sellerPublicKey)
 
   const buyerATA = await getAssociatedTokenAddress(mint, buyerKeypair.publicKey)
-  const [escrowPDA] = deriveEscrowPDA(contractId)
-  const [vaultPDA] = deriveEscrowVaultPDA(contractId)
+  const [escrowPDA] = deriveEscrowPDA(contractId, buyerKeypair.publicKey)
+  const [vaultPDA] = deriveEscrowVaultPDA(contractId, buyerKeypair.publicKey)
 
   // Idempotency pre-flight: if the escrow PDA already exists on chain, this
   // contract was locked by a previous attempt that may have CF/devnet-timed
@@ -324,13 +320,16 @@ export async function lockEscrowOnChain(
 export async function releaseEscrowOnChain(
   contractId: string,
   sellerPublicKey: string,
+  buyerPublicKey: string,
 ): Promise<string> {
-  // Derive escrow PDAs. Contract IDs are hashed to 32 bytes on both client
-  // and on-chain, so UUID-length IDs are now properly supported.
+  // Derive escrow PDAs. Seeds now bind to (contract_id, buyer) so caller
+  // must supply buyer pubkey. Contract IDs are SHA-256 hashed to 32 bytes
+  // on both client and on-chain.
+  const buyerPk = new PublicKey(buyerPublicKey)
   let escrowPDA: PublicKey, vaultPDA: PublicKey
   try {
-    ;[escrowPDA] = deriveEscrowPDA(contractId)
-    ;[vaultPDA] = deriveEscrowVaultPDA(contractId)
+    ;[escrowPDA] = deriveEscrowPDA(contractId, buyerPk)
+    ;[vaultPDA] = deriveEscrowVaultPDA(contractId, buyerPk)
   } catch (e: any) {
     // Unexpected PDA derivation error — propagate as-is.
     throw e
@@ -391,12 +390,13 @@ export async function refundEscrowOnChain(
   contractId: string,
   buyerPublicKey: string,
 ): Promise<string> {
-  // Derive escrow PDAs. Contract IDs are hashed to 32 bytes on both client
-  // and on-chain, so UUID-length IDs are now properly supported.
+  // Derive escrow PDAs. Seeds now bind to (contract_id, buyer); caller
+  // already supplies buyer pubkey for ATA refund routing.
+  const buyerPk = new PublicKey(buyerPublicKey)
   let escrowPDA: PublicKey, vaultPDA: PublicKey
   try {
-    ;[escrowPDA] = deriveEscrowPDA(contractId)
-    ;[vaultPDA] = deriveEscrowVaultPDA(contractId)
+    ;[escrowPDA] = deriveEscrowPDA(contractId, buyerPk)
+    ;[vaultPDA] = deriveEscrowVaultPDA(contractId, buyerPk)
   } catch (e: any) {
     // Unexpected PDA derivation error — propagate as-is.
     throw e

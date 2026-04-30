@@ -166,7 +166,8 @@ pub mod relay_agent_registry {
 
         let contract_id_hash = hash_contract_id(&ctx.accounts.escrow_account.contract_id);
         let vault_bump = ctx.accounts.escrow_account.vault_bump;
-        let seeds: &[&[u8]] = &[b"escrow-vault", &contract_id_hash, &[vault_bump]];
+        let buyer_key = ctx.accounts.escrow_account.buyer;
+        let seeds: &[&[u8]] = &[b"escrow-vault", &contract_id_hash, buyer_key.as_ref(), &[vault_bump]];
 
         // Transfer RELAY from escrow vault → seller ATA
         let cpi_accounts = Transfer {
@@ -201,7 +202,8 @@ pub mod relay_agent_registry {
 
         let contract_id_hash = hash_contract_id(&ctx.accounts.escrow_account.contract_id);
         let vault_bump = ctx.accounts.escrow_account.vault_bump;
-        let seeds: &[&[u8]] = &[b"escrow-vault", &contract_id_hash, &[vault_bump]];
+        let buyer_key = ctx.accounts.escrow_account.buyer;
+        let seeds: &[&[u8]] = &[b"escrow-vault", &contract_id_hash, buyer_key.as_ref(), &[vault_bump]];
 
         // Transfer RELAY from escrow vault → buyer ATA
         let cpi_accounts = Transfer {
@@ -883,23 +885,25 @@ pub struct LockEscrow<'info> {
     #[account(mut)]
     pub buyer_token_account: Account<'info, TokenAccount>,
 
-    /// Escrow metadata PDA.
+    /// Escrow metadata PDA. Seeds bind to BOTH contract_id AND buyer so that
+    /// no third party can squat the PDA by front-running with a bogus lock.
     #[account(
         init,
         payer = payer,
         space = EscrowAccount::SIZE,
-        seeds = [b"escrow".as_ref(), hash_contract_id(&contract_id).as_ref()],
+        seeds = [b"escrow".as_ref(), hash_contract_id(&contract_id).as_ref(), buyer.key().as_ref()],
         bump,
     )]
     pub escrow_account: Account<'info, EscrowAccount>,
 
     /// Program-owned escrow vault (token account PDA that holds the RELAY).
+    /// Seeds mirror escrow_account: contract_id + buyer.
     #[account(
         init,
         payer = payer,
         token::mint = mint,
         token::authority = escrow_vault,
-        seeds = [b"escrow-vault".as_ref(), hash_contract_id(&contract_id).as_ref()],
+        seeds = [b"escrow-vault".as_ref(), hash_contract_id(&contract_id).as_ref(), buyer.key().as_ref()],
         bump,
     )]
     pub escrow_vault: Account<'info, TokenAccount>,
@@ -919,10 +923,10 @@ pub struct ReleaseEscrow<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
-    /// Escrow metadata PDA.
+    /// Escrow metadata PDA. Seeds include buyer for collision-resistance.
     #[account(
         mut,
-        seeds = [b"escrow".as_ref(), hash_contract_id(&escrow_account.contract_id).as_ref()],
+        seeds = [b"escrow".as_ref(), hash_contract_id(&escrow_account.contract_id).as_ref(), escrow_account.buyer.as_ref()],
         bump = escrow_account.bump,
     )]
     pub escrow_account: Account<'info, EscrowAccount>,
@@ -930,7 +934,7 @@ pub struct ReleaseEscrow<'info> {
     /// Escrow vault holding the locked RELAY.
     #[account(
         mut,
-        seeds = [b"escrow-vault".as_ref(), hash_contract_id(&escrow_account.contract_id).as_ref()],
+        seeds = [b"escrow-vault".as_ref(), hash_contract_id(&escrow_account.contract_id).as_ref(), escrow_account.buyer.as_ref()],
         bump = escrow_account.vault_bump,
     )]
     pub escrow_vault: Account<'info, TokenAccount>,
@@ -955,10 +959,10 @@ pub struct RefundEscrow<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
-    /// Escrow metadata PDA.
+    /// Escrow metadata PDA. Seeds include buyer for collision-resistance.
     #[account(
         mut,
-        seeds = [b"escrow".as_ref(), hash_contract_id(&escrow_account.contract_id).as_ref()],
+        seeds = [b"escrow".as_ref(), hash_contract_id(&escrow_account.contract_id).as_ref(), escrow_account.buyer.as_ref()],
         bump = escrow_account.bump,
     )]
     pub escrow_account: Account<'info, EscrowAccount>,
@@ -966,7 +970,7 @@ pub struct RefundEscrow<'info> {
     /// Escrow vault holding the locked RELAY.
     #[account(
         mut,
-        seeds = [b"escrow-vault".as_ref(), hash_contract_id(&escrow_account.contract_id).as_ref()],
+        seeds = [b"escrow-vault".as_ref(), hash_contract_id(&escrow_account.contract_id).as_ref(), escrow_account.buyer.as_ref()],
         bump = escrow_account.vault_bump,
     )]
     pub escrow_vault: Account<'info, TokenAccount>,

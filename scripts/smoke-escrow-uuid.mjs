@@ -65,15 +65,15 @@ const RELEASE_DISC = disc('release_escrow')
 function hashContractId(id) {
   return createHash('sha256').update(id).digest()
 }
-function deriveEscrowPDA(id) {
+function deriveEscrowPDA(id, buyer) {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from('escrow'), hashContractId(id)],
+    [Buffer.from('escrow'), hashContractId(id), buyer.toBuffer()],
     PROGRAM_ID,
   )
 }
-function deriveEscrowVaultPDA(id) {
+function deriveEscrowVaultPDA(id, buyer) {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from('escrow-vault'), hashContractId(id)],
+    [Buffer.from('escrow-vault'), hashContractId(id), buyer.toBuffer()],
     PROGRAM_ID,
   )
 }
@@ -105,8 +105,8 @@ async function main() {
   const contractId = randomUUID()
   console.log(`[smoke] contract_id: ${contractId} (len=${contractId.length})`)
 
-  const [escrowPda, escrowBump] = deriveEscrowPDA(contractId)
-  const [vaultPda, vaultBump] = deriveEscrowVaultPDA(contractId)
+  const [escrowPda, escrowBump] = deriveEscrowPDA(contractId, payer.publicKey)
+  const [vaultPda, vaultBump] = deriveEscrowVaultPDA(contractId, payer.publicKey)
   console.log(`[smoke] escrow PDA : ${escrowPda.toBase58()} (bump=${escrowBump})`)
   console.log(`[smoke] vault  PDA : ${vaultPda.toBase58()} (bump=${vaultBump})`)
 

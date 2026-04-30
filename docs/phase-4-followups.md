@@ -45,6 +45,17 @@ Severity: `P0` ship-blocking, `P1` next sprint, `P2` quarterly cleanup,
   (sha2 crate added to Cargo.toml). Ready for: anchor build + IDL regeneration
   + devnet deploy + smoke test. See `OUTPUTS/DAY_3_SUMMARY.md`.
 
+- [x] **[P1] Escrow PDA seeds bind buyer pubkey (squat-proof)** —
+  code complete (commit pending). Updated 6 program-side seed
+  declarations + 2 runtime CPI seed arrays in `release_escrow` /
+  `refund_escrow` to include `buyer.key()`. Updated TS client
+  `deriveEscrowPDA` / `deriveEscrowVaultPDA` signatures to accept
+  buyer pubkey, threaded through all 3 callers (`lockEscrowOnChain`,
+  `releaseEscrowOnChain`, `refundEscrowOnChain`) and `contract-engine.js`
+  release path. Smoke test updated. **Awaiting `anchor build` +
+  mainnet upgrade deploy** — see [`docs/escrow-pda-buyer-upgrade.md`](./escrow-pda-buyer-upgrade.md)
+  for deploy checklist.
+
 - [ ] **[P2] `lockEscrowOnChain` still on `@solana/web3.js`** — Pass C
   item 4 ported `release` and `refund` only because they don't need a
   buyer keypair as co-signer. `lock` requires the buyer agent's signer,
