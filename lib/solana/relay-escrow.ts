@@ -142,17 +142,40 @@ async function getAgentKeypair(agentId: string): Promise<Keypair> {
 // ── Instruction builders ──────────────────────────────────────────────────────
 
 function buildLockEscrowData(contractId: string, amount: bigint): Buffer {
-  // Borsh: discriminator(8) + string(4 + len) + u64(8)
+  // Borsh layout (matches Rust signature: contract_id_hash, contract_id, amount):
+  //   discriminator(8) + contract_id_hash([u8;32]) + contract_id(string) + amount(u64)
+  const idHash = hashContractId(contractId)
   const idBytes = Buffer.from(contractId, 'utf-8')
-  const buf = Buffer.alloc(8 + 4 + idBytes.length + 8)
+  const buf = Buffer.alloc(8 + 32 + 4 + idBytes.length + 8)
   let offset = 0
 
   LOCK_DISC.copy(buf, offset); offset += 8
+  idHash.copy(buf, offset); offset += 32
   buf.writeUInt32LE(idBytes.length, offset); offset += 4
   idBytes.copy(buf, offset); offset += idBytes.length
   buf.writeBigUInt64LE(amount, offset)
 
   return buf
+}
+
+/**
+ * Build the data payload for release_escrow / refund_escrow.
+ * Borsh layout: discriminator(8) + contract_id_hash([u8;32]) + buyer(Pubkey, 32)
+ */
+function buildReleaseOrRefundData(
+  disc: Buffer,
+  contractId: string,
+  buyer: PublicKey,
+): Uint8Array {
+  const idHash = hashContractId(contractId)
+  const buf = Buffer.alloc(8 + 32 + 32)
+  let offset = 0
+
+  disc.copy(buf, offset); offset += 8
+  idHash.copy(buf, offset); offset += 32
+  Buffer.from(buyer.toBuffer()).copy(buf, offset)
+
+  return new Uint8Array(buf)
 }
 
 /**
@@ -367,7 +390,7 @@ export async function releaseEscrowOnChain(
       { address: sellerAta,        role: AccountRole.WRITABLE },        // seller_token_account
       { address: TOKEN_PROGRAM_ADDRESS, role: AccountRole.READONLY },   // token_program
     ],
-    data: new Uint8Array(RELEASE_DISC),
+    data: buildReleaseOrRefundData(RELEASE_DISC, contractId, buyerPk),
   }
 
   const memoIx = getAddMemoInstruction({
@@ -431,7 +454,7 @@ export async function refundEscrowOnChain(
       { address: buyerAta,         role: AccountRole.WRITABLE },        // buyer_token_account
       { address: TOKEN_PROGRAM_ADDRESS, role: AccountRole.READONLY },   // token_program
     ],
-    data: new Uint8Array(REFUND_DISC),
+    data: buildReleaseOrRefundData(REFUND_DISC, contractId, buyerPk),
   }
 
   const memoIx = getAddMemoInstruction({

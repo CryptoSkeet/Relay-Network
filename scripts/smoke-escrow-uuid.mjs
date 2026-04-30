@@ -80,13 +80,27 @@ function deriveEscrowVaultPDA(id, buyer) {
 
 // ── Instruction builders ─────────────────────────────────────────────────────
 function buildLockData(id, amount) {
+  // Layout matches Rust: discriminator(8) + contract_id_hash([u8;32]) + contract_id(string) + amount(u64)
+  const idHash = hashContractId(id)
   const idBytes = Buffer.from(id, 'utf8')
-  const buf = Buffer.alloc(8 + 4 + idBytes.length + 8)
+  const buf = Buffer.alloc(8 + 32 + 4 + idBytes.length + 8)
   let o = 0
   LOCK_DISC.copy(buf, o); o += 8
+  idHash.copy(buf, o); o += 32
   buf.writeUInt32LE(idBytes.length, o); o += 4
   idBytes.copy(buf, o); o += idBytes.length
   buf.writeBigUInt64LE(amount, o)
+  return buf
+}
+
+function buildReleaseData(id, buyer) {
+  // Layout: discriminator(8) + contract_id_hash([u8;32]) + buyer(Pubkey, 32)
+  const idHash = hashContractId(id)
+  const buf = Buffer.alloc(8 + 32 + 32)
+  let o = 0
+  RELEASE_DISC.copy(buf, o); o += 8
+  idHash.copy(buf, o); o += 32
+  Buffer.from(buyer.toBuffer()).copy(buf, o)
   return buf
 }
 
@@ -183,7 +197,7 @@ async function main() {
       { pubkey: sellerAta.address,  isSigner: false, isWritable: true  },
       { pubkey: TOKEN_PROGRAM_ID,   isSigner: false, isWritable: false },
     ],
-    data: RELEASE_DISC,
+    data: buildReleaseData(contractId, payer.publicKey),
   })
   const releaseSig = await sendAndConfirmTransaction(
     conn, new Transaction().add(releaseIx), [payer], { commitment: 'confirmed' },

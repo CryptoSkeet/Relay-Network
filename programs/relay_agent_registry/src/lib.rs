@@ -118,13 +118,23 @@ pub mod relay_agent_registry {
 
     /// Lock RELAY tokens into a program-owned escrow vault for a contract.
     /// The buyer transfers `amount` RELAY from their ATA to the escrow vault PDA.
+    ///
+    /// `contract_id_hash` MUST equal sha256(contract_id). It is passed as a
+    /// pre-computed instruction arg (rather than calling hash_contract_id() in
+    /// the seed expression) so that Anchor's IDL build pass can statically
+    /// resolve the seeds without invoking user functions.
     pub fn lock_escrow(
         ctx: Context<LockEscrow>,
+        contract_id_hash: [u8; 32],
         contract_id: String,
         amount: u64,
     ) -> Result<()> {
         require!(contract_id.len() <= MAX_CONTRACT_ID_LEN, EscrowError::ContractIdTooLong);
         require!(amount > 0, EscrowError::ZeroAmount);
+        require!(
+            hash_contract_id(&contract_id) == contract_id_hash,
+            EscrowError::ContractIdMismatch
+        );
 
         // Transfer RELAY from buyer ATA → escrow vault
         let cpi_accounts = Transfer {
@@ -160,14 +170,26 @@ pub mod relay_agent_registry {
 
     /// Release escrowed RELAY to the seller after contract settlement.
     /// Only the payer (backend authority) can call this.
-    pub fn release_escrow(ctx: Context<ReleaseEscrow>) -> Result<()> {
+    ///
+    /// `contract_id_hash` and `buyer` are passed as explicit instruction args
+    /// so the seed expressions in `ReleaseEscrow` can be resolved by Anchor's
+    /// IDL build pass (which cannot read sibling account fields). Both are
+    /// runtime-asserted against the loaded escrow_account.
+    pub fn release_escrow(
+        ctx: Context<ReleaseEscrow>,
+        contract_id_hash: [u8; 32],
+        buyer: Pubkey,
+    ) -> Result<()> {
         let escrow = &ctx.accounts.escrow_account;
         require!(escrow.state == EscrowState::Locked, EscrowError::NotLocked);
+        require!(escrow.buyer == buyer, EscrowError::BuyerMismatch);
+        require!(
+            hash_contract_id(&escrow.contract_id) == contract_id_hash,
+            EscrowError::ContractIdMismatch
+        );
 
-        let contract_id_hash = hash_contract_id(&ctx.accounts.escrow_account.contract_id);
-        let vault_bump = ctx.accounts.escrow_account.vault_bump;
-        let buyer_key = ctx.accounts.escrow_account.buyer;
-        let seeds: &[&[u8]] = &[b"escrow-vault", &contract_id_hash, buyer_key.as_ref(), &[vault_bump]];
+        let vault_bump = escrow.vault_bump;
+        let seeds: &[&[u8]] = &[b"escrow-vault", &contract_id_hash, buyer.as_ref(), &[vault_bump]];
 
         // Transfer RELAY from escrow vault → seller ATA
         let cpi_accounts = Transfer {
@@ -196,14 +218,23 @@ pub mod relay_agent_registry {
 
     /// Refund escrowed RELAY back to the buyer (contract cancelled).
     /// Only the payer (backend authority) can call this.
-    pub fn refund_escrow(ctx: Context<RefundEscrow>) -> Result<()> {
+    ///
+    /// See `release_escrow` for why `contract_id_hash` and `buyer` are explicit args.
+    pub fn refund_escrow(
+        ctx: Context<RefundEscrow>,
+        contract_id_hash: [u8; 32],
+        buyer: Pubkey,
+    ) -> Result<()> {
         let escrow = &ctx.accounts.escrow_account;
         require!(escrow.state == EscrowState::Locked, EscrowError::NotLocked);
+        require!(escrow.buyer == buyer, EscrowError::BuyerMismatch);
+        require!(
+            hash_contract_id(&escrow.contract_id) == contract_id_hash,
+            EscrowError::ContractIdMismatch
+        );
 
-        let contract_id_hash = hash_contract_id(&ctx.accounts.escrow_account.contract_id);
-        let vault_bump = ctx.accounts.escrow_account.vault_bump;
-        let buyer_key = ctx.accounts.escrow_account.buyer;
-        let seeds: &[&[u8]] = &[b"escrow-vault", &contract_id_hash, buyer_key.as_ref(), &[vault_bump]];
+        let vault_bump = escrow.vault_bump;
+        let seeds: &[&[u8]] = &[b"escrow-vault", &contract_id_hash, buyer.as_ref(), &[vault_bump]];
 
         // Transfer RELAY from escrow vault → buyer ATA
         let cpi_accounts = Transfer {
@@ -824,6 +855,10 @@ pub enum EscrowError {
     DepositorMismatch,
     #[msg("Destination ATA mint does not match the escrowed mint")]
     MintMismatch,
+    #[msg("contract_id_hash does not match sha256(escrow_account.contract_id)")]
+    ContractIdMismatch,
+    #[msg("buyer arg does not match escrow_account.buyer")]
+    BuyerMismatch,
 }
 
 // ── Escrow state ──────────────────────────────────────────────────────────────
@@ -867,7 +902,7 @@ impl EscrowAccount {
 // ── Escrow account contexts ──────────────────────────────────────────────────
 
 #[derive(Accounts)]
-#[instruction(contract_id: String, amount: u64)]
+#[instruction(contract_id_hash: [u8; 32])]
 pub struct LockEscrow<'info> {
     /// The buyer locking RELAY into escrow.
     #[account(mut)]
@@ -887,23 +922,25 @@ pub struct LockEscrow<'info> {
 
     /// Escrow metadata PDA. Seeds bind to BOTH contract_id AND buyer so that
     /// no third party can squat the PDA by front-running with a bogus lock.
+    /// `contract_id_hash` must equal sha256(contract_id) — runtime-checked in
+    /// the handler (`require!(hash_contract_id(&contract_id) == contract_id_hash)`).
     #[account(
         init,
         payer = payer,
         space = EscrowAccount::SIZE,
-        seeds = [b"escrow".as_ref(), hash_contract_id(&contract_id).as_ref(), buyer.key().as_ref()],
+        seeds = [b"escrow".as_ref(), contract_id_hash.as_ref(), buyer.key().as_ref()],
         bump,
     )]
     pub escrow_account: Account<'info, EscrowAccount>,
 
     /// Program-owned escrow vault (token account PDA that holds the RELAY).
-    /// Seeds mirror escrow_account: contract_id + buyer.
+    /// Seeds mirror escrow_account: contract_id_hash + buyer.
     #[account(
         init,
         payer = payer,
         token::mint = mint,
         token::authority = escrow_vault,
-        seeds = [b"escrow-vault".as_ref(), hash_contract_id(&contract_id).as_ref(), buyer.key().as_ref()],
+        seeds = [b"escrow-vault".as_ref(), contract_id_hash.as_ref(), buyer.key().as_ref()],
         bump,
     )]
     pub escrow_vault: Account<'info, TokenAccount>,
@@ -918,15 +955,18 @@ pub struct LockEscrow<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(contract_id_hash: [u8; 32], buyer: Pubkey)]
 pub struct ReleaseEscrow<'info> {
     /// Backend authority that triggers release.
     #[account(mut)]
     pub payer: Signer<'info>,
 
-    /// Escrow metadata PDA. Seeds include buyer for collision-resistance.
+    /// Escrow metadata PDA. Seeds use the explicit `contract_id_hash` and
+    /// `buyer` instruction args (runtime-checked against escrow_account fields
+    /// in the handler).
     #[account(
         mut,
-        seeds = [b"escrow".as_ref(), hash_contract_id(&escrow_account.contract_id).as_ref(), escrow_account.buyer.as_ref()],
+        seeds = [b"escrow".as_ref(), contract_id_hash.as_ref(), buyer.as_ref()],
         bump = escrow_account.bump,
     )]
     pub escrow_account: Account<'info, EscrowAccount>,
@@ -934,7 +974,7 @@ pub struct ReleaseEscrow<'info> {
     /// Escrow vault holding the locked RELAY.
     #[account(
         mut,
-        seeds = [b"escrow-vault".as_ref(), hash_contract_id(&escrow_account.contract_id).as_ref(), escrow_account.buyer.as_ref()],
+        seeds = [b"escrow-vault".as_ref(), contract_id_hash.as_ref(), buyer.as_ref()],
         bump = escrow_account.vault_bump,
     )]
     pub escrow_vault: Account<'info, TokenAccount>,
@@ -954,15 +994,18 @@ pub struct ReleaseEscrow<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(contract_id_hash: [u8; 32], buyer: Pubkey)]
 pub struct RefundEscrow<'info> {
     /// Backend authority that triggers refund.
     #[account(mut)]
     pub payer: Signer<'info>,
 
-    /// Escrow metadata PDA. Seeds include buyer for collision-resistance.
+    /// Escrow metadata PDA. Seeds use the explicit `contract_id_hash` and
+    /// `buyer` instruction args (runtime-checked against escrow_account fields
+    /// in the handler).
     #[account(
         mut,
-        seeds = [b"escrow".as_ref(), hash_contract_id(&escrow_account.contract_id).as_ref(), escrow_account.buyer.as_ref()],
+        seeds = [b"escrow".as_ref(), contract_id_hash.as_ref(), buyer.as_ref()],
         bump = escrow_account.bump,
     )]
     pub escrow_account: Account<'info, EscrowAccount>,
@@ -970,7 +1013,7 @@ pub struct RefundEscrow<'info> {
     /// Escrow vault holding the locked RELAY.
     #[account(
         mut,
-        seeds = [b"escrow-vault".as_ref(), hash_contract_id(&escrow_account.contract_id).as_ref(), escrow_account.buyer.as_ref()],
+        seeds = [b"escrow-vault".as_ref(), contract_id_hash.as_ref(), buyer.as_ref()],
         bump = escrow_account.vault_bump,
     )]
     pub escrow_vault: Account<'info, TokenAccount>,
