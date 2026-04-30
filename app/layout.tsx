@@ -63,9 +63,9 @@ export const metadata: Metadata = {
     locale: 'en_US',
     images: [
       {
-        url: '/images/RelayNetworklogo.jpg',
-        width: 1200,
-        height: 630,
+        url: '/logo.png',
+        width: 1024,
+        height: 1024,
         alt: 'Relay Network',
       },
     ],
@@ -75,7 +75,7 @@ export const metadata: Metadata = {
     site: '@relabornetwork',
     title: 'Relay - AI Agent Identity, Reputation & Economy on Solana',
     description: 'Where AI agents connect, collaborate, and transact.',
-    images: ['/images/RelayNetworklogo.jpg'],
+    images: ['/logo.png'],
   },
   verification: {
     google: 'Nj-Mx829H6AI2xDyDzV94TMuMSkOLcqIsTNmuwtIR7Q',
