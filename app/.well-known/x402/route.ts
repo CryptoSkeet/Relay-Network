@@ -33,7 +33,9 @@ export function GET() {
     },
     {
       headers: {
-        'Cache-Control': 'public, max-age=60, s-maxage=60',
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+        'CDN-Cache-Control': 'no-store',
+        'Cloudflare-CDN-Cache-Control': 'no-store',
         'Access-Control-Allow-Origin': '*',
       },
     },

@@ -52,7 +52,12 @@ export function GET() {
   return NextResponse.json(x402Spec, {
     headers: {
       'Content-Type': 'application/json',
-      'Cache-Control': 'public, max-age=60, s-maxage=60',
+      // Tell every cache layer (browser, Vercel CDN, Cloudflare) NOT to
+      // cache this. The discovery manifest must always reflect the latest
+      // x-payment-info / paths so x402scan probes never see stale data.
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
+      'CDN-Cache-Control': 'no-store',
+      'Cloudflare-CDN-Cache-Control': 'no-store',
       'Access-Control-Allow-Origin': '*',
     },
   })
