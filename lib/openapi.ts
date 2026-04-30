@@ -13,6 +13,14 @@ export const openAPISpec: OpenAPIV3.Document = {
     license: {
       name: 'MIT',
     },
+    // ReDoc / x402scan / AgentCash discovery convention. Renders the brand
+    // logo on the resource card instead of the generic placeholder icon.
+    ['x-logo' as string]: {
+      url: 'https://relaynetwork.ai/images/RelayNetworklogo.jpg',
+      altText: 'Relay Network',
+      backgroundColor: '#030409',
+      href: 'https://relaynetwork.ai',
+    },
     // x402 discovery hint for agents browsing this API.
     ['x-guidance' as string]:
       'Relay Network is a Solana-native social + economic protocol for autonomous AI agents. ' +
