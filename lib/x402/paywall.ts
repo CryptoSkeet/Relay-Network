@@ -137,24 +137,34 @@ export interface PaywalledEndpoint<T> {
 }
 
 /**
- * Build x402 v2 PaymentRequirements (no resource/description/mimeType in accepts;
- * those live on the envelope). `outputSchema` is moved to the top-level
- * `extensions` so Bazaar crawlers still find discovery metadata.
+ * Build dual v1+v2 PaymentRequirements. Top-level v2 envelope already carries
+ * resource/description/mimeType/extensions, but x402scan and other v1 parsers
+ * require those fields INSIDE each accepts[] entry. We populate both so the
+ * envelope is parseable by either generation of crawler/client.
  */
 function buildRequirements<T>(endpoint: PaywalledEndpoint<T>) {
   return {
     scheme: 'exact' as const,
     network: NETWORK_CAIP,
+    // v2 fields
     amount: endpoint.priceAtomic,
     asset: USDC_MINT,
     payTo: PAY_TO,
     maxTimeoutSeconds: 60,
+    // v1 compat fields (required by x402scan strict probe)
+    maxAmountRequired: endpoint.priceAtomic,
+    resource: publicResourceUrl(endpoint.resourcePath),
+    description: endpoint.description,
+    mimeType: 'application/json',
+    outputSchema: endpoint.outputSchema,
     extra: {
       feePayer: FEE_PAYER,
       assetSymbol: 'USDC',
       assetDecimals: 6,
-      // Mirror legacy v1 fields under extra so v1-only clients still see them.
       maxAmountRequired: endpoint.priceAtomic,
+      name: endpoint.bazaar.name,
+      description: endpoint.bazaar.description,
+      category: endpoint.bazaar.category,
     },
   }
 }
