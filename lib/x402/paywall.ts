@@ -28,6 +28,14 @@ const NETWORK_SLUG = NETWORK_CAIP.includes('devnet') || NETWORK_CAIP.includes('E
   ? 'solana:devnet'
   : 'solana:mainnet'
 
+// x402 v1 network slug. The Coinbase v1 schema (used by @agentcash/discovery
+// and x402scan probes) requires a short slug — `solana` or `solana-devnet` —
+// NOT the CAIP-2 form. Sending the CAIP form here causes registration to fail
+// with "No valid x402 response found" (NETWORK_SOLANA_ALIAS_INVALID).
+const NETWORK_V1 = NETWORK_CAIP.includes('devnet') || NETWORK_CAIP.includes('EtWTRA')
+  ? 'solana-devnet'
+  : 'solana'
+
 const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
 
 const PAY_TO =
@@ -137,26 +145,30 @@ export interface PaywalledEndpoint<T> {
 }
 
 /**
- * Build dual v1+v2 PaymentRequirements. Top-level v2 envelope already carries
- * resource/description/mimeType/extensions, but x402scan and other v1 parsers
- * require those fields INSIDE each accepts[] entry. We populate both so the
- * envelope is parseable by either generation of crawler/client.
+ * Build dual v1+v2 PaymentRequirements. Top-level v1 envelope (x402Version: 1)
+ * is what @agentcash/discovery / x402scan probes parse, so accepts[] must carry
+ * all required v1 fields (network as short slug, maxAmountRequired, resource,
+ * description, payTo, maxTimeoutSeconds, asset). We additionally include the
+ * v2 `amount` field for forward compatibility — Coinbase v2 schema is non-strict
+ * and tolerates extra keys.
  */
 function buildRequirements<T>(endpoint: PaywalledEndpoint<T>) {
   return {
     scheme: 'exact' as const,
-    network: NETWORK_CAIP,
-    // v2 fields
-    amount: endpoint.priceAtomic,
-    asset: USDC_MINT,
-    payTo: PAY_TO,
-    maxTimeoutSeconds: 60,
-    // v1 compat fields (required by x402scan strict probe)
+    // v1 short slug — required by @agentcash/discovery v1 parser. CAIP form
+    // would trip NETWORK_SOLANA_ALIAS_INVALID and silently drop the resource.
+    network: NETWORK_V1,
+    // v1 required fields
     maxAmountRequired: endpoint.priceAtomic,
     resource: publicResourceUrl(endpoint.resourcePath),
     description: endpoint.description,
     mimeType: 'application/json',
+    payTo: PAY_TO,
+    maxTimeoutSeconds: 60,
+    asset: USDC_MINT,
     outputSchema: endpoint.outputSchema,
+    // v2 forward-compat (ignored by v1 parser)
+    amount: endpoint.priceAtomic,
     extra: {
       feePayer: FEE_PAYER,
       assetSymbol: 'USDC',
@@ -165,6 +177,8 @@ function buildRequirements<T>(endpoint: PaywalledEndpoint<T>) {
       name: endpoint.bazaar.name,
       description: endpoint.bazaar.description,
       category: endpoint.bazaar.category,
+      // Canonical CAIP-2 form for v2-aware clients that want chain-id specificity.
+      networkCaip: NETWORK_CAIP,
     },
   }
 }
@@ -196,19 +210,24 @@ function paymentRequiredResponse<T>(
   requirements: ReturnType<typeof buildRequirements<T>>,
   extraError?: string,
 ) {
-  // x402 v2 envelope: top-level resource/extensions, accepts[] without
-  // resource/description/mimeType/outputSchema fields per requirement.
+  // x402 v1 envelope. We MUST emit `x402Version: 1` (not 2) because
+  // @agentcash/discovery's v1 body parser hard-rejects any other value with
+  // "No valid x402 response found". Since we don't emit a `payment-required`
+  // header, the v2 header parser is never invoked — only the v1 body parser
+  // runs. v1 has no top-level `resource`/`extensions` fields, but zod parses
+  // the envelope non-strict, so we keep them as additive metadata for
+  // crawlers (x402scan, x402list.fun, agentcash) that want them.
   const body = {
-    x402Version: 2 as const,
+    x402Version: 1 as const,
     error: extraError ?? 'Payment required',
+    accepts: [requirements],
+    // Additive metadata — ignored by v1 parser, surfaced to v2-aware crawlers.
     resource: {
       url: publicResourceUrl(endpoint.resourcePath),
       description: endpoint.description,
       mimeType: 'application/json',
     },
-    accepts: [requirements],
     extensions: {
-      // Bazaar discovery metadata for crawlers (x402scan, x402list.fun, etc.)
       bazaar: {
         name: endpoint.bazaar.name,
         description: endpoint.bazaar.description,
