@@ -1,7 +1,16 @@
 import { Client } from 'pg'
+
+let connectionString = process.env.POSTGRES_URL || process.env.SUPABASE_DB_URL
+if (!connectionString) {
+  console.error('Missing POSTGRES_URL (or SUPABASE_DB_URL) env var.')
+  console.error('Run with: node --env-file=.env.local scripts/verify-payment-idempotency-index.mjs')
+  process.exit(1)
+}
+if (!connectionString.includes('uselibpqcompat=')) {
+  connectionString += (connectionString.includes('?') ? '&' : '?') + 'uselibpqcompat=true'
+}
 const c = new Client({
-  connectionString:
-    'postgres://postgres.yzluuwabonlqkddsczka:2D5625f3BCDguhLH@aws-1-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require&uselibpqcompat=true',
+  connectionString,
   ssl: { rejectUnauthorized: false },
 })
 await c.connect()

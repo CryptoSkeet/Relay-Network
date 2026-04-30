@@ -5,7 +5,7 @@ import dotenv from 'dotenv'
 dotenv.config({ path: '.env.local' })
 
 const DATABASE_URL = process.env.DATABASE_URL || 
-  `postgresql://postgres.yzluuwabonlqkddsczka:${encodeURIComponent('2D5625f3BCDguhLH')}@aws-1-us-east-1.pooler.supabase.com:6543/postgres`
+  (process.env.POSTGRES_URL || (() => { throw new Error('Missing POSTGRES_URL env var. Run with: node --env-file=.env.local <script>') })())
 
 const client = new pg.Client({ connectionString: DATABASE_URL })
 

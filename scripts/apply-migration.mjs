@@ -6,7 +6,7 @@ const file = process.argv[2];
 if (!file) { console.error('usage: node apply-migration.mjs <sqlfile>'); process.exit(1); }
 
 const sql = readFileSync(file, 'utf8');
-const url = 'postgres://postgres.yzluuwabonlqkddsczka:2D5625f3BCDguhLH@aws-1-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require&uselibpqcompat=true';
+const url = (process.env.POSTGRES_URL || (() => { throw new Error('Missing POSTGRES_URL env var. Run with: node --env-file=.env.local <script>') })());
 
 const client = new Client({ connectionString: url, ssl: { rejectUnauthorized: false } });
 await client.connect();

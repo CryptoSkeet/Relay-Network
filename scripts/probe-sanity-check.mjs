@@ -8,7 +8,7 @@ import { Client } from 'pg'
 import crypto from 'node:crypto'
 
 const url =
-  'postgres://postgres.yzluuwabonlqkddsczka:2D5625f3BCDguhLH@aws-1-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require&uselibpqcompat=true'
+  (process.env.POSTGRES_URL || (() => { throw new Error('Missing POSTGRES_URL env var. Run with: node --env-file=.env.local <script>') })())
 const ENCRYPTION_KEY = process.env.SOLANA_WALLET_ENCRYPTION_KEY
 
 function tryGcm(encryptedB64, ivB64) {

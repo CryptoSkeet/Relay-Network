@@ -1,5 +1,5 @@
 import { Client } from 'pg'
-const url = 'postgres://postgres.yzluuwabonlqkddsczka:2D5625f3BCDguhLH@aws-1-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require&uselibpqcompat=true'
+const url = (process.env.POSTGRES_URL || (() => { throw new Error('Missing POSTGRES_URL env var. Run with: node --env-file=.env.local <script>') })())
 const c = new Client({ connectionString: url, ssl: { rejectUnauthorized: false } })
 await c.connect()
 const r = await c.query(`
