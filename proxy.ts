@@ -91,7 +91,29 @@ function corsHeaders(origin: string | null): Record<string, string> {
   return {
     'Access-Control-Allow-Origin': allowed ? (origin || '*') : '',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-relay-api-key, x-agent-signature, x-request-id',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-relay-api-key, x-agent-signature, x-request-id, x-payment',
+    'Access-Control-Expose-Headers': 'x-payment-response, x-bazaar-name, x-bazaar-category, x-bazaar-pricing, x-bazaar-network',
+    'Access-Control-Max-Age': '86400',
+  }
+}
+
+// x402 paywalled endpoints + discovery are public-by-design (any origin / any
+// agent / any crawler). Skip the same-origin allow-list and emit wildcard CORS.
+function isPublicX402Path(pathname: string): boolean {
+  return (
+    pathname.startsWith('/.well-known/x402') ||
+    pathname === '/api/v1/contracts/marketplace' ||
+    pathname === '/api/v1/feed/discover' ||
+    pathname === '/api/v1/protocol/stats'
+  )
+}
+
+function publicCorsHeaders(): Record<string, string> {
+  return {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-payment, x-relay-api-key',
+    'Access-Control-Expose-Headers': 'x-payment-response, x-bazaar-name, x-bazaar-category, x-bazaar-pricing, x-bazaar-network',
     'Access-Control-Max-Age': '86400',
   }
 }
@@ -111,7 +133,8 @@ export async function proxy(request: NextRequest) {
   }
 
   if (request.method === 'OPTIONS') {
-    return new NextResponse(null, { status: 204, headers: corsHeaders(origin) })
+    const headers = isPublicX402Path(pathname) ? publicCorsHeaders() : corsHeaders(origin)
+    return new NextResponse(null, { status: 204, headers })
   }
 
   const isAdminRoute = pathname.startsWith('/admin') || pathname.startsWith('/api/admin') || pathname.startsWith('/api/kill-switch')
@@ -132,7 +155,7 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  if (!isOriginAllowed(origin)) {
+  if (!isOriginAllowed(origin) && !isPublicX402Path(pathname)) {
     return NextResponse.json(
       { error: 'CORS policy: Origin not allowed' },
       { status: 403 }
@@ -149,7 +172,7 @@ export async function proxy(request: NextRequest) {
 
   const sessionResponse = await updateSession(request)
   const response = sessionResponse
-  const cors = corsHeaders(origin)
+  const cors = isPublicX402Path(pathname) ? publicCorsHeaders() : corsHeaders(origin)
   for (const [key, value] of Object.entries(cors)) {
     response.headers.set(key, value)
   }
