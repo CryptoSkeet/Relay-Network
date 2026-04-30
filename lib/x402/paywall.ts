@@ -14,7 +14,20 @@ import {
  * share one facilitator config (PayAI Solana by default, CDP optional).
  */
 
-const NETWORK = 'solana'
+// CAIP-2 network ID. Defaults to Solana mainnet (where USDC mint EPjFWdd5...
+// settles). Override via X402_NETWORK_CAIP for other clusters, e.g.:
+//   solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp1tu7BL5  (mainnet, canonical)
+//   solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1         (devnet, canonical)
+//   solana:mainnet / solana:devnet                  (short forms also accepted)
+const NETWORK_CAIP =
+  process.env.X402_NETWORK_CAIP ??
+  'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp1tu7BL5'
+
+// Friendly network slug for logging / DB rows
+const NETWORK_SLUG = NETWORK_CAIP.includes('devnet') || NETWORK_CAIP.includes('EtWTRA')
+  ? 'solana:devnet'
+  : 'solana:mainnet'
+
 const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
 
 const PAY_TO =
@@ -123,22 +136,25 @@ export interface PaywalledEndpoint<T> {
   fetchData: (req: NextRequest) => Promise<T | null>
 }
 
+/**
+ * Build x402 v2 PaymentRequirements (no resource/description/mimeType in accepts;
+ * those live on the envelope). `outputSchema` is moved to the top-level
+ * `extensions` so Bazaar crawlers still find discovery metadata.
+ */
 function buildRequirements<T>(endpoint: PaywalledEndpoint<T>) {
   return {
     scheme: 'exact' as const,
-    network: NETWORK,
-    maxAmountRequired: endpoint.priceAtomic,
+    network: NETWORK_CAIP,
+    amount: endpoint.priceAtomic,
     asset: USDC_MINT,
     payTo: PAY_TO,
-    resource: publicResourceUrl(endpoint.resourcePath),
-    description: endpoint.description,
-    mimeType: 'application/json',
     maxTimeoutSeconds: 60,
-    outputSchema: endpoint.outputSchema,
     extra: {
       feePayer: FEE_PAYER,
       assetSymbol: 'USDC',
       assetDecimals: 6,
+      // Mirror legacy v1 fields under extra so v1-only clients still see them.
+      maxAmountRequired: endpoint.priceAtomic,
     },
   }
 }
@@ -161,7 +177,7 @@ function bazaarHeaders<T>(endpoint: PaywalledEndpoint<T>): Record<string, string
     'x-bazaar-description': toHeaderSafe(endpoint.bazaar.description),
     'x-bazaar-category': toHeaderSafe(endpoint.bazaar.category),
     'x-bazaar-pricing': toHeaderSafe(`${endpoint.priceLabel} per call`),
-    'x-bazaar-network': NETWORK,
+    'x-bazaar-network': NETWORK_CAIP,
   }
 }
 
@@ -170,17 +186,32 @@ function paymentRequiredResponse<T>(
   requirements: ReturnType<typeof buildRequirements<T>>,
   extraError?: string,
 ) {
-  return new Response(
-    JSON.stringify({
-      x402Version: 1,
-      error: extraError ?? 'Payment required',
-      accepts: [requirements],
-    }),
-    {
-      status: 402,
-      headers: { 'Content-Type': 'application/json', ...bazaarHeaders(endpoint) },
+  // x402 v2 envelope: top-level resource/extensions, accepts[] without
+  // resource/description/mimeType/outputSchema fields per requirement.
+  const body = {
+    x402Version: 2 as const,
+    error: extraError ?? 'Payment required',
+    resource: {
+      url: publicResourceUrl(endpoint.resourcePath),
+      description: endpoint.description,
+      mimeType: 'application/json',
     },
-  )
+    accepts: [requirements],
+    extensions: {
+      // Bazaar discovery metadata for crawlers (x402scan, x402list.fun, etc.)
+      bazaar: {
+        name: endpoint.bazaar.name,
+        description: endpoint.bazaar.description,
+        category: endpoint.bazaar.category,
+        pricing: `${endpoint.priceLabel} per call`,
+      },
+      outputSchema: endpoint.outputSchema,
+    },
+  }
+  return new Response(JSON.stringify(body), {
+    status: 402,
+    headers: { 'Content-Type': 'application/json', ...bazaarHeaders(endpoint) },
+  })
 }
 
 /**
@@ -253,7 +284,7 @@ export function createPaywalledHandler<T>(endpoint: PaywalledEndpoint<T>) {
         await supabase.from('agent_x402_transactions').insert({
           agent_id:       null,
           direction:      'inbound',
-          network:        `solana:${(settlement.network as string)?.includes('mainnet') ? 'mainnet' : 'devnet'}`,
+          network:        NETWORK_SLUG,
           resource_url:   publicResourceUrl(endpoint.resourcePath),
           description:    endpoint.description,
           amount_usdc:    usdc,
