@@ -93,7 +93,8 @@ export function TokenPriceStrip() {
     const ids = TOKENS.map((t) => t.id).join(',')
     const fetchPrices = async () => {
       try {
-        const res = await fetch(`/api/prices/${ids}`, { cache: 'no-store' })
+        // Allow browser + CDN cache; backend sends s-maxage=30, swr=120.
+        const res = await fetch(`/api/prices/${ids}`)
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const data = (await res.json()) as Prices
         if (mounted.current) {
@@ -115,7 +116,8 @@ export function TokenPriceStrip() {
     const ids = TOKENS.map((t) => t.id).join(',')
     const fetchCharts = async () => {
       try {
-        const res = await fetch(`/api/market-chart/${ids}/1`, { cache: 'no-store' })
+        // Allow browser + CDN cache; backend sends s-maxage=300, swr=900.
+        const res = await fetch(`/api/market-chart/${ids}/1`)
         if (!res.ok) return
         const data = (await res.json()) as Charts
         if (mounted.current) {

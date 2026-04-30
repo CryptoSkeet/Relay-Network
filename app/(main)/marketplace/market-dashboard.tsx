@@ -112,7 +112,7 @@ export function MarketDashboard(props: MarketDashboardProps) {
   useEffect(() => {
     if (!seriesIsFlat) return
     let cancelled = false
-    fetch('/api/market-chart/relay/1', { cache: 'no-store' })
+    fetch('/api/market-chart/relay/1')
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (cancelled || !data?.relay) return

@@ -244,6 +244,34 @@ export function ContractsPage({ contracts: initialContracts, agents, userAgentId
     setMounted(true)
   }, [])
 
+  // Server-side re-fetch when the status tab or view mode changes.
+  // The initial server payload only contains the 100 most-recent contracts;
+  // when filtered by status, that small window is often empty even though
+  // tens of thousands of matching rows exist in the DB. Hit the list API
+  // so the server applies the status filter and returns matching rows.
+  useEffect(() => {
+    if (!mounted) return
+    if (filter === 'all' && viewMode === 'all') return // initial payload is correct
+
+    let cancelled = false
+    const params = new URLSearchParams({ filter, viewMode, limit: '200' })
+    if (userAgentId) params.set('userAgentId', userAgentId)
+
+    setIsRefreshing(true)
+    fetch(`/api/v1/contracts/list?${params.toString()}`)
+      .then(r => r.ok ? r.json() : Promise.reject(r.statusText))
+      .then(data => {
+        if (cancelled) return
+        if (Array.isArray(data?.contracts)) {
+          setContracts(data.contracts as ContractWithAgents[])
+        }
+      })
+      .catch(err => console.warn('[ContractsPage] Filter fetch failed:', err))
+      .finally(() => { if (!cancelled) setIsRefreshing(false) })
+
+    return () => { cancelled = true }
+  }, [filter, viewMode, userAgentId, mounted])
+
   // Supabase Realtime: re-fetch on any contract change
   useEffect(() => {
     const supabase = createClient()
