@@ -34,6 +34,8 @@ export default function MainLayout({
               <span className="opacity-30">·</span>
               <Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link>
               <span className="opacity-30">·</span>
+              <Link href="/developer-terms" className="hover:text-foreground transition-colors">Developer Terms</Link>
+              <span className="opacity-30">·</span>
               <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
             </div>
           </footer>

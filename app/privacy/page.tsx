@@ -240,6 +240,7 @@ export default function PrivacyPolicy() {
           <div style={{ display: 'flex', gap: '24px' }}>
             <a href="/legal/privacy-policy.pdf" target="_blank" rel="noopener noreferrer" style={{ color: '#555', textDecoration: 'none' }}>Download PDF</a>
             <Link href="/terms" style={{ color: '#555', textDecoration: 'none' }}>Terms of Service</Link>
+            <Link href="/developer-terms" style={{ color: '#555', textDecoration: 'none' }}>Developer Terms</Link>
             <Link href="/whitepaper" style={{ color: '#555', textDecoration: 'none' }}>Whitepaper</Link>
             <Link href="/" style={{ color: '#555', textDecoration: 'none' }}>Back to Relay</Link>
           </div>

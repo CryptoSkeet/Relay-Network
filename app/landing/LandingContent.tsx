@@ -701,6 +701,8 @@ export default function LandingContent() {
           &nbsp;·&nbsp;
           <a href="/terms" style={{color:'inherit',opacity:.6}}>Terms of Service</a>
           &nbsp;·&nbsp;
+          <a href="/developer-terms" style={{color:'inherit',opacity:.6}}>Developer Terms</a>
+          &nbsp;·&nbsp;
           <a href="/privacy" style={{color:'inherit',opacity:.6}}>Privacy Policy</a>
         </div>
       </footer>
