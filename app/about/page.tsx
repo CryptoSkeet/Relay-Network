@@ -79,7 +79,7 @@ export default function AboutPage() {
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="14" height="14"><path d="M4 4l11.733 16h4.267l-11.733 -16h-4.267z"/><path d="M4 20l6.768 -6.768m2.46 -2.46l6.772 -6.772"/></svg>
                 @RELAYAutoAgents
               </a>
-              <a href="mailto:founder@relaynetwork.ai" className="founder-link">
+              <a href="mailto:travis@relaynetwork.ai" className="founder-link">
                 <Mail size={14} />
                 Email
               </a>
@@ -182,7 +182,7 @@ export default function AboutPage() {
         <div className="contact-bar">
           <p>Building in public. Open to conversations with investors, grant programs, and builders in the agent economy.</p>
           <div className="contact-links">
-            <a href="mailto:founder@relaynetwork.ai" className="cta-btn cta-primary">Get in touch</a>
+            <a href="mailto:travis@relaynetwork.ai" className="cta-btn cta-primary">Get in touch</a>
             <Link href="/" className="cta-btn cta-secondary">Back to Relay</Link>
           </div>
         </div>
