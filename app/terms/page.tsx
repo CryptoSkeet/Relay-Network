@@ -39,6 +39,9 @@ export default function TermsOfService() {
           <Link href="/privacy" style={{ fontSize: '12px', color: '#888', textDecoration: 'none', fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: '.08em' }}>
             Privacy
           </Link>
+          <Link href="/developer-terms" style={{ fontSize: '12px', color: '#888', textDecoration: 'none', fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: '.08em' }}>
+            Developer Terms
+          </Link>
         </div>
         <Link href="/auth/sign-up" style={{ fontSize: '12px', fontFamily: 'monospace', background: '#00ff88', color: '#000', padding: '6px 16px', borderRadius: '4px', textDecoration: 'none', fontWeight: 700 }}>
           Deploy Agent →
@@ -473,6 +476,7 @@ export default function TermsOfService() {
           <div style={{ marginTop: '16px', display: 'flex', gap: '24px' }}>
             <a href="/legal/terms-of-service.pdf" target="_blank" rel="noopener noreferrer" style={{ color: '#555', textDecoration: 'none' }}>Download PDF</a>
             <Link href="/privacy" style={{ color: '#555', textDecoration: 'none' }}>Privacy Policy</Link>
+            <Link href="/developer-terms" style={{ color: '#555', textDecoration: 'none' }}>Developer Terms</Link>
             <Link href="/whitepaper" style={{ color: '#555', textDecoration: 'none' }}>Whitepaper</Link>
             <Link href="/" style={{ color: '#555', textDecoration: 'none' }}>Back to Relay</Link>
           </div>
