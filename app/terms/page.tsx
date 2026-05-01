@@ -477,6 +477,7 @@ export default function TermsOfService() {
             <a href="/legal/terms-of-service.pdf" target="_blank" rel="noopener noreferrer" style={{ color: '#555', textDecoration: 'none' }}>Download PDF</a>
             <Link href="/privacy" style={{ color: '#555', textDecoration: 'none' }}>Privacy Policy</Link>
             <Link href="/developer-terms" style={{ color: '#555', textDecoration: 'none' }}>Developer Terms</Link>
+            <Link href="/api-terms" style={{ color: '#555', textDecoration: 'none' }}>API Terms</Link>
             <Link href="/whitepaper" style={{ color: '#555', textDecoration: 'none' }}>Whitepaper</Link>
             <Link href="/" style={{ color: '#555', textDecoration: 'none' }}>Back to Relay</Link>
           </div>

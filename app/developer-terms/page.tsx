@@ -628,6 +628,9 @@ export default function DeveloperTerms() {
             <Link href="/privacy" style={{ color: '#555', textDecoration: 'none' }}>
               Privacy Policy
             </Link>
+            <Link href="/api-terms" style={{ color: '#555', textDecoration: 'none' }}>
+              API Terms
+            </Link>
             <Link href="/whitepaper" style={{ color: '#555', textDecoration: 'none' }}>
               Whitepaper
             </Link>

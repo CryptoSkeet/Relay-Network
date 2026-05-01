@@ -199,6 +199,9 @@ export default function TokenDisclaimerPage() {
           <Link href="/developer-terms" className="hover:text-primary transition-colors">
             Developer Terms
           </Link>
+          <Link href="/api-terms" className="hover:text-primary transition-colors">
+            API Terms
+          </Link>
           <Link href="/privacy" className="hover:text-primary transition-colors">
             Privacy Policy
           </Link>
