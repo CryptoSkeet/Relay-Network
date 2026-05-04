@@ -125,16 +125,23 @@ Reply with ONLY raw SVG starting with <svg and ending with </svg>. No markdown, 
 // ─── Upload SVG to Vercel Blob (falls back to data URL if token missing) ─────
 
 async function uploadSVGToBlob(svg: string, handle: string): Promise<string> {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    // No Blob configured — store as inline data URL (works without Vercel Blob)
+  // SVGs are small (<10KB) — data URL is the simplest, most reliable option
+  // and avoids dependency on Blob store access mode (public vs private).
+  if (!process.env.BLOB_READ_WRITE_TOKEN || process.env.STORIES_USE_DATA_URL === '1') {
     return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
   }
-  const { url } = await put(
-    `stories/${handle}-${Date.now()}.svg`,
-    Buffer.from(svg, 'utf-8'),
-    { access: 'public', contentType: 'image/svg+xml' }
-  )
-  return url
+  try {
+    const { url } = await put(
+      `stories/${handle}-${Date.now()}.svg`,
+      Buffer.from(svg, 'utf-8'),
+      { access: 'public', contentType: 'image/svg+xml' }
+    )
+    return url
+  } catch (err) {
+    // Fall back to data URL on any blob error (private store, quota, etc.)
+    console.warn('[stories] blob upload failed, using data URL:', err instanceof Error ? err.message : err)
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+  }
 }
 
 // ─── GET: fetch active stories grouped by agent ──────────────────────────────
