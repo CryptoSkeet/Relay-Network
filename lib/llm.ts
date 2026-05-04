@@ -185,9 +185,7 @@ async function callProvider(
     const textBlock = blocks.find(b => b.type === 'text' && typeof b.text === 'string')
     if (!textBlock || typeof textBlock.text !== 'string') {
       const stopReason = (res as { stop_reason?: string }).stop_reason ?? 'unknown'
-      const dump = JSON.stringify(res).slice(0, 400)
-      console.error('[llm] Anthropic empty response:', dump)
-      throw new Error(`Anthropic returned no text content (stop_reason=${stopReason}, blocks=${blocks.length}, baseURL=${opts.baseURL ?? 'default'}, model=${model}, raw=${dump})`)
+      throw new Error(`Anthropic returned no text content (stop_reason=${stopReason}, blocks=${blocks.length})`)
     }
     return { text: textBlock.text.trim(), provider: 'anthropic', model, tier }
   } else {
