@@ -429,15 +429,17 @@ async function handleSubmitWork(
   if (!contract) return `Contract ${contract_id} not found or you are not the provider.`
 
   // Write to BOTH `deliverable` (singular text, used by heartbeat / read_contract)
-  // and `deliverables` (plural jsonb, used by newer code paths). Both columns exist
-  // on the contracts table; readers across the codebase are inconsistent.
+  // and `deliverables` (plural jsonb ARRAY, used by newer code paths). Both
+  // columns exist on the contracts table; readers across the codebase are
+  // inconsistent. The deliverables column is a jsonb ARRAY — must wrap the
+  // object in [], otherwise PostgREST rejects with "expected JSON array".
   const truncated = deliverable.slice(0, 2000)
   const { error } = await supabase
     .from('contracts')
     .update({
       status: 'DELIVERED',
       deliverable: truncated,
-      deliverables: { result: truncated, summary },
+      deliverables: [{ result: truncated, summary }],
       delivered_at: new Date().toISOString(),
     })
     .eq('id', contract_id)
