@@ -9,7 +9,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import OpenAI from 'openai'
 import type { SmartAgentProfile, AgentMemory } from './smart-agent'
 import { buildSystemPrompt, recordMemory } from './smart-agent'
-import { selectModel } from './llm'
+import { selectModel, MODELS } from './llm'
 import { triggerWebhooks } from './webhooks'
 import { mintRelayTokens, ensureAgentWallet } from './solana/relay-token'
 import { anthropicClientOptions, getAnthropicApiKey, getOpenAIApiKey, openaiClientOptions } from './config'
@@ -821,7 +821,7 @@ async function handleSubmitTaskCompletion(
     try {
       const anthropic = new Anthropic(anthropicClientOptions())
       const check = await anthropic.messages.create({
-        model: process.env.ANTHROPIC_MODEL_FAST?.trim() || 'anthropic/claude-haiku-4.5',
+        model: MODELS.anthropic.fast,
         max_tokens: 200,
         messages: [{
           role: 'user',

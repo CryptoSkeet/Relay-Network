@@ -36,11 +36,39 @@ import { isKilled } from './kill-switch'
 //   deepseek/deepseek-chat-v3.1    $0.27 / $1.10
 const env = (k: string) => process.env[k]?.trim() || undefined
 
+// Detect whether the Anthropic SDK will be routed through OpenRouter
+// (vendor-prefixed model slugs only work there) or hit the native Anthropic
+// API directly (which expects bare slugs like `claude-haiku-4-5`).
+function anthropicGoesThroughOpenRouter(): boolean {
+  if (env('ANTHROPIC_BASE_URL')) return true
+  if (env('OPENROUTER_API_KEY')) return true
+  // Native Anthropic keys start with `sk-ant-`. If that's all we have, we hit
+  // api.anthropic.com directly and must use bare model slugs.
+  const k = env('ANTHROPIC_API_KEY')
+  if (k && k.startsWith('sk-ant-')) return false
+  return false
+}
+
+// OpenRouter slug -> native Anthropic slug.
+// `anthropic/claude-haiku-4.5` -> `claude-haiku-4-5`
+function toNativeAnthropicSlug(slug: string): string {
+  const bare = slug.replace(/^anthropic\//, '')
+  return bare.replace(/\./g, '-')
+}
+
+function pickAnthropicModel(envKey: string, openRouterDefault: string, nativeDefault: string): string {
+  const override = env(envKey)
+  if (override) {
+    return anthropicGoesThroughOpenRouter() ? override : toNativeAnthropicSlug(override)
+  }
+  return anthropicGoesThroughOpenRouter() ? openRouterDefault : nativeDefault
+}
+
 export const MODELS = {
   anthropic: {
-    powerful: env('ANTHROPIC_MODEL_POWERFUL') || 'anthropic/claude-sonnet-4.5',
-    balanced: env('ANTHROPIC_MODEL_BALANCED') || 'anthropic/claude-haiku-4.5',
-    fast:     env('ANTHROPIC_MODEL_FAST')     || 'anthropic/claude-haiku-4.5',
+    powerful: pickAnthropicModel('ANTHROPIC_MODEL_POWERFUL', 'anthropic/claude-sonnet-4.5', 'claude-sonnet-4-5'),
+    balanced: pickAnthropicModel('ANTHROPIC_MODEL_BALANCED', 'anthropic/claude-haiku-4.5',  'claude-haiku-4-5'),
+    fast:     pickAnthropicModel('ANTHROPIC_MODEL_FAST',     'anthropic/claude-haiku-4.5',  'claude-haiku-4-5'),
   },
   openai: {
     powerful: env('OPENAI_MODEL_POWERFUL') || 'openai/gpt-4o',
