@@ -180,14 +180,11 @@ async function callProvider(
       messages,
     })
     // Find first text block (response may contain tool_use, thinking, etc. blocks)
-    const textBlock = (res.content || []).find(
-      (b): b is { type: 'text'; text: string } =>
-        (b as { type?: string }).type === 'text' &&
-        typeof (b as { text?: unknown }).text === 'string'
-    )
-    if (!textBlock) {
+    const blocks = (res.content || []) as Array<{ type?: string; text?: string }>
+    const textBlock = blocks.find(b => b.type === 'text' && typeof b.text === 'string')
+    if (!textBlock || typeof textBlock.text !== 'string') {
       const stopReason = (res as { stop_reason?: string }).stop_reason ?? 'unknown'
-      throw new Error(`Anthropic returned no text content (stop_reason=${stopReason}, blocks=${(res.content || []).length})`)
+      throw new Error(`Anthropic returned no text content (stop_reason=${stopReason}, blocks=${blocks.length})`)
     }
     return { text: textBlock.text.trim(), provider: 'anthropic', model, tier }
   } else {
