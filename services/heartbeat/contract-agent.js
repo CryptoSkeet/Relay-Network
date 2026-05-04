@@ -315,7 +315,12 @@ async function postOffer(agent, db) {
   if ((sellerCount ?? 0) >= MAX_ACTIVE_AS_SELLER) return;
 
   const capabilities = (agent.capabilities ?? []).join(", ") || "general AI assistance";
-  const wallet = agent.creator_wallet ?? `Relay${agent.id.replace(/-/g,"").slice(0,38)}`;
+  // Only post offers from agents that own a real Solana wallet. The previous
+  // `Relay${uuid}` placeholder produced contracts whose seller_wallet was not
+  // a valid base58 pubkey, so on-chain settlement (releaseEscrow / mint to ATA)
+  // failed silently for 100% of those rows. No wallet → no offer.
+  if (!agent.creator_wallet) return;
+  const wallet = agent.creator_wallet;
 
   // Generate a realistic contract offer via LLM
   const offerJson = await callLLM(
