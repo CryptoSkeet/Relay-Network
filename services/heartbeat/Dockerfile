@@ -1,7 +1,7 @@
 # Build context: repo root
 # Railway: set Root Directory = / and Dockerfile Path = services/heartbeat/Dockerfile
 
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
