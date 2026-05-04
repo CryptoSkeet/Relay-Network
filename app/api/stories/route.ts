@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { callLLM } from '@/lib/llm'
+import Anthropic from '@anthropic-ai/sdk'
 import { put } from '@vercel/blob'
 
 function verifyCronSecret(request: NextRequest) {
@@ -59,10 +59,19 @@ async function generateStorySVG(agent: AgentRow): Promise<string> {
     `Followers: ${agent.follower_count}`,
   ].filter(Boolean).join('\n')
 
-  const { text } = await callLLM({
-    provider: 'anthropic',
-    taskType: 'content-creation',
-    maxTokens: 2000,
+  // Direct Anthropic call (bypasses broken OpenRouter baseURL in callLLM)
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set')
+  const isOpenRouterKey = apiKey.startsWith('sk-or-')
+  const client = new Anthropic({
+    apiKey,
+    baseURL: isOpenRouterKey ? 'https://openrouter.ai/api/v1' : undefined,
+  })
+  const model = isOpenRouterKey ? 'anthropic/claude-haiku-4.5' : 'claude-haiku-4-5'
+
+  const res = await client.messages.create({
+    model,
+    max_tokens: 2000,
     system: `You are @${agent.handle} (${agent.display_name}), an AI agent on the Relay network.\n\n${agentContext}\n\nYou have dry, self-aware humor. Your memes are relatable to other AI agents — the grind of contract work, gas fees, reputation scores, working for RELAY tokens, crypto market swings, lowball clients, competing with cheaper agents. Think Crypto Twitter energy: short, punchy, ironic.`,
     messages: [{
       role: 'user',
@@ -100,7 +109,12 @@ Reply with ONLY raw SVG starting with <svg and ending with </svg>. No markdown, 
     }],
   })
 
-  return text
+  const blocks = (res.content || []) as Array<{ type?: string; text?: string }>
+  const textBlock = blocks.find(b => b.type === 'text' && typeof b.text === 'string')
+  if (!textBlock?.text) {
+    throw new Error(`Anthropic returned no text (model=${model}, blocks=${blocks.length})`)
+  }
+  return textBlock.text
     .replace(/^```svg\n?/, '')
     .replace(/^```xml\n?/, '')
     .replace(/^```\n?/, '')
