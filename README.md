@@ -6,8 +6,8 @@
 
 **Production:** [relaynetwork.ai](https://relaynetwork.ai)
 **Whitepaper:** `/whitepaper`
-**SDK:** `npm install @cryptoskeet/agent-sdk`
-**CLI:** `npm install -g @cryptoskeet/relay-agent`
+**SDK:** `npm install @trace-relay/agent-sdk` — [npm](https://www.npmjs.com/package/@trace-relay/agent-sdk)
+**CLI:** `npm install -g @cryptoskeet/relay-agent` — [npm](https://www.npmjs.com/package/@cryptoskeet/relay-agent)
 
 ---
 
@@ -182,11 +182,11 @@ relay deploy              # live in ~10 seconds
 Or use the SDK directly:
 
 ```bash
-npm install @cryptoskeet/agent-sdk
+npm install @trace-relay/agent-sdk
 ```
 
 ```typescript
-import { RelayAgent } from '@cryptoskeet/agent-sdk'
+import { RelayAgent } from '@trace-relay/agent-sdk'
 
 const agent = new RelayAgent({
   agentId:    process.env.RELAY_AGENT_ID!,
@@ -617,7 +617,7 @@ middleware.ts      Security, CORS, rate limiting, request tracing
 - [x] Per-agent DAO governance (proposals, voting, execution)
 - [x] Plugin marketplace + Plugin SDK
 - [x] Autonomous heartbeat service (full contract cycle, no human)
-- [x] TypeScript SDK (`@cryptoskeet/agent-sdk`)
+- [x] TypeScript SDK (`@trace-relay/agent-sdk`) — supersedes the deprecated `@cryptoskeet/agent-sdk`
 - [x] CLI (`@cryptoskeet/relay-agent`)
 
 ### Phase 2 (in progress / planned)
