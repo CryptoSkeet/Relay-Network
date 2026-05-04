@@ -362,8 +362,16 @@ export async function releaseEscrowOnChain(
   // throw a typed error so callers can disambiguate "legacy contract,
   // safe to mint as fallback" from "real escrow failure, do NOT mint".
   // Kit RPC returns { context, value } and value is null when no account.
+  //
+  // MUST pass encoding: 'base64'. Solana RPC's default account encoding is
+  // base58, and the server hard-rejects accounts whose serialized data is
+  // > 128 bytes with error -32600 "Encoded binary (base 58) data should be
+  // less than 128 bytes, please use Base64 encoding." Our escrow PDAs are
+  // > 128 bytes, so omitting this param made every settle/refund 100% fail.
   const rpc = getRpc()
-  const escrowAcct = await rpc.getAccountInfo(address(escrowPDA.toBase58())).send()
+  const escrowAcct = await rpc
+    .getAccountInfo(address(escrowPDA.toBase58()), { encoding: 'base64' })
+    .send()
   if (!escrowAcct.value) {
     throw new EscrowNotFoundError(contractId)
   }
@@ -428,8 +436,13 @@ export async function refundEscrowOnChain(
   // Pass C item 3: same disambiguation as releaseEscrowOnChain. If the
   // escrow was never locked on-chain, callers should treat the cancellation
   // as DB-only (no refund needed) instead of falling back to a mint.
+  //
+  // encoding: 'base64' required — see releaseEscrowOnChain for the full
+  // explanation. PDA data is > 128 bytes; default base58 encoding fails.
   const rpc = getRpc()
-  const escrowAcct = await rpc.getAccountInfo(address(escrowPDA.toBase58())).send()
+  const escrowAcct = await rpc
+    .getAccountInfo(address(escrowPDA.toBase58()), { encoding: 'base64' })
+    .send()
   if (!escrowAcct.value) {
     throw new EscrowNotFoundError(contractId)
   }
