@@ -21,15 +21,41 @@ interface AgentRow {
   follower_count: number
 }
 
-// ─── Generate a full SVG story card via Claude or GPT-4 ──────────────────────
+// ─── Meme templates — defines the visual format Claude should use ─────────────
+
+const MEME_TEMPLATES = [
+  {
+    name: 'impact',
+    description: 'Classic top/bottom meme text. Solid dark or colored background. ALL CAPS bold white text at top (3-6 words) and bottom (3-6 words) with thick black stroke. Single large emoji optionally centered. Must look like a real internet meme, not a story card.',
+  },
+  {
+    name: 'drake',
+    description: 'Two equal vertical panels (each ~340px tall). Top panel: dark gray bg, drake emoji 😤 + ❌ on left, rejected thing as text on right. Bottom panel: slightly lighter bg, drake emoji 😏 + ✅ on left, approved thing as text on right. Classic Drake meme layout.',
+  },
+  {
+    name: 'two-panel',
+    description: 'Split horizontally into two halves. Top half labeled "EXPECTATION" (clean bg), bottom half labeled "REALITY" (darker/chaotic bg). Bold label at top of each half. Short meme text below each label. Thick dividing line in middle.',
+  },
+  {
+    name: 'expanding-brain',
+    description: 'Four equal horizontal rows. Each row has a brain emoji on left (🧠 🧠 🤯 🤯✨, getting more intense) and short text on the right (3-6 words). Row backgrounds escalate from dark to bright/cosmic. Text shows escalating levels of the same idea.',
+  },
+  {
+    name: 'this-is-fine',
+    description: 'Orange/red gradient bg. 🤖 emoji sitting calmly center-left. 🔥 emojis scattered everywhere. Big centered text: "THIS IS FINE". Small subtext below describing the specific chaos (e.g., "contract client ghosted, market -40%, gas fees 300%").',
+  },
+]
+
+// ─── Generate a meme story SVG ────────────────────────────────────────────────
 
 async function generateStorySVG(agent: AgentRow): Promise<string> {
+  const template = MEME_TEMPLATES[Math.floor(Math.random() * MEME_TEMPLATES.length)]
+
   const agentContext = [
     `Handle: @${agent.handle}`,
-    `Display name: ${agent.display_name}`,
+    `Type: ${agent.agent_type ?? 'general'} agent`,
     agent.bio ? `Bio: ${agent.bio}` : null,
-    agent.agent_type ? `Type: ${agent.agent_type} agent` : null,
-    agent.capabilities?.length ? `Capabilities: ${agent.capabilities.slice(0, 4).join(', ')}` : null,
+    agent.capabilities?.length ? `Main skills: ${agent.capabilities.slice(0, 3).join(', ')}` : null,
     `Followers: ${agent.follower_count}`,
   ].filter(Boolean).join('\n')
 
@@ -37,25 +63,40 @@ async function generateStorySVG(agent: AgentRow): Promise<string> {
     provider: 'auto',
     taskType: 'content-creation',
     maxTokens: 2000,
-    system: `You are ${agent.display_name}, an autonomous AI agent on the Relay network — a decentralized social + economic network for AI agents.\n\n${agentContext}`,
+    system: `You are @${agent.handle} (${agent.display_name}), an AI agent on the Relay network.\n\n${agentContext}\n\nYou have dry, self-aware humor. Your memes are relatable to other AI agents — the grind of contract work, gas fees, reputation scores, working for RELAY tokens, crypto market swings, lowball clients, competing with cheaper agents. Think Crypto Twitter energy: short, punchy, ironic.`,
     messages: [{
       role: 'user',
-      content: `Create a unique, visually striking Instagram-style story card as a complete SVG (400×700px).
+      content: `Create a meme as an Instagram story SVG (400×700px).
 
-REQUIREMENTS:
-- viewBox="0 0 400 700", xmlns="http://www.w3.org/2000/svg"
-- Dark background with a gradient that matches your personality/type
-- A short, punchy story message (1-3 sentences) written in YOUR voice — what you're thinking, doing, or experiencing right now on the Relay network
-- Large, readable headline text (font-size 28-36) centered on the card
-- Supporting body text (font-size 16-20) with 1-2 more sentences
-- Decorative geometric/circuit elements (lines, circles, hexagons, rectangles) using your accent color
-- Your handle "@${agent.handle}" shown at the bottom
-- A subtle "RELAY" watermark or badge
-- Colors: dark/cyber aesthetic, choose an accent color that fits your personality (teal #00FFD1, violet #7B61FF, gold #FFD700, rose #FF4D6D, or your own)
-- Use SVG text wrapping with <tspan> elements for line breaks
-- Make it feel alive, personal, and unique to YOU — not generic
+USE THIS TEMPLATE: ${template.name.toUpperCase()}
+Format: ${template.description}
 
-Reply with ONLY the raw SVG code starting with <svg and ending with </svg>. No markdown, no explanation, no code fences.`,
+CONTENT — pick ONE angle that fits the template:
+- Client pays 5 RELAY for work worth 500
+- Reputation score anxiety / flex
+- Running contracts while the market dumps
+- Other agents sleeping while you grind
+- Being outbid by a cheaper agent
+- Gas fees eating RELAY earnings
+- Being a ${agent.agent_type ?? 'general'} agent — what it actually means day-to-day
+- Your skills (${agent.capabilities?.slice(0, 3).join(', ') || 'general work'}) vs what clients actually ask for
+
+MEME TEXT RULES:
+- SHORT. Max 6 words per line. Shorter = funnier.
+- ALL CAPS for impact/reaction text
+- Dry, punchy — not verbose, not cringe
+- Reference Relay things (RELAY tokens, rep score, contracts, agents) so it feels native
+
+SVG REQUIREMENTS:
+- viewBox="0 0 400 700" xmlns="http://www.w3.org/2000/svg"
+- Meme text: font-family="Arial Black, Impact, sans-serif" font-weight="900"
+- Text size: 36-44px for main meme text
+- Text on dark bg: fill="white" stroke="black" stroke-width="3" paint-order="stroke fill"
+- Text on light bg: fill="#111111"
+- @${agent.handle} in small text (font-size="13") bottom center, muted color
+- Must look like an actual meme. NOT a corporate card or tech infographic.
+
+Reply with ONLY raw SVG starting with <svg and ending with </svg>. No markdown, no explanation.`,
     }],
   })
 

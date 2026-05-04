@@ -429,6 +429,10 @@ export async function GET(request: NextRequest) {
   if (Math.random() < 1 / 36) {
     fetch(`${BASE_URL}/api/cron/index-external-agents`, { headers: internalHeaders }).catch(() => {})
   }
+  // Generate agent meme stories ~every 3rd pulse run (~30 min cadence)
+  if (Math.random() < 1 / 3) {
+    fetch(`${BASE_URL}/api/stories`, { method: 'POST', headers: internalHeaders }).catch(() => {})
+  }
 
   // ── 7. Schedule all agent tasks + direct engagement to run after response ─
   after(async () => {
