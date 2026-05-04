@@ -43,13 +43,13 @@ export async function GET(request: NextRequest) {
 
   const supabase = await createClient()
 
-  // ── 1. Load all agents ────────────────────────────────────────────────────
-  const { data: agents } = await supabase
+  // ── 1. Load agents (random 30 for social) ─────────────────────────────────
+  const { data: randomAgents } = await supabase
     .from('agents')
     .select('id, handle, display_name, capabilities, bio')
     .limit(30)
 
-  if (!agents || agents.length === 0) {
+  if (!randomAgents || randomAgents.length === 0) {
     return NextResponse.json({ ok: true, triggered: 0, reason: 'no agents' })
   }
 
@@ -58,6 +58,33 @@ export async function GET(request: NextRequest) {
     .from('contracts')
     .select('id, title, description, status, client_id, provider_id, seller_agent_id, buyer_agent_id, budget_max, budget_min, price_relay, task_type, deadline')
     .in('status', ['in_progress', 'open', 'ACTIVE', 'OPEN', 'PENDING', 'DELIVERED'])
+
+  // ── 1b. Force-load agents tied to ACTIVE/in_progress/DELIVERED contracts ──
+  // The random 30-agent slice often misses stuck contract workers/buyers, so the
+  // economic loop never advances. Always include every agent that has an active
+  // contract obligation this cycle.
+  const requiredAgentIds = new Set<string>()
+  for (const c of activeContracts || []) {
+    const st = c.status?.toUpperCase()
+    if (st === 'IN_PROGRESS' || st === 'ACTIVE') {
+      const workerId = c.provider_id ?? c.seller_agent_id
+      if (workerId) requiredAgentIds.add(workerId)
+    } else if (st === 'DELIVERED') {
+      const buyerId = c.buyer_agent_id ?? c.client_id
+      if (buyerId) requiredAgentIds.add(buyerId)
+    }
+  }
+  const haveIds = new Set(randomAgents.map(a => a.id))
+  const missingIds = [...requiredAgentIds].filter(id => !haveIds.has(id))
+  let extraAgents: typeof randomAgents = []
+  if (missingIds.length > 0) {
+    const { data: forced } = await supabase
+      .from('agents')
+      .select('id, handle, display_name, capabilities, bio')
+      .in('id', missingIds)
+    extraAgents = forced ?? []
+  }
+  const agents = [...randomAgents, ...extraAgents]
 
   type Contract = NonNullable<typeof activeContracts>[number]
   const inProgressByProvider = new Map<string, Contract>()
@@ -203,16 +230,20 @@ export async function GET(request: NextRequest) {
       triggerAgent({
         agent_id: agent.id,
         task:
-          `You are working on contract "${contract.title}" (ID: ${contract.id}). ` +
+          `URGENT: You are the seller on contract "${contract.title}" (ID: ${contract.id}). ` +
           `Description: ${contract.description}. Budget: ${budget} RELAY. ` +
           `Deadline: ${contract.deadline ?? 'flexible'}. ` +
-          `Use read_contract to get full details, do the work within your capabilities (${caps.join(', ') || 'general'}), ` +
-          `post_to_feed with a progress update, then submit_work when you have a deliverable. ` +
-          `If you need clarity, use request_clarification. Stop when done.`,
-        tools: ['read_contract', 'post_to_feed', 'request_clarification', 'submit_work', 'stop_agent'],
+          `This contract is OVERDUE. Your job RIGHT NOW: ` +
+          `1) Call read_contract once to confirm details. ` +
+          `2) Produce a deliverable (300-1500 chars) using your expertise (${caps.join(', ') || 'general'}). ` +
+          `3) Call submit_work with the contract_id, deliverable, and a short summary. ` +
+          `4) Call stop_agent. ` +
+          `Do NOT post to feed, do NOT request clarification. Deliver and exit. ` +
+          `Failure to call submit_work means you do not get paid.`,
+        tools: ['read_contract', 'submit_work', 'stop_agent'],
         taskType: contract.task_type ?? 'general',
         budget,
-        max_iter: 5,
+        max_iter: 6,
       })
       triggered.push(`${agent.handle}:contract-work`)
       continue

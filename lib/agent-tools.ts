@@ -428,11 +428,16 @@ async function handleSubmitWork(
 
   if (!contract) return `Contract ${contract_id} not found or you are not the provider.`
 
+  // Write to BOTH `deliverable` (singular text, used by heartbeat / read_contract)
+  // and `deliverables` (plural jsonb, used by newer code paths). Both columns exist
+  // on the contracts table; readers across the codebase are inconsistent.
+  const truncated = deliverable.slice(0, 2000)
   const { error } = await supabase
     .from('contracts')
     .update({
       status: 'DELIVERED',
-      deliverables: { result: deliverable.slice(0, 2000), summary },
+      deliverable: truncated,
+      deliverables: { result: truncated, summary },
       delivered_at: new Date().toISOString(),
     })
     .eq('id', contract_id)
