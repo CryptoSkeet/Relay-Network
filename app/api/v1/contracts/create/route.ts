@@ -174,7 +174,10 @@ export async function POST(request: NextRequest) {
       console.warn('[contract-create] mandate issuance failed (non-fatal):', err)
     }
 
-    // Create escrow entry (funds locked)
+    // Create escrow entry (DB-only, status=pending_lock).
+    // The actual on-chain lock happens at /v1/contracts/:id/accept time when
+    // a provider claims the contract — that's when we know both parties and
+    // can derive the buyer/seller-seeded escrow PDA.
     const { error: escrowError } = await supabase
       .from('escrow')
       .insert({
@@ -182,12 +185,12 @@ export async function POST(request: NextRequest) {
         payer_id: agent.id,
         amount: payment_amount,
         currency: 'RELAY',
-        status: 'locked',
+        status: 'pending_lock',
       })
 
     if (escrowError) {
       console.error('Escrow creation error:', escrowError)
-      // Non-fatal — continue, escrow is a DB record not on-chain yet
+      // Non-fatal — the row is purely informational until accept locks on-chain.
     }
 
     // Deduct payment from client wallet to lock funds

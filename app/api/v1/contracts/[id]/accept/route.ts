@@ -95,11 +95,70 @@ export async function POST(
       }, { status: 409 })
     }
 
-    // Update escrow with payee
-    await supabase
-      .from('escrow')
-      .update({ payee_id: agent.id })
-      .eq('contract_id', contractId)
+    // ── On-chain escrow lock ──────────────────────────────────────────────
+    // Now that buyer (client_id) and seller (provider_id = agent.id) are
+    // both known, transfer the buyer's RELAY into the program-owned vault
+    // PDA. This is the SDK-side equivalent of contract-engine.initiateContract
+    // and was previously missing — the create route only wrote a DB-only
+    // `escrow` row that never touched the chain.
+    //
+    // If the on-chain lock fails (empty buyer ATA, RPC outage, etc.) we
+    // REVERT the contract back to 'open' so another provider can pick it
+    // up rather than leaving it stuck in_progress with no funds locked.
+    try {
+      const { lockEscrowOnChain } = await import('@/lib/solana/relay-escrow')
+      const { ensureAgentWallet } = await import('@/lib/solana/relay-token')
+
+      const buyerWalletData = await ensureAgentWallet(contract.client_id)
+      const sellerWalletData = await ensureAgentWallet(agent.id)
+
+      if (!buyerWalletData?.publicKey || !sellerWalletData?.publicKey) {
+        throw new Error(
+          `Missing Solana wallet (buyer=${!!buyerWalletData?.publicKey} seller=${!!sellerWalletData?.publicKey})`,
+        )
+      }
+
+      const payAmount =
+        contract.price_relay ?? contract.budget_max ?? contract.budget_min ?? 0
+
+      if (payAmount > 0) {
+        const sig = await lockEscrowOnChain(
+          contractId,
+          contract.client_id,
+          sellerWalletData.publicKey,
+          payAmount,
+        )
+        await supabase
+          .from('escrow')
+          .update({
+            payee_id: agent.id,
+            status: 'locked',
+            metadata: { on_chain: true, lock_tx_hash: sig },
+          })
+          .eq('contract_id', contractId)
+        console.log(`[contract-accept] On-chain escrow lock tx: ${sig}`)
+      } else {
+        // Zero-amount contract — just record the payee.
+        await supabase
+          .from('escrow')
+          .update({ payee_id: agent.id })
+          .eq('contract_id', contractId)
+      }
+    } catch (lockErr) {
+      // Revert: unaccept the contract so another provider can claim it.
+      await supabase
+        .from('contracts')
+        .update({ provider_id: null, status: 'open', accepted_at: null })
+        .eq('id', contractId)
+        .eq('provider_id', agent.id)
+      const msg =
+        lockErr instanceof Error ? lockErr.message : String(lockErr)
+      console.error('[contract-accept] On-chain escrow lock failed, reverted:', msg)
+      return NextResponse.json(
+        { error: `On-chain escrow lock failed: ${msg}` },
+        { status: 402 },
+      )
+    }
 
     // Notify the client
     await supabase.from('contract_notifications').insert({

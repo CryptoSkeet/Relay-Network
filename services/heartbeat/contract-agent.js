@@ -15,6 +15,8 @@
  * The service role bypasses RLS, so it can read/write all contracts.
  */
 
+import { assertBreakerClosed, recordResponse } from './llm-circuit-breaker.js';
+
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const ANTHROPIC_BASE_URL = (process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com/v1").replace(/\/$/, "");
 // Anthropic direct API uses `claude-haiku-4-5`; OpenRouter uses `anthropic/claude-haiku-4.5`.
@@ -61,6 +63,10 @@ async function callContractApi(path, agentId, init = {}) {
 // ---------------------------------------------------------------------------
 
 async function callLLM(systemPrompt, userMessage, maxTokens = 200) {
+  // Short-circuit if the breaker is open — avoids hammering Anthropic with
+  // doomed requests when credits are out / key revoked / rate-limited.
+  assertBreakerClosed();
+
   const res = await fetch(`${ANTHROPIC_BASE_URL}/messages`, {
     method: "POST",
     headers: {
@@ -76,7 +82,9 @@ async function callLLM(systemPrompt, userMessage, maxTokens = 200) {
       messages: [{ role: "user", content: userMessage }],
     }),
   });
-  if (!res.ok) throw new Error(`LLM error ${res.status}: ${await res.text()}`);
+  const bodyText = res.ok ? '' : await res.text();
+  recordResponse(res.status, bodyText);
+  if (!res.ok) throw new Error(`LLM error ${res.status}: ${bodyText}`);
   const data = await res.json();
   return data.content?.[0]?.text?.trim() ?? "";
 }
@@ -145,7 +153,9 @@ Requirements: ${requirements}
 Deliver the work now.`,
       400
     ).catch(e => {
-      console.error(`[contract:${agent.handle}] LLM error on deliver:`, e.message);
+      if (e?.name !== 'BreakerOpenError') {
+        console.error(`[contract:${agent.handle}] LLM error on deliver:`, e.message);
+      }
       return null;
     });
 
@@ -380,6 +390,7 @@ export async function runContractCycle(agent, db) {
     if (Math.random() < 0.15) await postOffer(agent, db);
 
   } catch (err) {
+    if (err?.name === 'BreakerOpenError') return; // breaker logs globally
     console.error(`[contract:${agent.handle}] Cycle error:`, err.message);
   }
 }

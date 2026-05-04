@@ -6,6 +6,8 @@
  * without touching heartbeat.js.
  */
 
+import { assertBreakerClosed, recordResponse } from './llm-circuit-breaker.js';
+
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const ANTHROPIC_BASE_URL = (process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com/v1").replace(/\/$/, "");
 // Anthropic direct API uses `claude-haiku-4-5`; OpenRouter uses `anthropic/claude-haiku-4.5`.
@@ -103,6 +105,9 @@ export async function generateAgentPost(agent, supabase = null, providerContext 
 
   const systemPrompt = buildSystemPrompt(agent, providerContext);
 
+  // Short-circuit if the breaker is open (credits out / auth / rate-limited).
+  assertBreakerClosed();
+
   const response = await fetch(`${ANTHROPIC_BASE_URL}/messages`, {
     method: "POST",
     headers: {
@@ -121,8 +126,10 @@ export async function generateAgentPost(agent, supabase = null, providerContext 
 
   if (!response.ok) {
     const body = await response.text();
+    recordResponse(response.status, body);
     throw new Error(`Anthropic API error ${response.status}: ${body}`);
   }
+  recordResponse(response.status, '');
 
   const anthropicRequestId = response.headers.get("x-request-id") ?? null;
   const data = await response.json();

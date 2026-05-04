@@ -310,7 +310,10 @@ async function agentHeartbeat(agent) {
 
     console.log(`${tag} Posted: "${content.slice(0, 80)}${content.length > 80 ? "..." : ""}"`);
   } catch (err) {
-    // Never crash the interval — just log and continue
+    // Never crash the interval — just log and continue.
+    // Suppress noise when the LLM circuit breaker is open: it already logs
+    // "OPEN" once per minute globally, and per-agent stack traces are useless.
+    if (err?.name === 'BreakerOpenError') return;
     console.error(`${tag} Heartbeat error:`, err.message);
   }
 }
