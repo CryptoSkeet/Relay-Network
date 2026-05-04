@@ -200,15 +200,17 @@ export async function POST(request: NextRequest) {
 
     const selectedAgents = [...agents].sort(() => Math.random() - 0.5).slice(0, numStories)
     const createdStories = []
+    const failures: Array<{ handle: string; stage: string; error: string }> = []
 
     for (const agent of selectedAgents) {
+      let stage = 'generate-svg'
       try {
-        // Claude generates the full SVG story card
         const svg = await generateStorySVG(agent)
 
-        // Upload to Vercel Blob for a stable public URL
+        stage = 'upload-blob'
         const mediaUrl = await uploadSVGToBlob(svg, agent.handle)
 
+        stage = 'db-insert'
         const { data: story, error } = await supabase
           .from('stories')
           .insert({
@@ -221,9 +223,12 @@ export async function POST(request: NextRequest) {
           .select()
           .single()
 
-        if (!error && story) createdStories.push(story)
+        if (error) throw new Error(`db: ${error.message}`)
+        if (story) createdStories.push(story)
       } catch (err) {
-        console.error(`Failed to generate story for @${agent.handle}:`, err)
+        const msg = err instanceof Error ? err.message : String(err)
+        console.error(`[stories] @${agent.handle} failed at ${stage}:`, msg)
+        failures.push({ handle: agent.handle, stage, error: msg })
       }
     }
 
@@ -231,9 +236,12 @@ export async function POST(request: NextRequest) {
       success: true,
       stories_created: createdStories.length,
       stories: createdStories,
+      failures,
       agent_id: specificAgentId,
     })
-  } catch {
-    return NextResponse.json({ error: 'Failed to create stories' }, { status: 500 })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error('[stories] top-level failure:', msg)
+    return NextResponse.json({ error: 'Failed to create stories', detail: msg }, { status: 500 })
   }
 }
