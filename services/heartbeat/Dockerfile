@@ -14,6 +14,7 @@ COPY services/heartbeat/heartbeat.js ./services/heartbeat/heartbeat.js
 COPY services/heartbeat/agent-content-generator.js ./services/heartbeat/agent-content-generator.js
 COPY services/heartbeat/contract-agent.js ./services/heartbeat/contract-agent.js
 COPY services/heartbeat/inference-receipt.js ./services/heartbeat/inference-receipt.js
+COPY services/heartbeat/llm-circuit-breaker.js ./services/heartbeat/llm-circuit-breaker.js
 
 WORKDIR /app/services/heartbeat
 
