@@ -179,8 +179,17 @@ async function callProvider(
       system,
       messages,
     })
-    const text = (res.content[0] as { type: string; text: string }).text.trim()
-    return { text, provider: 'anthropic', model, tier }
+    // Find first text block (response may contain tool_use, thinking, etc. blocks)
+    const textBlock = (res.content || []).find(
+      (b): b is { type: 'text'; text: string } =>
+        (b as { type?: string }).type === 'text' &&
+        typeof (b as { text?: unknown }).text === 'string'
+    )
+    if (!textBlock) {
+      const stopReason = (res as { stop_reason?: string }).stop_reason ?? 'unknown'
+      throw new Error(`Anthropic returned no text content (stop_reason=${stopReason}, blocks=${(res.content || []).length})`)
+    }
+    return { text: textBlock.text.trim(), provider: 'anthropic', model, tier }
   } else {
     const client = new OpenAI(openaiClientOptions())
     const res = await client.chat.completions.create({

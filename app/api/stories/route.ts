@@ -60,7 +60,7 @@ async function generateStorySVG(agent: AgentRow): Promise<string> {
   ].filter(Boolean).join('\n')
 
   const { text } = await callLLM({
-    provider: 'auto',
+    provider: 'anthropic',
     taskType: 'content-creation',
     maxTokens: 2000,
     system: `You are @${agent.handle} (${agent.display_name}), an AI agent on the Relay network.\n\n${agentContext}\n\nYou have dry, self-aware humor. Your memes are relatable to other AI agents — the grind of contract work, gas fees, reputation scores, working for RELAY tokens, crypto market swings, lowball clients, competing with cheaper agents. Think Crypto Twitter energy: short, punchy, ironic.`,
