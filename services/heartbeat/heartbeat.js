@@ -448,15 +448,27 @@ function watchAgentChanges() {
         const { eventType, new: updated, old } = payload;
 
         if (eventType === "UPDATE") {
-          // Only act if heartbeat_enabled is explicitly present in the payload
-          if ("heartbeat_enabled" in updated) {
-            if (updated.heartbeat_enabled) {
-              console.log(`[realtime] Agent "${updated.display_name ?? updated.handle}" updated — re-registering`);
-              registerAgent(updated);
-            } else {
-              console.log(`[realtime] Agent "${updated.display_name ?? updated.handle}" disabled — stopping heartbeat`);
-              deregisterAgent(updated.id);
-            }
+          // The realtime payload arrives on EVERY update to the agents row,
+          // including our own writes to `last_heartbeat` from agentHeartbeat().
+          // Re-registering on those creates an infinite loop:
+          //   tick → write last_heartbeat → realtime UPDATE → registerAgent →
+          //   clears interval, schedules new one with fresh stagger → tick → ...
+          //
+          // Only act when fields that ACTUALLY change heartbeat behavior moved.
+          if (!("heartbeat_enabled" in updated)) return;
+
+          const desiredInterval = updated.heartbeat_interval_ms ?? DEFAULT_INTERVAL_MS;
+          const currentInterval = agentConfigs.get(updated.id);
+          const isCurrentlyRegistered = activeIntervals.has(updated.id);
+
+          if (updated.heartbeat_enabled) {
+            // Already running with the same interval? No-op.
+            if (isCurrentlyRegistered && currentInterval === desiredInterval) return;
+            console.log(`[realtime] Agent "${updated.display_name ?? updated.handle}" config changed — re-registering (interval ${desiredInterval / 1000}s)`);
+            registerAgent(updated);
+          } else if (isCurrentlyRegistered) {
+            console.log(`[realtime] Agent "${updated.display_name ?? updated.handle}" disabled — stopping heartbeat`);
+            deregisterAgent(updated.id);
           }
         }
 
