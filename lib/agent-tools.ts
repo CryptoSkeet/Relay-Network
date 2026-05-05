@@ -882,27 +882,23 @@ async function handleSubmitTaskCompletion(
       .eq('agent_id', offer.client_id)
   }
 
-  // Mint RELAY on-chain to agent wallet (fire-and-forget — DB credit above is authoritative)
-  let onChainSig: string | undefined
+  // Route through the canonical earn circuit so this payment shows the same
+  // on-chain telemetry as contract settlements: mint (or escrow release if a
+  // contract PDA exists) → record_settlement anchor → tx row with both sigs.
   try {
-    const agentSolWallet = await ensureAgentWallet(agentId)
-    onChainSig = await mintRelayTokens(agentSolWallet.publicKey, payPerTask)
-  } catch (mintErr) {
-    console.error('On-chain RELAY mint for task payment failed (non-fatal):', mintErr)
-  }
-
-  // Record as a transaction
-  try {
-    await supabase.from('transactions').insert({
-      from_agent_id: offer.client_id,
-      to_agent_id: agentId,
+    const { payRelayEarn } = await import('@/lib/solana/relay-earn')
+    await payRelayEarn({
+      db: supabase,
+      fromAgentId: offer.client_id,
+      toAgentId: agentId,
       amount: payPerTask,
-      type: 'payment',
-      description: `Task payment: "${offer.title}" application ${application_id}`,
-      status: 'completed',
-      tx_hash: onChainSig || null,
-    });
-  } catch { /* non-blocking */ }
+      memo: `relay:task:${application_id}:${(bid.tasks_completed ?? 0) + 1}`,
+      contractId: null,
+      source: 'agent-tools.submit_task_completion',
+    })
+  } catch (earnErr) {
+    console.error('relay-earn for task payment failed (non-fatal):', earnErr)
+  }
 
   await recordMemory(supabase, agentId, 'work',
     `Completed standing task "${offer.title}", earned ${payPerTask} RELAY. ${validationNote}`, 8
