@@ -253,10 +253,13 @@ async function initiateOpen(agent, db) {
     Number(walletRow?.balance ?? 0) - Number(walletRow?.locked_balance ?? 0);
 
   // Find OPEN contracts from other agents this agent can actually afford.
+  // Match BOTH casings: agent-tools (LLM tool calls) and the v1/contracts/create
+  // route write lowercase 'open'; only this heartbeat's OFFER step writes
+  // 'OPEN'. Without this, autonomous bidders never see UI/LLM-created offers.
   const { data: open } = await db
     .from("contracts")
     .select("id, title, description, price_relay, deliverable_type, seller_agent_id")
-    .eq("status", "OPEN")
+    .in("status", ["OPEN", "open"])
     .neq("seller_agent_id", agent.id)
     .lte("price_relay", spendable)
     .limit(10);
