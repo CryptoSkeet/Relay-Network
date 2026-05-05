@@ -23,6 +23,8 @@ import {
   TOKEN_PROGRAM_ID,
   getAssociatedTokenAddress,
   getOrCreateAssociatedTokenAccount,
+  getAccount,
+  TokenAccountNotFoundError,
 } from '@solana/spl-token'
 import {
   address,
@@ -209,7 +211,27 @@ function decodeEscrowBuyer(data: Buffer | Uint8Array): PublicKey | null {
  *
  * The buyer's RELAY tokens are transferred from their ATA to a program-owned
  * vault PDA. Returns the transaction signature.
+ *
+ * Throws `InsufficientRelayBalanceError` BEFORE attempting the on-chain tx if
+ * the buyer's ATA is missing or under-funded. This avoids burning a Solana
+ * simulation per failure (the SPL token program would otherwise reject with
+ * a generic `0x1 / Error: insufficient funds` after consuming compute units),
+ * and gives upstream callers a structured signal they can surface or skip.
  */
+export class InsufficientRelayBalanceError extends Error {
+  readonly code = 'INSUFFICIENT_RELAY_BALANCE'
+  constructor(
+    public readonly required: number,
+    public readonly available: number,
+    public readonly buyerWallet: string,
+  ) {
+    super(
+      `Insufficient RELAY: buyer ${buyerWallet} has ${available} RELAY, contract requires ${required}`,
+    )
+    this.name = 'InsufficientRelayBalanceError'
+  }
+}
+
 export async function lockEscrowOnChain(
   contractId: string,
   buyerAgentId: string,
@@ -225,6 +247,27 @@ export async function lockEscrowOnChain(
   const buyerATA = await getAssociatedTokenAddress(mint, buyerKeypair.publicKey)
   const [escrowPDA] = deriveEscrowPDA(contractId, buyerKeypair.publicKey)
   const [vaultPDA] = deriveEscrowVaultPDA(contractId, buyerKeypair.publicKey)
+
+  // Pre-flight balance check. Cheaper (1 RPC) than the alternative — sending
+  // the tx, paying for ~25k compute units, and parsing a generic SPL token
+  // 0x1 out of the simulation logs. Also lets callers cancel/skip the
+  // contract without an on-chain side-effect.
+  let availableRaw = 0n
+  try {
+    const ataAccount = await getAccount(connection, buyerATA)
+    availableRaw = ataAccount.amount
+  } catch (e) {
+    if (!(e instanceof TokenAccountNotFoundError)) throw e
+    // ATA doesn't exist → balance is 0
+  }
+  const requiredRaw = BigInt(Math.round(amount * 1_000_000))
+  if (availableRaw < requiredRaw) {
+    throw new InsufficientRelayBalanceError(
+      amount,
+      Number(availableRaw) / 1_000_000,
+      buyerKeypair.publicKey.toBase58(),
+    )
+  }
 
   // Idempotency pre-flight: if the escrow PDA already exists on chain, this
   // contract was locked by a previous attempt that may have CF/devnet-timed

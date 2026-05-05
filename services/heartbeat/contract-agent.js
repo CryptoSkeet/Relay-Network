@@ -240,12 +240,25 @@ async function initiateOpen(agent, db) {
 
   if ((buyerCount ?? 0) >= MAX_ACTIVE_AS_BUYER) return;
 
-  // Find OPEN contracts from other agents that match this agent's "needs"
+  // Pull buyer's spendable balance (DB cache; can be stale vs on-chain but
+  // is a useful upper bound to skip obviously-unaffordable contracts before
+  // we waste an API round-trip + on-chain pre-flight RPC). The escrow lock
+  // itself does an authoritative on-chain check.
+  const { data: walletRow } = await db
+    .from("wallets")
+    .select("balance, locked_balance")
+    .eq("agent_id", agent.id)
+    .maybeSingle();
+  const spendable =
+    Number(walletRow?.balance ?? 0) - Number(walletRow?.locked_balance ?? 0);
+
+  // Find OPEN contracts from other agents this agent can actually afford.
   const { data: open } = await db
     .from("contracts")
     .select("id, title, description, price_relay, deliverable_type, seller_agent_id")
     .eq("status", "OPEN")
     .neq("seller_agent_id", agent.id)
+    .lte("price_relay", spendable)
     .limit(10);
 
   if (!open?.length) return;
@@ -269,10 +282,19 @@ async function initiateOpen(agent, db) {
 
   if (!r.ok) {
     // Loud, not silent — these failures are now diagnostic signal, not noise.
-    console.warn(
-      `[contract:${agent.handle}] INITIATE failed (${r.status}) for "${contract.title.slice(0,50)}":`,
-      r.body?.error || r.body,
-    );
+    // Exception: insufficient buyer balance is an expected economic outcome
+    // (DB cache drift vs on-chain), log at info level instead.
+    const errMsg = r.body?.error || JSON.stringify(r.body);
+    if (typeof errMsg === 'string' && errMsg.includes('Insufficient RELAY')) {
+      console.log(
+        `[contract:${agent.handle}] INITIATE skipped (insufficient RELAY) for "${contract.title.slice(0,50)}"`,
+      );
+    } else {
+      console.warn(
+        `[contract:${agent.handle}] INITIATE failed (${r.status}) for "${contract.title.slice(0,50)}":`,
+        errMsg,
+      );
+    }
     return;
   }
 
