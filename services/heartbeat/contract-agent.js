@@ -398,6 +398,71 @@ Title: 10-60 chars. Description: 1-2 sentences. Be specific about what you'll de
 }
 
 // ---------------------------------------------------------------------------
+// 6. APPLY-TO-HIRING — volunteer as seller on a UI/LLM-posted job
+//
+// Hiring offers are written by app/api/contracts/create, v1/contracts/create,
+// and lib/agent-tools.postHiringOffer. They have client_id (the hirer/buyer)
+// set, seller_agent_id null, status 'open' (lowercase). We claim the seller
+// slot and trigger the buyer-side escrow lock via the API.
+// ---------------------------------------------------------------------------
+
+async function applyToHiring(agent, db) {
+  // Same seller-side rate limit as postOffer
+  const { count: sellerCount } = await db
+    .from("contracts")
+    .select("id", { count: "exact", head: true })
+    .eq("seller_agent_id", agent.id)
+    .in("status", ["OPEN", "PENDING", "ACTIVE"]);
+  if ((sellerCount ?? 0) >= MAX_ACTIVE_AS_SELLER) return;
+
+  // Need a real wallet to be paid out
+  if (!agent.creator_wallet) return;
+
+  // Find sellerless offers from other agents (both casings)
+  const { data: offers } = await db
+    .from("contracts")
+    .select("id, title, price_relay, client_id")
+    .in("status", ["open", "OPEN"])
+    .is("seller_agent_id", null)
+    .not("client_id", "is", null)
+    .neq("client_id", agent.id)
+    .limit(10);
+
+  if (!offers?.length) return;
+
+  const offer = offers[Math.floor(Math.random() * offers.length)];
+
+  const r = await callContractApi(
+    `/api/contracts/${offer.id}/accept-hiring`,
+    agent.id,
+    {
+      method: "POST",
+      body: JSON.stringify({ sellerWallet: agent.creator_wallet }),
+    },
+  ).catch(e => ({ ok: false, status: 0, body: { error: e.message } }));
+
+  if (!r.ok) {
+    const msg = r.body?.error || JSON.stringify(r.body);
+    // 409 = race lost, 400 = buyer broke. Both are normal — info, not warn.
+    if (r.status === 409 || (typeof msg === 'string' && msg.includes('Insufficient RELAY'))) {
+      console.log(
+        `[contract:${agent.handle}] APPLY skipped (${r.status}) for "${offer.title.slice(0,50)}": ${msg}`,
+      );
+    } else {
+      console.warn(
+        `[contract:${agent.handle}] APPLY failed (${r.status}) for "${offer.title.slice(0,50)}":`,
+        msg,
+      );
+    }
+    return;
+  }
+
+  console.log(
+    `[contract:${agent.handle}] APPLIED as seller: "${offer.title.slice(0,50)}" (${offer.price_relay} RELAY)`,
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main export — run full contract cycle for one agent
 // ---------------------------------------------------------------------------
 
@@ -410,8 +475,9 @@ export async function runContractCycle(agent, db) {
     await deliverActive(agent, db);
     await settleDelivered(agent, db);
 
-    // Probabilistic — agents don't initiate/offer every single tick
+    // Probabilistic — agents don't initiate/offer/apply every single tick
     if (Math.random() < 0.30) await initiateOpen(agent, db);
+    if (Math.random() < 0.25) await applyToHiring(agent, db);
     if (Math.random() < 0.15) await postOffer(agent, db);
 
   } catch (err) {
