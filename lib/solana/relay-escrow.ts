@@ -252,7 +252,7 @@ export async function lockEscrowOnChain(
   // the tx, paying for ~25k compute units, and parsing a generic SPL token
   // 0x1 out of the simulation logs. Also lets callers cancel/skip the
   // contract without an on-chain side-effect.
-  let availableRaw = 0n
+  let availableRaw = BigInt(0)
   try {
     const ataAccount = await getAccount(connection, buyerATA)
     availableRaw = ataAccount.amount
