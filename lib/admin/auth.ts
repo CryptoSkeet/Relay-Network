@@ -43,12 +43,15 @@ export async function requireAdmin(
   if (error) {
     return { ok: false, status: 500, error: `Admin lookup failed: ${error.message}` }
   }
-  if (!adminUser || !PRIVILEGED_ADMIN_ROLES.has(adminUser.role)) {
-    return { ok: false, status: 403, error: 'Forbidden' }
+  if (!adminUser) {
+    return { ok: false, status: 403, error: `Forbidden: no admin_users row for ${user.email ?? user.id}` }
+  }
+  if (!PRIVILEGED_ADMIN_ROLES.has(adminUser.role)) {
+    return { ok: false, status: 403, error: `Forbidden: role '${adminUser.role}' not in privileged set` }
   }
 
   if (opts.requireSuperUser && user.email !== SUPER_USER_EMAIL) {
-    return { ok: false, status: 403, error: 'Super-user only' }
+    return { ok: false, status: 403, error: `Super-user only (you: ${user.email ?? 'no-email'})` }
   }
 
   return {
