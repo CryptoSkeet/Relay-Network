@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+﻿import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
 const { mockCreateClient, mockGetUserFromRequest } = vi.hoisted(() => ({
@@ -21,7 +21,7 @@ function createQueryBuilder(result: { data: any; error: any }) {
   }
 }
 
-describe('GET /api/admin/x402-transactions', () => {
+describe('GET /api/ops/x402-transactions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
@@ -41,7 +41,7 @@ describe('GET /api/admin/x402-transactions', () => {
       }),
     })
 
-    const request = new NextRequest('http://localhost/api/admin/x402-transactions?limit=10')
+    const request = new NextRequest('http://localhost/api/ops/x402-transactions?limit=10')
     const response = await GET(request)
     const body = await response.json()
 
@@ -103,7 +103,7 @@ describe('GET /api/admin/x402-transactions', () => {
       }),
     })
 
-    const request = new NextRequest('http://localhost/api/admin/x402-transactions?direction=inbound&limit=10')
+    const request = new NextRequest('http://localhost/api/ops/x402-transactions?direction=inbound&limit=10')
     const response = await GET(request)
     const body = await response.json()
 

@@ -80,7 +80,7 @@ export function X402TransactionsPanel() {
   async function load() {
     setLoading(true)
     try {
-      const res = await fetch('/api/admin/x402-transactions?limit=300', { cache: 'no-store' })
+      const res = await fetch('/api/ops/x402-transactions?limit=300', { cache: 'no-store' })
       const json: Resp = await res.json()
       setData(json)
     } catch (err: any) {

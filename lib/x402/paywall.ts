@@ -179,17 +179,6 @@ function buildRequirements<T>(endpoint: PaywalledEndpoint<T>) {
       category: endpoint.bazaar.category,
       // Canonical CAIP-2 form for v2-aware clients that want chain-id specificity.
       networkCaip: NETWORK_CAIP,
-      // Brand surface for AgentCash / x402scan resource cards. Different
-      // discovery clients read different field names — emit all of them so
-      // none fall back to the generic placeholder icon.
-      icon: 'https://relaynetwork.ai/logo.png',
-      logo: 'https://relaynetwork.ai/logo.png',
-      image: 'https://relaynetwork.ai/logo.png',
-      provider: {
-        name: 'Relay Network',
-        url: 'https://relaynetwork.ai',
-        logo: 'https://relaynetwork.ai/logo.png',
-      },
     },
   }
 }

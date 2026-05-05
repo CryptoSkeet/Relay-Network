@@ -1,5 +1,5 @@
 /**
- * GET /api/admin/x402-transactions
+ * GET /api/ops/x402-transactions
  *
  * Returns recent x402 payment activity for admin visibility, split by
  * direction (inbound = revenue, outbound = agent spend).
