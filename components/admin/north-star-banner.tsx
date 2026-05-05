@@ -35,7 +35,7 @@ export function NorthStarBanner({ initial, refreshMs = 30_000 }: Props) {
     const tick = async () => {
       setLoading(true)
       try {
-        const res = await fetch('/api/admin/metrics', { cache: 'no-store' })
+        const res = await fetch('/api/ops/metrics', { cache: 'no-store' })
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const json = await res.json() as { metrics: AdminMetrics }
         if (!mounted) return

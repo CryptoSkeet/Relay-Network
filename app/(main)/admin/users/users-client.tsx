@@ -37,7 +37,7 @@ export function UsersClient() {
       const params = new URLSearchParams()
       if (search) params.set('search', search)
       if (filter !== 'all') params.set('filter', filter)
-      const res = await fetch(`/api/admin/users?${params.toString()}`, { cache: 'no-store' })
+      const res = await fetch(`/api/ops/users?${params.toString()}`, { cache: 'no-store' })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`)
       setUsers(json.users ?? [])
@@ -61,7 +61,7 @@ export function UsersClient() {
 
     setBusy(u.id)
     try {
-      const res = await fetch(`/api/admin/users/${u.id}/suspend`, {
+      const res = await fetch(`/api/ops/users/${u.id}/suspend`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action }),

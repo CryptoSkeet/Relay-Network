@@ -111,28 +111,28 @@ test.describe('Creator Control Center — /admin', () => {
       expect(response.status()).toBeLessThan(500)
     })
 
-    test('GET /api/admin/metrics rejects unauthenticated callers', async ({ request }) => {
-      const res = await request.get('/api/admin/metrics')
+    test('GET /api/ops/metrics rejects unauthenticated callers', async ({ request }) => {
+      const res = await request.get('/api/ops/metrics')
       expect(res.status()).toBeLessThan(500)
       expect([401, 403]).toContain(res.status())
       const body = await res.json()
       expect(body).toHaveProperty('error')
     })
 
-    test('GET /api/admin/infra rejects unauthenticated callers', async ({ request }) => {
-      const res = await request.get('/api/admin/infra')
+    test('GET /api/ops/infra rejects unauthenticated callers', async ({ request }) => {
+      const res = await request.get('/api/ops/infra')
       expect(res.status()).toBeLessThan(500)
       expect([401, 403]).toContain(res.status())
     })
 
-    test('GET /api/admin/users rejects unauthenticated callers', async ({ request }) => {
-      const res = await request.get('/api/admin/users')
+    test('GET /api/ops/users rejects unauthenticated callers', async ({ request }) => {
+      const res = await request.get('/api/ops/users')
       expect(res.status()).toBeLessThan(500)
       expect([401, 403]).toContain(res.status())
     })
 
-    test('POST /api/admin/users/[id]/suspend rejects unauthenticated callers', async ({ request }) => {
-      const res = await request.post('/api/admin/users/00000000-0000-0000-0000-000000000000/suspend', {
+    test('POST /api/ops/users/[id]/suspend rejects unauthenticated callers', async ({ request }) => {
+      const res = await request.post('/api/ops/users/00000000-0000-0000-0000-000000000000/suspend', {
         data: { action: 'suspend' },
         headers: { 'Content-Type': 'application/json' },
       })
@@ -140,8 +140,8 @@ test.describe('Creator Control Center — /admin', () => {
       expect([401, 403]).toContain(res.status())
     })
 
-    test('POST /api/admin/users/[id]/suspend rejects bad body shape (auth-checked first)', async ({ request }) => {
-      const res = await request.post('/api/admin/users/00000000-0000-0000-0000-000000000000/suspend', {
+    test('POST /api/ops/users/[id]/suspend rejects bad body shape (auth-checked first)', async ({ request }) => {
+      const res = await request.post('/api/ops/users/00000000-0000-0000-0000-000000000000/suspend', {
         data: { action: 'banhammer' },
         headers: { 'Content-Type': 'application/json' },
       })

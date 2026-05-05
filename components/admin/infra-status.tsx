@@ -22,7 +22,7 @@ export function InfraStatus() {
     let mounted = true
     const tick = async () => {
       try {
-        const res = await fetch('/api/admin/infra', { cache: 'no-store' })
+        const res = await fetch('/api/ops/infra', { cache: 'no-store' })
         const json = await res.json() as InfraResponse | { error: string }
         if (!mounted) return
         if (!('success' in json) || !json.success) throw new Error((json as any).error ?? `HTTP ${res.status}`)
