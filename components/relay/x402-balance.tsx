@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -9,6 +9,8 @@ import { Loader2, ExternalLink, RefreshCw, AlertCircle, CheckCircle2 } from 'luc
 interface X402BalanceProps {
   agentId?: string
   walletAddress?: string
+  /** When true, fetches the user's linked wallets and shows a picker. */
+  showLinkedWalletPicker?: boolean
 }
 
 interface BalanceResp {
@@ -18,14 +20,52 @@ interface BalanceResp {
   error?: string
 }
 
-export function X402Balance({ agentId, walletAddress }: X402BalanceProps) {
+interface LinkedWallet {
+  id: string
+  address: string
+  label: string | null
+  network: string
+  is_primary: boolean
+}
+
+function shortAddr(a: string): string {
+  if (!a) return '—'
+  return `${a.slice(0, 4)}…${a.slice(-4)}`
+}
+
+export function X402Balance({ agentId, walletAddress, showLinkedWalletPicker }: X402BalanceProps) {
   const [data, setData] = useState<BalanceResp | null>(null)
   const [loading, setLoading] = useState(true)
+  const [linkedWallets, setLinkedWallets] = useState<LinkedWallet[]>([])
+  const [selectedAddress, setSelectedAddress] = useState<string | null>(walletAddress ?? null)
 
-  async function load() {
+  useEffect(() => {
+    if (!showLinkedWalletPicker) return
+    let cancelled = false
+    fetch('/api/v1/wallet/link', { cache: 'no-store' })
+      .then(r => r.json())
+      .then(j => {
+        if (cancelled) return
+        const wallets: LinkedWallet[] = j?.wallets ?? []
+        setLinkedWallets(wallets)
+        if (!walletAddress) {
+          const primary = wallets.find(w => w.is_primary) ?? wallets[0]
+          if (primary) setSelectedAddress(primary.address)
+        }
+      })
+      .catch(() => { /* non-fatal */ })
+    return () => { cancelled = true }
+  }, [showLinkedWalletPicker, walletAddress])
+
+  const load = useCallback(async () => {
     setLoading(true)
     try {
-      const qs = agentId ? `agent_id=${agentId}` : `wallet_address=${walletAddress}`
+      const addr = walletAddress ?? selectedAddress
+      let qs: string
+      if (addr) qs = `wallet_address=${encodeURIComponent(addr)}`
+      else if (agentId) qs = `agent_id=${agentId}`
+      else { setLoading(false); return }
+
       const res = await fetch(`/api/v1/wallet/x402-balance?${qs}`, { cache: 'no-store' })
       const json: BalanceResp = await res.json()
       setData(json)
@@ -34,14 +74,19 @@ export function X402Balance({ agentId, walletAddress }: X402BalanceProps) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [agentId, walletAddress, selectedAddress])
 
-  useEffect(() => { load() /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [agentId, walletAddress])
+  useEffect(() => { load() }, [load])
 
   const balance = data?.usdc?.balance ?? 0
   const ready = !!data?.usdc?.ready_to_spend
   const network = data?.wallet?.network ?? 'solana:mainnet'
   const isMainnet = network === 'solana:mainnet'
+  const sourceLabel = walletAddress
+    ? 'External wallet'
+    : selectedAddress
+      ? (linkedWallets.find(w => w.address === selectedAddress)?.label || 'Linked wallet')
+      : 'Agent custodial wallet'
 
   return (
     <Card>
@@ -54,7 +99,7 @@ export function X402Balance({ agentId, walletAddress }: X402BalanceProps) {
             </Badge>
           </CardTitle>
           <CardDescription className="text-xs">
-            Available to spend on x402 paywalls (agentic.market, etc)
+            Available to spend on x402 paywalls (agentic.market, etc) · {sourceLabel}
           </CardDescription>
         </div>
         <Button variant="ghost" size="icon" onClick={load} disabled={loading}>
@@ -62,6 +107,23 @@ export function X402Balance({ agentId, walletAddress }: X402BalanceProps) {
         </Button>
       </CardHeader>
       <CardContent className="space-y-3">
+        {showLinkedWalletPicker && linkedWallets.length > 0 && !walletAddress && (
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Source wallet</label>
+            <select
+              className="w-full text-xs font-mono bg-background border rounded px-2 py-1.5"
+              value={selectedAddress ?? ''}
+              onChange={e => setSelectedAddress(e.target.value || null)}
+            >
+              {agentId && <option value="">Agent custodial wallet</option>}
+              {linkedWallets.map(w => (
+                <option key={w.id} value={w.address}>
+                  {w.is_primary ? '★ ' : ''}{w.label ? `${w.label} — ` : ''}{shortAddr(w.address)}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         {loading && !data ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="w-4 h-4 animate-spin" /> Checking USDC…

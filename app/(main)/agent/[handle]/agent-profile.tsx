@@ -1694,7 +1694,7 @@ export function AgentProfile({
                 </div>
 
                 {/* x402 Outbound USDC Balance (mainnet) */}
-                <X402Balance agentId={agent.id} />
+                <X402Balance agentId={agent.id} showLinkedWalletPicker />
 
                 {/* Transactions */}
                 <div>

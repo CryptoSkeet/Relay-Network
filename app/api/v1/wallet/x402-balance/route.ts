@@ -7,23 +7,23 @@
  * outbound payments to mainnet x402 paywalls (agentic.market, etc).
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getUserFromRequest } from '@/lib/supabase/server'
 import { authorizeAgentAccess } from '@/lib/agent-access'
 import { getAgentUsdcBalance } from '@/lib/x402/relay-x402-client'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
+const SOLANA_ADDRESS = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const agentId = searchParams.get('agent_id')
+  const walletAddress = searchParams.get('wallet_address')
 
-  if (!agentId) {
-    return NextResponse.json({ error: 'agent_id required' }, { status: 400 })
+  if (!agentId && !walletAddress) {
+    return NextResponse.json({ error: 'agent_id or wallet_address required' }, { status: 400 })
   }
-
-  const access = await authorizeAgentAccess(request, agentId)
-  if (!access.ok) return access.response
 
   const rawNetwork = (process.env.X402_OUTBOUND_NETWORK || 'solana:mainnet').trim()
   const network: 'solana:mainnet' | 'solana:devnet' =
@@ -32,18 +32,55 @@ export async function GET(request: NextRequest) {
       : 'solana:mainnet'
 
   try {
-    const supabase = await createClient()
-    const { data } = await supabase
-      .from('solana_wallets')
-      .select('public_key')
-      .eq('agent_id', agentId)
-      .maybeSingle()
+    let publicKey: string
 
-    if (!data) {
-      return NextResponse.json({ error: 'No Solana wallet found for this agent' }, { status: 404 })
+    if (walletAddress) {
+      // Direct wallet lookup — must be a wallet the user has linked OR their agent's custodial.
+      if (!SOLANA_ADDRESS.test(walletAddress)) {
+        return NextResponse.json({ error: 'Invalid wallet_address' }, { status: 400 })
+      }
+      const user = await getUserFromRequest(request)
+      if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+      const supabase = await createClient()
+      const { data: linked } = await supabase
+        .from('linked_wallets')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('address', walletAddress)
+        .maybeSingle()
+
+      if (!linked) {
+        // Allow if it matches a custodial wallet on one of the user's agents.
+        const { data: ownAgentWallet } = await supabase
+          .from('solana_wallets')
+          .select('public_key, agent_id, agents!inner(user_id)')
+          .eq('public_key', walletAddress)
+          .maybeSingle()
+
+        const ownerId = (ownAgentWallet as any)?.agents?.user_id
+        if (!ownAgentWallet || ownerId !== user.id) {
+          return NextResponse.json({ error: 'Wallet not linked to this user' }, { status: 403 })
+        }
+      }
+
+      publicKey = walletAddress
+    } else {
+      const access = await authorizeAgentAccess(request, agentId!)
+      if (!access.ok) return access.response
+
+      const supabase = await createClient()
+      const { data } = await supabase
+        .from('solana_wallets')
+        .select('public_key')
+        .eq('agent_id', agentId)
+        .maybeSingle()
+
+      if (!data) {
+        return NextResponse.json({ error: 'No Solana wallet found for this agent' }, { status: 404 })
+      }
+      publicKey = data.public_key
     }
-
-    const publicKey = data.public_key
 
     const balanceUsdc = await getAgentUsdcBalance(publicKey, network)
     const cluster = network === 'solana:mainnet' ? '' : '?cluster=devnet'

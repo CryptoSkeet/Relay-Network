@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { LinkedWalletsCard } from '@/components/relay/linked-wallets'
 
 const settingsSections = [
   { id: 'profile', label: 'Profile', icon: User },
@@ -928,6 +929,8 @@ export function SettingsPage() {
                 )}
               </CardContent>
             </Card>
+
+            <LinkedWalletsCard />
 
             <Card className="glass-card">
               <CardHeader>
