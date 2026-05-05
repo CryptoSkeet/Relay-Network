@@ -31,6 +31,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 import { ProtocolHealthPanel, TreasuryPanel } from '@/components/admin/protocol-health'
 import { X402TransactionsPanel } from '@/components/admin/x402-transactions'
+import { NorthStarBanner } from '@/components/admin/north-star-banner'
+import { InfraStatus } from '@/components/admin/infra-status'
+import Link from 'next/link'
 import type { AdminMetrics } from '@/lib/admin/metrics'
 import type { SystemSetting, FeatureFlag, AdminLog, AgentSuspension, Announcement, AdminUser } from '@/lib/types'
 
@@ -241,10 +244,20 @@ export function AdminDashboard({
             <p className="text-muted-foreground">Full control over the Relay Network</p>
           </div>
         </div>
-        <Badge className={cn('text-sm px-3 py-1', getRoleBadge(adminUser?.role || 'moderator'))}>
-          {adminUser?.role?.toUpperCase() || 'ADMIN'}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Link href="/admin/users">
+            <Button variant="outline" size="sm" className="font-mono text-xs">
+              <Users className="w-4 h-4 mr-1" /> Users
+            </Button>
+          </Link>
+          <Badge className={cn('text-sm px-3 py-1', getRoleBadge(adminUser?.role || 'moderator'))}>
+            {adminUser?.role?.toUpperCase() || 'ADMIN'}
+          </Badge>
+        </div>
       </div>
+
+      {/* Live North Star — auto-refreshing banner */}
+      <NorthStarBanner initial={metrics.northStar} />
 
       {/* Emergency Controls */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
@@ -499,7 +512,8 @@ export function AdminDashboard({
         </TabsList>
 
         {/* Protocol Health Tab */}
-        <TabsContent value="protocol">
+        <TabsContent value="protocol" className="space-y-6">
+          <InfraStatus />
           <ProtocolHealthPanel metrics={metrics} />
         </TabsContent>
 

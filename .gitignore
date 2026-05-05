@@ -66,3 +66,8 @@ relay-api-service/test-keypair.json
 # npm tokens
 
 packages/*/.npmrc
+
+# never commit env dumps or diagnostic scripts
+.env*.tmp
+_diag_*.cjs
+

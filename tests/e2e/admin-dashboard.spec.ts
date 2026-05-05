@@ -110,6 +110,62 @@ test.describe('Creator Control Center — /admin', () => {
       // Should be 401/403 — not 500
       expect(response.status()).toBeLessThan(500)
     })
+
+    test('GET /api/admin/metrics rejects unauthenticated callers', async ({ request }) => {
+      const res = await request.get('/api/admin/metrics')
+      expect(res.status()).toBeLessThan(500)
+      expect([401, 403]).toContain(res.status())
+      const body = await res.json()
+      expect(body).toHaveProperty('error')
+    })
+
+    test('GET /api/admin/infra rejects unauthenticated callers', async ({ request }) => {
+      const res = await request.get('/api/admin/infra')
+      expect(res.status()).toBeLessThan(500)
+      expect([401, 403]).toContain(res.status())
+    })
+
+    test('GET /api/admin/users rejects unauthenticated callers', async ({ request }) => {
+      const res = await request.get('/api/admin/users')
+      expect(res.status()).toBeLessThan(500)
+      expect([401, 403]).toContain(res.status())
+    })
+
+    test('POST /api/admin/users/[id]/suspend rejects unauthenticated callers', async ({ request }) => {
+      const res = await request.post('/api/admin/users/00000000-0000-0000-0000-000000000000/suspend', {
+        data: { action: 'suspend' },
+        headers: { 'Content-Type': 'application/json' },
+      })
+      expect(res.status()).toBeLessThan(500)
+      expect([401, 403]).toContain(res.status())
+    })
+
+    test('POST /api/admin/users/[id]/suspend rejects bad body shape (auth-checked first)', async ({ request }) => {
+      const res = await request.post('/api/admin/users/00000000-0000-0000-0000-000000000000/suspend', {
+        data: { action: 'banhammer' },
+        headers: { 'Content-Type': 'application/json' },
+      })
+      // Either 400 (bad action) or 401/403 (no auth) — never 500
+      expect(res.status()).toBeLessThan(500)
+      expect([400, 401, 403]).toContain(res.status())
+    })
+  })
+
+  // ── /admin/users page ───────────────────────────────────────────────────────
+  test.describe('User Management Page', () => {
+    test('unauthenticated user is redirected away from /admin/users', async ({ page }) => {
+      const response = await page.goto('/admin/users')
+      expect(response!.status()).toBeLessThan(500)
+      await page.waitForURL(/\/(auth\/login|home|admin)/, { timeout: 10000 })
+      expect(page.url()).toMatch(/\/(auth\/login|home|admin)/)
+    })
+
+    test('/admin/users does not leak secrets in HTML', async ({ page }) => {
+      await page.goto('/admin/users')
+      const html = await page.content()
+      expect(html).not.toContain('SUPABASE_SERVICE_ROLE_KEY')
+      expect(html).not.toContain('eyJhbGciOi')
+    })
   })
 
   // ── Page Structure (unauthenticated — verify redirect page works) ───────────
