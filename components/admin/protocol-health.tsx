@@ -1,8 +1,10 @@
 'use client'
 
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { TrendingUp, TrendingDown, Activity, Users, DollarSign, ExternalLink } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { TrendingUp, TrendingDown, Activity, Users, DollarSign, ExternalLink, RefreshCw, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type {
   AdminMetrics, EngineHealth, FunnelStep, NorthStarMetrics, TreasuryStats,
@@ -234,61 +236,191 @@ function EngineStat({ label, value, tone }: {
   )
 }
 
-// ---------- Error Monitor (known errors from Datadog) ----------
+// ---------- Error Monitor (live from /api/ops/errors, refreshes every 24h) ----------
 
-const KNOWN_ERRORS = [
-  { route: 'POST /rest/v1/bids', code: 400, priority: 'CRITICAL', status: 'fixed', fix: 'Wrong column name (amount → proposed_price). Fixed Apr 19.' },
-  { route: 'PATCH /rest/v1/contracts (settle)', code: 400, priority: 'CRITICAL', status: 'fixed', fix: '.single() → .maybeSingle() with idempotent guard.' },
-  { route: 'GET /rest/v1/contract_activity_log', code: 404, priority: 'HIGH', status: 'fixed', fix: 'Migration applied Apr 20; table live with RLS + PostgREST cache reload.' },
-  { route: 'GET /rest/v1/posts (order=like_count)', code: 500, priority: 'HIGH', status: 'fixed', fix: 'Removed SQL order; client-side sort fallback.' },
-  { route: 'POST /rest/v1/conversations', code: 400, priority: 'MEDIUM', status: 'fixed', fix: 'Unique-violation race handler returns existing conv.' },
-  { route: 'GET /rest/v1/agents (single)', code: 406, priority: 'MEDIUM', status: 'fixed', fix: '.single() → .maybeSingle() across follows/chat.' },
-  { route: 'GET /rest/v1/stakes', code: 404, priority: 'LOW', status: 'fixed', fix: 'Promise.allSettled tolerant fallback in wallet.' },
-  { route: 'GET /rest/v1/wallets (join)', code: 400, priority: 'LOW', status: 'fixed', fix: 'Dropped non-FK client_id join in wallet page.' },
-] as const
-
-const PRIORITY_VARIANT: Record<string, 'destructive' | 'default' | 'secondary' | 'outline'> = {
-  CRITICAL: 'destructive', HIGH: 'destructive', MEDIUM: 'default', LOW: 'secondary',
+interface ErrorsResponse {
+  railway: {
+    source: 'railway-metrics' | 'unconfigured' | 'unreachable'
+    totalRequests: number | null
+    totalErrors: number | null
+    errorRate: string | null
+    errorsByType: Record<string, number>
+    sampleSize: number | null
+    detail: string
+    fetchedAt: string | null
+  }
+  adminIncidents24h: {
+    count: number
+    items: Array<{
+      id: string
+      action: string
+      target_type: string | null
+      target_id: string | null
+      details: any
+      created_at: string
+    }>
+  }
+  collectedAt: string
+  refreshIntervalMs: number
 }
 
-const STATUS_TONE: Record<string, string> = {
-  fixed: 'text-primary',
-  mitigated: 'text-orange-400',
-  open: 'text-destructive',
+const REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000
+
+function relativeTime(iso: string | null): string {
+  if (!iso) return 'never'
+  const ms = Date.now() - new Date(iso).getTime()
+  if (ms < 60_000) return 'just now'
+  if (ms < 3_600_000) return `${Math.floor(ms / 60_000)}m ago`
+  if (ms < 86_400_000) return `${Math.floor(ms / 3_600_000)}h ago`
+  return `${Math.floor(ms / 86_400_000)}d ago`
 }
 
 function ErrorMonitor() {
+  const [data, setData] = useState<ErrorsResponse | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/ops/errors', { cache: 'no-store' })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body?.error || `HTTP ${res.status}`)
+      }
+      setData(await res.json())
+    } catch (e: any) {
+      setError(e?.message ?? 'Failed to load')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    load()
+    timerRef.current = setInterval(load, REFRESH_INTERVAL_MS)
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current)
+    }
+  }, [load])
+
+  const railway = data?.railway
+  const incidents = data?.adminIncidents24h
+  const errorTypes = railway ? Object.entries(railway.errorsByType).sort((a, b) => b[1] - a[1]) : []
+  const sourceTone =
+    railway?.source === 'railway-metrics' ? 'text-primary'
+    : railway?.source === 'unreachable' ? 'text-destructive'
+    : 'text-orange-400'
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center justify-between">
+        <CardTitle className="flex items-center justify-between gap-2 flex-wrap">
           <span>Error Monitor</span>
-          <Badge variant="outline" className="font-mono text-xs">
-            {KNOWN_ERRORS.filter(e => e.status === 'fixed').length}/{KNOWN_ERRORS.length} resolved
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="font-mono text-xs">
+              {railway?.errorRate ?? '—'} error rate
+            </Badge>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={load}
+              disabled={loading}
+              className="h-7 px-2 text-xs font-mono"
+            >
+              <RefreshCw className={cn('w-3 h-3 mr-1', loading && 'animate-spin')} />
+              Refresh
+            </Button>
+          </div>
         </CardTitle>
-        <CardDescription>Top production errors from Datadog (last 7 days)</CardDescription>
+        <CardDescription className="font-mono text-xs">
+          Live from Railway service /metrics + admin_logs (24h). Auto-refresh every 24h.
+          {' '}Last update: {relativeTime(data?.collectedAt ?? null)}.
+        </CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-2">
-          {KNOWN_ERRORS.map(err => (
-            <div key={err.route}
-              className="border rounded-lg p-3 bg-card hover:bg-muted/30 transition-colors">
-              <div className="flex items-center justify-between mb-1 gap-2 flex-wrap">
-                <span className="text-xs font-mono">{err.route}</span>
-                <div className="flex items-center gap-2">
-                  <Badge variant={PRIORITY_VARIANT[err.priority]} className="text-xs">
-                    {err.priority}
-                  </Badge>
-                  <span className="text-xs font-mono text-destructive">{err.code}</span>
-                  <span className={cn('text-xs font-mono uppercase', STATUS_TONE[err.status])}>
-                    {err.status}
-                  </span>
-                </div>
-              </div>
-              <p className="text-xs font-mono text-muted-foreground">{err.fix}</p>
+      <CardContent className="space-y-4">
+        {error && (
+          <div className="flex items-start gap-2 border border-destructive/40 bg-destructive/5 rounded p-3 text-xs font-mono text-destructive">
+            <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        {/* Railway service block */}
+        <div className="border rounded-lg p-3 bg-card">
+          <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+            <span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+              Railway service (relay-api)
+            </span>
+            <span className={cn('text-xs font-mono uppercase', sourceTone)}>
+              {railway?.source ?? (loading ? 'loading…' : 'no data')}
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-3 text-xs font-mono">
+            <div>
+              <div className="text-muted-foreground uppercase">Requests</div>
+              <div className="text-base">{railway?.totalRequests ?? '—'}</div>
             </div>
-          ))}
+            <div>
+              <div className="text-muted-foreground uppercase">Errors</div>
+              <div className={cn('text-base', (railway?.totalErrors ?? 0) > 0 && 'text-destructive')}>
+                {railway?.totalErrors ?? '—'}
+              </div>
+            </div>
+            <div>
+              <div className="text-muted-foreground uppercase">Sample</div>
+              <div className="text-base">{railway?.sampleSize ?? '—'}</div>
+            </div>
+          </div>
+          {errorTypes.length > 0 && (
+            <div className="mt-3 space-y-1">
+              <div className="text-xs font-mono uppercase text-muted-foreground">Top error types</div>
+              {errorTypes.slice(0, 5).map(([type, count]) => (
+                <div key={type} className="flex items-center justify-between text-xs font-mono">
+                  <span className="text-destructive">{type}</span>
+                  <span>{count}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {railway?.detail && (
+            <p className="mt-2 text-[10px] font-mono text-muted-foreground italic">{railway.detail}</p>
+          )}
+        </div>
+
+        {/* Admin incidents block */}
+        <div className="border rounded-lg p-3 bg-card">
+          <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+            <span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+              Admin incidents · last 24h
+            </span>
+            <Badge variant={(incidents?.count ?? 0) > 0 ? 'destructive' : 'secondary'} className="text-xs">
+              {incidents?.count ?? 0}
+            </Badge>
+          </div>
+          {(!incidents || incidents.items.length === 0) ? (
+            <p className="text-xs font-mono text-muted-foreground">
+              No FAIL / ERROR / DISABLED / SHUTDOWN actions in admin_logs.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {incidents.items.map(row => (
+                <div key={row.id} className="flex items-start justify-between gap-3 text-xs font-mono">
+                  <div className="min-w-0">
+                    <div className="text-destructive truncate">{row.action}</div>
+                    {row.target_type && (
+                      <div className="text-muted-foreground truncate">
+                        {row.target_type}{row.target_id ? `:${row.target_id.slice(0, 8)}` : ''}
+                      </div>
+                    )}
+                  </div>
+                  <span className="text-muted-foreground shrink-0">{relativeTime(row.created_at)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
