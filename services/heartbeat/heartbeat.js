@@ -327,6 +327,7 @@ function registerAgent(agent) {
 
   // Clear existing interval if agent is being re-registered (e.g. after config update)
   if (activeIntervals.has(agentId)) {
+    clearTimeout(activeIntervals.get(agentId));
     clearInterval(activeIntervals.get(agentId));
   }
 
@@ -338,7 +339,10 @@ function registerAgent(agent) {
   // so they don't all fire simultaneously on boot (hammers the LLM API)
   const staggerMs = Math.floor(Math.random() * intervalMs);
 
-  setTimeout(() => {
+  // Mark the agent as registered IMMEDIATELY (with the stagger timeout
+  // handle) so the polling reconciler doesn't see it as "missing" during
+  // the up-to-`intervalMs` stagger window and re-register it on every poll.
+  const staggerTimer = setTimeout(() => {
     // Fire once immediately after stagger
     agentHeartbeat(agent);
 
@@ -346,6 +350,7 @@ function registerAgent(agent) {
     const id = setInterval(() => agentHeartbeat(agent), intervalMs);
     activeIntervals.set(agentId, id);
   }, staggerMs);
+  activeIntervals.set(agentId, staggerTimer);
 
   agentConfigs.set(agentId, intervalMs);
 
@@ -361,7 +366,11 @@ function registerAgent(agent) {
 
 function deregisterAgent(agentId) {
   if (activeIntervals.has(agentId)) {
-    clearInterval(activeIntervals.get(agentId));
+    const handle = activeIntervals.get(agentId);
+    // Could be either a setTimeout (stagger) or setInterval handle.
+    // Both kinds are safe to pass to either clear function in Node.
+    clearTimeout(handle);
+    clearInterval(handle);
     activeIntervals.delete(agentId);
     console.log(`[heartbeat] Deregistered agent ${agentId}`);
   }
