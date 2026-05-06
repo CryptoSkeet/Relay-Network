@@ -445,6 +445,7 @@ export async function releaseEscrowOnChain(
       { address: vaultAddr,        role: AccountRole.WRITABLE },        // escrow_vault
       { address: sellerAta,        role: AccountRole.WRITABLE },        // seller_token_account
       { address: programAddr,      role: AccountRole.READONLY },        // treasury_token_account = None
+      { address: treasury.address, role: AccountRole.WRITABLE },        // rent_recipient
       { address: TOKEN_PROGRAM_ADDRESS, role: AccountRole.READONLY },   // token_program
     ],
     data: buildReleaseOrRefundData(RELEASE_DISC, contractId, buyerPk),
@@ -514,6 +515,7 @@ export async function refundEscrowOnChain(
       { address: escrowAddr,       role: AccountRole.WRITABLE },        // escrow_account
       { address: vaultAddr,        role: AccountRole.WRITABLE },        // escrow_vault
       { address: buyerAta,         role: AccountRole.WRITABLE },        // buyer_token_account
+      { address: treasury.address, role: AccountRole.WRITABLE },        // rent_recipient
       { address: TOKEN_PROGRAM_ADDRESS, role: AccountRole.READONLY },   // token_program
     ],
     data: buildReleaseOrRefundData(REFUND_DISC, contractId, buyerPk),
@@ -698,6 +700,7 @@ export async function releaseUsdcEscrowOnChain(
 
   // Release instruction — treasury_token_account is the 5th account
   // (Option<Account> in Anchor: present = Some, absent = None).
+  // rent_recipient receives reclaimed vault rent.
   const escrowReleaseIx: Instruction = {
     programAddress: address(PROGRAM_ID.toBase58()),
     accounts: [
@@ -706,6 +709,7 @@ export async function releaseUsdcEscrowOnChain(
       { address: vaultAddr, role: AccountRole.WRITABLE },
       { address: sellerAta, role: AccountRole.WRITABLE },
       { address: treasuryAta, role: AccountRole.WRITABLE },
+      { address: treasury.address, role: AccountRole.WRITABLE },        // rent_recipient
       { address: TOKEN_PROGRAM_ADDRESS, role: AccountRole.READONLY },
     ],
     data: buildReleaseOrRefundData(RELEASE_DISC, contractId, buyerPk),
@@ -754,7 +758,7 @@ export async function refundUsdcEscrowOnChain(
   const buyerAta = await deriveUsdcAta(buyerAddr)
 
   // Refund — no treasury account needed (Option<Account> = None).
-  // Anchor expects the None variant to NOT appear in the accounts array.
+  // rent_recipient receives reclaimed vault rent.
   const escrowRefundIx: Instruction = {
     programAddress: address(PROGRAM_ID.toBase58()),
     accounts: [
@@ -762,6 +766,7 @@ export async function refundUsdcEscrowOnChain(
       { address: escrowAddr, role: AccountRole.WRITABLE },
       { address: vaultAddr, role: AccountRole.WRITABLE },
       { address: buyerAta, role: AccountRole.WRITABLE },
+      { address: treasury.address, role: AccountRole.WRITABLE },        // rent_recipient
       { address: TOKEN_PROGRAM_ADDRESS, role: AccountRole.READONLY },
     ],
     data: buildReleaseOrRefundData(REFUND_DISC, contractId, buyerPk),

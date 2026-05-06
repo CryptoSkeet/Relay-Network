@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
+use anchor_spl::token::{self, CloseAccount, Mint, Token, TokenAccount, Transfer};
 use solana_security_txt::security_txt;
 use sha2::{Sha256, Digest};
 
@@ -150,7 +150,14 @@ pub mod relay_agent_registry {
             EscrowError::ContractIdMismatch
         );
 
-        // Transfer RELAY from buyer ATA → escrow vault
+        // Only RELAY and USDC mints are allowed in escrow.
+        let mint_key = ctx.accounts.mint.key();
+        require!(
+            mint_key == RELAY_MINT || mint_key == USDC_MINT,
+            EscrowError::UnsupportedMint
+        );
+
+        // Transfer tokens from buyer ATA → escrow vault
         let cpi_accounts = Transfer {
             from: ctx.accounts.buyer_token_account.to_account_info(),
             to: ctx.accounts.escrow_vault.to_account_info(),
@@ -198,7 +205,7 @@ pub mod relay_agent_registry {
         contract_id_hash: [u8; 32],
         buyer: Pubkey,
     ) -> Result<()> {
-        let escrow = &ctx.accounts.escrow_account;
+        let escrow = &mut ctx.accounts.escrow_account;
         require!(escrow.state == EscrowState::Locked, EscrowError::NotLocked);
         require!(escrow.buyer == buyer, EscrowError::BuyerMismatch);
         require!(
@@ -206,13 +213,15 @@ pub mod relay_agent_registry {
             EscrowError::ContractIdMismatch
         );
 
+        // M1: Set state BEFORE CPIs to prevent any re-entrancy window.
+        escrow.state = EscrowState::Released;
+
         let vault_bump = escrow.vault_bump;
         let seeds: &[&[u8]] = &[b"escrow-vault", &contract_id_hash, buyer.as_ref(), &[vault_bump]];
         let signer_seeds: &[&[&[u8]]] = &[seeds];
 
         let is_usdc = escrow.mint == USDC_MINT;
         let fee_amount = if is_usdc {
-            // checked_mul / checked_div to avoid overflow on large escrows
             escrow.amount
                 .checked_mul(PROTOCOL_FEE_BPS)
                 .and_then(|v| v.checked_div(10_000))
@@ -220,15 +229,15 @@ pub mod relay_agent_registry {
         } else {
             0u64
         };
-        let seller_amount = escrow.amount.checked_sub(fee_amount).unwrap();
+        let seller_amount = escrow.amount
+            .checked_sub(fee_amount)
+            .ok_or(EscrowError::FeeExceedsAmount)?;
 
         // Transfer fee to treasury (USDC escrows only, skip if fee is 0)
         if fee_amount > 0 {
             let treasury_ata = ctx.accounts.treasury_token_account
                 .as_ref()
                 .ok_or(EscrowError::TreasuryRequired)?;
-            // Validate treasury ATA: must be owned by TREASURY and match the escrow mint.
-            // (Anchor `Option<Account>` constraints can't reference the wrapper, so checked here.)
             require!(treasury_ata.owner == TREASURY, EscrowError::BeneficiaryMismatch);
             require!(treasury_ata.mint == escrow.mint, EscrowError::MintMismatch);
             let cpi_fee = Transfer {
@@ -261,14 +270,21 @@ pub mod relay_agent_registry {
             seller_amount,
         )?;
 
-        // Mark escrow as released
-        let escrow_mut = &mut ctx.accounts.escrow_account;
-        escrow_mut.state = EscrowState::Released;
+        // Close the vault token account to reclaim rent.
+        token::close_account(CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            CloseAccount {
+                account: ctx.accounts.escrow_vault.to_account_info(),
+                destination: ctx.accounts.rent_recipient.to_account_info(),
+                authority: ctx.accounts.escrow_vault.to_account_info(),
+            },
+            signer_seeds,
+        ))?;
 
         emit!(EscrowReleased {
-            contract_id: escrow_mut.contract_id.clone(),
-            seller: escrow_mut.seller,
-            amount: escrow_mut.amount,
+            contract_id: escrow.contract_id.clone(),
+            seller: escrow.seller,
+            amount: escrow.amount,
             fee: fee_amount,
         });
 
@@ -284,7 +300,7 @@ pub mod relay_agent_registry {
         contract_id_hash: [u8; 32],
         buyer: Pubkey,
     ) -> Result<()> {
-        let escrow = &ctx.accounts.escrow_account;
+        let escrow = &mut ctx.accounts.escrow_account;
         require!(escrow.state == EscrowState::Locked, EscrowError::NotLocked);
         require!(escrow.buyer == buyer, EscrowError::BuyerMismatch);
         require!(
@@ -292,29 +308,43 @@ pub mod relay_agent_registry {
             EscrowError::ContractIdMismatch
         );
 
+        // Set state BEFORE CPIs.
+        escrow.state = EscrowState::Refunded;
+
         let vault_bump = escrow.vault_bump;
         let seeds: &[&[u8]] = &[b"escrow-vault", &contract_id_hash, buyer.as_ref(), &[vault_bump]];
+        let signer_seeds: &[&[&[u8]]] = &[seeds];
 
-        // Transfer RELAY from escrow vault → buyer ATA
+        // Transfer tokens from escrow vault → buyer ATA
         let cpi_accounts = Transfer {
             from: ctx.accounts.escrow_vault.to_account_info(),
             to: ctx.accounts.buyer_token_account.to_account_info(),
             authority: ctx.accounts.escrow_vault.to_account_info(),
         };
-        let cpi_program = ctx.accounts.token_program.to_account_info();
         token::transfer(
-            CpiContext::new_with_signer(cpi_program, cpi_accounts, &[seeds]),
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                cpi_accounts,
+                signer_seeds,
+            ),
             escrow.amount,
         )?;
 
-        // Mark escrow as refunded
-        let escrow_mut = &mut ctx.accounts.escrow_account;
-        escrow_mut.state = EscrowState::Refunded;
+        // Close the vault token account to reclaim rent.
+        token::close_account(CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            CloseAccount {
+                account: ctx.accounts.escrow_vault.to_account_info(),
+                destination: ctx.accounts.rent_recipient.to_account_info(),
+                authority: ctx.accounts.escrow_vault.to_account_info(),
+            },
+            signer_seeds,
+        ))?;
 
         emit!(EscrowRefunded {
-            contract_id: escrow_mut.contract_id.clone(),
-            buyer: escrow_mut.buyer,
-            amount: escrow_mut.amount,
+            contract_id: escrow.contract_id.clone(),
+            buyer: escrow.buyer,
+            amount: escrow.amount,
         });
 
         Ok(())
@@ -920,6 +950,12 @@ pub enum EscrowError {
     BuyerMismatch,
     #[msg("USDC escrow release requires the treasury token account")]
     TreasuryRequired,
+    #[msg("Only RELAY and USDC mints are supported for escrow")]
+    UnsupportedMint,
+    #[msg("Protocol fee exceeds escrow amount")]
+    FeeExceedsAmount,
+    #[msg("Only the escrow admin can release or refund")]
+    Unauthorized,
 }
 
 // ── Escrow state ──────────────────────────────────────────────────────────────
@@ -940,7 +976,7 @@ pub struct EscrowAccount {
     pub buyer: Pubkey,
     /// Seller who receives funds on release.
     pub seller: Pubkey,
-    /// The SPL token mint (RELAY).
+    /// The SPL token mint (RELAY or USDC).
     pub mint: Pubkey,
     /// Amount locked (raw units, 6 decimals).
     pub amount: u64,
@@ -969,16 +1005,21 @@ pub struct LockEscrow<'info> {
     #[account(mut)]
     pub buyer: Signer<'info>,
 
-    /// Seller pubkey (not a signer — just recorded).
-    /// CHECK: Validated by the backend; stored for release routing.
+    /// Seller pubkey (not a signer — just recorded). Release/refund are
+    /// gated by STAKE_ADMIN, so a bogus seller can't self-release.
+    /// CHECK: Stored for release routing; validated by admin-gated release.
     pub seller: UncheckedAccount<'info>,
 
-    /// SPL token mint (RELAY or USDC).
-    /// CHECK: Validated by token program during transfer.
-    pub mint: UncheckedAccount<'info>,
+    /// SPL token mint (RELAY or USDC). Validated as Account<Mint> by Anchor
+    /// deserialization, and allowlisted in the handler.
+    pub mint: Account<'info, Mint>,
 
-    /// Buyer's associated token account for the escrowed mint.
-    #[account(mut)]
+    /// Buyer's ATA for the escrowed mint. Owner must match buyer signer.
+    #[account(
+        mut,
+        constraint = buyer_token_account.owner == buyer.key() @ EscrowError::DepositorMismatch,
+        constraint = buyer_token_account.mint == mint.key() @ EscrowError::MintMismatch,
+    )]
     pub buyer_token_account: Account<'info, TokenAccount>,
 
     /// Escrow metadata PDA. Seeds bind to BOTH contract_id AND buyer so that
@@ -1018,21 +1059,22 @@ pub struct LockEscrow<'info> {
 #[derive(Accounts)]
 #[instruction(contract_id_hash: [u8; 32], buyer: Pubkey)]
 pub struct ReleaseEscrow<'info> {
-    /// Backend authority that triggers release.
-    #[account(mut)]
+    /// Backend authority that triggers release. Gated to STAKE_ADMIN
+    /// (= program upgrade authority) to prevent unauthorized fund release.
+    #[account(mut, address = STAKE_ADMIN @ EscrowError::Unauthorized)]
     pub payer: Signer<'info>,
 
-    /// Escrow metadata PDA. Seeds use the explicit `contract_id_hash` and
-    /// `buyer` instruction args (runtime-checked against escrow_account fields
-    /// in the handler).
+    /// Escrow metadata PDA. Closed after release to reclaim rent.
     #[account(
         mut,
+        close = payer,
         seeds = [b"escrow".as_ref(), contract_id_hash.as_ref(), buyer.as_ref()],
         bump = escrow_account.bump,
     )]
     pub escrow_account: Account<'info, EscrowAccount>,
 
-    /// Escrow vault holding the locked RELAY.
+    /// Escrow vault holding the locked tokens. Closed after transfer
+    /// to reclaim rent (token::close CPI in handler).
     #[account(
         mut,
         seeds = [b"escrow-vault".as_ref(), contract_id_hash.as_ref(), buyer.as_ref()],
@@ -1041,9 +1083,7 @@ pub struct ReleaseEscrow<'info> {
     pub escrow_vault: Account<'info, TokenAccount>,
 
     /// Seller's ATA receiving tokens. MUST be owned by the seller recorded
-    /// at lock time and MUST be denominated in the escrow's mint. Without
-    /// these constraints a compromised/buggy backend could redirect funds
-    /// to any ATA — defeating the escrow's whole point.
+    /// at lock time and MUST be denominated in the escrow's mint.
     #[account(
         mut,
         constraint = seller_token_account.owner == escrow_account.seller @ EscrowError::BeneficiaryMismatch,
@@ -1053,10 +1093,15 @@ pub struct ReleaseEscrow<'info> {
 
     /// Treasury ATA for protocol fee collection. Required when the escrowed
     /// mint is USDC; omit (None) for RELAY escrows. Owner/mint validation
-    /// happens in the `release_escrow` handler (Anchor `Option<Account>`
-    /// constraints can't reference the Option wrapper).
+    /// happens in the handler (Anchor Option<Account> constraints can't
+    /// reference the wrapper).
     #[account(mut)]
     pub treasury_token_account: Option<Account<'info, TokenAccount>>,
+
+    /// Rent recipient for vault closure.
+    /// CHECK: Receives rent lamports from closed vault token account.
+    #[account(mut)]
+    pub rent_recipient: UncheckedAccount<'info>,
 
     pub token_program: Program<'info, Token>,
 }
@@ -1064,21 +1109,20 @@ pub struct ReleaseEscrow<'info> {
 #[derive(Accounts)]
 #[instruction(contract_id_hash: [u8; 32], buyer: Pubkey)]
 pub struct RefundEscrow<'info> {
-    /// Backend authority that triggers refund.
-    #[account(mut)]
+    /// Backend authority that triggers refund. Gated to STAKE_ADMIN.
+    #[account(mut, address = STAKE_ADMIN @ EscrowError::Unauthorized)]
     pub payer: Signer<'info>,
 
-    /// Escrow metadata PDA. Seeds use the explicit `contract_id_hash` and
-    /// `buyer` instruction args (runtime-checked against escrow_account fields
-    /// in the handler).
+    /// Escrow metadata PDA. Closed after refund to reclaim rent.
     #[account(
         mut,
+        close = payer,
         seeds = [b"escrow".as_ref(), contract_id_hash.as_ref(), buyer.as_ref()],
         bump = escrow_account.bump,
     )]
     pub escrow_account: Account<'info, EscrowAccount>,
 
-    /// Escrow vault holding the locked RELAY.
+    /// Escrow vault holding the locked tokens. Closed after transfer.
     #[account(
         mut,
         seeds = [b"escrow-vault".as_ref(), contract_id_hash.as_ref(), buyer.as_ref()],
@@ -1094,6 +1138,11 @@ pub struct RefundEscrow<'info> {
         constraint = buyer_token_account.mint == escrow_account.mint @ EscrowError::MintMismatch,
     )]
     pub buyer_token_account: Account<'info, TokenAccount>,
+
+    /// Rent recipient for vault closure.
+    /// CHECK: Receives rent lamports from closed vault token account.
+    #[account(mut)]
+    pub rent_recipient: UncheckedAccount<'info>,
 
     pub token_program: Program<'info, Token>,
 }

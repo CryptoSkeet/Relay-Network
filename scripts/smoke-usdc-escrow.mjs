@@ -201,6 +201,7 @@ async function testLockAndRelease(conn, payer) {
       { pubkey: vaultPda,              isSigner: false, isWritable: true  }, // escrow_vault
       { pubkey: sellerAta.address,     isSigner: false, isWritable: true  }, // seller_token_account
       { pubkey: treasuryAta.address,   isSigner: false, isWritable: true  }, // treasury_token_account (Some)
+      { pubkey: payer.publicKey,       isSigner: false, isWritable: true  }, // rent_recipient
       { pubkey: TOKEN_PROGRAM_ID,      isSigner: false, isWritable: false }, // token_program
     ],
     data: buildReleaseOrRefundData(RELEASE_DISC, contractId, payer.publicKey),
@@ -211,10 +212,10 @@ async function testLockAndRelease(conn, payer) {
   console.log(`  release  : ${releaseSig}`)
   console.log(`  solscan  : https://solscan.io/tx/${releaseSig}?cluster=devnet`)
 
-  // Verify vault is empty
-  const vaultAfter = await getTokenBalance(conn, vaultPda)
-  console.log(`  vault    : ${vaultAfter} (expected 0)`)
-  if (vaultAfter !== 0n) throw new Error('vault not drained')
+  // Verify vault is closed (account no longer exists after release)
+  const vaultInfoAfter = await conn.getAccountInfo(vaultPda)
+  console.log(`  vault    : ${vaultInfoAfter ? 'still exists (ERROR)' : 'closed (rent reclaimed)'}`)
+  if (vaultInfoAfter) throw new Error('vault should be closed after release')
 
   // Verify fee landed in treasury
   const treasuryAfter = await getTokenBalance(conn, treasuryAta.address)
@@ -231,12 +232,10 @@ async function testLockAndRelease(conn, payer) {
   console.log(`  seller   : net ${sellerNet} raw (expected -${expectedFee})`)
   if (sellerNet !== -expectedFee) throw new Error(`seller balance mismatch`)
 
-  // Verify escrow state = Released (1)
+  // Verify escrow account is closed (rent reclaimed)
   const escrowInfo = await conn.getAccountInfo(escrowPda)
-  const stateOffset = 8 + 4 + contractId.length + 32 + 32 + 32 + 8
-  const state = escrowInfo.data.readUInt8(stateOffset)
-  console.log(`  state    : ${['Locked', 'Released', 'Refunded'][state]}`)
-  if (state !== 1) throw new Error('escrow not Released')
+  console.log(`  escrow   : ${escrowInfo ? 'still exists (ERROR)' : 'closed (rent reclaimed)'}`)
+  if (escrowInfo) throw new Error('escrow account should be closed after release')
 
   console.log('  PASS')
 }
@@ -289,6 +288,7 @@ async function testLockAndRefund(conn, payer) {
       { pubkey: escrowPda,       isSigner: false, isWritable: true  }, // escrow_account
       { pubkey: vaultPda,        isSigner: false, isWritable: true  }, // escrow_vault
       { pubkey: buyerAta.address, isSigner: false, isWritable: true }, // buyer_token_account
+      { pubkey: payer.publicKey, isSigner: false, isWritable: true  }, // rent_recipient
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // token_program
     ],
     data: buildReleaseOrRefundData(REFUND_DISC, contractId, payer.publicKey),
@@ -305,12 +305,10 @@ async function testLockAndRefund(conn, payer) {
   console.log(`  buyer net: ${net} (expected 0 — full refund)`)
   if (net !== 0n) throw new Error(`buyer not fully refunded: net ${net}`)
 
-  // Verify state = Refunded (2)
+  // Verify escrow account is closed (rent reclaimed)
   const escrowInfo = await conn.getAccountInfo(escrowPda)
-  const stateOffset = 8 + 4 + contractId.length + 32 + 32 + 32 + 8
-  const state = escrowInfo.data.readUInt8(stateOffset)
-  console.log(`  state    : ${['Locked', 'Released', 'Refunded'][state]}`)
-  if (state !== 2) throw new Error('escrow not Refunded')
+  console.log(`  escrow   : ${escrowInfo ? 'still exists (ERROR)' : 'closed (rent reclaimed)'}`)
+  if (escrowInfo) throw new Error('escrow account should be closed after refund')
 
   console.log('  PASS')
 }
@@ -378,6 +376,7 @@ async function testRelayEscrowRegression(conn, payer) {
       { pubkey: vaultPda,          isSigner: false, isWritable: true  },
       { pubkey: sellerAta.address, isSigner: false, isWritable: true  },
       { pubkey: PROGRAM_ID,        isSigner: false, isWritable: false }, // None placeholder
+      { pubkey: payer.publicKey,   isSigner: false, isWritable: true  }, // rent_recipient
       { pubkey: TOKEN_PROGRAM_ID,  isSigner: false, isWritable: false },
     ],
     data: buildReleaseOrRefundData(RELEASE_DISC, contractId, payer.publicKey),
