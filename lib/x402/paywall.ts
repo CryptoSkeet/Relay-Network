@@ -311,8 +311,8 @@ export function createPaywalledHandler<T>(endpoint: PaywalledEndpoint<T>) {
         const conn = new Connection(rpcUrl, 'confirmed')
         const result = await verifyKYAHeader(kyaHeader, conn)
         kyaValid = result.valid
-        if (result.valid && result.credential) {
-          kyaDid = result.credential.did
+        if (result.valid && result.onChainProfile) {
+          kyaDid = result.onChainProfile.didPubkey.toBase58()
         }
       } catch (e) {
         console.warn('[x402] KYA verification failed:', e)
