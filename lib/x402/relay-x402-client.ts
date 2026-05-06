@@ -5,8 +5,10 @@ import { wrapFetchWithPayment, x402Client } from '@x402/fetch'
 import { ExactSvmScheme, toClientSvmSigner } from '@x402/svm'
 import { createKeyPairSignerFromBytes } from '@solana/kit'
 import { Connection, PublicKey } from '@solana/web3.js'
+import { createHash } from 'crypto'
 import { getKeypairFromStorage } from '@/lib/solana/generate-wallet'
 import { createClient } from '@/lib/supabase/server'
+import { buildKYAHeader, KYA_HEADER } from '@/lib/solana/kya-credential'
 
 // SPL USDC mints (canonical)
 const USDC_MINTS = {
@@ -25,6 +27,19 @@ function deriveAta(owner: PublicKey, mint: PublicKey): PublicKey {
     ASSOCIATED_TOKEN_PROGRAM_ID,
   )
   return ata
+}
+
+/**
+ * Convert a DID string (base58 pubkey or "did:relay:<handle>") to a PublicKey.
+ * Falls back to sha256 hash when the DID isn't a valid base58 key.
+ */
+function didToPubkey(did: string): PublicKey {
+  const raw = did.replace(/^did:relay:/, '')
+  try {
+    return new PublicKey(raw)
+  } catch {
+    return new PublicKey(createHash('sha256').update(did).digest())
+  }
 }
 
 function rpcForNetwork(network: 'solana:mainnet' | 'solana:devnet'): string {
@@ -146,14 +161,31 @@ export async function agentFetchX402(
   const fetchWithPay = wrapFetchWithPayment(fetch, client)
 
   try {
-    // 4. Fetch the paid resource — x402 handles 402 handshake automatically
+    // 4. Build KYA credential header from agent's on-chain profile.
+    // KYA replaces the old raw DID/reputation headers with a single
+    // cryptographically-verifiable credential that the receiving server
+    // can check against on-chain state.
+    const identityHeaders: Record<string, string> = {
+      'X-Relay-Agent-ID': agentId,
+    }
+    if (agent?.did) {
+      try {
+        const didPubkey = didToPubkey(agent.did)
+        const kyaValue = await buildKYAHeader(didPubkey)
+        if (kyaValue) {
+          identityHeaders[KYA_HEADER] = kyaValue
+        }
+      } catch (e) {
+        // KYA resolution failed (network, PDA not found, etc.)
+        // Fall through without the header — the payment still works,
+        // the agent just won't get credential-based discounts.
+        console.warn('[x402-client] KYA header build failed:', e)
+      }
+    }
+
+    // 5. Fetch the paid resource — x402 handles 402 handshake automatically
     const response = await fetchWithPay(resource.url, {
-      headers: {
-        // Attach Relay identity so servers can verify agent trustworthiness
-        'X-Relay-DID':        agent?.did ?? '',
-        'X-Relay-Reputation': String(agent?.reputation_score ?? 0),
-        'X-Relay-Agent-ID':   agentId,
-      },
+      headers: identityHeaders,
     })
 
     if (!response.ok) {
@@ -177,7 +209,7 @@ export async function agentFetchX402(
       // Header missing or malformed — log without sig
     }
 
-    // 5. Log the spend to DB for transparency
+    // 6. Log the spend to DB for transparency
     await supabase.from('agent_x402_transactions').insert({
       agent_id:       agentId,
       direction:      'outbound',

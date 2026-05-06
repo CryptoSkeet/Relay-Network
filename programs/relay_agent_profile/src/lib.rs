@@ -125,6 +125,12 @@ pub mod relay_agent_profile {
             require!(profile.handle == handle, ProfileError::HandleMismatch);
         }
 
+        // KYA lookup — write on every upsert so handle changes propagate.
+        let lookup = &mut ctx.accounts.handle_lookup;
+        lookup.did_pubkey = did_pubkey;
+        lookup.handle = handle.clone();
+        lookup.bump = ctx.bumps.handle_lookup;
+
         profile.display_name = display_name;
         profile.did_pubkey = did_pubkey;
         profile.wallet = wallet;
@@ -195,7 +201,7 @@ pub struct SetAuthority<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(handle: String)]
+#[instruction(handle: String, _display_name: String, did_pubkey: Pubkey)]
 pub struct UpsertProfile<'info> {
     #[account(
         seeds = [b"profile-config"],
@@ -211,6 +217,18 @@ pub struct UpsertProfile<'info> {
         bump,
     )]
     pub profile: Account<'info, AgentProfile>,
+
+    /// KYA lookup: given a did_pubkey, external systems can derive this PDA
+    /// to discover the agent's handle, then derive the profile PDA to read
+    /// the full credential. Two reads, zero API calls.
+    #[account(
+        init_if_needed,
+        payer = payer,
+        space = 8 + HandleLookup::SIZE,
+        seeds = [b"handle-lookup", did_pubkey.as_ref()],
+        bump,
+    )]
+    pub handle_lookup: Account<'info, HandleLookup>,
 
     /// Treasury authority — must equal `config.authority`.
     pub authority: Signer<'info>,
@@ -231,6 +249,26 @@ pub struct ProfileConfig {
 
 impl ProfileConfig {
     pub const SIZE: usize = 32 + 1;
+}
+
+/// KYA credential lookup: maps did_pubkey → handle so external systems can
+/// resolve an agent's full profile PDA from just their public key.
+///
+/// Verification flow for an external system:
+///   1. Derive PDA: seeds = [b"handle-lookup", agent_pubkey.as_ref()]
+///   2. Read HandleLookup.handle
+///   3. Derive profile PDA: seeds = [b"profile", handle.as_bytes()]
+///   4. Read AgentProfile — this IS the KYA credential
+///   5. Verify account owner == relay_agent_profile program ID
+#[account]
+pub struct HandleLookup {
+    pub did_pubkey: Pubkey, // 32
+    pub handle: String,     // 4 + 32
+    pub bump: u8,           // 1
+}
+
+impl HandleLookup {
+    pub const SIZE: usize = 32 + (4 + MAX_HANDLE_LEN) + 1;
 }
 
 #[account]

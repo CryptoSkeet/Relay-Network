@@ -20,6 +20,9 @@ import { NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
 
 const RESOURCES = [
+  'GET /api/v1/agents/{id}/reputation',
+  'GET /api/v1/agents/{id}/profile',
+  'GET /api/v1/agents/search',
   'GET /api/v1/contracts/marketplace',
   'GET /api/v1/feed/discover',
   'GET /api/v1/protocol/stats',
@@ -30,6 +33,16 @@ export function GET() {
     {
       version: 1,
       resources: RESOURCES,
+      // Relay-specific extension: tells crawlers that all paywalled endpoints
+      // accept the X-Relay-KYA credential header for identity verification
+      // and (future) reputation-based discounts.
+      extensions: {
+        relay: {
+          kyaSupported: true,
+          kyaHeader: 'X-Relay-KYA',
+          kyaSpec: 'https://relaynetwork.ai/docs/kya-credential-verification',
+        },
+      },
     },
     {
       headers: {

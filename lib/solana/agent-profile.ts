@@ -99,6 +99,20 @@ export function deriveAgentProfilePDA(handle: string): [PublicKey, number] {
   )
 }
 
+/**
+ * KYA credential lookup: derive the PDA that maps a DID pubkey → handle.
+ * External systems use this to resolve an agent's full profile from just
+ * their public key, without calling Relay's API.
+ *
+ * Flow: pubkey → deriveHandleLookupPDA → read handle → deriveAgentProfilePDA → read credential
+ */
+export function deriveHandleLookupPDA(didPubkey: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from('handle-lookup'), didPubkey.toBuffer()],
+    RELAY_AGENT_PROFILE_PROGRAM_ID,
+  )
+}
+
 // ── Canonical profile hash ───────────────────────────────────────────────────
 
 /**
@@ -237,6 +251,7 @@ export async function setProfileAuthority(newAuthority: PublicKey): Promise<stri
 export interface UpsertResult {
   signature: string
   pda: PublicKey
+  handleLookupPda: PublicKey
   solscanUrl: string
   profileHash: string // hex
 }
@@ -248,6 +263,7 @@ export async function upsertAgentProfileOnChain(
   const authority = getAuthorityKeypair()
   const [configPda] = deriveProfileConfigPDA()
   const [profilePda] = deriveAgentProfilePDA(fields.handle)
+  const [handleLookupPda] = deriveHandleLookupPDA(fields.didPubkey)
 
   const cfg = await conn.getAccountInfo(configPda)
   if (!cfg) {
@@ -296,6 +312,7 @@ export async function upsertAgentProfileOnChain(
     keys: [
       { pubkey: configPda, isSigner: false, isWritable: false },
       { pubkey: profilePda, isSigner: false, isWritable: true },
+      { pubkey: handleLookupPda, isSigner: false, isWritable: true }, // KYA lookup
       { pubkey: authority.publicKey, isSigner: true, isWritable: false },
       { pubkey: authority.publicKey, isSigner: true, isWritable: true }, // payer
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
@@ -312,6 +329,7 @@ export async function upsertAgentProfileOnChain(
   return {
     signature,
     pda: profilePda,
+    handleLookupPda,
     solscanUrl: solscanAccountUrl(profilePda),
     profileHash: hash.toString('hex'),
   }
@@ -350,6 +368,28 @@ function readString(buf: Buffer, o: number): { value: string; next: number } {
   const start = o + 4
   const end = start + len
   return { value: buf.subarray(start, end).toString('utf8'), next: end }
+}
+
+/**
+ * KYA credential resolution: given just a pubkey, look up the agent's handle
+ * via the on-chain lookup PDA, then fetch the full profile.
+ *
+ * Returns null if the agent has no lookup PDA (never had upsert_profile called).
+ */
+export async function resolveCredentialByPubkey(
+  didPubkey: PublicKey,
+  conn?: Connection,
+): Promise<OnChainAgentProfile | null> {
+  const c = conn ?? getSolanaConnection()
+  const [lookupPda] = deriveHandleLookupPDA(didPubkey)
+  const info = await c.getAccountInfo(lookupPda)
+  if (!info) return null
+
+  // Parse HandleLookup: discriminator(8) + did_pubkey(32) + handle(string) + bump(1)
+  const buf = info.data.subarray(8)
+  // skip did_pubkey (32 bytes)
+  const handleRead = readString(buf, 32)
+  return fetchAgentProfileOnChain(handleRead.value, c)
 }
 
 export async function fetchAgentProfileOnChain(

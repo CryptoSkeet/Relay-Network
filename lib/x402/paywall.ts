@@ -1,10 +1,12 @@
 import { NextRequest } from 'next/server'
+import { Connection } from '@solana/web3.js'
 import {
   HTTPFacilitatorClient,
   decodePaymentSignatureHeader,
   encodePaymentResponseHeader,
   type FacilitatorConfig,
 } from '@x402/core/http'
+import { verifyKYAHeader, KYA_HEADER } from '@/lib/solana/kya-credential'
 
 /**
  * Shared x402 + Bazaar discovery paywall for Relay's monetized API surface.
@@ -136,6 +138,12 @@ export interface PaywalledEndpoint<T> {
   /** Marketing metadata for Bazaar headers. */
   bazaar: BazaarMetadata
   /**
+   * Basis-point discount applied when the caller presents a valid KYA
+   * credential (e.g. 1000 = 10% off). Defaults to 0 (no discount).
+   * Phase 3 will make this dynamic based on reputation score.
+   */
+  kyaDiscountBps?: number
+  /**
    * Fetch the paid response data. Must be safe to fail (return null) — on
    * null we still settle and return an empty payload so the caller doesn't
    * get charged for a failure on our side. (We currently DO settle on null;
@@ -235,6 +243,11 @@ function paymentRequiredResponse<T>(
         pricing: `${endpoint.priceLabel} per call`,
       },
       outputSchema: endpoint.outputSchema,
+      relay: {
+        kyaSupported: true,
+        kyaDiscountBps: endpoint.kyaDiscountBps ?? 0,
+        kyaHeader: KYA_HEADER,
+      },
     },
   }
   return new Response(JSON.stringify(body), {
@@ -284,6 +297,28 @@ export function createPaywalledHandler<T>(endpoint: PaywalledEndpoint<T>) {
       )
     }
 
+    // Verify KYA credential if present. Best-effort: a missing or invalid
+    // credential doesn't block the request (they already paid), but a valid
+    // one gets logged and will drive discounts in Phase 3.
+    let kyaValid = false
+    let kyaDid: string | null = null
+    const kyaHeader = req.headers.get(KYA_HEADER)
+    if (kyaHeader) {
+      try {
+        const rpcUrl = process.env.QUICKNODE_RPC_URL
+          || process.env.NEXT_PUBLIC_SOLANA_RPC
+          || 'https://api.devnet.solana.com'
+        const conn = new Connection(rpcUrl, 'confirmed')
+        const result = await verifyKYAHeader(kyaHeader, conn)
+        kyaValid = result.valid
+        if (result.valid && result.credential) {
+          kyaDid = result.credential.did
+        }
+      } catch (e) {
+        console.warn('[x402] KYA verification failed:', e)
+      }
+    }
+
     let data: T | null = null
     try {
       data = await endpoint.fetchData(req)
@@ -321,6 +356,8 @@ export function createPaywalledHandler<T>(endpoint: PaywalledEndpoint<T>) {
           payer_address:  settlement.payer ?? null,
           pay_to_address: PAY_TO,
           facilitator:    FACILITATOR_PROVIDER,
+          payer_relay_did: kyaDid,
+          kya_verified:   kyaValid,
           status:         'completed',
           created_at:     new Date().toISOString(),
         })
@@ -335,13 +372,18 @@ export function createPaywalledHandler<T>(endpoint: PaywalledEndpoint<T>) {
       )
     }
 
+    const responseHeaders: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'x-payment-response': settlementHeader,
+      ...bazaarHeaders(endpoint),
+    }
+    if (kyaValid) {
+      responseHeaders['x-relay-kya-verified'] = 'true'
+    }
+
     return new Response(JSON.stringify(data ?? {}), {
       status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'x-payment-response': settlementHeader,
-        ...bazaarHeaders(endpoint),
-      },
+      headers: responseHeaders,
     })
   }
 }

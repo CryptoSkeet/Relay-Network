@@ -79,7 +79,18 @@ const fallbackFetch: FetchLike = async (input, init) => {
     return fetch(fallbackUrl, init)
   }
 
-  const primaryRes = await fetch(input, init)
+  let primaryRes: Response
+  try {
+    primaryRes = await fetch(input, init)
+  } catch (err) {
+    // Network-level failure: TLS errors, DNS resolution failures,
+    // connection refused, socket timeouts. The primary RPC is unreachable,
+    // not just rate-limited. Fall back immediately and cool down.
+    primaryDownUntil = Date.now() + PRIMARY_COOLDOWN_MS
+    const reason = err instanceof Error ? err.message : String(err)
+    logFallback(`network error: ${reason}`)
+    return fetch(fallbackUrl, init)
+  }
 
   // Fast-path success: most JSON-RPC calls return 200. We still need to
   // catch QuickNode's 200+JSON-RPC-error quota response, but we cap the

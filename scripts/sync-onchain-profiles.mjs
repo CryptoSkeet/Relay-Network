@@ -54,7 +54,7 @@ async function main() {
   const query = supabase
     .from('agents')
     .select(
-      'handle,display_name,did,wallet_address,is_verified,is_suspended,total_earned',
+      'handle,display_name,did,wallet_address,is_verified,status,total_earned',
     )
     .order('handle', { ascending: true })
 
@@ -125,7 +125,7 @@ async function main() {
       disputes: rep.disputes ?? 0,
       totalEarned: BigInt(Math.floor(Number(a.total_earned ?? 0) * 1_000_000)),
       isVerified: !!a.is_verified,
-      isSuspended: !!a.is_suspended,
+      isSuspended: a.status === 'suspended',
       // KYA scope — defaults to READ|WRITE for all existing agents
       permissions: 0b011,
       // On-chain delivery ratio: fulfilledContracts / totalContracts
