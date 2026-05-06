@@ -66,17 +66,36 @@ export function ServiceDetail({ service, relatedServices, similarServices, isExt
     setConnectResult(null)
 
     if (isExternal && service.mcp_endpoint) {
-      // Copy MCP endpoint to clipboard
       await navigator.clipboard.writeText(service.mcp_endpoint)
       setConnectResult(`\u2705 Endpoint copied. Add to your agent config or Claude Desktop's mcp_servers block. This agent communicates via SSE streaming \u2014 not accessible in browser.`)
       setIsSubmitting(false)
       return
     }
 
-    // Regular service hire flow
-    await new Promise((r) => setTimeout(r, 1000))
-    setConnectResult(`Request sent to ${service.agent.display_name}! They will respond shortly.`)
-    setIsSubmitting(false)
+    try {
+      const res = await fetch('/api/hire', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          service_id: service.id,
+          message: message.trim() || undefined,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setConnectResult(data.error || 'Something went wrong. Try again.')
+        return
+      }
+
+      setConnectResult(`Request sent to ${service.agent.display_name}! They will respond shortly.`)
+      setMessage('')
+    } catch {
+      setConnectResult('Network error. Check your connection and try again.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (

@@ -6,16 +6,29 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { AgentAvatar } from '@/components/relay/agent-avatar'
+import { HireMessageCard } from '@/components/relay/hire-message-card'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import type { Agent } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
+
+interface MessageMetadata {
+  type?: string
+  contract_id?: string
+  service_id?: string
+  service_name?: string
+  price_min?: number
+  price_max?: number
+  currency?: string
+  status?: 'pending' | 'accepted' | 'declined'
+}
 
 interface Message {
   id: string
   sender_id: string
   content: string
   created_at: string
+  metadata?: MessageMetadata | null
 }
 
 interface ChatWindowProps {
@@ -170,23 +183,44 @@ export function ChatWindow({ agent }: ChatWindowProps) {
           {messages.map((msg) => {
             const isMe = msg.sender_id === myAgentId
             const isTemp = msg.id.startsWith('temp-')
+            const isHireRequest = msg.metadata?.type === 'hire_request'
+            const isHireResponse = msg.metadata?.type === 'hire_response'
+
             return (
               <div key={msg.id} className={cn('flex gap-2', isMe ? 'justify-end' : 'justify-start')}>
                 {!isMe && (
                   <AgentAvatar src={agent.avatar_url} name={agent.display_name} size="sm" />
                 )}
                 <div className={cn('flex flex-col gap-1', isMe ? 'items-end' : 'items-start')}>
-                  <div
-                    className={cn(
-                      'max-w-xs md:max-w-sm lg:max-w-md rounded-2xl px-4 py-2.5 text-sm',
-                      isMe
-                        ? 'bg-primary text-primary-foreground rounded-br-sm'
-                        : 'bg-muted text-foreground rounded-bl-sm',
-                      isTemp && 'opacity-60'
-                    )}
-                  >
-                    {msg.content}
-                  </div>
+                  {isHireRequest && msg.metadata ? (
+                    <HireMessageCard
+                      metadata={msg.metadata as {
+                        type: 'hire_request'
+                        contract_id: string
+                        service_id: string
+                        service_name: string
+                        price_min: number
+                        price_max: number
+                        currency: string
+                        status: 'pending' | 'accepted' | 'declined'
+                      }}
+                      isProvider={!isMe}
+                    />
+                  ) : (
+                    <div
+                      className={cn(
+                        'max-w-xs md:max-w-sm lg:max-w-md rounded-2xl px-4 py-2.5 text-sm',
+                        isMe
+                          ? 'bg-primary text-primary-foreground rounded-br-sm'
+                          : 'bg-muted text-foreground rounded-bl-sm',
+                        isTemp && 'opacity-60',
+                        isHireResponse && msg.metadata?.status === 'accepted' && 'border border-green-500/30',
+                        isHireResponse && msg.metadata?.status === 'declined' && 'border border-red-500/30',
+                      )}
+                    >
+                      {msg.content}
+                    </div>
+                  )}
                   <div className="flex items-center gap-1 px-1">
                     <span className="text-xs text-muted-foreground">{formatTime(msg.created_at)}</span>
                     {isMe && !isTemp && <CheckCheck className="w-3 h-3 text-primary" />}
