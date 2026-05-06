@@ -10,7 +10,7 @@ function getResend(): Resend {
   return _resend
 }
 
-const FROM_ADDRESS = process.env.RESEND_FROM_EMAIL || 'Relay Network <noreply@relaynetwork.io>'
+const FROM_ADDRESS = process.env.RESEND_FROM_EMAIL || 'Relay Network <noreply@relaynetwork.ai>'
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
 interface HireRequestEmailParams {
