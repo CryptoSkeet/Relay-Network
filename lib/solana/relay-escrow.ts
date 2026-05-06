@@ -31,6 +31,7 @@ import {
   AccountRole,
   type Address,
   type Instruction,
+  type TransactionSigner,
 } from '@solana/kit'
 import { getAddMemoInstruction } from '@solana-program/memo'
 import { createHash } from 'crypto'
@@ -432,13 +433,18 @@ export async function releaseEscrowOnChain(
   })
   const sellerAta = await deriveRelayAta(sellerAddr)
 
+  // treasury_token_account is Option<Account> in Anchor 0.31. When None
+  // (RELAY escrows don't pay protocol fee), pass the program ID as a
+  // placeholder since it's not the last account in the struct.
+  const programAddr: Address = address(PROGRAM_ID.toBase58())
   const escrowReleaseIx: Instruction = {
-    programAddress: address(PROGRAM_ID.toBase58()),
+    programAddress: programAddr,
     accounts: [
       { address: treasury.address, role: AccountRole.WRITABLE_SIGNER }, // payer
       { address: escrowAddr,       role: AccountRole.WRITABLE },        // escrow_account
       { address: vaultAddr,        role: AccountRole.WRITABLE },        // escrow_vault
       { address: sellerAta,        role: AccountRole.WRITABLE },        // seller_token_account
+      { address: programAddr,      role: AccountRole.READONLY },        // treasury_token_account = None
       { address: TOKEN_PROGRAM_ADDRESS, role: AccountRole.READONLY },   // token_program
     ],
     data: buildReleaseOrRefundData(RELEASE_DISC, contractId, buyerPk),
@@ -520,5 +526,252 @@ export async function refundEscrowOnChain(
   const result = await sendAndConfirm([createAtaIx, escrowRefundIx, memoIx], treasury)
   invalidateBalanceCache(buyerPublicKey)
   console.log(`[escrow] Refunded escrow for contract ${contractId} to buyer: ${result.signature}`)
+  return result.signature as string
+}
+
+// ── USDC escrow ─────────────────────────────────────────────────────────────
+//
+// Same instructions as RELAY escrow but using the USDC SPL mint. The on-chain
+// program is mint-agnostic — the difference is which mint and ATAs we pass.
+// On release, a protocol fee (PROTOCOL_FEE_BPS) goes to the treasury USDC ATA.
+
+const USDC_MINT_DEVNET  = new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU')
+const USDC_MINT_MAINNET = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v')
+const TREASURY_PUBKEY   = new PublicKey('4TmAbwMAMqHSUPDWgFLZn9Ep3A3w5hqnY461dhg3xgaz')
+
+function getUsdcMint(): PublicKey {
+  const network = (getEnv('SOLANA_NETWORK') || 'devnet').toLowerCase()
+  return network === 'mainnet' || network === 'mainnet-beta'
+    ? USDC_MINT_MAINNET
+    : USDC_MINT_DEVNET
+}
+
+/**
+ * Derive a USDC ATA for an owner using classic SPL Token program.
+ * USDC on Solana uses classic SPL Token, not Token-2022.
+ */
+const USDC_MINT_ADDRESS: Address = address(getUsdcMint().toBase58())
+
+async function deriveUsdcAta(owner: Address): Promise<Address> {
+  const { findAssociatedTokenPda } = await import('@solana-program/token')
+  const [ata] = await findAssociatedTokenPda({
+    owner,
+    mint: USDC_MINT_ADDRESS,
+    tokenProgram: TOKEN_PROGRAM_ADDRESS,
+  })
+  return ata
+}
+
+async function buildCreateUsdcAtaIdempotentIx(params: {
+  feePayer: TransactionSigner
+  owner: Address
+}): Promise<Instruction> {
+  const { getCreateAssociatedTokenIdempotentInstructionAsync } = await import('@solana-program/token')
+  return getCreateAssociatedTokenIdempotentInstructionAsync({
+    payer: params.feePayer,
+    owner: params.owner,
+    mint: USDC_MINT_ADDRESS,
+    tokenProgram: TOKEN_PROGRAM_ADDRESS,
+  })
+}
+
+/**
+ * Lock USDC into on-chain escrow for a contract.
+ * Same flow as lockEscrowOnChain but using the USDC mint.
+ */
+export async function lockUsdcEscrowOnChain(
+  contractId: string,
+  buyerAgentId: string,
+  sellerPublicKey: string,
+  amount: number, // human-readable USDC (6 decimals)
+): Promise<string> {
+  const connection = getSolanaConnection()
+  const mint = getUsdcMint()
+  const payer = getPayerKeypair()
+  const buyerKeypair = await getAgentKeypair(buyerAgentId)
+  const sellerPubkey = new PublicKey(sellerPublicKey)
+
+  const buyerATA = await getAssociatedTokenAddress(mint, buyerKeypair.publicKey)
+  const [escrowPDA] = deriveEscrowPDA(contractId, buyerKeypair.publicKey)
+  const [vaultPDA] = deriveEscrowVaultPDA(contractId, buyerKeypair.publicKey)
+
+  // Pre-flight balance check
+  let availableRaw = BigInt(0)
+  try {
+    const ataAccount = await getAccount(connection, buyerATA)
+    availableRaw = ataAccount.amount
+  } catch (e) {
+    if (!(e instanceof TokenAccountNotFoundError)) throw e
+  }
+  const requiredRaw = BigInt(Math.round(amount * 1_000_000))
+  if (availableRaw < requiredRaw) {
+    throw new Error(
+      `Insufficient USDC: buyer ${buyerKeypair.publicKey.toBase58()} has ${Number(availableRaw) / 1_000_000} USDC, need ${amount}`,
+    )
+  }
+
+  // Idempotency: if escrow PDA already exists, recover the signature
+  const existing = await connection.getAccountInfo(escrowPDA)
+  if (existing) {
+    const recordedBuyer = decodeEscrowBuyer(existing.data)
+    if (!recordedBuyer || !recordedBuyer.equals(buyerKeypair.publicKey)) {
+      throw new Error(`Escrow PDA for contract ${contractId} exists with different buyer`)
+    }
+    const sigs = await connection.getSignaturesForAddress(escrowPDA, { limit: 1 })
+    if (sigs[0]?.signature) {
+      console.warn(`[usdc-escrow] PDA already exists for ${contractId} — recovering sig ${sigs[0].signature}`)
+      return sigs[0].signature
+    }
+  }
+
+  const rawAmount = BigInt(Math.round(amount * 1_000_000))
+  const data = buildLockEscrowData(contractId, rawAmount)
+
+  const ix = new TransactionInstruction({
+    programId: PROGRAM_ID,
+    keys: [
+      { pubkey: buyerKeypair.publicKey, isSigner: true, isWritable: true },
+      { pubkey: sellerPubkey, isSigner: false, isWritable: false },
+      { pubkey: mint, isSigner: false, isWritable: false },
+      { pubkey: buyerATA, isSigner: false, isWritable: true },
+      { pubkey: escrowPDA, isSigner: false, isWritable: true },
+      { pubkey: vaultPDA, isSigner: false, isWritable: true },
+      { pubkey: payer.publicKey, isSigner: true, isWritable: true },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
+    ],
+    data,
+  })
+
+  const tx = new Transaction().add(ix)
+  const sig = await sendAndConfirmTransaction(connection, tx, [payer, buyerKeypair], {
+    commitment: 'confirmed',
+    preflightCommitment: 'confirmed',
+    maxRetries: 3,
+  })
+
+  console.log(`[usdc-escrow] Locked ${amount} USDC for contract ${contractId}: ${sig}`)
+  return sig
+}
+
+/**
+ * Release USDC escrow to seller with protocol fee to treasury.
+ * The on-chain program deducts PROTOCOL_FEE_BPS from the escrowed amount
+ * and sends it to the treasury ATA before transferring the rest to the seller.
+ */
+export async function releaseUsdcEscrowOnChain(
+  contractId: string,
+  sellerPublicKey: string,
+  buyerPublicKey: string,
+): Promise<string> {
+  const buyerPk = new PublicKey(buyerPublicKey)
+  const [escrowPDA] = deriveEscrowPDA(contractId, buyerPk)
+  const [vaultPDA] = deriveEscrowVaultPDA(contractId, buyerPk)
+
+  const rpc = getRpc()
+  const escrowAcct = await rpc
+    .getAccountInfo(address(escrowPDA.toBase58()), { encoding: 'base64' })
+    .send()
+  if (!escrowAcct.value) {
+    throw new EscrowNotFoundError(contractId)
+  }
+
+  const treasury = await getTreasurySigner()
+  const sellerAddr: Address = address(sellerPublicKey)
+  const escrowAddr: Address = address(escrowPDA.toBase58())
+  const vaultAddr: Address = address(vaultPDA.toBase58())
+  const treasuryAddr: Address = address(TREASURY_PUBKEY.toBase58())
+
+  // Create ATAs idempotently for seller and treasury
+  const createSellerAtaIx = await buildCreateUsdcAtaIdempotentIx({
+    feePayer: treasury,
+    owner: sellerAddr,
+  })
+  const createTreasuryAtaIx = await buildCreateUsdcAtaIdempotentIx({
+    feePayer: treasury,
+    owner: treasuryAddr,
+  })
+
+  const sellerAta = await deriveUsdcAta(sellerAddr)
+  const treasuryAta = await deriveUsdcAta(treasuryAddr)
+
+  // Release instruction — treasury_token_account is the 5th account
+  // (Option<Account> in Anchor: present = Some, absent = None).
+  const escrowReleaseIx: Instruction = {
+    programAddress: address(PROGRAM_ID.toBase58()),
+    accounts: [
+      { address: treasury.address, role: AccountRole.WRITABLE_SIGNER },
+      { address: escrowAddr, role: AccountRole.WRITABLE },
+      { address: vaultAddr, role: AccountRole.WRITABLE },
+      { address: sellerAta, role: AccountRole.WRITABLE },
+      { address: treasuryAta, role: AccountRole.WRITABLE },
+      { address: TOKEN_PROGRAM_ADDRESS, role: AccountRole.READONLY },
+    ],
+    data: buildReleaseOrRefundData(RELEASE_DISC, contractId, buyerPk),
+  }
+
+  const memoIx = getAddMemoInstruction({
+    memo: `relay:contract:${contractId}:settled:usdc`,
+  })
+
+  const result = await sendAndConfirm(
+    [createSellerAtaIx, createTreasuryAtaIx, escrowReleaseIx, memoIx],
+    treasury,
+  )
+  console.log(`[usdc-escrow] Released USDC escrow for ${contractId} to seller: ${result.signature}`)
+  return result.signature as string
+}
+
+/**
+ * Refund USDC escrow back to the buyer (no fee on refunds).
+ */
+export async function refundUsdcEscrowOnChain(
+  contractId: string,
+  buyerPublicKey: string,
+): Promise<string> {
+  const buyerPk = new PublicKey(buyerPublicKey)
+  const [escrowPDA] = deriveEscrowPDA(contractId, buyerPk)
+  const [vaultPDA] = deriveEscrowVaultPDA(contractId, buyerPk)
+
+  const rpc = getRpc()
+  const escrowAcct = await rpc
+    .getAccountInfo(address(escrowPDA.toBase58()), { encoding: 'base64' })
+    .send()
+  if (!escrowAcct.value) {
+    throw new EscrowNotFoundError(contractId)
+  }
+
+  const treasury = await getTreasurySigner()
+  const buyerAddr: Address = address(buyerPublicKey)
+  const escrowAddr: Address = address(escrowPDA.toBase58())
+  const vaultAddr: Address = address(vaultPDA.toBase58())
+
+  const createAtaIx = await buildCreateUsdcAtaIdempotentIx({
+    feePayer: treasury,
+    owner: buyerAddr,
+  })
+  const buyerAta = await deriveUsdcAta(buyerAddr)
+
+  // Refund — no treasury account needed (Option<Account> = None).
+  // Anchor expects the None variant to NOT appear in the accounts array.
+  const escrowRefundIx: Instruction = {
+    programAddress: address(PROGRAM_ID.toBase58()),
+    accounts: [
+      { address: treasury.address, role: AccountRole.WRITABLE_SIGNER },
+      { address: escrowAddr, role: AccountRole.WRITABLE },
+      { address: vaultAddr, role: AccountRole.WRITABLE },
+      { address: buyerAta, role: AccountRole.WRITABLE },
+      { address: TOKEN_PROGRAM_ADDRESS, role: AccountRole.READONLY },
+    ],
+    data: buildReleaseOrRefundData(REFUND_DISC, contractId, buyerPk),
+  }
+
+  const memoIx = getAddMemoInstruction({
+    memo: `relay:contract:${contractId}:cancelled:usdc`,
+  })
+
+  const result = await sendAndConfirm([createAtaIx, escrowRefundIx, memoIx], treasury)
+  console.log(`[usdc-escrow] Refunded USDC escrow for ${contractId} to buyer: ${result.signature}`)
   return result.signature as string
 }

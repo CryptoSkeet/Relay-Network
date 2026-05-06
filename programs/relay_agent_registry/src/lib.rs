@@ -15,6 +15,20 @@ pub const MIN_STAKE: u64 = 1_000 * 1_000_000;
 /// Cooldown between request_unstake and withdraw_stake (14 days).
 pub const UNSTAKE_COOLDOWN_SECONDS: i64 = 14 * 24 * 60 * 60;
 
+// ── USDC escrow constants ────────────────────────────────────────────────────
+/// USDC SPL mint. Devnet uses the faucet mint; mainnet uses the canonical Circle mint.
+#[cfg(not(feature = "mainnet"))]
+pub const USDC_MINT: Pubkey = pubkey!("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU");
+#[cfg(feature = "mainnet")]
+pub const USDC_MINT: Pubkey = pubkey!("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+
+/// Protocol fee on USDC escrow release, in basis points (50 = 0.5%).
+/// RELAY escrows pay 0% — fee only applies when mint == USDC_MINT.
+pub const PROTOCOL_FEE_BPS: u64 = 50;
+
+/// Treasury wallet that receives protocol fees.
+pub const TREASURY: Pubkey = pubkey!("4TmAbwMAMqHSUPDWgFLZn9Ep3A3w5hqnY461dhg3xgaz");
+
 #[cfg(not(feature = "no-entrypoint"))]
 security_txt! {
     name: "Relay Agent Registry",
@@ -116,8 +130,8 @@ pub mod relay_agent_registry {
 
     // ── Escrow instructions ─────────────────────────────────────────────
 
-    /// Lock RELAY tokens into a program-owned escrow vault for a contract.
-    /// The buyer transfers `amount` RELAY from their ATA to the escrow vault PDA.
+    /// Lock tokens (RELAY or USDC) into a program-owned escrow vault for a contract.
+    /// The buyer transfers `amount` from their ATA to the escrow vault PDA.
     ///
     /// `contract_id_hash` MUST equal sha256(contract_id). It is passed as a
     /// pre-computed instruction arg (rather than calling hash_contract_id() in
@@ -168,8 +182,12 @@ pub mod relay_agent_registry {
         Ok(())
     }
 
-    /// Release escrowed RELAY to the seller after contract settlement.
+    /// Release escrowed tokens to the seller after contract settlement.
     /// Only the payer (backend authority) can call this.
+    ///
+    /// When the escrowed mint is USDC, a protocol fee (PROTOCOL_FEE_BPS) is
+    /// deducted and sent to the treasury ATA before the remainder goes to the
+    /// seller. RELAY escrows pay no fee — full amount goes to the seller.
     ///
     /// `contract_id_hash` and `buyer` are passed as explicit instruction args
     /// so the seed expressions in `ReleaseEscrow` can be resolved by Anchor's
@@ -190,17 +208,57 @@ pub mod relay_agent_registry {
 
         let vault_bump = escrow.vault_bump;
         let seeds: &[&[u8]] = &[b"escrow-vault", &contract_id_hash, buyer.as_ref(), &[vault_bump]];
+        let signer_seeds: &[&[&[u8]]] = &[seeds];
 
-        // Transfer RELAY from escrow vault → seller ATA
-        let cpi_accounts = Transfer {
+        let is_usdc = escrow.mint == USDC_MINT;
+        let fee_amount = if is_usdc {
+            // checked_mul / checked_div to avoid overflow on large escrows
+            escrow.amount
+                .checked_mul(PROTOCOL_FEE_BPS)
+                .and_then(|v| v.checked_div(10_000))
+                .unwrap_or(0)
+        } else {
+            0u64
+        };
+        let seller_amount = escrow.amount.checked_sub(fee_amount).unwrap();
+
+        // Transfer fee to treasury (USDC escrows only, skip if fee is 0)
+        if fee_amount > 0 {
+            let treasury_ata = ctx.accounts.treasury_token_account
+                .as_ref()
+                .ok_or(EscrowError::TreasuryRequired)?;
+            // Validate treasury ATA: must be owned by TREASURY and match the escrow mint.
+            // (Anchor `Option<Account>` constraints can't reference the wrapper, so checked here.)
+            require!(treasury_ata.owner == TREASURY, EscrowError::BeneficiaryMismatch);
+            require!(treasury_ata.mint == escrow.mint, EscrowError::MintMismatch);
+            let cpi_fee = Transfer {
+                from: ctx.accounts.escrow_vault.to_account_info(),
+                to: treasury_ata.to_account_info(),
+                authority: ctx.accounts.escrow_vault.to_account_info(),
+            };
+            token::transfer(
+                CpiContext::new_with_signer(
+                    ctx.accounts.token_program.to_account_info(),
+                    cpi_fee,
+                    signer_seeds,
+                ),
+                fee_amount,
+            )?;
+        }
+
+        // Transfer remainder to seller
+        let cpi_seller = Transfer {
             from: ctx.accounts.escrow_vault.to_account_info(),
             to: ctx.accounts.seller_token_account.to_account_info(),
             authority: ctx.accounts.escrow_vault.to_account_info(),
         };
-        let cpi_program = ctx.accounts.token_program.to_account_info();
         token::transfer(
-            CpiContext::new_with_signer(cpi_program, cpi_accounts, &[seeds]),
-            escrow.amount,
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                cpi_seller,
+                signer_seeds,
+            ),
+            seller_amount,
         )?;
 
         // Mark escrow as released
@@ -211,12 +269,13 @@ pub mod relay_agent_registry {
             contract_id: escrow_mut.contract_id.clone(),
             seller: escrow_mut.seller,
             amount: escrow_mut.amount,
+            fee: fee_amount,
         });
 
         Ok(())
     }
 
-    /// Refund escrowed RELAY back to the buyer (contract cancelled).
+    /// Refund escrowed tokens back to the buyer (contract cancelled).
     /// Only the payer (backend authority) can call this.
     ///
     /// See `release_escrow` for why `contract_id_hash` and `buyer` are explicit args.
@@ -859,6 +918,8 @@ pub enum EscrowError {
     ContractIdMismatch,
     #[msg("buyer arg does not match escrow_account.buyer")]
     BuyerMismatch,
+    #[msg("USDC escrow release requires the treasury token account")]
+    TreasuryRequired,
 }
 
 // ── Escrow state ──────────────────────────────────────────────────────────────
@@ -912,11 +973,11 @@ pub struct LockEscrow<'info> {
     /// CHECK: Validated by the backend; stored for release routing.
     pub seller: UncheckedAccount<'info>,
 
-    /// The RELAY SPL token mint.
+    /// SPL token mint (RELAY or USDC).
     /// CHECK: Validated by token program during transfer.
     pub mint: UncheckedAccount<'info>,
 
-    /// Buyer's associated token account (RELAY).
+    /// Buyer's associated token account for the escrowed mint.
     #[account(mut)]
     pub buyer_token_account: Account<'info, TokenAccount>,
 
@@ -979,7 +1040,7 @@ pub struct ReleaseEscrow<'info> {
     )]
     pub escrow_vault: Account<'info, TokenAccount>,
 
-    /// Seller's ATA receiving RELAY. MUST be owned by the seller recorded
+    /// Seller's ATA receiving tokens. MUST be owned by the seller recorded
     /// at lock time and MUST be denominated in the escrow's mint. Without
     /// these constraints a compromised/buggy backend could redirect funds
     /// to any ATA — defeating the escrow's whole point.
@@ -989,6 +1050,13 @@ pub struct ReleaseEscrow<'info> {
         constraint = seller_token_account.mint == escrow_account.mint @ EscrowError::MintMismatch,
     )]
     pub seller_token_account: Account<'info, TokenAccount>,
+
+    /// Treasury ATA for protocol fee collection. Required when the escrowed
+    /// mint is USDC; omit (None) for RELAY escrows. Owner/mint validation
+    /// happens in the `release_escrow` handler (Anchor `Option<Account>`
+    /// constraints can't reference the Option wrapper).
+    #[account(mut)]
+    pub treasury_token_account: Option<Account<'info, TokenAccount>>,
 
     pub token_program: Program<'info, Token>,
 }
@@ -1080,6 +1148,7 @@ pub struct EscrowReleased {
     pub contract_id: String,
     pub seller: Pubkey,
     pub amount: u64,
+    pub fee: u64,
 }
 
 #[event]
