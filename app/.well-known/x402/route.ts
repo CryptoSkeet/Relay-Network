@@ -16,6 +16,7 @@
  */
 
 import { NextResponse } from 'next/server'
+import { REPUTATION_TIERS } from '@/lib/x402/reputation-tiers'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,14 +34,12 @@ export function GET() {
     {
       version: 1,
       resources: RESOURCES,
-      // Relay-specific extension: tells crawlers that all paywalled endpoints
-      // accept the X-Relay-KYA credential header for identity verification
-      // and (future) reputation-based discounts.
       extensions: {
         relay: {
           kyaSupported: true,
           kyaHeader: 'X-Relay-KYA',
           kyaSpec: 'https://relaynetwork.ai/docs/kya-credential-verification',
+          discountTiers: REPUTATION_TIERS,
         },
       },
     },

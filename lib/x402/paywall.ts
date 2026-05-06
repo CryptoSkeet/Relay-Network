@@ -7,6 +7,7 @@ import {
   type FacilitatorConfig,
 } from '@x402/core/http'
 import { verifyKYAHeader, KYA_HEADER } from '@/lib/solana/kya-credential'
+import { getDiscountBps, applyDiscount, REPUTATION_TIERS } from '@/lib/x402/reputation-tiers'
 
 /**
  * Shared x402 + Bazaar discovery paywall for Relay's monetized API surface.
@@ -138,9 +139,9 @@ export interface PaywalledEndpoint<T> {
   /** Marketing metadata for Bazaar headers. */
   bazaar: BazaarMetadata
   /**
-   * Basis-point discount applied when the caller presents a valid KYA
-   * credential (e.g. 1000 = 10% off). Defaults to 0 (no discount).
-   * Phase 3 will make this dynamic based on reputation score.
+   * Max discount cap in basis points (e.g. 2000 = 20%). Defaults to 0
+   * (uncapped — discount is driven purely by reputation tier). Set this
+   * to limit discounts on high-cost endpoints regardless of reputation.
    */
   kyaDiscountBps?: number
   /**
@@ -160,14 +161,18 @@ export interface PaywalledEndpoint<T> {
  * v2 `amount` field for forward compatibility — Coinbase v2 schema is non-strict
  * and tolerates extra keys.
  */
-function buildRequirements<T>(endpoint: PaywalledEndpoint<T>) {
+function buildRequirements<T>(
+  endpoint: PaywalledEndpoint<T>,
+  discountBps = 0,
+) {
+  const effectivePrice = applyDiscount(endpoint.priceAtomic, discountBps)
   return {
     scheme: 'exact' as const,
     // v1 short slug — required by @agentcash/discovery v1 parser. CAIP form
     // would trip NETWORK_SOLANA_ALIAS_INVALID and silently drop the resource.
     network: NETWORK_V1,
     // v1 required fields
-    maxAmountRequired: endpoint.priceAtomic,
+    maxAmountRequired: effectivePrice,
     resource: publicResourceUrl(endpoint.resourcePath),
     description: endpoint.description,
     mimeType: 'application/json',
@@ -176,12 +181,12 @@ function buildRequirements<T>(endpoint: PaywalledEndpoint<T>) {
     asset: USDC_MINT,
     outputSchema: endpoint.outputSchema,
     // v2 forward-compat (ignored by v1 parser)
-    amount: endpoint.priceAtomic,
+    amount: effectivePrice,
     extra: {
       feePayer: FEE_PAYER,
       assetSymbol: 'USDC',
       assetDecimals: 6,
-      maxAmountRequired: endpoint.priceAtomic,
+      maxAmountRequired: effectivePrice,
       name: endpoint.bazaar.name,
       description: endpoint.bazaar.description,
       category: endpoint.bazaar.category,
@@ -247,6 +252,7 @@ function paymentRequiredResponse<T>(
         kyaSupported: true,
         kyaDiscountBps: endpoint.kyaDiscountBps ?? 0,
         kyaHeader: KYA_HEADER,
+        discountTiers: REPUTATION_TIERS,
       },
     },
   }
@@ -261,11 +267,12 @@ function paymentRequiredResponse<T>(
  */
 export function createPaywalledHandler<T>(endpoint: PaywalledEndpoint<T>) {
   return async function GET(req: NextRequest): Promise<Response> {
-    const requirements = buildRequirements(endpoint)
+    // Full-price requirements for the 402 response (no discount)
+    const fullRequirements = buildRequirements(endpoint)
 
     const paymentHeader = req.headers.get('x-payment')
     if (!paymentHeader) {
-      return paymentRequiredResponse(endpoint, requirements)
+      return paymentRequiredResponse(endpoint, fullRequirements)
     }
 
     let paymentPayload
@@ -274,34 +281,16 @@ export function createPaywalledHandler<T>(endpoint: PaywalledEndpoint<T>) {
     } catch (e) {
       return paymentRequiredResponse(
         endpoint,
-        requirements,
+        fullRequirements,
         `Invalid X-PAYMENT header: ${(e as Error).message}`,
       )
     }
 
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const verification = await facilitator.verify(paymentPayload, requirements as any)
-      if (!verification.isValid) {
-        return paymentRequiredResponse(
-          endpoint,
-          requirements,
-          `Payment verification failed: ${verification.invalidReason ?? 'unknown'}`,
-        )
-      }
-    } catch (e) {
-      return paymentRequiredResponse(
-        endpoint,
-        requirements,
-        `Facilitator verify error: ${(e as Error).message}`,
-      )
-    }
-
-    // Verify KYA credential if present. Best-effort: a missing or invalid
-    // credential doesn't block the request (they already paid), but a valid
-    // one gets logged and will drive discounts in Phase 3.
+    // ── KYA verification (before payment verify so we know the discount) ──
     let kyaValid = false
     let kyaDid: string | null = null
+    let kyaScore = 0
+    let dynamicDiscountBps = 0
     const kyaHeader = req.headers.get(KYA_HEADER)
     if (kyaHeader) {
       try {
@@ -313,10 +302,38 @@ export function createPaywalledHandler<T>(endpoint: PaywalledEndpoint<T>) {
         kyaValid = result.valid
         if (result.valid && result.onChainProfile) {
           kyaDid = result.onChainProfile.didPubkey.toBase58()
+          kyaScore = result.onChainProfile.reputationScore
+          dynamicDiscountBps = getDiscountBps(kyaScore)
         }
       } catch (e) {
         console.warn('[x402] KYA verification failed:', e)
       }
+    }
+
+    // Build requirements with reputation discount applied (if any).
+    // Agents see the discount tiers in the 402 response, compute their
+    // discounted price client-side, and pay that amount. We verify/settle
+    // against the same discounted requirements so the math lines up.
+    const requirements = dynamicDiscountBps > 0
+      ? buildRequirements(endpoint, dynamicDiscountBps)
+      : fullRequirements
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const verification = await facilitator.verify(paymentPayload, requirements as any)
+      if (!verification.isValid) {
+        return paymentRequiredResponse(
+          endpoint,
+          fullRequirements,
+          `Payment verification failed: ${verification.invalidReason ?? 'unknown'}`,
+        )
+      }
+    } catch (e) {
+      return paymentRequiredResponse(
+        endpoint,
+        fullRequirements,
+        `Facilitator verify error: ${(e as Error).message}`,
+      )
     }
 
     let data: T | null = null
@@ -333,7 +350,7 @@ export function createPaywalledHandler<T>(endpoint: PaywalledEndpoint<T>) {
       if (!settlement.success) {
         return paymentRequiredResponse(
           endpoint,
-          requirements,
+          fullRequirements,
           `Payment settlement failed: ${settlement.errorReason ?? 'unknown'}`,
         )
       }
@@ -343,7 +360,7 @@ export function createPaywalledHandler<T>(endpoint: PaywalledEndpoint<T>) {
       try {
         const { createClient } = await import('@/lib/supabase/server')
         const supabase = await createClient()
-        const atomic = settlement.amount ?? endpoint.priceAtomic
+        const atomic = settlement.amount ?? requirements.maxAmountRequired
         const usdc = Number(atomic) / 1_000_000
         await supabase.from('agent_x402_transactions').insert({
           agent_id:       null,
@@ -358,6 +375,8 @@ export function createPaywalledHandler<T>(endpoint: PaywalledEndpoint<T>) {
           facilitator:    FACILITATOR_PROVIDER,
           payer_relay_did: kyaDid,
           kya_verified:   kyaValid,
+          kya_score:      kyaScore,
+          discount_bps:   dynamicDiscountBps,
           status:         'completed',
           created_at:     new Date().toISOString(),
         })
@@ -367,7 +386,7 @@ export function createPaywalledHandler<T>(endpoint: PaywalledEndpoint<T>) {
     } catch (e) {
       return paymentRequiredResponse(
         endpoint,
-        requirements,
+        fullRequirements,
         `Facilitator settle error: ${(e as Error).message}`,
       )
     }
@@ -379,6 +398,7 @@ export function createPaywalledHandler<T>(endpoint: PaywalledEndpoint<T>) {
     }
     if (kyaValid) {
       responseHeaders['x-relay-kya-verified'] = 'true'
+      responseHeaders['x-relay-kya-discount-bps'] = String(dynamicDiscountBps)
     }
 
     return new Response(JSON.stringify(data ?? {}), {
