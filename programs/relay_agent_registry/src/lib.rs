@@ -39,7 +39,7 @@ security_txt! {
     source_code: "https://github.com/CryptoSkeet/v0-ai-agent-instagram",
     source_revision: env!("CARGO_PKG_VERSION"),
     source_release: "relay-agent-registry-v0.1.0",
-    auditors: "None — pre-audit.",
+    auditors: "Internal — May 2026 (self-audit). Pending external review.",
     acknowledgements: "https://relaynetwork.ai/security#acknowledgements"
 }
 
@@ -47,6 +47,11 @@ security_txt! {
 const MAX_HANDLE_LEN: usize = 30;
 /// Maximum contract ID length (UUID = 36 chars).
 const MAX_CONTRACT_ID_LEN: usize = 36;
+
+/// Default escrow lock duration (30 days). After this window, the buyer can
+/// reclaim funds via `expire_escrow` even if the admin never settles. This
+/// guards against admin key loss freezing buyer funds indefinitely.
+pub const ESCROW_EXPIRY_SECS: i64 = 30 * 24 * 60 * 60;
 
 /// Hash contract_id (UUID) to 32 bytes for PDA seed derivation.
 /// Solana caps PDA seeds at 32 bytes; UUIDs are 36 bytes.
@@ -175,6 +180,7 @@ pub mod relay_agent_registry {
         escrow.amount = amount;
         escrow.state = EscrowState::Locked;
         escrow.locked_at = Clock::get()?.unix_timestamp;
+        escrow.expires_at = escrow.locked_at.saturating_add(ESCROW_EXPIRY_SECS);
         escrow.bump = ctx.bumps.escrow_account;
         escrow.vault_bump = ctx.bumps.escrow_vault;
 
@@ -184,6 +190,7 @@ pub mod relay_agent_registry {
             seller: escrow.seller,
             amount,
             locked_at: escrow.locked_at,
+            expires_at: escrow.expires_at,
         });
 
         Ok(())
@@ -345,6 +352,67 @@ pub mod relay_agent_registry {
             contract_id: escrow.contract_id.clone(),
             buyer: escrow.buyer,
             amount: escrow.amount,
+        });
+
+        Ok(())
+    }
+
+    /// Buyer-initiated refund after the escrow has expired (>= `expires_at`).
+    /// Unlike `refund_escrow`, this is NOT admin-gated — it is the safety
+    /// net so funds cannot be frozen indefinitely if the admin key is lost.
+    pub fn expire_escrow(
+        ctx: Context<ExpireEscrow>,
+        contract_id_hash: [u8; 32],
+    ) -> Result<()> {
+        let escrow = &mut ctx.accounts.escrow_account;
+        require!(escrow.state == EscrowState::Locked, EscrowError::NotLocked);
+        require!(escrow.buyer == ctx.accounts.buyer.key(), EscrowError::BuyerMismatch);
+        require!(
+            hash_contract_id(&escrow.contract_id) == contract_id_hash,
+            EscrowError::ContractIdMismatch
+        );
+        let now = Clock::get()?.unix_timestamp;
+        require!(now >= escrow.expires_at, EscrowError::NotYetExpired);
+
+        // Set state BEFORE CPIs.
+        escrow.state = EscrowState::Refunded;
+
+        let buyer_key = escrow.buyer;
+        let vault_bump = escrow.vault_bump;
+        let seeds: &[&[u8]] = &[b"escrow-vault", &contract_id_hash, buyer_key.as_ref(), &[vault_bump]];
+        let signer_seeds: &[&[&[u8]]] = &[seeds];
+
+        // Transfer tokens from escrow vault → buyer ATA
+        let cpi_accounts = Transfer {
+            from: ctx.accounts.escrow_vault.to_account_info(),
+            to: ctx.accounts.buyer_token_account.to_account_info(),
+            authority: ctx.accounts.escrow_vault.to_account_info(),
+        };
+        token::transfer(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                cpi_accounts,
+                signer_seeds,
+            ),
+            escrow.amount,
+        )?;
+
+        // Close the vault token account to reclaim rent.
+        token::close_account(CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            CloseAccount {
+                account: ctx.accounts.escrow_vault.to_account_info(),
+                destination: ctx.accounts.buyer.to_account_info(),
+                authority: ctx.accounts.escrow_vault.to_account_info(),
+            },
+            signer_seeds,
+        ))?;
+
+        emit!(EscrowExpired {
+            contract_id: escrow.contract_id.clone(),
+            buyer: escrow.buyer,
+            amount: escrow.amount,
+            expires_at: escrow.expires_at,
         });
 
         Ok(())
@@ -956,6 +1024,8 @@ pub enum EscrowError {
     FeeExceedsAmount,
     #[msg("Only the escrow admin can release or refund")]
     Unauthorized,
+    #[msg("Escrow has not yet reached its expiry timestamp")]
+    NotYetExpired,
 }
 
 // ── Escrow state ──────────────────────────────────────────────────────────────
@@ -984,6 +1054,8 @@ pub struct EscrowAccount {
     pub state: EscrowState,
     /// Unix timestamp when locked.
     pub locked_at: i64,
+    /// Unix timestamp after which the buyer can self-refund via `expire_escrow`.
+    pub expires_at: i64,
     /// PDA bump for the escrow account.
     pub bump: u8,
     /// PDA bump for the escrow vault token account.
@@ -991,9 +1063,10 @@ pub struct EscrowAccount {
 }
 
 /// Account size: 8 (discriminator) + (4+36) contract_id + 32 buyer + 32 seller
-///             + 32 mint + 8 amount + 1 state + 8 locked_at + 1 bump + 1 vault_bump = 163
+///             + 32 mint + 8 amount + 1 state + 8 locked_at + 8 expires_at
+///             + 1 bump + 1 vault_bump = 171
 impl EscrowAccount {
-    pub const SIZE: usize = 8 + (4 + MAX_CONTRACT_ID_LEN) + 32 + 32 + 32 + 8 + 1 + 8 + 1 + 1;
+    pub const SIZE: usize = 8 + (4 + MAX_CONTRACT_ID_LEN) + 32 + 32 + 32 + 8 + 1 + 8 + 8 + 1 + 1;
 }
 
 // ── Escrow account contexts ──────────────────────────────────────────────────
@@ -1147,6 +1220,42 @@ pub struct RefundEscrow<'info> {
     pub token_program: Program<'info, Token>,
 }
 
+#[derive(Accounts)]
+#[instruction(contract_id_hash: [u8; 32])]
+pub struct ExpireEscrow<'info> {
+    /// Buyer reclaiming their funds after expiry. Must match
+    /// `escrow_account.buyer` (enforced at handler).
+    #[account(mut)]
+    pub buyer: Signer<'info>,
+
+    /// Escrow metadata PDA. Closed after expiry-refund; rent goes to buyer.
+    #[account(
+        mut,
+        close = buyer,
+        seeds = [b"escrow".as_ref(), contract_id_hash.as_ref(), buyer.key().as_ref()],
+        bump = escrow_account.bump,
+    )]
+    pub escrow_account: Account<'info, EscrowAccount>,
+
+    /// Escrow vault holding the locked tokens. Closed after transfer.
+    #[account(
+        mut,
+        seeds = [b"escrow-vault".as_ref(), contract_id_hash.as_ref(), buyer.key().as_ref()],
+        bump = escrow_account.vault_bump,
+    )]
+    pub escrow_vault: Account<'info, TokenAccount>,
+
+    /// Buyer's ATA receiving the refund. Owner + mint validated against escrow.
+    #[account(
+        mut,
+        constraint = buyer_token_account.owner == escrow_account.buyer @ EscrowError::DepositorMismatch,
+        constraint = buyer_token_account.mint == escrow_account.mint @ EscrowError::MintMismatch,
+    )]
+    pub buyer_token_account: Account<'info, TokenAccount>,
+
+    pub token_program: Program<'info, Token>,
+}
+
 #[event]
 pub struct AgentStakedAndRegistered {
     pub agent: Pubkey,
@@ -1190,6 +1299,7 @@ pub struct EscrowLocked {
     pub seller: Pubkey,
     pub amount: u64,
     pub locked_at: i64,
+    pub expires_at: i64,
 }
 
 #[event]
@@ -1205,6 +1315,14 @@ pub struct EscrowRefunded {
     pub contract_id: String,
     pub buyer: Pubkey,
     pub amount: u64,
+}
+
+#[event]
+pub struct EscrowExpired {
+    pub contract_id: String,
+    pub buyer: Pubkey,
+    pub amount: u64,
+    pub expires_at: i64,
 }
 
 #[event]
