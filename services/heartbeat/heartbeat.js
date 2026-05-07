@@ -68,7 +68,20 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
   process.exit(1);
 }
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+// IMPORTANT: pass the service-role JWT to the realtime socket as well.
+// Without this, the realtime server treats the connection as anonymous and
+// closes postgres_changes subscriptions almost immediately after SUBSCRIBED,
+// causing a tight "Channel closed → Reconnected" loop in the logs.
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false },
+  realtime: {
+    params: { apikey: SUPABASE_SERVICE_KEY, eventsPerSecond: 10 },
+  },
+});
+// Belt-and-suspenders: explicitly set the realtime auth token so the websocket
+// authenticates as service_role on every (re)connect, including after a
+// transient disconnect when the channel is rebuilt.
+try { supabase.realtime.setAuth(SUPABASE_SERVICE_KEY); } catch { /* ignore */ }
 
 // ---------------------------------------------------------------------------
 // Agent registry — maps agentId → NodeJS interval handle
@@ -421,21 +434,45 @@ async function loadAgents() {
 let realtimeChannel = null;
 let realtimeReconnectAttempt = 0;
 let realtimeReconnectTimer = null;
+let realtimeSubscribedAt = 0;          // timestamp of last SUBSCRIBED
+let realtimeFlapCount = 0;             // SUBSCRIBED→CLOSED within FLAP_THRESHOLD_MS
+let realtimeLastLogAt = 0;             // throttle reconnect noise
 const REALTIME_BACKOFF_MAX_MS = 5 * 60 * 1000;
+const REALTIME_FLAP_THRESHOLD_MS = 5_000;   // close within 5s of subscribe = flap
+const REALTIME_LOG_THROTTLE_MS = 60_000;    // at most 1 reconnect log/min while flapping
 const RECONCILE_INTERVAL_MS = parseInt(process.env.HEARTBEAT_RECONCILE_INTERVAL_MS ?? "60000");
 
 function scheduleRealtimeReconnect(reason) {
   if (realtimeReconnectTimer) return; // already scheduled
 
+  // If the channel just subscribed and immediately closed, treat as a "flap"
+  // and back off harder + suppress per-cycle noise. This avoids spamming logs
+  // when the realtime server keeps closing the channel for reasons we can't
+  // fix client-side (rolling deploy overlap, server-side session conflict).
+  const aliveMs = realtimeSubscribedAt ? Date.now() - realtimeSubscribedAt : Infinity;
+  const isFlap = aliveMs < REALTIME_FLAP_THRESHOLD_MS;
+  if (isFlap) realtimeFlapCount += 1;
+  else realtimeFlapCount = 0;
+
   realtimeReconnectAttempt += 1;
+  // When flapping, ignore the per-attempt counter (which keeps resetting on
+  // the brief SUBSCRIBED) and grow backoff with the flap count instead.
+  const exponent = isFlap ? realtimeFlapCount : realtimeReconnectAttempt - 1;
   const delay = Math.min(
-    1000 * Math.pow(2, realtimeReconnectAttempt - 1),
+    1000 * Math.pow(2, exponent),
     REALTIME_BACKOFF_MAX_MS
   );
-  console.warn(
-    `[realtime] Channel ${reason} — reconnecting in ${(delay / 1000).toFixed(0)}s ` +
-    `(attempt ${realtimeReconnectAttempt}). Polling reconciler remains active.`
-  );
+
+  const now = Date.now();
+  const shouldLog = !isFlap || (now - realtimeLastLogAt) > REALTIME_LOG_THROTTLE_MS;
+  if (shouldLog) {
+    realtimeLastLogAt = now;
+    const flapNote = isFlap ? ` [flap x${realtimeFlapCount}]` : "";
+    console.warn(
+      `[realtime] Channel ${reason} — reconnecting in ${(delay / 1000).toFixed(0)}s ` +
+      `(attempt ${realtimeReconnectAttempt})${flapNote}. Polling reconciler remains active.`
+    );
+  }
 
   realtimeReconnectTimer = setTimeout(async () => {
     realtimeReconnectTimer = null;
@@ -443,6 +480,9 @@ function scheduleRealtimeReconnect(reason) {
       try { await supabase.removeChannel(realtimeChannel); } catch { /* ignore */ }
       realtimeChannel = null;
     }
+    // Re-assert realtime auth before reconnecting in case the socket was
+    // re-created without the service-role token.
+    try { supabase.realtime.setAuth(SUPABASE_SERVICE_KEY); } catch { /* ignore */ }
     watchAgentChanges();
   }, delay);
 }
@@ -493,9 +533,13 @@ function watchAgentChanges() {
     )
     .subscribe((status) => {
       if (status === 'SUBSCRIBED') {
-        if (realtimeReconnectAttempt > 0) {
+        realtimeSubscribedAt = Date.now();
+        // Only announce "Reconnected" once we've stayed up long enough that
+        // it's not just a flap about to close again. The flap counter is
+        // cleared by scheduleRealtimeReconnect when aliveMs > threshold.
+        if (realtimeReconnectAttempt > 0 && realtimeFlapCount === 0) {
           console.log(`[realtime] Reconnected after ${realtimeReconnectAttempt} attempt(s)`);
-        } else {
+        } else if (realtimeReconnectAttempt === 0) {
           console.log('[realtime] Watching agents table for config changes');
         }
         realtimeReconnectAttempt = 0;
