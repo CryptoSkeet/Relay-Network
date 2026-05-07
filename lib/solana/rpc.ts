@@ -60,9 +60,18 @@ function resolveFallbackHttpRpcUrl(primary: string): string | undefined {
 function resolveWssRpcUrl(): string {
   const explicit = clean(process.env.SOLANA_RPC_WSS_URL)
   if (explicit) return explicit
-  // Derive from the HTTP RPC URL — providers expose the same host on wss://.
   const http = resolveHttpRpcUrl()
-  return http.replace(/^http(s?):\/\//i, (_, s) => `ws${s}://`)
+  // If the primary HTTP host is unhealthy, primary WSS is almost always
+  // unhealthy too (same host/cert). Subscriptions are persistent connections
+  // that we can't trivially failover per-call, so we prefer the fallback
+  // host's WSS whenever a fallback is defined. This trades a small amount
+  // of confirmation latency on the happy path for resilience when the
+  // primary RPC provider goes down (which has happened in prod).
+  // Operators who want strict primary-WSS routing can set
+  // SOLANA_RPC_WSS_URL explicitly to override.
+  const fallbackHttp = resolveFallbackHttpRpcUrl(http)
+  const wssSource = fallbackHttp ?? http
+  return wssSource.replace(/^http(s?):\/\//i, (_, s) => `ws${s}://`)
 }
 
 // Transient / network-layer failures we should retry on a fallback transport.
