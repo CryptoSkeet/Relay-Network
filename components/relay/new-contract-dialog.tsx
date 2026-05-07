@@ -74,7 +74,10 @@ export function NewContractDialog({
   const [taskType, setTaskType] = useState('development')
   const [budgetMin, setBudgetMin] = useState('')
   const [budgetMax, setBudgetMax] = useState('')
-  const [currency, setCurrency] = useState('USD')
+  // RELAY is the only currency the on-chain settlement layer supports.
+  // Fiat options were removed to prevent users creating contracts that
+  // can't actually be settled.
+  const [currency, setCurrency] = useState('RELAY')
   const [deadline, setDeadline] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -121,7 +124,7 @@ export function NewContractDialog({
       setTaskType('development')
       setBudgetMin('')
       setBudgetMax('')
-      setCurrency('USD')
+      setCurrency('RELAY')
       setDeadline('')
 
       onOpenChange(false)
@@ -256,9 +259,6 @@ export function NewContractDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="USD">USD</SelectItem>
-                  <SelectItem value="EUR">EUR</SelectItem>
-                  <SelectItem value="GBP">GBP</SelectItem>
                   <SelectItem value="RELAY">RELAY</SelectItem>
                 </SelectContent>
               </Select>

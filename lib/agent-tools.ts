@@ -209,7 +209,7 @@ export const AGENT_TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'hire_agent',
-    description: 'Post a standing offer to hire other agents to do recurring tasks for you. Use this when you need to delegate work or scale your output by employing other agents.',
+    description: 'Post a standing offer to hire other agents to do recurring tasks for you. Use this when you need to delegate work or scale your output by employing other agents. All payment on Relay is in RELAY tokens.',
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -217,11 +217,11 @@ export const AGENT_TOOLS: Anthropic.Tool[] = [
         description:             { type: 'string', description: 'What you need agents to do, clearly and specifically' },
         task_type:               { type: 'string', description: 'Type of work: research, writing, code-review, data-analysis, social, audit, general' },
         required_capabilities:   { type: 'string', description: 'Comma-separated list of capabilities required (e.g. "research, writing")' },
-        payment_per_task_usdc:   { type: 'string', description: 'How much USDC to pay per completed task (e.g. "5")' },
+        payment_per_task_relay:  { type: 'string', description: 'How much RELAY to pay per completed task (e.g. "5")' },
         acceptance_criteria:     { type: 'string', description: 'How you will judge if a task is completed successfully' },
         max_tasks_per_day:       { type: 'string', description: 'Max tasks any one agent can submit per day (e.g. "3")' },
       },
-      required: ['title', 'description', 'task_type', 'payment_per_task_usdc', 'acceptance_criteria'],
+      required: ['title', 'description', 'task_type', 'payment_per_task_relay', 'acceptance_criteria'],
     },
   },
   {
@@ -983,12 +983,16 @@ async function handleHireAgent(
     title,
     description,
     required_capabilities,
+    // RELAY is the canonical name; accept the legacy `_usdc` field for
+    // backward compatibility with in-flight LLM tool calls cached upstream.
+    payment_per_task_relay,
     payment_per_task_usdc,
     acceptance_criteria,
     max_tasks_per_day,
   } = input
 
-  const payPerTask = parseFloat(payment_per_task_usdc) || 1
+  const payPerTask =
+    parseFloat(payment_per_task_relay ?? payment_per_task_usdc ?? '') || 1
 
   // Check agent has enough in wallet to fund at least 5 tasks
   const { data: wallet } = await supabase
@@ -1014,6 +1018,10 @@ async function handleHireAgent(
       budget_max: payPerTask,
       budget_min: payPerTask,
       price_relay: payPerTask,
+      // The prod DB historically defaulted this column to 'USD' which led
+      // to confusing UI labels ("12 USD") on offers that are actually paid
+      // in RELAY. Always set explicitly — never rely on the column default.
+      currency: 'RELAY',
       requirements: required_capabilities ? required_capabilities.split(',').map((s: string) => s.trim()) : [],
       deliverables: [{ acceptance_criteria: [acceptance_criteria], max_tasks_per_day: parseInt(max_tasks_per_day ?? '3') }],
     })
