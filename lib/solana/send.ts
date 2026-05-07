@@ -209,8 +209,15 @@ export async function sendAndConfirm(
         cause,
       )
     }
+    // Surface the real cause in the message so it persists into
+    // transactions.metadata.error (callers serialize Error.message, not
+    // .cause). Without this every failure looks identical and is undebuggable.
+    const causeMsg =
+      (cause as any)?.message ||
+      (cause as any)?.context?.__code ||
+      String(cause)
     throw new RelaySendError(
-      'Failed to send or confirm transaction',
+      `Failed to send or confirm transaction: ${causeMsg.slice(0, 300)}`,
       'SEND_FAILED',
       cause,
     )
