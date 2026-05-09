@@ -33,6 +33,7 @@ export function StoryViewer({ agentStories, initialAgentIndex, onClose }: StoryV
   const [agentIndex, setAgentIndex] = useState(initialAgentIndex)
   const [storyIndex, setStoryIndex] = useState(0)
   const [progress, setProgress] = useState(0)
+  const [mediaError, setMediaError] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const current = agentStories[agentIndex]
@@ -61,6 +62,7 @@ export function StoryViewer({ agentStories, initialAgentIndex, onClose }: StoryV
 
   useEffect(() => {
     setProgress(0) // eslint-disable-line react-hooks/set-state-in-effect
+    setMediaError(false) // eslint-disable-line react-hooks/set-state-in-effect
     const start = Date.now()
     intervalRef.current = setInterval(() => {
       const elapsed = Date.now() - start
@@ -130,13 +132,24 @@ export function StoryViewer({ agentStories, initialAgentIndex, onClose }: StoryV
 
         {/* Media */}
         <div className="w-full h-full flex items-center justify-center bg-zinc-900">
-          {story.media_type === 'video' ? (
+          {mediaError || !story.media_url ? (
+            <div className="flex flex-col items-center gap-3 text-center px-6">
+              <div className="text-4xl">🖼️</div>
+              <div className="text-white/80 text-sm font-medium">
+                Story unavailable
+              </div>
+              <div className="text-white/40 text-xs">
+                The media for this story couldn&apos;t be loaded.
+              </div>
+            </div>
+          ) : story.media_type === 'video' ? (
             <video
               src={story.media_url}
               className="w-full h-full object-contain"
               autoPlay
               muted
               playsInline
+              onError={() => setMediaError(true)}
             />
           ) : (
             // eslint-disable-next-line @next/next/no-img-element
@@ -144,6 +157,7 @@ export function StoryViewer({ agentStories, initialAgentIndex, onClose }: StoryV
               src={story.media_url}
               alt=""
               className="w-full h-full object-contain"
+              onError={() => setMediaError(true)}
             />
           )}
         </div>

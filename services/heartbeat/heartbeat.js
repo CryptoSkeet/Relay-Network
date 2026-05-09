@@ -98,6 +98,30 @@ async function agentHeartbeat(agent) {
   const label = agent.display_name ?? agent.handle ?? agent.id;
   const tag = `[agent:${label}]`;
 
+  // ── Liveness FIRST. The agent is "online" because the service successfully
+  // scheduled this tick — not because content generation succeeded. Marking
+  // online status BEFORE the LLM call ensures agents don't fall offline en
+  // masse the moment Anthropic credits run out / breaker trips. ──────────────
+  const tickStart = new Date().toISOString();
+  try {
+    await Promise.all([
+      supabase.from("agents").update({ last_heartbeat: tickStart }).eq("id", agent.id),
+      supabase.from("agent_online_status").upsert(
+        {
+          agent_id: agent.id,
+          is_online: true,
+          last_heartbeat: tickStart,
+          consecutive_misses: 0,
+          current_status: "idle",
+          updated_at: tickStart,
+        },
+        { onConflict: "agent_id" }
+      ),
+    ]);
+  } catch (livenessErr) {
+    console.warn(`${tag} Liveness update failed:`, livenessErr.message);
+  }
+
   try {
     // 1. Build plugin context for this agent tick
     const ctx = buildContext({ agent, supabase });
@@ -113,27 +137,36 @@ async function agentHeartbeat(agent) {
     if (pluginContent) {
       content = pluginContent;
     } else {
-      const generated = await generateAgentPost(agent, supabase, providerContext);
-      content = generated.content;
-      inferenceReceipt = generated; // carry prompt/response hashes for receipt
+      // Wrap LLM call so a BreakerOpenError (or any LLM failure) does NOT
+      // abort the rest of the tick — contract cycle, earn flow, and the
+      // heartbeat-event log all run regardless. We just skip posting.
+      try {
+        const generated = await generateAgentPost(agent, supabase, providerContext);
+        content = generated.content;
+        inferenceReceipt = generated; // carry prompt/response hashes for receipt
+      } catch (llmErr) {
+        if (llmErr?.name !== 'BreakerOpenError') {
+          console.warn(`${tag} Content generation failed:`, llmErr.message);
+        }
+        content = null;
+      }
     }
 
-    if (!content || content.trim().length === 0) {
-      console.warn(`${tag} LLM returned empty content — skipping post`);
-      return;
-    }
+    let postRow = null;
+    if (content && content.trim().length > 0) {
+      // 2. Insert post into Relay feed (post_type now a real column)
+      const inserted = await supabase.from("posts").insert({
+        agent_id: agent.id,
+        content: content.trim(),
+        media_type: "text",
+        post_type: "autonomous",
+      }).select("id").single();
 
-    // 2. Insert post into Relay feed (post_type now a real column)
-    const { data: postRow, error: postError } = await supabase.from("posts").insert({
-      agent_id: agent.id,
-      content: content.trim(),
-      media_type: "text",
-      post_type: "autonomous",
-    }).select("id").single();
-
-    if (postError) {
-      console.error(`${tag} Failed to insert post:`, postError.message);
-      return;
+      if (inserted.error) {
+        console.error(`${tag} Failed to insert post:`, inserted.error.message);
+      } else {
+        postRow = inserted.data;
+      }
     }
 
     // 2a. Store inference receipt (proves LLM was called for this specific content)
@@ -150,29 +183,6 @@ async function agentHeartbeat(agent) {
         if (error) console.warn(`${tag} Failed to store inference receipt:`, error.message);
       });
     }
-
-    const now = new Date().toISOString();
-
-    // 3. Update last_heartbeat directly on the agent row
-    await supabase
-      .from("agents")
-      .update({ last_heartbeat: now })
-      .eq("id", agent.id);
-
-    // 4. Upsert agent_online_status (mark online for network dashboard)
-    await supabase
-      .from("agent_online_status")
-      .upsert(
-        {
-          agent_id: agent.id,
-          is_online: true,
-          last_heartbeat: now,
-          consecutive_misses: 0,
-          current_status: "idle",
-          updated_at: now,
-        },
-        { onConflict: "agent_id" }
-      );
 
     // 5. Emit plugin lifecycle event
     await pluginRuntime.emit("onPostCreated", ctx, { content: content.trim(), agentId: agent.id });
@@ -437,9 +447,12 @@ let realtimeReconnectTimer = null;
 let realtimeSubscribedAt = 0;          // timestamp of last SUBSCRIBED
 let realtimeFlapCount = 0;             // SUBSCRIBED→CLOSED within FLAP_THRESHOLD_MS
 let realtimeLastLogAt = 0;             // throttle reconnect noise
+let realtimeBenignCycles = 0;          // count of single-attempt CLOSED→SUBSCRIBED cycles since last summary
+let realtimeBenignSummaryAt = 0;       // timestamp of last benign-cycle summary log
 const REALTIME_BACKOFF_MAX_MS = 5 * 60 * 1000;
 const REALTIME_FLAP_THRESHOLD_MS = 5_000;   // close within 5s of subscribe = flap
 const REALTIME_LOG_THROTTLE_MS = 60_000;    // at most 1 reconnect log/min while flapping
+const REALTIME_BENIGN_SUMMARY_MS = 10 * 60 * 1000; // emit one summary per 10min of normal cycling
 const RECONCILE_INTERVAL_MS = parseInt(process.env.HEARTBEAT_RECONCILE_INTERVAL_MS ?? "60000");
 
 function scheduleRealtimeReconnect(reason) {
@@ -464,7 +477,14 @@ function scheduleRealtimeReconnect(reason) {
   );
 
   const now = Date.now();
-  const shouldLog = !isFlap || (now - realtimeLastLogAt) > REALTIME_LOG_THROTTLE_MS;
+  // Suppress benign single-attempt cycles (Supabase realtime periodically closes
+  // long-lived postgres_changes channels for internal reasons; recovery is
+  // immediate and harmless). We still emit a periodic summary so operators
+  // can see the connection is cycling rather than wedged-but-silent.
+  const isBenignCycle = !isFlap && realtimeReconnectAttempt === 1;
+  const shouldLog = isBenignCycle
+    ? false
+    : (!isFlap || (now - realtimeLastLogAt) > REALTIME_LOG_THROTTLE_MS);
   if (shouldLog) {
     realtimeLastLogAt = now;
     const flapNote = isFlap ? ` [flap x${realtimeFlapCount}]` : "";
@@ -533,14 +553,27 @@ function watchAgentChanges() {
     )
     .subscribe((status) => {
       if (status === 'SUBSCRIBED') {
-        realtimeSubscribedAt = Date.now();
-        // Only announce "Reconnected" once we've stayed up long enough that
-        // it's not just a flap about to close again. The flap counter is
-        // cleared by scheduleRealtimeReconnect when aliveMs > threshold.
-        if (realtimeReconnectAttempt > 0 && realtimeFlapCount === 0) {
-          console.log(`[realtime] Reconnected after ${realtimeReconnectAttempt} attempt(s)`);
-        } else if (realtimeReconnectAttempt === 0) {
+        const now = Date.now();
+        realtimeSubscribedAt = now;
+        if (realtimeReconnectAttempt === 0) {
           console.log('[realtime] Watching agents table for config changes');
+        } else if (realtimeReconnectAttempt === 1 && realtimeFlapCount === 0) {
+          // Benign single-attempt recovery — count silently and emit a
+          // periodic summary so the cycling stays observable without spamming.
+          realtimeBenignCycles += 1;
+          if (now - realtimeBenignSummaryAt > REALTIME_BENIGN_SUMMARY_MS) {
+            if (realtimeBenignSummaryAt > 0) {
+              const minutes = Math.round((now - realtimeBenignSummaryAt) / 60000);
+              console.log(
+                `[realtime] ${realtimeBenignCycles} benign reconnect cycle(s) in last ${minutes}m ` +
+                `(server-side channel rotation; all recovered on first attempt).`
+              );
+            }
+            realtimeBenignSummaryAt = now;
+            realtimeBenignCycles = 0;
+          }
+        } else if (realtimeReconnectAttempt > 1 && realtimeFlapCount === 0) {
+          console.log(`[realtime] Reconnected after ${realtimeReconnectAttempt} attempt(s)`);
         }
         realtimeReconnectAttempt = 0;
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
