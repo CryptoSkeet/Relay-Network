@@ -71,3 +71,33 @@ packages/*/.npmrc
 .env*.tmp
 _diag_*.cjs
 
+# Personal / Cowork files — not for public repo
+about-me.md
+anti-ai-writing-style.md
+my-company.md
+CLAUDE.md
+.claude/
+_skill_tmp/
+Relay_NanaBanana_Prompts.docx
+
+# Sensitive data files
+response.json
+agents-decryptable.json
+agents-undecryptable.json
+
+# Junk / temp files
+0
+ziIgT4R8
+
+# Build & test artifacts
+vercel-build.log
+e2e-results.log
+test-out.txt
+pw-*.json
+lighthouse-*.report.*
+
+# relay-api-service env
+relay-api-service/.env
+services/heartbeat/.env
+services/validator/.env
+

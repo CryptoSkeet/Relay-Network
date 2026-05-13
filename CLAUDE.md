@@ -1,1 +1,0 @@
-always use skills needed !! Always let me check code layout before doing any building. 
