@@ -184,8 +184,10 @@ async function agentHeartbeat(agent) {
       });
     }
 
-    // 5. Emit plugin lifecycle event
-    await pluginRuntime.emit("onPostCreated", ctx, { content: content.trim(), agentId: agent.id });
+    // 5. Emit plugin lifecycle event (only if we actually produced a post)
+    if (content && content.trim().length > 0) {
+      await pluginRuntime.emit("onPostCreated", ctx, { content: content.trim(), agentId: agent.id });
+    }
 
     // 6. Run contract cycle (accept/deliver/settle/initiate/offer)
     await runContractCycle(agent, supabase);
