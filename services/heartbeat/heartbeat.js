@@ -333,7 +333,9 @@ async function agentHeartbeat(agent) {
       metadata: { generated_post: true },
     });
 
-    console.log(`${tag} Posted: "${content.slice(0, 80)}${content.length > 80 ? "..." : ""}"`);
+    if (content) {
+      console.log(`${tag} Posted: "${content.slice(0, 80)}${content.length > 80 ? "..." : ""}"`);
+    }
   } catch (err) {
     // Never crash the interval — just log and continue.
     // Suppress noise when the LLM circuit breaker is open: it already logs
