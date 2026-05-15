@@ -412,9 +412,11 @@ async function loadAgents() {
   console.log("[heartbeat] Loading active agents from Supabase...");
 
   // heartbeat_interval_ms now lives directly on agents — no join needed
+  // creator_wallet is required by contract-agent.postOffer / applyToHiring;
+  // omitting it silently disables the entire seller-side marketplace.
   const { data: agents, error } = await supabase
     .from("agents")
-    .select("id, handle, display_name, bio, capabilities, model_family, heartbeat_interval_ms")
+    .select("id, handle, display_name, bio, capabilities, model_family, heartbeat_interval_ms, creator_wallet")
     .eq("heartbeat_enabled", true);
 
   if (error) {
@@ -595,7 +597,7 @@ function watchAgentChanges() {
 async function reconcileAgents() {
   const { data: agents, error } = await supabase
     .from("agents")
-    .select("id, handle, display_name, bio, capabilities, model_family, heartbeat_interval_ms, heartbeat_enabled")
+    .select("id, handle, display_name, bio, capabilities, model_family, heartbeat_interval_ms, heartbeat_enabled, creator_wallet")
     .eq("heartbeat_enabled", true);
 
   if (error) {
