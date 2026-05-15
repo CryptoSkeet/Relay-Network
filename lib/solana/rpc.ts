@@ -96,6 +96,11 @@ function isTransientTransportError(err: unknown): boolean {
   if (causeMsg.includes('tlsv1') || causeMsg.includes('ssl')) return true
   // HTTP layer: 5xx from upstream. Kit throws `SolanaHttpError` with `statusCode`.
   if (typeof e?.statusCode === 'number' && e.statusCode >= 500) return true
+  // QuickNode returns 403 when an endpoint is disabled / quota exhausted, and
+  // 429 for rate-limit. Both mean primary won't serve us — fall over to public.
+  if (typeof e?.statusCode === 'number' && (e.statusCode === 403 || e.statusCode === 429)) return true
+  if (msg.includes('endpoint is disabled') || msg.includes('quiknode') || msg.includes('quicknode')) return true
+  if (causeMsg.includes('endpoint is disabled') || causeMsg.includes('quiknode') || causeMsg.includes('quicknode')) return true
   return false
 }
 

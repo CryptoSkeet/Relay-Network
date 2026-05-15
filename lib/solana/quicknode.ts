@@ -49,7 +49,9 @@ type FetchLike = typeof fetch
 
 function isQuotaError(status: number, bodyText: string): boolean {
   if (status === 429) return true
-  if (status === 403 && /quota|limit|daily/i.test(bodyText)) return true
+  // 403 covers quota / daily-limit / endpoint-disabled / suspended account.
+  if (status === 403 && /quota|limit|daily|disabled|suspended|endpoint|forbidden/i.test(bodyText)) return true
+  if (status === 403) return true // any 403 from primary → try fallback
   // QuickNode sometimes returns 200 with a JSON-RPC -32003 error body.
   if (status === 200 && /-32003|daily request limit|upgrade your account/i.test(bodyText)) return true
   return false
